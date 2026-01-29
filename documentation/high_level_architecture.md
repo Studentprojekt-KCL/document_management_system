@@ -1,8 +1,7 @@
 > [!WARNING]
-> Critical content demanding immediate user attention due to potential risks.
+> The information in this file is merely a suggestion, and might be changed in the future.
 
 # High level architecture
-=======
 ![Query service](images/overview.png)
 
 ## Query

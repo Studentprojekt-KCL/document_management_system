@@ -1,3 +1,5 @@
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+
 import os
 from logging import error, warning, info
 from datetime import datetime

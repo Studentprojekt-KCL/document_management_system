@@ -17,9 +17,11 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     """
     error(msg)
     timestamp = int(datetime.now().timestamp())
-    requests.put(
-        os.environ.get("LOG_ENDPOINT"), {"log": {"err": msg}, "timespamp": timestamp}, timeout=60
-    )
+    log_service = os.environ.get("LOG_SERVICE")
+    if not isinstance(log_service, str):
+        error("Log service not set, export 'LOG_SERVICE'.")
+        return
+    requests.put(log_service, {"log": {"err": msg}, "timespamp": timestamp}, timeout=60)
 
 
 def dms_warning(msg: str, *_: Any, **__: Any) -> None:
@@ -31,8 +33,12 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     """
     warning(msg)
     timestamp = int(datetime.now().timestamp())
+    log_service = os.environ.get("LOG_SERVICE")
+    if not isinstance(log_service, str):
+        error("Log service not set, export 'LOG_SERVICE'.")
+        return
     requests.put(
-        os.environ.get("LOG_ENDPOINT"),
+        log_service,
         {"log": {"warning": msg}, "timestamp": timestamp},
         timeout=60,
     )
@@ -47,6 +53,8 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     """
     info(msg)
     timestamp = int(datetime.now().timestamp())
-    requests.put(
-        os.environ.get("LOG_ENDPOINT"), {"log": {"info": msg}, "timestamp": timestamp}, timeout=60
-    )
+    log_service = os.environ.get("LOG_SERVICE")
+    if not isinstance(log_service, str):
+        error("Log service not set, export 'LOG_SERVICE'.")
+        return
+    requests.put(log_service, {"log": {"info": msg}, "timestamp": timestamp}, timeout=60)

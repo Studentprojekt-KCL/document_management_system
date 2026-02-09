@@ -1,7 +1,7 @@
 services:
   logger-endpoint:
     image: logger-endpoint:latest
-    env_file: logger_endpoint.env
+    env_file: ./env/logger_endpoint.env
     build: ./endpoint/
     ports:
       - "8000:8000"
@@ -9,8 +9,8 @@ services:
       - ./endpoint/src:/src
 
   logger-database:
-    image: logger-database:latset
-    env_file: logger_database.env
+    image: logger-database:latest
+    env_file: ./env/logger_database.env
     build: ./database
     ports:
       - "3306:3306"

@@ -1,22 +1,24 @@
+"""Handle database connections and queries."""
+
 import mysql.connector
 import os
 from .models import Log
 
-def connect():
-    host = os.environ.get('LOGGER_DB_HOST')
-    user = os.environ.get('LOGGER_DB_USER')
-    password = os.environ.get('LOGGER_DB_PASS')
-    database = os.environ.get('LOGGER_DB_DATABASE')
 
-    return mysql.connector.connect(
-        host=host,
-        user=user,
-        database=database,
-        password=password
-    )
+def connect():
+    """Return database connection."""
+
+    host = os.environ.get("LOGGER_DB_HOST")
+    user = os.environ.get("LOGGER_DB_USER")
+    password = os.environ.get("LOGGER_DB_PASS")
+    database = os.environ.get("LOGGER_DB_DATABASE")
+
+    return mysql.connector.connect(host=host, user=user, database=database, password=password)
 
 
 def database_get_logs():
+    """Grab all logs."""
+
     db = connect()
     cursor = db.cursor()
     _ = cursor.execute("SELECT * FROM logs")
@@ -26,6 +28,8 @@ def database_get_logs():
 
 
 def database_add_log(log: Log) -> Log:
+    """Add new log to database and return a Log."""
+
     db = connect()
     cursor = db.cursor()
     sql = "INSERT INTO logs (occured, message, event_type, service) VALUES (%s, %s, %s, %s)"

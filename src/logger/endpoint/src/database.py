@@ -1,7 +1,7 @@
 """Handle database connections and queries."""
 
-import mysql.connector
 import os
+import mysql.connector
 from .models import Log
 
 
@@ -33,7 +33,6 @@ def database_add_log(log: Log) -> Log:
     db = connect()
     cursor = db.cursor()
     sql = "INSERT INTO logs (occured, message, event_type, service) VALUES (%s, %s, %s, %s)"
-    val = (log.occured, log.message, log.event_type, log.service)
-    _ = cursor.execute(sql, val)
+    _ = cursor.execute(sql, log.to_values())
     _ = db.commit()
     return log

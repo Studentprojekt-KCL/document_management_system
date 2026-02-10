@@ -1,7 +1,7 @@
 """Handel endpoints"""
 
-from fastapi import FastAPI
 from datetime import datetime
+from fastapi import FastAPI
 from .models import Log
 from .handlers import handel_get_logs, handel_add_log
 
@@ -17,4 +17,5 @@ async def get_logs(start: datetime | None = None, end: datetime | None = None) -
 @app.post("/logs")
 async def add_log(log: Log):
     """Add a log to the database, returns the Log."""
+    print(log.to_string())
     return handel_add_log(log)

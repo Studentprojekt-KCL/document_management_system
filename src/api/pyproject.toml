@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dmis_api"
+description = "Library for main DMIS main API."
+dependencies = [
+    "requests>=2.32",
+    "fastapi[standard]>=0.128.7",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}

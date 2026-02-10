@@ -10,7 +10,7 @@ app = FastAPI()
 
 @app.get("/logs")
 async def get_logs(start: datetime | None = None, end: datetime | None = None) -> list[Log] | None:
-    """Get logs, either returns a list or None"""
+    """Get logs, either returns a list or None, crazy"""
     return handel_get_logs(start, end)
 
 

@@ -1,4 +1,4 @@
-"""Handle database connections and queries."""
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import os
 import mysql.connector

@@ -1,4 +1,4 @@
-"""Database representations."""
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from datetime import datetime
 from pydantic import BaseModel

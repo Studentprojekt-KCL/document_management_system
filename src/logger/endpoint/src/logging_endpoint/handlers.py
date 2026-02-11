@@ -1,4 +1,4 @@
-"""Handle potential formatting between the endpoints and database."""
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from datetime import datetime, timedelta
 from .models import Log

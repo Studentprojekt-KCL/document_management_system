@@ -1,16 +1,14 @@
 services:
-  logger-endpoint:
-    image: logger-endpoint:latest
-    env_file: ./env/logger_endpoint.env
-    build: ./endpoint/
+  log-api:
+    image: log-api:latest
+    env_file: ./env/log_api.env
+    build: ./api/
     ports:
       - "8000:8000"
-    # volumes:
-    #   - ./endpoint/src:/src
 
-  logger-database:
-    image: logger-database:latest
-    env_file: ./env/logger_database.env
+  log-database:
+    image: log-database:latest
+    env_file: ./env/log_database.env
     build: ./database
     ports:
       - "3306:3306"

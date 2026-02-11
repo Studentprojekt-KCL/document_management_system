@@ -6,8 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dmis_api"
 description = "Library for main DMIS main API."
 dependencies = [
-    "requests>=2.32",
-    "fastapi[standard]>=0.128.7",
+    "fastapi[standard]>=0.128",
 ]
 dynamic = ["version"]
 

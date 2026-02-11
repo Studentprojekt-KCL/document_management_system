@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import argparse
+from typing import Any, Sequence
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -24,12 +25,12 @@ class API:
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
-        errors: dict
+        errors: dict[str, str | Sequence[Any]]
         if isinstance(exc, RequestValidationError):
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
             errors = {"detail": str(exc)}
-        content: str | dict
+        content: str | dict[str, str]
         if self.log_level == "debug":
             content = jsonable_encoder(errors)
         else:
@@ -48,8 +49,8 @@ class API:
     @app.post("/logs")
     async def add_log(log: Log):
         """Add a log to the database, returns the Log."""
-        print(log.to_string())
         return handel_add_log(log)
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

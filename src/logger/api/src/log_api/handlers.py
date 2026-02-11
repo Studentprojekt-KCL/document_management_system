@@ -18,11 +18,7 @@ def handel_get_logs(start: datetime | None, end: datetime | None) -> list[Log] |
     if end is None:
         end = datetime.now()
 
-    log = Log(service="llm", message="hello", event_type="ERROR", occured=datetime.now())
-
-    database_get_logs()
-
-    return [log]
+    return database_get_logs(start, end)
 
 
 def handel_add_log(log: Log) -> Log:

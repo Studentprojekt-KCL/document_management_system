@@ -51,6 +51,12 @@ class API:
         """Add a log to the database, returns the Log."""
         return handel_add_log(log)
 
+    @staticmethod
+    @app.get("/health")
+    async def check_health():
+        """Respond to health check"""
+        return JSONResponse(status_code=200, content={"msg": "healthy"})
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

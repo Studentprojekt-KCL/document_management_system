@@ -7,10 +7,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "logging_endpoint"
+name = "log_api"
 version = "0.0.1"
-description = "Logging endpoint"
+description = "Logging API"
 dependencies = [
   "mysql-connector-python >= 9.5",
   "fastapi[standard] >= 0.128",
 ]
+
+[project.scripts]
+log_api = "log_api.api:run"

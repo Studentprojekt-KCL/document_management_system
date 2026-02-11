@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import sys
 from typing import Any
 import argparse
 
@@ -12,31 +11,47 @@ from fastapi.encoders import jsonable_encoder
 
 from dmis_api.structures import IndexRequest
 
-app = FastAPI()
 
-log_level: str | None = None
+class API:
+    """Management class for main API."""
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    """Overwrite FastAPI exception handeler."""
-    content: str | dict
-    if log_level == "debug":
-        content = jsonable_encoder({"detail": exc.errors(), "body": exc.body})
-    else:
-        content = "ERROR"
-    return JSONResponse(status_code=422, content=content)
+    app = FastAPI()
+
+    log_level: str | None = None
+
+    def __init__(self) -> None:
+        """Constructor."""
+        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+
+    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+        """Overwrite FastAPI exception handeler."""
+        errors: dict
+        if isinstance(exc, RequestValidationError):
+            errors = {"detail": exc.errors(), "body": exc.body}
+        else:
+            errors = {"detail": str(exc)}
+        content: str | dict
+        if self.log_level == "debug":
+            content = jsonable_encoder(errors)
+        else:
+            content = "ERROR"
+        return JSONResponse(status_code=422, content=content)
+
+    @staticmethod
+    @app.get("/index", status_code=200)
+    async def index(item: IndexRequest) -> Any:
+        """DMIS API index endpoint definition."""
+        return item
 
 
-@app.get("/index", status_code=200)
-async def index(item: IndexRequest) -> Any:
-    """DMIS API index endpoint definition."""
-    return item
-
-def run():
+def run() -> None:
+    """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
+
+    api = API()
     if args.dev:
-        global log_level
-        log_level = "debug"
-    uvicorn.run(app, host="0.0.0.0", log_level=log_level)
+        api.log_level = "debug"
+
+    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level)

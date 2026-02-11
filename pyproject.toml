@@ -1,0 +1,21 @@
+[tool.pylint.MASTER]
+ignore = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = ["too-few-public-methods", "import-error"]
+
+[tool.pylint.format]
+max-line-length = 132
+
+[tool.ruff]
+exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
+
+[tool.mypy]
+disallow_untyped_defs = true
+exclude = '(\.env|venv|__pycache__|\.tox|^build/)'
+ignore_missing_imports = true
+
+
+[tool.black]
+line-length = 132
+exclude = '/(\.env|venv|__pycache__|\.tox|build)/'

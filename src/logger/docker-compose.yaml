@@ -5,8 +5,8 @@ services:
     build: ./endpoint/
     ports:
       - "8000:8000"
-    volumes:
-      - ./endpoint/src:/src
+    # volumes:
+    #   - ./endpoint/src:/src
 
   logger-database:
     image: logger-database:latest

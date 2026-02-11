@@ -1,11 +1,11 @@
-FROM python:3.13-trixie as build
+FROM python:3.13-trixie AS build
 COPY ./src/ /src/
 COPY ./pyproject.toml /src/
 WORKDIR /src
 RUN python -m pip install build
 RUN python -m build
 
-FROM python:3.13-trixie
+FROM python:3.13-trixie AS install
 COPY --from=build /src/dist/log_api-*.whl /src/
 WORKDIR /src
 RUN python -m pip install log_api-*.whl

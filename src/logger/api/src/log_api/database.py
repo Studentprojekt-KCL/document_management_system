@@ -17,9 +17,10 @@ def connect():
 
     return mysql.connector.connect(host=host, user=user, database=database, password=password)
 
+
 def extract_row_data(row: RowType | dict[str, RowItemType]) -> Log:
     """Extract each values from a row validating the type.
-    
+
     Keyword arguments:
     row -- Row from the database.
     """
@@ -27,13 +28,13 @@ def extract_row_data(row: RowType | dict[str, RowItemType]) -> Log:
     if not isinstance(row, tuple):
         raise TypeError("Row is of wrong type.")
 
-    id: int | None = row[0] if isinstance(row[0], int) else None
+    log_id: int | None = row[0] if isinstance(row[0], int) else None
     occured: datetime | None = row[1] if isinstance(row[1], datetime) else None
     message: str | None = row[2] if isinstance(row[2], str) else None
     event_type: str | None = row[3] if isinstance(row[3], str) else None
     service: str | None = row[4] if isinstance(row[4], str) else None
 
-    if id is None:
+    if log_id is None:
         raise TypeError("Id is of wrong type.")
     if occured is None:
         raise TypeError("Occured is of wrong type.")
@@ -44,7 +45,7 @@ def extract_row_data(row: RowType | dict[str, RowItemType]) -> Log:
     if service is None:
         raise TypeError("Service is of wrong type.")
 
-    return Log(id = id, occured = occured, message = message, event_type = event_type, service = service)
+    return Log(id=log_id, occured=occured, message=message, event_type=event_type, service=service)
 
 
 def database_get_logs(start: datetime, end: datetime) -> list[Log]:

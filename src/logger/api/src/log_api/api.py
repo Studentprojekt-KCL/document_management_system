@@ -2,18 +2,20 @@
 
 import argparse
 from typing import Any, Sequence
+from datetime import datetime
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from datetime import datetime
 
 from .handlers import handel_get_logs, handel_add_log
 from .models import Log
 
+
 class API:
+    """API object, holds all endpoints and configuration."""
 
     app: FastAPI = FastAPI()
 
@@ -37,13 +39,11 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-
     @staticmethod
     @app.get("/logs")
     async def get_logs(start: datetime | None = None, end: datetime | None = None) -> list[Log] | None:
         """Get logs, either returns a list or None"""
         return handel_get_logs(start, end)
-
 
     @staticmethod
     @app.post("/logs")

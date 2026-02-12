@@ -47,13 +47,13 @@ class API:
 
     @staticmethod
     @app.post("/logs")
-    async def add_log(log: Log):
+    async def add_log(log: Log) -> Log:
         """Add a log to the database, returns the Log."""
         return handel_add_log(log)
 
     @staticmethod
     @app.get("/health")
-    async def check_health():
+    async def check_health() -> JSONResponse:
         """Respond to health check"""
         return JSONResponse(status_code=200, content={"msg": "healthy"})
 

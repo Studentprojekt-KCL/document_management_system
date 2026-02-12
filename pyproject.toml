@@ -2,7 +2,7 @@
 ignore = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
 
 [tool.pylint.'MESSAGES CONTROL']
-disable = ["too-few-public-methods", "import-error"]
+disable = ["too-few-public-methods", "import-error", "R0801"]
 
 [tool.pylint.format]
 max-line-length = 132

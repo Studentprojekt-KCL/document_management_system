@@ -3,11 +3,13 @@
 import os
 from datetime import datetime
 import mysql.connector
+from mysql.connector.abstracts import MySQLConnectionAbstract
+from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
 
-def connect():
+def connect() -> PooledMySQLConnection | MySQLConnectionAbstract:
     """Return database connection."""
 
     host = os.environ.get("LOGGER_DB_HOST")

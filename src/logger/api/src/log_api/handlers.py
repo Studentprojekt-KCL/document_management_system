@@ -1,8 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from datetime import datetime, timedelta
-from .models import Log
-from .database import database_get_logs, database_add_log
+from log_api.models import Log
+from log_api.database import database_get_logs, database_add_log
 
 
 def handel_get_logs(start: datetime | None, end: datetime | None) -> list[Log] | None:

@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import mysql.connector
 from mysql.connector.types import RowItemType, RowType
-from .models import Log
+from log_api.models import Log
 
 
 def connect():

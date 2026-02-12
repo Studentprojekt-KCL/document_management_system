@@ -10,8 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from .handlers import handel_get_logs, handel_add_log
-from .models import Log
+from log_api.handlers import handel_get_logs, handel_add_log
+from log_api.models import Log
 
 
 class API:

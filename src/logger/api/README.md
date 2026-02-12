@@ -30,3 +30,16 @@ Which should result in a `200` and:
 ## Further API documentation
 
 An automated API documentation is constructed when the API service is initiaded, and can be found at http://127.0.0.1:8000/docs
+
+## Configuration
+
+Configuration is done through environment variables.
+
+- `LOGGER_DB_HOST` Database host.
+- `LOGGER_DB_USER` Database user.
+- `LOGGER_DB_PASS` User password for database.
+- `LOGGER_DB_DATABASE` Database name.
+
+Optional flags:
+
+- `--dev`, developer mode

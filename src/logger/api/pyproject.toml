@@ -1,0 +1,22 @@
+[build-system]
+requires = [
+  "setuptools >= 77.0.3",
+  "mysql-connector-python >= 9.5",
+  "fastapi[standard] >= 0.128",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "log_api"
+version = "0.0.1"
+description = "Logging API"
+dependencies = [
+  "mysql-connector-python >= 9.5",
+  "fastapi[standard] >= 0.128",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+log_api = "log_api.api:run"

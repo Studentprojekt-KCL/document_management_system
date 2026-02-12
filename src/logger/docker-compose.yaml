@@ -1,0 +1,20 @@
+services:
+  log-api:
+    image: log-api:latest
+    env_file: ./env/log_api.env
+    build: ./api/
+    # command: "--dev" # To enable devloper mode
+    ports:
+      - "8000:8000"
+
+  log-database:
+    image: log-database:latest
+    env_file: ./env/log_database.env
+    build: ./database
+    environment:
+      MYSQL_DATABASE: "logger"
+      MYSQL_USER: "logger"
+      MYSQL_PASSWORD: "changeme"
+      MYSQL_RANDOM_ROOT_PASSWORD: "true"
+    # ports:
+    #   - "3306:3306"

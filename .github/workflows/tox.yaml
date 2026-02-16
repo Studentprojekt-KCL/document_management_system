@@ -3,7 +3,7 @@ name: Tox
 on:
   push:
     branches:
-      - '*'
+      - '**'
 
 jobs:
   run-tox:

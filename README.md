@@ -1,5 +1,21 @@
 # Document Management integration System
 
+## Folder Structures
+
+```
+DMS
+├── documentation
+└── src
+    ├── api
+    ├── logger
+    │   ├── api
+    │   ├── database
+    │   └── webui
+    ├── front_end
+    ├── collectors
+    ├── search_engine
+    └── shared_functions
+```
 ## Developer instructions
 
 Firstly, it is recommended to add your SSH keys to Github, [this guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) can be followed.

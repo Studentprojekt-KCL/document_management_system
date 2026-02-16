@@ -1,10 +1,29 @@
 # Document Management integration System
 
+## Folder Structures
+
+```
+DMS
+├── documentation
+└── src
+    ├── api
+    ├── logger
+    │   ├── api
+    │   ├── database
+    │   └── webui
+    ├── front_end
+    ├── collectors
+    │   ├── github_collector
+    │   ├── smb_collector
+    │   └── gitlab_collector
+    ├── search_engine
+    └── shared_functions
+```
 ## Developer instructions
 
 Firstly, it is recommended to add your SSH keys to Github, [this guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) can be followed.
 
-# Step 1 (This should only be done at initial setup)
+### Step 1 (This should only be done at initial setup)
 
 Then clone the repository
 
@@ -16,7 +35,7 @@ If you write code in python, create a virtual env and install tox:
     $ source .venv/bin/activate
     $ pip install tox
 
-# Step 2 (This should be done for each commit)
+### Step 2 (This should be done for each commit)
 
 Check out a new branch (where feature name references the issue fixed):
 

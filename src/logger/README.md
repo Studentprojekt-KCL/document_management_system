@@ -2,8 +2,6 @@
 
 This are a collection of services for the logger.
 
-```
-
 ## Usage
 
 To run simply execute:

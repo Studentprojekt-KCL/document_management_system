@@ -4,6 +4,7 @@ import os
 from logging import error, warning, info
 from datetime import datetime
 from typing import Any
+from socket import gethostname
 
 import requests
 
@@ -16,12 +17,22 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
         msg: Error message.
     """
     error(msg)
-    timestamp = int(datetime.now().timestamp())
+    timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
         error("Log service not set, export 'LOG_SERVICE'.")
         return
-    requests.put(log_service, {"log": {"err": msg}, "timespamp": timestamp}, timeout=60)
+
+    _res = requests.post(
+        log_service,
+        json={
+            "service": gethostname(),  # Probably not the best solution
+            "message": msg,
+            "event_type": "ERROR",
+            "occured": timestamp.isoformat(),
+        },
+        timeout=60,
+    )
 
 
 def dms_warning(msg: str, *_: Any, **__: Any) -> None:
@@ -32,14 +43,19 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
         msg: Warning message.
     """
     warning(msg)
-    timestamp = int(datetime.now().timestamp())
+    timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
         error("Log service not set, export 'LOG_SERVICE'.")
         return
-    requests.put(
+    _res = requests.post(
         log_service,
-        {"log": {"warning": msg}, "timestamp": timestamp},
+        json={
+            "service": gethostname(),  # Probably not the best solution
+            "message": msg,
+            "event_type": "WARNING",
+            "occured": timestamp.isoformat(),
+        },
         timeout=60,
     )
 
@@ -52,9 +68,18 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
         msg: Info message.
     """
     info(msg)
-    timestamp = int(datetime.now().timestamp())
+    timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
         error("Log service not set, export 'LOG_SERVICE'.")
         return
-    requests.put(log_service, {"log": {"info": msg}, "timestamp": timestamp}, timeout=60)
+    _res = requests.post(
+        log_service,
+        json={
+            "service": gethostname(),  # Probably not the best solution
+            "message": msg,
+            "event_type": "INFO",
+            "occured": timestamp.isoformat(),
+        },
+        timeout=60,
+    )

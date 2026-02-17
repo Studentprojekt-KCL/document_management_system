@@ -6,7 +6,7 @@ RUN python -m pip install build
 RUN python -m build
 
 FROM python:3.13-trixie AS install
-COPY --from=build /src/dist/search_engine-*.whl /src/
+COPY --from=build /src/dist/se_api-*.whl /src/
 WORKDIR /src
-RUN python -m pip install search_engine-*.whl
-ENTRYPOINT ["search_engine"]
+RUN python -m pip install se_api-*.whl
+ENTRYPOINT ["se_api"]

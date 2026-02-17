@@ -1,0 +1,20 @@
+[build-system]
+requires = [
+  "setuptools >= 77.0.3",
+  "fastapi[standard] >= 0.128",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "search_engine"
+version = "0.0.1"
+description = "Search Engine"
+dependencies = [
+  "fastapi[standard] >= 0.128",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+search_engine = "search_engine.api:run"

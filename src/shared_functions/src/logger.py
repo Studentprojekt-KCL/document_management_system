@@ -8,6 +8,7 @@ from socket import gethostname
 
 import requests
 
+
 def dms_error(msg: str, *_: Any, **__: Any) -> None:
     """Logging service which will handeling errors.
 
@@ -24,13 +25,14 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
 
     _res = requests.post(
         log_service,
-        json = {
-            "service": gethostname(), #Probably not the best solution
+        json={
+            "service": gethostname(),  # Probably not the best solution
             "message": msg,
             "event_type": "ERROR",
-            "occured": timestamp.isoformat()
+            "occured": timestamp.isoformat(),
         },
-        timeout=60)
+        timeout=60,
+    )
 
 
 def dms_warning(msg: str, *_: Any, **__: Any) -> None:
@@ -48,13 +50,14 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
         return
     _res = requests.post(
         log_service,
-        json = {
-            "service":  gethostname(), #Probably not the best solution
+        json={
+            "service": gethostname(),  # Probably not the best solution
             "message": msg,
             "event_type": "WARNING",
-            "occured": timestamp.isoformat()
+            "occured": timestamp.isoformat(),
         },
-        timeout=60)
+        timeout=60,
+    )
 
 
 def dms_info(msg: str, *_: Any, **__: Any) -> None:
@@ -72,12 +75,11 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
         return
     _res = requests.post(
         log_service,
-        json = {
-            "service":  gethostname(), #Probably not the best solution
+        json={
+            "service": gethostname(),  # Probably not the best solution
             "message": msg,
             "event_type": "INFO",
-            "occured": timestamp.isoformat()
+            "occured": timestamp.isoformat(),
         },
-        timeout=60)
-
-dms_error("heelo")
+        timeout=60,
+    )

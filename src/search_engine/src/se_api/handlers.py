@@ -1,9 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from search_engine.models import Query, Metadata
+from se_api.models import File, Query, Metadata
 
 
-def preform_search(request: Query) -> list[str] | None:
+def preform_search(request: Query) -> list[File] | None:
     """Get get files from collectors preform the search, returns a list.
 
     Keyword arguments:
@@ -20,6 +20,7 @@ def preform_search(request: Query) -> list[str] | None:
 
 
 def preform_query(query: str | None) -> None:
+    """Preform query"""
     if query is None:
         return
 
@@ -27,6 +28,7 @@ def preform_query(query: str | None) -> None:
 
 
 def metadata_search(metadata: Metadata | None) -> None:
+    """Preform meta search"""
     if metadata is None:
         return
 

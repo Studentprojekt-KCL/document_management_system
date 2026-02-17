@@ -6,15 +6,15 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "search_engine"
-version = "0.0.1"
+name = "se_api"
 description = "Search Engine"
 dependencies = [
   "fastapi[standard] >= 0.128",
 ]
+dynamic = ["version"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [project.scripts]
-search_engine = "search_engine.api:run"
+se_api = "se_api.api:run"

@@ -10,8 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from search_engine.handlers import preform_query
-from search_engine.models import Query
+from se_api.handlers import preform_search
+from se_api.models import File, Query
 
 
 class API:
@@ -41,9 +41,9 @@ class API:
 
     @staticmethod
     @app.get("/search")
-    async def query(request: Query) -> list[str] | None:
+    async def query(request: Query) -> list[File] | None:
         """Preform query on documments, either returns a list or None"""
-        return preform_query(request)
+        return preform_search(request)
 
     @staticmethod
     @app.get("/health")

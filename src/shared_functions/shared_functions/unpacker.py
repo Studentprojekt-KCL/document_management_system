@@ -1,3 +1,5 @@
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+
 from collections.abc import Iterable
 from typing import Any
 
@@ -11,11 +13,14 @@ def unpack_values(values: Iterable, path: tuple) -> Any:
         values: Recursively defined iterable object to unpack.
         path: Path through recursive object.
     """
+    if not isinstance(values, Iterable):
+        return None
+    value: Any = values
     for section in path:
-        if isinstance(section, str) and isinstance(values, dict):
-            values = values.get(section)
+        if isinstance(section, str) and isinstance(value, dict):
+            value = value.get(value)
         elif isinstance(section, int):
-            values = values[section]
+            value = value[section]
         else:
             return None
-    return values
+    return value

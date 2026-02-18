@@ -1,0 +1,8 @@
+services:
+  log-api:
+    image: search-engine:latest
+    # env_file: ./env/search_engine.env
+    build: ./
+    # command: "--dev" # To enable devloper mode
+    ports:
+      - "8000:8000"

@@ -1,0 +1,14 @@
+name: Build on pull request for develop branch
+on:
+  pull_request:
+    branches: ["develop"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        working-directory: Build docker images in src/ dir
+        context: src/
+        run: docker compose build --pull

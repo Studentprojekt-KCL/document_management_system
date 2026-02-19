@@ -18,7 +18,7 @@ def unpack_values(values: Iterable, path: tuple) -> Any:
     value: Any = values
     for section in path:
         if isinstance(section, str) and isinstance(value, dict):
-            value = value.get(value)
+            value = value.get(section)
         elif isinstance(section, int):
             value = value[section]
         else:

@@ -8,9 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "se_api"
 description = "Search Engine"
-dependencies = [
-  "fastapi[standard] >= 0.128",
-]
+dependencies = ["fastapi[standard] >= 0.128"]
 dynamic = ["version"]
 
 [tool.setuptools]

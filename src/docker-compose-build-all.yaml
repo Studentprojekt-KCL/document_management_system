@@ -1,12 +1,12 @@
 services:
   log-api:
-    image: log-api:latest
+    image: log-api
     build: ./logger/api/
 
   log-database:
-    image: log-database:latest
+    image: log-database
     build: ./logger/database
 
   search_engine:
-    image: search-engine:latest
+    image: search-engine
     build: ./search_engine

@@ -10,3 +10,7 @@ services:
   search_engine:
     image: search-engine
     build: ./search_engine
+
+  api:
+    image: dmis-api
+    build: ./api

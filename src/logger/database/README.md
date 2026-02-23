@@ -20,5 +20,8 @@ The code in this subdirectory contain the queries and Dockerfile for the logging
 
 ## Configuration
 
-This services uses environment variables as the configuration and can be found [here](https://hub.docker.com/_/mysql)
+- `MYSQL_DATABASE`, database name.
+- `MYSQL_USER`, database user.
+- `MYSQL_PASSWORD`, user password.
+- `MYSQL_RANDOM_ROOT_PASSWORD` / `MYSQL_RANDOM_ROOT_PASSWORD`, MySQL root password.
 

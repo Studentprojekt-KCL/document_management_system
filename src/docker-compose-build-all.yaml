@@ -14,3 +14,7 @@ services:
   api:
     image: dmis-api
     build: ./api
+
+  front_end:
+    image: front-end
+    build: ./front_end

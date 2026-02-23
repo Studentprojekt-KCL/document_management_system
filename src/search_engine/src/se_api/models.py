@@ -11,6 +11,9 @@ class Metadata(BaseModel):
     creator: str | None = None
     created: datetime | None = None
     edited: datetime | None = None
+    size: int | None = None
+    classification: str | None = None
+    source: str | None = None
 
 
 class Query(BaseModel):

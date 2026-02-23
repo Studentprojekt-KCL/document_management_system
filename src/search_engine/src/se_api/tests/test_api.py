@@ -16,7 +16,19 @@ def api_obj() -> API:
 @pytest.fixture
 def query_obj() -> Query:
     """Create query object."""
-    return Query(user_id="", query="", metadata=Metadata(name="", creator="", created=datetime.now(), edited=datetime.now()))
+    return Query(
+        user_id="",
+        query="",
+        metadata=Metadata(
+            name="",
+            creator="",
+            created=datetime.now(),
+            edited=datetime.now(),
+            size=0,
+            classification="father help",
+            source="gitlab",
+        ),
+    )
 
 
 @pytest.mark.asyncio

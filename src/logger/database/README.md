@@ -20,6 +20,8 @@ The code in this subdirectory contain the queries and Dockerfile for the logging
 
 ## Configuration
 
+Configuration is done through environment variables.
+
 - `MYSQL_DATABASE`, database name.
 - `MYSQL_USER`, database user.
 - `MYSQL_PASSWORD`, user password.

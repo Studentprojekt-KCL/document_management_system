@@ -1,14 +1,17 @@
 [build-system]
 requires = [
   "setuptools >= 77.0.3",
-  "fastapi[standard] >= 0.128",
+  "fastapi[standard] >= 0.128"
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "se_api"
 description = "Search Engine"
-dependencies = ["fastapi[standard] >= 0.128"]
+dependencies = [
+  "fastapi[standard] >= 0.128",
+  "dmis-shared-functions @ file:../shared_functions"
+]
 dynamic = ["version"]
 
 [tool.setuptools]
@@ -16,3 +19,4 @@ package-dir = {"" = "src"}
 
 [project.scripts]
 se_api = "se_api.api:run"
+

@@ -11,4 +11,4 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = {"" = "shared_functions"}

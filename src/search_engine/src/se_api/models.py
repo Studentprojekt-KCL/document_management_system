@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -7,8 +8,12 @@ class Metadata(BaseModel):
     """Object containging file metadata."""
 
     name: str | None = None
-    author: str | None = None
-    version: str | None = None
+    creator: str | None = None
+    created: datetime | None = None
+    edited: datetime | None = None
+    size: int | None = None
+    classification: str | None = None
+    source: str | None = None
 
 
 class Query(BaseModel):

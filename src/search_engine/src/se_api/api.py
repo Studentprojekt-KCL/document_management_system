@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import argparse
 from typing import Any
 from collections.abc import Sequence
 
@@ -12,18 +11,23 @@ from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import preform_search
 from se_api.models import File, Query
-
+from se_api.config import APIConfiguration
 
 class API:
     """API object, holds all endpoints and configuration."""
 
     app: FastAPI = FastAPI()
+    config: APIConfiguration
 
     log_level: str | None = None
 
     def __init__(self) -> None:
         """Constructor."""
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+        self.config = APIConfiguration()
+
+    def start(self):
+        uvicorn.run(self.app, host=self.config.host, log_level=self.config.port)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -55,12 +59,5 @@ class API:
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
-    parser = argparse.ArgumentParser()
-    _ = parser.add_argument("--dev", action="store_true")
-    args = parser.parse_args()
-
-    api = API()
-    if args.dev:
-        api.log_level = "debug"
-
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level)
+    api: API = API()
+    api.start()

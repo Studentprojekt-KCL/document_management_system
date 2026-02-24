@@ -7,6 +7,7 @@ name = "gitlab_service"
 description = ""
 version = "0.1.0"
 dependencies = [
+    "fastapi[standard]>=0.128",
     "requests>=2.32",
     "dmis_shared_functions @ file:../../shared_functions",
 ]

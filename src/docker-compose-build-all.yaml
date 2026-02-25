@@ -1,0 +1,20 @@
+services:
+  log-api:
+    image: log-api
+    build: ./logger/api/
+
+  log-database:
+    image: log-database
+    build: ./logger/database
+
+  search_engine:
+    image: search-engine
+    build: ./search_engine
+
+  dmis-api:
+    image: dmis-api
+    build: ./api
+
+  front_end:
+    image: front-end
+    build: ./front_end

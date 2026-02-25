@@ -1,0 +1,15 @@
+name: Build on pull request for develop branch
+on:
+  pull_request:
+    branches: ["develop"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build docker images in src/
+        working-directory: src
+        run: docker compose -f docker-compose-build-all.yaml build --pull

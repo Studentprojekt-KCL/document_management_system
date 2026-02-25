@@ -60,6 +60,3 @@ def run() -> None:
         api.log_level = "debug"
 
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level)
-
-
-run()

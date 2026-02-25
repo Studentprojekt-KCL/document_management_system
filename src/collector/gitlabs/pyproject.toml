@@ -14,3 +14,6 @@ dependencies = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[project.scripts]
+gitlab_connector = "gitlab_collector_api:run"

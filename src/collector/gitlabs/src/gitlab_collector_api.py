@@ -8,32 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel
 
 from interfacer import GitLabs
-
-
-class File(BaseModel):
-    """Basic search structure."""
-
-    file_pointer: str
-    include_content: bool | None = True
-
-class Subdata(BaseModel):
-    """Basic search structure."""
-
-    subdata: str | None
-
-    model_config: dict = {  # type: ignore
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "subdata": "<BASE64_RETRIEVED_IN_PREVIOUS_REQUEST>"
-                }
-            ]
-        }
-    }
-
 
 
 class API:
@@ -64,14 +40,13 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self, subdata: Subdata | None) -> Any:
+    async def files(self, subdata: str | None = None) -> Any:
         """Endpoint returning a list of files available."""
         return self.gitlabs_instance.pointers_to_all_files_to_index(subdata)
 
     async def file(self, file_pointer: str, include_content: bool = True) -> Any:
         """Endpoint for retrieving specific file."""
         return self.gitlabs_instance.get_file(file_pointer, include_content)
-
 
 
 def run() -> None:
@@ -85,5 +60,6 @@ def run() -> None:
         api.log_level = "debug"
 
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level)
+
 
 run()

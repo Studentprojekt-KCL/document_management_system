@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitlab_service"
+description = ""
+version = "0.1.0"
+dependencies = [
+    "fastapi[standard]>=0.128",
+    "requests>=2.32",
+    "dmis_shared_functions @ file:../../shared_functions",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+gitlab_connector = "gitlab_collector_api:run"

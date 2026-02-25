@@ -12,7 +12,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from logger import dms_error, dms_info
+from logger import dms_error, dms_info  # pylint: disable=no-name-in-module
 
 
 class GitLabs:

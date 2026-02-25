@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dmis_shared_functions"
+version = "0.1.0"
 description = "Library containing shared functions used in DMIS."
 dependencies = [
     "requests>=2.32",
 ]
-dynamic = ["version"]
 
 [tool.setuptools]
 package-dir = {"" = "shared_functions"}

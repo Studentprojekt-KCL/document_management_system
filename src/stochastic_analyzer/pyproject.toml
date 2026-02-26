@@ -14,11 +14,16 @@ dependencies = [
     "pydantic-settings",
     "numpy>=2.1.0",
     "torch",
+    "transformers >= 4.51.0",
+    "safetensors >= 0.4.3",
+    "accelerate >= 0.30.0",
+    "pydantic >= 2.0.0",
     "sentence-transformers",
 ]
 
 [tool.setuptools]
-packages = ["embedded_ranker"]
+packages = ["embedded_ranker", "classification_analyzer"]
 
 [project.scripts]
 reranker = "embedded_ranker.main:start"
+classification_analyzer = "classification_analyzer.main:main"

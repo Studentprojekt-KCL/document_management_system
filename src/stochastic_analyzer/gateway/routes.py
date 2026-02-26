@@ -1,8 +1,8 @@
 """Define API and routes"""
 
 from fastapi import APIRouter, Request, HTTPException
-from embedded_ranker.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck
-from embedded_ranker.config import settings
+from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck
+from gateway.config import settings
 
 router = APIRouter()
 

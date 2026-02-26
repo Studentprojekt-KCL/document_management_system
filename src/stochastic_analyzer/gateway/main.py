@@ -10,9 +10,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from embedded_ranker.config import settings
-from embedded_ranker.routes import router
-from embedded_ranker.ranker import RankerService
+from gateway.config import settings
+from gateway.routes import router
+from gateway.services.ranker import RankerService
 
 
 @asynccontextmanager

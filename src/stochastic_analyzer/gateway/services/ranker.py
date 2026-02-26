@@ -2,8 +2,8 @@
 
 from sentence_transformers import CrossEncoder
 import torch
-from embedded_ranker.config import settings
-from embedded_ranker.schemas import DocumentObject
+from gateway.config import settings
+from gateway.schemas import DocumentObject
 
 
 class RankerService:

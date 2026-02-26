@@ -6,24 +6,20 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "embedded-ranker"
+name = "stochastic-analyzer"
 version = "1.0.0"
-description = "Embedded Ranker Service"
+description = "Unified query gateway service"
 dependencies = [
     "fastapi[standard] >= 0.128",
     "pydantic-settings",
-    "numpy>=2.1.0",
+    "numpy<2.0.0",
     "torch",
-    "transformers >= 4.51.0",
-    "safetensors >= 0.4.3",
-    "accelerate >= 0.30.0",
-    "pydantic >= 2.0.0",
     "sentence-transformers",
+    "httpx",
 ]
 
 [tool.setuptools]
-packages = ["embedded_ranker", "classification_analyzer"]
+packages = ["gateway"]
 
 [project.scripts]
-reranker = "embedded_ranker.main:start"
-classification_analyzer = "classification_analyzer.main:main"
+reranker = "gateway.main:start"

@@ -10,7 +10,11 @@ class Settings(BaseSettings):
     MODEL_NAME: str
 
     DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"
-    API_TITLE: str = "DMS Re-Ranker"
+
+    MINISTRAL_URL: str
+    MINISTRAL_MODEL: str
+
+    API_TITLE: str = "stochastic analyzer gateway"
     API_VERSION: str = "1.0.0"
 
     HOST: str

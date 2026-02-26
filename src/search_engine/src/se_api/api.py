@@ -3,13 +3,15 @@
 from typing import Any
 from collections.abc import Sequence
 
+from logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from se_api.handlers import preform_search
+from se_api.exceptions import SeAPIException
+from se_api.handlers import Handler
 from se_api.models import File, Query
 from se_api.config import APIConfiguration
 
@@ -18,16 +20,19 @@ class API:
 
     app: FastAPI = FastAPI()
     config: APIConfiguration
-
-    log_level: str | None = None
+    handler: Handler
 
     def __init__(self) -> None:
         """Constructor."""
-        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+        self.handler = Handler()
         self.config = APIConfiguration()
 
+        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+        self.app.add_api_route("/search", self.query, methods=["GET"])
+        self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
+
     def start(self):
-        uvicorn.run(self.app, host=self.config.host, log_level=self.config.port)
+        uvicorn.run(self.app, host=self.config.host, log_level=self.config.log_level)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -37,21 +42,21 @@ class API:
         else:
             errors = {"detail": str(exc)}
         content: str | dict[str, str]
-        if self.log_level == "debug":
+        if self.config.log_level == "debug":
             content = jsonable_encoder(errors)
         else:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    @staticmethod
-    @app.get("/search")
-    async def query(request: Query) -> list[File] | None:
+    async def query(self, request: Query) -> list[File] | None:
         """Preform query on documments, either returns a list or None"""
-        return preform_search(request)
+        try:
+            return self.handler.preform_search(request)
+        except SeAPIException as e:
+            dms_error(e.msg)
+            return None
 
-    @staticmethod
-    @app.get("/health")
-    async def check_health() -> JSONResponse:
+    async def check_health(self) -> JSONResponse:
         """Respond to health check"""
         # check connection with collectors
         return JSONResponse(status_code=200, content={"msg": "healthy"})

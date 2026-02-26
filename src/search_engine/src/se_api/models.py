@@ -7,13 +7,11 @@ from pydantic import BaseModel
 class Metadata(BaseModel):
     """Object containging file metadata."""
 
+    unique_pointer: str
     name: str | None = None
-    creator: str | None = None
-    created: datetime | None = None
     edited: datetime | None = None
     size: int | None = None
-    classification: str | None = None
-    source: str | None = None
+    type: str | None = None
 
 
 class Query(BaseModel):
@@ -29,3 +27,4 @@ class File(BaseModel):
 
     content: str
     metadata: Metadata
+

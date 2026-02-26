@@ -27,4 +27,3 @@ class File(BaseModel):
 
     content: str
     metadata: Metadata
-

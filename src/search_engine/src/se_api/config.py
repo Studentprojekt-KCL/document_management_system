@@ -5,7 +5,7 @@ import argparse
 class APIConfiguration:
     port: int
     host: str
-    log_level: str | None = None
+    log_level: str
 
     def __init__(self): 
         try:
@@ -16,7 +16,7 @@ class APIConfiguration:
             dms_error(repr(e))
             self.port = 0
             self.host = ""
-            self.log_level = None
+            self.log_level = ""
 
     def load_port(self):
         temp: str | None = environ.get("SE_API_PORT", None)
@@ -45,5 +45,7 @@ class APIConfiguration:
 
         if args.dev:
             self.log_level = "debug"
+        else:
+            self.log_level = ""
 
 

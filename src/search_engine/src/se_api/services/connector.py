@@ -1,9 +1,8 @@
-import base64
 from os import environ
 from datetime import datetime
-from time import strptime
 from logger import dms_error
-from requests import get, Response, exceptions
+from requests import Session, get, exceptions
+import threading
 
 from se_api.exceptions import SeAPIException
 from se_api.models import File, Metadata
@@ -51,9 +50,18 @@ class Connector:
 
         return file_pointers
 
-    def get_file(self, pointer: str) -> File | None:
-        try:
-            response = get(f"{self.address}/file", params={"file_pointer": pointer}).json()
+    def get_file(self, pointer: str, session: Session | None = None) -> File | None:
+        file: File | None = None
+
+        s: Session
+        if session is None:
+            s = Session()
+        else:
+            s = session
+
+
+        try:            
+            response = s.get(f"{self.address}/file", params={"file_pointer": pointer}).json()
             if not isinstance(response["metadata"], dict):
                 raise SeAPIException("")
 
@@ -71,7 +79,7 @@ class Connector:
             if not isinstance(type, str): raise SeAPIException("")
             if not isinstance(content, str): raise SeAPIException("")
 
-            file: File = File(
+            file = File(
                 content=content,
                 metadata=Metadata(
                     unique_pointer=unique_pointer,
@@ -82,23 +90,23 @@ class Connector:
                 )
             )
 
-            return file
         except exceptions.InvalidJSONError as e:
             dms_error(e.strerror if e.strerror is not None else "") 
 
-        return None
+        if session is None:
+            s.close()
+
+        return file
 
     def get_files(self) -> list[File]:
         pointers: list[str] = self.get_file_pointers()
         files: list[File] = []
-        count: int = 0
 
-        for pointer in pointers:
-            file: File | None = self.get_file(pointer)
-            if file is not None:
-                files.append(file)
-            count += 1
-            print(f"{count}/{len(pointers)}")
+        with Session() as session:
+            for pointer in pointers:
+                file: File | None = self.get_file(pointer, session)
+                if file is not None:
+                    files.append(file)
 
         return files
 

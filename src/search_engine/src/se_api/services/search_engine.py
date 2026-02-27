@@ -56,7 +56,7 @@ class SearchEngine:
         writer: IndexWriter = self.index.writer()
         for file in files:
             content_byte = base64.b64decode(file.content)
-            content = content_byte.decode("utf-8")
+            content = content_byte.decode("utf-8", "ignore")
             _ = writer.add_document(Document(
                 name = file.metadata.name if file.metadata.name is not None else "",
                 unique_pointer = file.metadata.unique_pointer,

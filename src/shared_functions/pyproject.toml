@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dmis_shared_functions"
+name = "shared-functions"
 version = "0.1.0"
 description = "Library containing shared functions used in DMIS."
 dependencies = [

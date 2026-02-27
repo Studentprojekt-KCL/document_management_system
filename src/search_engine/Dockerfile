@@ -1,7 +1,6 @@
 FROM python:3.13-alpine AS build
-COPY . /src/
-COPY ./pyproject.toml /src/
-WORKDIR /src
+COPY . /src
+WORKDIR /src/search_engine/
 RUN python -m pip install build
 RUN python -m build
 

@@ -31,6 +31,13 @@ Which should result in a `200` and:
 
 An automated API documentation is constructed when the API service is initiaded, and can be found at http://127.0.0.1:8000/docs
 
+## Configuration
+
+Configuration is done through environment variables.
+
+- `SE_API_PORT` Search engine port.
+- `SE_API_CONNECTOR_ADDRESS` Connector address.
+
 Optional flags:
 
 - `--dev`, developer mode

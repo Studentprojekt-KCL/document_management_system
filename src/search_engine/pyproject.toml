@@ -1,19 +1,11 @@
 [build-system]
-requires = [
-  "setuptools >= 77.0.3",
-  "fastapi[standard] >= 0.128",
-  "tantivy >= 0.25"
-]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "se_api"
 description = "Search Engine"
-dependencies = [
-  "fastapi[standard] >= 0.128",
-  "dmis-shared-functions @ file:../shared_functions",
-  "tantivy >= 0.25"
-]
+dynamic = ["dependencies"]
 version = "0.0.1"
 
 [tool.setuptools]

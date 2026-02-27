@@ -3,7 +3,7 @@
 from os import environ
 import argparse
 
-from logger import dms_error  # pylint: disable=no-name-in-module
+# from logger import dms_error  # pylint: disable=no-name-in-module
 
 
 class APIConfiguration:

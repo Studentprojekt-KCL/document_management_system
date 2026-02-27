@@ -7,7 +7,7 @@ from requests import get, exceptions, Session
 from se_api.exceptions import SeAPIException
 from se_api.models import File, Metadata
 
-from logger import dms_error  # pylint: disable=no-name-in-module
+# from logger import dms_error  # pylint: disable=no-name-in-module
 
 
 class Connector:

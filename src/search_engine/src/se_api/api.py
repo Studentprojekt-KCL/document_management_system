@@ -2,6 +2,7 @@
 
 from typing import Any
 from collections.abc import Sequence
+from logging import error
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -71,7 +72,7 @@ class API:
         try:
             return self.handler.preform_search(request)
         except SeAPIException as e:
-            dms_error(e.msg)
+            error(e.msg)
             return None
 
     async def check_health(self) -> JSONResponse:

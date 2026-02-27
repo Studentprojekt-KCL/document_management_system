@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from logging import error
 from os import environ
 from datetime import datetime
 from requests import get, exceptions, Session
@@ -128,7 +129,7 @@ class Connector:
             )
 
         except exceptions.InvalidJSONError as e:
-            dms_error(e.strerror if e.strerror is not None else "")
+            error(e.strerror if e.strerror is not None else "")
 
         if session is None:
             s.close()

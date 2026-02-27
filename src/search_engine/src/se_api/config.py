@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from os import environ
+from logging import error
 import argparse
 
 # from logger import dms_error  # pylint: disable=no-name-in-module
@@ -25,10 +26,10 @@ class APIConfiguration:
             self._load_host()
             self._load_log_level()
         except RuntimeError as e:
-            dms_error(repr(e))
             self.port = 0
             self.host = ""
             self.log_level = ""
+            error(e)
 
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
@@ -64,4 +65,4 @@ class APIConfiguration:
         if args.dev:
             self.log_level = "debug"
         else:
-            self.log_level = ""
+            self.log_level = "info"

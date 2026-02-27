@@ -1,16 +1,8 @@
-<<<<<<< HEAD
-from os import environ
-from datetime import datetime
-from logger import dms_error
-from requests import Session, get, exceptions
-import threading
-=======
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from os import environ
 from datetime import datetime
-from requests import get, exceptions
->>>>>>> dd5526ba930f9afad0c5bbd553a9a9b4d84091fb
+from requests import get, exceptions, Session
 
 from se_api.exceptions import SeAPIException
 from se_api.models import File, Metadata

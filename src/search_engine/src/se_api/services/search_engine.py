@@ -100,14 +100,16 @@ class SearchEngine:
         for file in files:
             content_byte = base64.b64decode(file.content)
             content = content_byte.decode("utf-8", "ignore")
-            _ = writer.add_document(Document(
-                name = file.metadata.name if file.metadata.name is not None else "",
-                unique_pointer = file.metadata.unique_pointer,
-                edited = file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
-                type = file.metadata.type if file.metadata.type is not None else "",
-                size = file.metadata.size if file.metadata.size is not None else "",
-                content = content
-            ))
+            _ = writer.add_document(
+                Document(
+                    name=file.metadata.name if file.metadata.name is not None else "",
+                    unique_pointer=file.metadata.unique_pointer,
+                    edited=file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
+                    type=file.metadata.type if file.metadata.type is not None else "",
+                    size=file.metadata.size if file.metadata.size is not None else "",
+                    content=content,
+                )
+            )
         _ = writer.commit()
         writer.wait_merging_threads()
         self.index.reload()

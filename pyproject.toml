@@ -12,7 +12,7 @@ exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
 
 [tool.mypy]
 disallow_untyped_defs = true
-exclude = '(\.env|venv|__pycache__|\.tox|^build/)'
+exclude = '(\.env|venv|__pycache__|\.tox|^build/|setup\.py)'
 ignore_missing_imports = true
 
 

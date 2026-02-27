@@ -1,35 +1,47 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from se_api.models import File, Query, Metadata
+from se_api.models import File, Query
+from se_api.services.connector import Connector
+from se_api.services.search_engine import SearchEngine
 
 
-def preform_search(request: Query) -> list[File] | None:
-    """Get get files from collectors preform the search, returns a list.
+class Handler:
+    """Handler for internal processing.
 
-    Keyword arguments:
-    query -- the query to preform.
+    Attributes:
+        connector: Connector service.
+        search_engine: Search engine service.
     """
 
-    preform_query(request.query)
-    metadata_search(request.metadata)
+    connector: Connector
+    search_engine: SearchEngine
 
-    # request files
-    # quick search
+    def __init__(self) -> None:
+        self.connector = Connector()
+        self.search_engine = SearchEngine()
 
-    return []
+    def preform_search(self, request: Query) -> list[File] | None:
+        """Get get files from collectors preform the search, returns a list.
 
+        Args:
+            request: Query to perform.
 
-def preform_query(query: str | None) -> None:
-    """Preform query"""
-    if query is None:
-        return
+        Returns:
+            Returns matching files or None.
+        """
 
-    return
+        if request.query is None:
+            return None
 
+        files: list[File] = self.connector.get_files()
+        self.search_engine.add_files(files)
+        pointers: list[str] = self.search_engine.query_files(request.query, k=10)
 
-def metadata_search(metadata: Metadata | None) -> None:
-    """Preform meta search"""
-    if metadata is None:
-        return
+        files = []
 
-    return
+        for pointer in pointers:
+            file: File | None = self.connector.get_file(pointer)
+            if file is not None:
+                files.append(file)
+
+        return files

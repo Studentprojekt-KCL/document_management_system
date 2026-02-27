@@ -1,7 +1,9 @@
 services:
   log-api:
     image: search-engine:latest
-    # env_file: ./env/search_engine.env
+    environment:
+      SE_API_PORT: 8000
+      SE_API_CONNECTOR_ADDRESS: "http://10.3.0.2:8000"
     build: ./
     # command: "--dev" # To enable devloper mode
     ports:

@@ -1,5 +1,5 @@
 # -------- Stage 1: Build --------
-FROM node:20.11.1-slim AS builder
+FROM node:20.19.0-slim AS builder
 
 WORKDIR /app
 

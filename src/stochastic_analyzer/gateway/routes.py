@@ -1,8 +1,9 @@
 """Define API and routes"""
 
 from fastapi import APIRouter, Request, HTTPException
-from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck
+from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult
 from gateway.config import settings
+from gateway.services.classifier import classify_document
 
 router = APIRouter()
 
@@ -33,3 +34,12 @@ async def rerank_documents(request: Request, payload: RankRequest) -> dict:
     )
 
     return {"ranked_results": scored_docs}
+
+@router.post("/classify", response_model=list[ClassificationResult])
+async def classify_documents(payload: list[InputItem]) -> list[dict]:
+    results = []
+    for item in payload:
+        result = await classify_document(item)
+        if result:
+            results.append(result.model_dump(by_alias=True))
+    return results

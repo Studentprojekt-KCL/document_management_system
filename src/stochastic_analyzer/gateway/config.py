@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     MINISTRAL_URL: str
     MINISTRAL_MODEL: str
 
+    QWEN_URL: str
+    QWEN_MODEL: str
+
     API_TITLE: str = "stochastic analyzer gateway"
     API_VERSION: str = "1.0.0"
 

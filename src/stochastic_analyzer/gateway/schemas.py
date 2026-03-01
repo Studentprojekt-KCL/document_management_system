@@ -66,3 +66,10 @@ class ClassificationResult(BaseModel):
     security_class: Literal["Public", "Internal", "Sensitive", "Confidential"] = Field(..., alias="Security-class")
 
     model_config = {"populate_by_name": True}
+
+#Summarization schema
+
+class SummaryResult(BaseModel):
+    """Output schema for a summarized document."""
+
+    summary: StrictStr

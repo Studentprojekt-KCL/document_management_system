@@ -1,9 +1,10 @@
 """Define API and routes"""
 
 from fastapi import APIRouter, Request, HTTPException
-from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult
+from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
 from gateway.config import settings
 from gateway.services.classifier import classify_document
+from gateway.services.summarizer import summarize_documents
 
 router = APIRouter()
 
@@ -43,3 +44,14 @@ async def classify_documents(payload: list[InputItem]) -> list[dict]:
         if result:
             results.append(result.model_dump(by_alias=True))
     return results
+
+@router.post("/summarize", response_model=SummaryResult)
+async def summarize_batch(payload: list[InputItem]) -> dict:
+    """Endpoint to summarize a batch of documents into a single summary."""
+    
+    result = await summarize_documents(payload)
+    
+    if result:
+        return result.model_dump()
+    else:
+        raise HTTPException(status_code=500, detail="Failed to generate a summary from the provided documents.")

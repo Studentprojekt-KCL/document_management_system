@@ -1,7 +1,7 @@
-# Embedded Ranker Service
+# Unified Document Analysis Gateway
 
 ## Description
-This microservice provides semantic document ranking using Cross-Encoder models. It is used to evaluate the relevance of document content against a specific query to refine search accuracy.
+This microservice provides semantic document ranking using Cross-Encoder models, alongside document security classification and batch summarization powered by generative LLMs. It evaluates the relevance of document content against a specific query, determines corporate security levels, and synthesizes unified summaries from multiple sources.
 
 ## Environment Setup
 Before running the service, you must create a `.env` file in the root directory. The application will not start without these variables. 
@@ -15,6 +15,14 @@ PORT=8000
 
 # Model configuration
 MODEL_NAME=BAAI/bge-reranker-v2-m3
+
+# Ministral / Ollama configuration
+MINISTRAL_URL=http://localhost:11434/api/generate
+MINISTRAL_MODEL=ministral-3:14b
+
+# Qwen / Ollama configuration
+QWEN_URL=http://localhost:11435/api/generate
+QWEN_MODEL=qwen2.5:0.5b
 ```
 
 ## Running the Service locally
@@ -24,9 +32,9 @@ To build and run the service via Docker:
    ```bash
    sudo docker build -t stochastic-analyzer .
    ```
-2. **Run the container (injecting the .env file):**
+2. **Run the container (using host networking and attaching GPUs):**
    ```bash
-   sudo docker run --env-file .env -p 8000:8000 stochastic-analyzer
+   sudo docker run -d --gpus all --network host --env-file .env stochastic-analyzer
    ```
 
 ## API Endpoints
@@ -43,7 +51,7 @@ Checks if the API is active, if the model has successfully loaded into memory, a
 {
   "status": "active",
   "model_loaded": true,
-  "device": "GPU"
+  "device": "cuda"
 }
 ```
 
@@ -100,5 +108,73 @@ Scores and sorts a list of documents based on their semantic relevance to a prov
       }
     }
   ]
+}
+```
+
+### 3. Document Classifier
+Analyzes document content and metadata to assign a strict security classification (Public, Internal, Sensitive, or Confidential) using the Qwen model.
+
+* **URL:** `/classify`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
+
+**Request Body Example:**
+```json
+[
+  {
+    "content": "Quarterly financial projections and unreleased earnings targets.",
+    "metadata": {
+      "name": "Q3_Projections",
+      "author": "Finance Team"
+    }
+  }
+]
+```
+
+**Success Response:** `200 OK`
+
+**Response Example:**
+```json
+[
+  {
+    "name": "Q3_Projections",
+    "Security-class": "Confidential"
+  }
+]
+```
+
+### 4. Batch Summarizer
+Synthesizes the content of multiple documents into a single, unified summary using the Ministral model.
+
+* **URL:** `/summarize`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
+
+**Request Body Example:**
+```json
+[
+  {
+    "content": "Quarterly financial projections and unreleased earnings targets.",
+    "metadata": {
+      "name": "Q3_Projections",
+      "author": "Finance Team"
+    }
+  },
+  {
+    "content": "Marketing expenditure was reduced by 15% across European regions.",
+    "metadata": {
+      "name": "EU_Marketing_Q3",
+      "author": "Marketing Team"
+    }
+  }
+]
+```
+
+**Success Response:** `200 OK`
+
+**Response Example:**
+```json
+{
+  "summary": "In Q3, the organization focused on strict financial projections and unreleased earnings targets, alongside a 15% reduction in European marketing expenditure."
 }
 ```

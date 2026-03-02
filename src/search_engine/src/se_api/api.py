@@ -12,7 +12,8 @@ from fastapi.encoders import jsonable_encoder
 
 from se_api.exceptions import SeAPIException
 from se_api.handlers import Handler
-from se_api.models import File, Query
+from se_api.models.file import File
+from se_api.models.query import Query
 from se_api.config import APIConfiguration
 
 # from logger import dms_error  # pylint: disable=no-name-in-module

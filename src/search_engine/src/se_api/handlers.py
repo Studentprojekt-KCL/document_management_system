@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from se_api.models import File, Query
+from se_api.models.file import File
+from se_api.models.query import Query
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
@@ -35,7 +36,7 @@ class Handler:
 
         files: list[File] = self.connector.get_files()
         self.search_engine.add_files(files)
-        pointers: list[str] = self.search_engine.query_files(request.query, k=10)
+        pointers: list[str] = self.search_engine.query_files(request, k=10)
 
         files = []
 

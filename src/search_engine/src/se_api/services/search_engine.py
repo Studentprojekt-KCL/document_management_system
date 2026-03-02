@@ -5,6 +5,7 @@ from tantivy import (
     Document,
     Index,
     IndexWriter,
+    Occur,
     Query,
     SchemaBuilder,
     SearchResult,
@@ -12,7 +13,9 @@ from tantivy import (
 )
 
 from se_api.exceptions import SeAPIException
-from se_api.models import File
+from se_api.models.file import File
+from se_api.models import query, metadata
+from se_api import models
 
 
 class SearchEngine:
@@ -37,7 +40,7 @@ class SearchEngine:
         # Memory only
         self.index = Index(schema)
 
-    def query_files(self, q: str, k: int = 50) -> list[str]:
+    def query_files(self, q: query.Query, k: int = 50) -> list[str]:
         """Query through the files in the index.
 
         Args:
@@ -51,8 +54,21 @@ class SearchEngine:
             SeAPIException: Potential formatting errors.
         """
 
+        queries: list[Query] = []
+
+        content: Query = Query.boost_query(self.index.parse_query(q.query, ["content"]), 1.0) if isinstance(q.query, str) else Query.empty_query()
+
+        queries.append(content)
+
+        if isinstance(q.metadata, metadata.Metadata):
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.name, ["name"]), 3.0) if isinstance(q.metadata.name, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.edited, ["edited"]), 1.0) if isinstance(q.metadata.edited, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.type, ["type"]), 1.0) if isinstance(q.metadata.type, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.size, ["size"]), 1.0) if isinstance(q.metadata.size, str) else Query.empty_query())
+
+        query = Query.boolean_query([(Occur.Must, Query.disjunction_max_query(queries, 0.3))])
+
         searcher: Searcher = self.index.searcher()
-        query: Query = self.index.parse_query(q, ["name", "content", "unique_pointer"])
         result: SearchResult = searcher.search(query, k)
         pointers: list[str] = []
         for _, doc_id in result.hits:

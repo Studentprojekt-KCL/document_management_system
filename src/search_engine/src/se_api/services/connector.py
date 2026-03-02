@@ -1,12 +1,14 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from itertools import count
 from logging import error
 from os import environ
 from datetime import datetime
 from requests import get, exceptions, Session
 
 from se_api.exceptions import SeAPIException
-from se_api.models import File, Metadata
+from se_api.models.file import File
+from se_api.models.metadata import Metadata
 
 # from logger import dms_error  # pylint: disable=no-name-in-module
 
@@ -145,10 +147,15 @@ class Connector:
         pointers: list[str] = self.get_file_pointers()
         files: list[File] = []
 
+        counter: int = 0
         with Session() as session:
             for pointer in pointers:
                 file: File | None = self.get_file(pointer, session)
                 if file is not None:
                     files.append(file)
+                print(f"{counter}/{50}")
+                counter += 1
+                if counter > 50:
+                    break
 
         return files

@@ -12,6 +12,10 @@ venv.bak/
 
 .idea/
 .vscode/
+*.swp
+*.swo
+*.swn
+*.iml
 
 .ruff_cache/
 
@@ -73,6 +77,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+# also unsure, but just in case
+pnpm-debug.log*
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -210,3 +216,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# OS, unsure if this is needed
+.DS_Store
+Thumbs.db

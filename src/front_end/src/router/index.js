@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Search from '@/views/Search.vue'
-import Sources from '@/views/Sources.vue'
-import Intelligence from '@/views/Intelligence.vue'
-import Compliance from '@/views/Compliance.vue'
+import SearchView from '@/views/SearchView.vue'
+import SourcesView from '@/views/SourcesView.vue'
+import IntelligenceView from '@/views/IntelligenceView.vue'
+import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import Login from '../views/Login.vue'
 
@@ -15,22 +15,22 @@ const routes = [
   {
     path: '/search',
     name: 'Search',
-    component: Search
+    component: SearchView
   },
   {
     path: '/sources',
     name: 'Sources',
-    component: Sources
+    component: SourcesView
   },
   {
     path: '/intelligence',
     name: 'Intelligence',
-    component: Intelligence
+    component: IntelligenceView
   },
   {
     path: '/compliance',
     name: 'Compliance',
-    component: Compliance
+    component: ComplianceView
   },
   {
     path: '/settings',

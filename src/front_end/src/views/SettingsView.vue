@@ -1,7 +1,7 @@
 <template>
   <div class="settings-view">
     <h1>System Settings</h1>
-    <p class="text-secondary">System configuration settings coming soon...</p>
+    <p class="text-secondary">System configuration settings coming soon...???</p>
   </div>
 </template>
 

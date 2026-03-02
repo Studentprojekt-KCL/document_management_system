@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import MainLayout from "@/layouts/MainLayout.vue"
 
 const route = useRoute()
 const isLoginPage = computed(() => route.path === '/')
@@ -11,7 +11,7 @@ const isLoginPage = computed(() => route.path === '/')
   <div v-if="isLoginPage">
     <router-view />
   </div>
-  <DefaultLayout v-else>
+  <MainLayout v-else>
     <router-view />
-  </DefaultLayout>
+  </MainLayout>
 </template>

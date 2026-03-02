@@ -78,13 +78,13 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html
 
 # Security: Make filesystem read-only where possible
-#RUN chmod -R 755 /var/cache/nginx /var/log/nginx /var/run && \
- #   touch /var/run/nginx.pid && \
- #   chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid
+RUN chmod -R 755 /var/cache/nginx /var/log/nginx /var/run && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
+#HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+   # CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
 
 EXPOSE 80
 

@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import base64
+from os import environ
 from tantivy import (
     Document,
     Index,
@@ -15,8 +16,20 @@ from tantivy import (
 from se_api.exceptions import SeAPIException
 from se_api.models.file import File
 from se_api.models import query, metadata
-from se_api import models
 
+class Multiplier:
+    name: float
+    type: float
+    edited: float
+    content: float
+    size: float
+
+    def __init__(self, name: float, type: float, edited: float, content: float, size: float) -> None:
+        self.name = name
+        self.type = type
+        self.edited = edited
+        self.content = content
+        self.size = size
 
 class SearchEngine:
     """Search engine service
@@ -26,6 +39,7 @@ class SearchEngine:
     """
 
     index: Index
+    multiplier: Multiplier
 
     def __init__(self) -> None:
         schema_builder = SchemaBuilder()
@@ -39,6 +53,16 @@ class SearchEngine:
 
         # Memory only
         self.index = Index(schema)
+
+        # Configuration
+        name = float(environ.get("SE_API_MULTIPLIER_NAME", 1.0))
+        type = float(environ.get("SE_API_MULTIPLIER_TYPE", 1.0))
+        edited = float(environ.get("SE_API_MULTIPLIER_EDITED", 1.0))
+        content = float(environ.get("SE_API_MULTIPLIER_CONTENT", 1.0))
+        size = float(environ.get("SE_API_MULTIPLIER_SIZE", 1.0))
+
+        self.multiplier = Multiplier(name, type, edited, content, size)
+
 
     def query_files(self, q: query.Query, k: int = 50) -> list[str]:
         """Query through the files in the index.
@@ -56,15 +80,15 @@ class SearchEngine:
 
         queries: list[Query] = []
 
-        content: Query = Query.boost_query(self.index.parse_query(q.query, ["content"]), 1.0) if isinstance(q.query, str) else Query.empty_query()
+        content: Query = Query.boost_query(self.index.parse_query(q.query, ["content"]), self.multiplier.content) if isinstance(q.query, str) else Query.empty_query()
 
         queries.append(content)
 
         if isinstance(q.metadata, metadata.Metadata):
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.name, ["name"]), 3.0) if isinstance(q.metadata.name, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.edited, ["edited"]), 1.0) if isinstance(q.metadata.edited, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.type, ["type"]), 1.0) if isinstance(q.metadata.type, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.size, ["size"]), 1.0) if isinstance(q.metadata.size, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.name, ["name"]), self.multiplier.name) if isinstance(q.metadata.name, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.edited, ["edited"]), self.multiplier.edited) if isinstance(q.metadata.edited, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.type, ["type"]), self.multiplier.type) if isinstance(q.metadata.type, str) else Query.empty_query())
+            queries.append(Query.boost_query(self.index.parse_query(q.metadata.size, ["size"]), self.multiplier.size) if isinstance(q.metadata.size, str) else Query.empty_query())
 
         query = Query.boolean_query([(Occur.Must, Query.disjunction_max_query(queries, 0.3))])
 

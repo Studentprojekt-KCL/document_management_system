@@ -37,6 +37,14 @@ Configuration is done through environment variables.
 
 - `SE_API_PORT` Search engine port.
 - `SE_API_CONNECTOR_ADDRESS` Connector address.
+- `SE_API_MINIO_HOST` MinIO host address, requierd.
+- `SE_API_MINIO_USER` MinIO user, requierd.
+- `SE_API_MINIO_PASSWORD` MinIO password address, requierd.
+- `SE_API_MULTIPLIER_NAME` how heavy the result of the name field is, optional.
+- `SE_API_MULTIPLIER_EDITED`  how heavy the result of the edited field is, optional.
+- `SE_API_MULTIPLIER_TYPE` how heavy the result of the type field is, optional.
+- `SE_API_MULTIPLIER_CONTENT` how heavy the result of the content field is, optional.
+- `SE_API_MULTIPLIER_SIZE` how heavy the result of the size field is, optional.
 
 Optional flags:
 

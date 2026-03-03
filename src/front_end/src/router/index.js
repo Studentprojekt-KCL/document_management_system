@@ -34,7 +34,8 @@ const routes = [
   {
     path: '/compliance',
     name: 'Compliance',
-    component: ComplianceView
+    component: ComplianceView,
+    meta: { requiresAuth: true}
   },
   {
     path: '/settings',
@@ -45,7 +46,7 @@ const routes = [
   {
     path: "/auth/callback",
     name: "AuthCallback",
-    component: AuthCallbackView,
+    component: AuthCallbackView
   }
 ]
 
@@ -64,16 +65,6 @@ router.beforeEach((to)=> {
     return {path: '/'};
   } 
   
-  /* 
-  // allow everyone to try access login page
-  if ((to.path) === "/"){
-    return true
-  }
-  if (!isAuthed){
-    return {path: "/"}
-  }
-  return true
-  */
 });
 
 export default router

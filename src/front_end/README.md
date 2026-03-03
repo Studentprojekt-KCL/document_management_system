@@ -44,4 +44,37 @@ sudo apt-get install -y nodejs
 ## After this the npm run dev should work. It will run the on adress: http://localhost:5173
 
 
+# Accessing the DMS
 
+The only way to access the DMS now is through logging in.
+Any attempt to bypass the path by adding /search would result in being redirected to the / path.
+1. http://localhost:8080 / http://localhost:5173
+2. press login
+3. enter credentials
+- frontend_tester
+- password
+4. gain access to DMS
+
+# Keycloak
+To access keycloak you can go to: https://ad.dms-lookup.com:8443/
+## creating a user
+Use the admin credentials to log in
+Choose User from the left side bar
+1. Add User
+- Leave required user actions empty
+- Leave email verified off
++ Username
++ email
++ first name
++ last name
+2. Create
+3. Credentials
+4. set password
++ enter password
++ re-enter password
+- leave temporary off
+5. save password
+
+## Test account
+username: frontend_tester
+password: password

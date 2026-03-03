@@ -14,7 +14,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from logger import dms_error, dms_info  # pylint: disable=no-name-in-module
+from logger import dms_error, dms_info, dms_warning  # pylint: disable=no-name-in-module
 
 
 class GitLabs:
@@ -114,7 +114,7 @@ class GitLabs:
 
     @staticmethod
     def _unpack_zip(content: bytes) -> list:
-        """Unpack and return filepath.""" #TODO write this
+        """Unpack .zip content and return a list containing all the files."""
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
             for file in zip_file.namelist():
@@ -122,21 +122,33 @@ class GitLabs:
                 if info.is_dir():
                     continue
                 try:
-                    file_content = zip_file.read(file).decode('utf-8')
+                    file_content = zip_file.read(file).decode("utf-8")
                 except UnicodeDecodeError as err:
                     file_content = ""
-                    pass #TODO, implement DMIS-warning/decide handeling for non utf-8 files.
-                files_data.append({
-                    "content": base64.b64encode(file_content.encode('utf-8')).decode('utf-8'),
-                    "metadata": {
-                        "name": file,
-                        "size": info.file_size
+                    dms_warning(f"Could not decode file: {file}. {err}")
+                files_data.append(
+                    {
+                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                        "metadata": {"name": file, "size": info.file_size},
                     }
-                })
+                )
 
         return files_data
 
-    def files_to_index(self, subdata: str | None = None) -> list:
+    def files_to_index(self, subdata: str | None = None) -> dict:
+        """Retrieve a structure of files to index.
+
+        Args:
+        ----
+            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
+                 of the system, but should always be supplied).
+
+        Returns:
+        -------
+            Dict structure {"subdata": generated_subdata, "files": file_data}, where generated_subdata
+                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
+                (this should always be passed back by client from previous request).
+        """
         subdata_dict: dict
         files_data: list = []
 

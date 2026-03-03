@@ -1,8 +1,11 @@
 # Set up
 Create a .env file with the following content
 
+    MINIO_ADDRESS=<ADDRESS>
     MINIO_ROOT_USER=<USERNAME>
     MINIO_ROOT_PASSWORD=<PASSWORD>
+    MINIO_USERNAME=<USERNAME>
+    MINIO_PASSWORD=<PASSWORD>
 
 NOTE; The password must have at least 8 characters
 

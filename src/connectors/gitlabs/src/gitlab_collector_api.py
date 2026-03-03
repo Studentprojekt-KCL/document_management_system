@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLabs
+from boto_tools import upload_file
 
 
 class API:
@@ -49,8 +50,12 @@ class API:
         """Endpoint for retrieving specific file."""
         return self.gitlabs_instance.get_file(file_pointer, include_content)
 
-    async def files_to_index(self, subdata: str, include_content: bool = True) -> Any:
-        self.gitlabs_instance.files_to_index()
+    async def files_to_index(self, subdata: str | None = None) -> dict:
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        content = self.gitlabs_instance.files_to_index(subdata)
+        url = upload_file(content, "gitlabs_content.json")
+        return {"subdata": content.get("subdata"), "file_url": url}
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

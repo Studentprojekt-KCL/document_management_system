@@ -1,0 +1,24 @@
+services:
+  log-api:
+    image: log-api
+    build: ./src/logger/api/
+
+  log-database:
+    image: log-database
+    build: ./src/logger/database
+
+  search-engine:
+    image: search-engine
+    build: ./src/search_engine
+
+  dmis-api:
+    image: dmis-api
+    build: ./src/api
+
+  front-end:
+    image: front-end
+    build: ./src/front_end
+
+  collector-gitlabs:
+    image: connector-gitlabs
+    build: ./src/connectors/gitlabs

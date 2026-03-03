@@ -1,5 +1,5 @@
 FROM python:3.13-alpine AS build
-COPY . /src
+COPY src/search_engine/ /src
 WORKDIR /src
 RUN python -m pip install build
 RUN python -m build

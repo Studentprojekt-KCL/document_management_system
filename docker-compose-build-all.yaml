@@ -1,19 +1,23 @@
 services:
   log-api:
     image: log-api
-    build: ./src/logger/api/
+    build:
+      dockerfile: src/logger/api/Dockerfile
 
   log-database:
     image: log-database
-    build: ./src/logger/database
+    build: 
+      dockerfile: src/logger/database/Dockerfile
 
   search-engine:
     image: search-engine
-    build: ./src/search_engine
+    build:
+      dockerfile: src/search_engine/Dockerfile
 
   dmis-api:
     image: dmis-api
-    build: ./src/api
+    build:
+      dockerfile: src/api/Dockerfile
 
   front-end:
     image: front-end
@@ -21,4 +25,5 @@ services:
 
   collector-gitlabs:
     image: connector-gitlabs
-    build: ./src/connectors/gitlabs
+    build:
+      dockerfile: src/connectors/gitlabs/Dockerfile

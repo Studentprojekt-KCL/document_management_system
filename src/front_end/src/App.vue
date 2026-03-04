@@ -11,6 +11,9 @@ const isLoginPage = computed(() => route.path === '/')
   <div v-if="isLoginPage">
     <router-view />
   </div>
+  <div v-else-if="route.path === '/404'">
+    <router-view />
+  </div>
   <MainLayout v-else>
     <router-view />
   </MainLayout>

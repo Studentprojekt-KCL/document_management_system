@@ -5,17 +5,11 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 // Keycloak attributes
-const KEYCLOAK_BASE = "https://ad.dms-lookup.com:8443";
-const REALM = "master";
-const CLIENT_ID = "dms-frontend";
-
-const handleNotification = () => {
-  console.log('Notification clicked');
-  // Notification logic here
-};
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
+const REALM = import.meta.env.VITE_REALM;
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
 
 const handleLogout = () => {
-  console.log('Logout clicked');
   
   const idToken = sessionStorage.getItem("id_token");
   const postLogoutRedirectUri = `${window.location.origin}/`;

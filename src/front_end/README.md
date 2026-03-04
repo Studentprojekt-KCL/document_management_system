@@ -90,3 +90,18 @@ ________________________________________
 ### Test account
 **username:** frontend_tester
 **password:** password
+
+________________________________________
+
+# Environment Setup
+Before running the service, you must create a `.env` file in the /front_end/ directory.
+
+Create `.env` file following this structure:
+
+```
+VITE_KEYCLOAK_BASE =https://ad.dms-lookup.com:8443
+VITE_REALM =master
+VITE_CLIENT_ID =dms-frontend
+```
+
+

@@ -3,9 +3,10 @@ import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 // Keycloak attributes
-const KEYCLOAK_BASE = "https://ad.dms-lookup.com:8443";
-const REALM = "master";
-const CLIENT_ID = "dms-frontend";
+
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
+const REALM = import.meta.env.VITE_REALM;
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
 
 const route = useRoute();
 const router = useRouter();

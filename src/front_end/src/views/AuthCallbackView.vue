@@ -60,45 +60,6 @@ onMounted(async () => {
     const data = await resp.json();
 
     // error with response
-}
-
-
-</script>
-
-<template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-header">
-        <h1>Document Management System</h1>
-        <p class="text-secondary">Sign in with your company account</p>
-      </div>
-
-      <div class="login-content">
-        <button 
-          @click="handleEntraIdLogin" 
-          :disabled="isLoading"
-          class="entra-btn"
-        >
-          <svg v-if="!isLoading" class="microsoft-icon" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="11" height="11" fill="#F25022"/>
-            <rect x="12" width="11" height="11" fill="#7FBA00"/>
-            <rect y="12" width="11" height="11" fill="#00A4EF"/>
-            <rect x="12" y="12" width="11" height="11" fill="#FFB900"/>
-          </svg>
-          <span v-if="isLoading">Signing in...</span>
-          <span v-else>Sign in with Microsoft Entra ID</span>
-        </button>
-
-        <div class="divider">
-          <span>Secure authentication</span>
-        </div>
-
-        <div class="info-text">
-          <p class="text-sm text-secondary">
-            Your organization uses Microsoft Entra ID for secure authentication.
-            Click the button above to sign in with your company credentials.
-          </p>
-    
     if (!resp.ok) {
       errorMsg.value = `Token exchange failed: ${data.error || resp.status} ${data.error_description || ""}`;
       return;

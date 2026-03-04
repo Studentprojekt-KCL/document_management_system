@@ -8,11 +8,18 @@ import LoginView from '../views/LoginView.vue'
 import AuthCallbackView from '../views/AuthCallbackView.vue'
 
 const routes = [
+  // Public ~ish
   {
     path: '/',
     name: 'Login',
     component: LoginView
   },
+  {
+    path: "/auth/callback",
+    name: "AuthCallback",
+    component: AuthCallbackView
+  },
+  // Requires Auth
   {
     path: '/search',
     name: 'Search',
@@ -43,11 +50,7 @@ const routes = [
     component: SettingsView,
     meta: { requiresAuth: true}
   },
-  {
-    path: "/auth/callback",
-    name: "AuthCallback",
-    component: AuthCallbackView
-  },
+  
   /*
   path: "/error",
   name: "Error",

@@ -10,6 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build docker images in src/
-        working-directory: src
+      - name: Build docker images in .
+        working-directory: .
         run: docker compose -f docker-compose-build-all.yaml build --pull

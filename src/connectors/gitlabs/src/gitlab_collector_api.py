@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLabs
+from boto_tools import upload_file
 
 
 class API:
@@ -25,6 +26,7 @@ class API:
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
+        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -47,6 +49,12 @@ class API:
     async def file(self, file_pointer: str, include_content: bool = True) -> Any:
         """Endpoint for retrieving specific file."""
         return self.gitlabs_instance.get_file(file_pointer, include_content)
+
+    async def files_to_index(self, subdata: str | None = None) -> dict:
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        content = self.gitlabs_instance.files_to_index(subdata)
+        url = upload_file(content, "gitlabs_content.json")
+        return {"subdata": content.get("subdata"), "file_url": url}
 
 
 def run() -> None:

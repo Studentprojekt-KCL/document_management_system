@@ -4,8 +4,8 @@ WORKDIR /app
 
 RUN pip install --upgrade pip build
 
-COPY pyproject.toml .
-COPY src src
+COPY src/api/pyproject.toml .
+COPY src/api/src src
 
 RUN python -m build
 

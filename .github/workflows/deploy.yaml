@@ -33,11 +33,11 @@ jobs:
           password: ${{ secrets.REGISTRY_PASS }}
 
       - name: Build all images
-        working-directory: src
+        working-directory: .
         run: docker compose -f ${{ env.COMPOSE_FILE }} build
 
       - name: Tag and push images to registry with :${{ github.sha }} and :latest
-        working-directory: src
+        working-directory: .
         run: |
           set -euo pipefail
 

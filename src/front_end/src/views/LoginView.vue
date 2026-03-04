@@ -59,46 +59,6 @@ const handleEntraIdLogin = async () => {
     `&code_challenge_method=S256`;
 
   window.location.assign(authUrl);
-  /*
-{
-  "realm": "master",
-  "auth-server-url": "https://ad.dms-lookup.com:8443/",
-  "ssl-required": "external",
-  "resource": "dms-frontend",
-  "public-client": true,
-  "confidential-port": 0
-}
-  
-*/
-
-
-
-
-
-  // Trial iplementation (current working)
-  /*
-  const redirectUri = (`${window.location.origin}/auth/callback`);
-  const url =
-    `${KEYCLOACK_BASE}/realms/${REALM}/protocol/openid-connect/auth` +
-    `?client_id=${encodeURIComponent(CLIENT_ID)}` +
-    `&redirect_uri=${redirectUri}` +
-    `&response_type=code` +
-    `&scope=openid`;
-  window.location.href = url;
-  */
-
-  
-  // Temporary - remove this when MSAL is implemented
-  //isLoading.value = true
-  // TODO: Implement MSAL login here
-  //console.log('Entra ID login clicked')
-
-  /*
-  setTimeout(() => {
-    isLoading.value = false
-    router.push('/search')
-  }, 1000)
-  */
 }
 
 

@@ -4,6 +4,8 @@ import os
 from urllib.parse import urljoin
 import base64
 import json
+import io
+import zipfile
 from hashlib import md5
 from typing import Any
 
@@ -12,7 +14,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from logger import dms_error, dms_info  # pylint: disable=no-name-in-module
+from dmis_logger import dms_error, dms_info, dms_warning  # pylint: disable=no-name-in-module
 
 
 class GitLabs:
@@ -110,6 +112,66 @@ class GitLabs:
 
         return base_structure
 
+    @staticmethod
+    def _unpack_zip(content: bytes) -> list:
+        """Unpack .zip content and return a list containing all the files."""
+        files_data: list = []
+        with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
+            for file in zip_file.namelist():
+                info = zip_file.getinfo(file)
+                if info.is_dir():
+                    continue
+                try:
+                    file_content = zip_file.read(file).decode("utf-8")
+                except UnicodeDecodeError as err:
+                    file_content = ""
+                    dms_warning(f"Could not decode file: {file}. {err}")
+                files_data.append(
+                    {
+                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                        "metadata": {"name": file, "size": info.file_size},
+                    }
+                )
+
+        return files_data
+
+    def files_to_index(self, subdata: str | None = None) -> dict:
+        """Retrieve a structure of files to index.
+
+        Args:
+        ----
+            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
+                 of the system, but should always be supplied).
+
+        Returns:
+        -------
+            Dict structure {"subdata": generated_subdata, "files": file_data}, where generated_subdata
+                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
+                (this should always be passed back by client from previous request).
+        """
+        subdata_dict: dict
+        files_data: list = []
+
+        if subdata is None:
+            subdata_dict = {}
+        else:
+            subdata_dict = json.loads(base64.b64decode(subdata))
+        current_subdata = self.get_project_ids()
+        projects = self._get_projects()
+        for project in projects:
+            project_id = project.get("id")
+            if current_subdata.get(project_id) == subdata_dict.get(str(project_id)):
+                continue
+
+            branch = project.get("default_branch")
+            url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
+            content = requests.get(url, timeout=120).content
+            files_data.extend(self._unpack_zip(content))
+
+        generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
+
+        return {"files": files_data, "subdata": generated_subdata}
+
     def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
         """Retrieve a containing URLs pointing to all available individual files available, except those in projects
             already indexed according to subdata.
@@ -146,7 +208,7 @@ class GitLabs:
     def _execute_request(url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_error(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")

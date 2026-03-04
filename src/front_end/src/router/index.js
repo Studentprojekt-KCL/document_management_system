@@ -6,6 +6,9 @@ import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '../views/LoginView.vue'
 import AuthCallbackView from '../views/AuthCallbackView.vue'
+import NotFoundView from '@/views/errors/NotFoundView.vue'
+import UnauthorizedView from '@/views/errors/UnauthorizedView.vue'
+import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import { hasRole } from '../utils/auth'
 
 const routes = [
@@ -51,21 +54,25 @@ const routes = [
     component: SettingsView,
     meta: { requiresAuth: true, requiresAdmin: true }
   },
-  
-  /*
-  path: "/error",
-  name: "Error",
-  component: ErrorView, // You would need to create an ErrorView.vue for this to work
-  */
+  {
+    path: '/404',
+    name: 'NotFound',
+    component: NotFoundView
+  },
+  {
+    path: '/401',
+    name: 'Unauthorized',
+    component: UnauthorizedView
+  },
+  {
+    path: '/403',
+    name: 'Forbidden',
+    component: ForbiddenView
+  },
   {
     path: '/:pathMatch(.*)*', // Regex for all unmatched paths
     name: 'NotFoundRedirect', // This route will catch all unmatched paths
-    redirect: () => {
-      const token = sessionStorage.getItem('access_token') 
-      return token ? '/search' : '/' // later return token ? '/error' : '/'
-      // I (Emma) think that if anything else is typed in the URL, it should redirect to an error page. 
-      // But for now, it just redirects to the login page if not logged in, and the search page if logged in.
-    }
+    redirect: '/404'
   }
 ]
 
@@ -85,22 +92,22 @@ router.beforeEach((to) => {
     const hasPkceVerifier = !!sessionStorage.getItem('pkce_verifier')
 
     if (!hasError && (!hasCode || !hasPkceVerifier)) {
-      return { path: '/' }
+      return { path: '/401' }
     }
     return true
   }
 
   if (to.name === 'Login' && isAuthed) {
-    return { path: '/search' } // may be changed to error page later.
+    return { path: '/search' }
   }
 
   if (to.meta?.requiresAuth && !isAuthed) {
-    return { path: '/' }
+    return { path: '/401' }
   }
 
   // admin only route
   if (to.meta?.requiresAdmin && !hasRole("admin")){
-    return {path: "/search"}
+    return {path: "/403"}
   }
 
   return true

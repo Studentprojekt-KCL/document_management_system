@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import base64
+from logging import error
 from os import environ
 from tantivy import (
     Document,
@@ -138,12 +139,12 @@ class SearchEngine:
 
         writer: IndexWriter = self.index.writer()
         for file in files:
-            content_byte = base64.b64decode(file.content)
-            content = content_byte.decode("utf-8", "ignore")
+            content_byte: bytes = base64.b64decode(file.content)
+            content: str = content_byte.decode("utf-8")
             _ = writer.add_document(
                 Document(
                     name=file.metadata.name if file.metadata.name is not None else "",
-                    unique_pointer=file.metadata.unique_pointer,
+                    unique_pointer=file.metadata.unique_pointer if file.metadata.unique_pointer is not None else "",
                     edited=file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
                     type=file.metadata.type if file.metadata.type is not None else "",
                     size=file.metadata.size if file.metadata.size is not None else "",

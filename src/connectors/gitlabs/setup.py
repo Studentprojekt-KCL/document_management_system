@@ -9,7 +9,6 @@ setup(
     install_requires=[
         "fastapi[standard]>=0.128",
         "requests>=2.32",
-        "boto3>=1.42",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

@@ -1,14 +1,41 @@
 <script setup>
 import { Bell, LogOut } from 'lucide-vue-next';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+// Keycloak attributes
+const KEYCLOAK_BASE = "https://ad.dms-lookup.com:8443";
+const REALM = "master";
+const CLIENT_ID = "dms-frontend";
 
 const handleNotification = () => {
   console.log('Notification clicked');
-  // Add your notification logic here
+  // Notification logic here
 };
 
 const handleLogout = () => {
   console.log('Logout clicked');
-  // Add your logout logic here
+  
+  const idToken = sessionStorage.getItem("id_token");
+  const postLogoutRedirectUri = `${window.location.origin}/`;
+
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("id_token");
+  sessionStorage.removeItem("pkce_verifier");
+  sessionStorage.removeItem("oidc_state");
+
+  if (idToken) {
+  const logoutUrl =
+  `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
+  `?id_token_hint=${encodeURIComponent(idToken)}` +
+  `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
+  `&client_id=${encodeURIComponent(CLIENT_ID)}`;
+
+  window.location.assign(logoutUrl);
+  return;
+  }
+
 };
 </script>
 

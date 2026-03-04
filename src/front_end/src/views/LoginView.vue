@@ -7,7 +7,7 @@ const router = useRouter()
 const isLoading = ref(false)
 
 // Keycloak attributes
-const KEYCLOAK_BASE = "https://ad.dms-lookup.com:8443"; // base keycloack
+const KEYCLOAK_BASE = "https://ad.dms-lookup.com:8443";
 const REALM = "master";
 const CLIENT_ID = "dms-frontend";
 
@@ -35,8 +35,6 @@ async function createPkcePair() {
   const challenge = base64UrlEncode(await sha256(verifier));
   return { verifier, challenge };
 }
-
-
 
 const handleEntraIdLogin = async () => {
   const { verifier, challenge } = await createPkcePair();

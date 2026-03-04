@@ -6,7 +6,7 @@ import json
 
 import boto3
 from botocore.exceptions import ClientError
-from logger import dms_error
+from dmis_logger import dms_error
 
 
 def upload_file(content: dict | list, file_name: str, bucket: str = "slask") -> str:

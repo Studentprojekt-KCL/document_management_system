@@ -14,7 +14,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from logger import dms_error, dms_info, dms_warning  # pylint: disable=no-name-in-module
+from dmis_logger import dms_error, dms_info, dms_warning  # pylint: disable=no-name-in-module
 
 
 class GitLabs:
@@ -165,7 +165,7 @@ class GitLabs:
 
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
-            content = requests.get(url).content
+            content = requests.get(url, timeout=120).content
             files_data.extend(self._unpack_zip(content))
 
         generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
@@ -208,7 +208,7 @@ class GitLabs:
     def _execute_request(url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_error(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")

@@ -104,4 +104,9 @@ VITE_REALM =master
 VITE_CLIENT_ID =dms-frontend
 ```
 
+## testing roles
+### Web Browser Testing
+f12 -> console:
 
+`hasRole("admin")`
+`hasRole("user")`

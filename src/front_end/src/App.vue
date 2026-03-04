@@ -4,14 +4,13 @@ import { useRoute } from 'vue-router'
 import MainLayout from "@/layouts/MainLayout.vue"
 
 const route = useRoute()
-const isLoginPage = computed(() => route.path === '/')
+const isPublicOrErrorPage = computed(() =>
+  ['/', '/401', '/403', '/404'].includes(route.path)
+)
 </script>
 
 <template>
-  <div v-if="isLoginPage">
-    <router-view />
-  </div>
-  <div v-else-if="route.path === '/404'">
+  <div v-if="isPublicOrErrorPage">
     <router-view />
   </div>
   <MainLayout v-else>

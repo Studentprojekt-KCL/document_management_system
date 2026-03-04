@@ -6,6 +6,7 @@ import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '../views/LoginView.vue'
 import AuthCallbackView from '../views/AuthCallbackView.vue'
+import { hasRole } from '../utils/auth'
 
 const routes = [
   // Public ~ish
@@ -42,13 +43,13 @@ const routes = [
     path: '/compliance',
     name: 'Compliance',
     component: ComplianceView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/settings',
     name: 'Settings',
     component: SettingsView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   
   /*
@@ -95,6 +96,11 @@ router.beforeEach((to) => {
 
   if (to.meta?.requiresAuth && !isAuthed) {
     return { path: '/' }
+  }
+
+  // admin only route
+  if (to.meta?.requiresAdmin && !hasRole("admin")){
+    return {path: "/search"}
   }
 
   return true

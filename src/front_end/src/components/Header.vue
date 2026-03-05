@@ -1,36 +1,31 @@
 <script setup>
 import { Bell, LogOut } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
 
 // Keycloak attributes
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
-const REALM = import.meta.env.VITE_REALM;
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
+const REALM = import.meta.env.VITE_REALM
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
 
 const handleLogout = () => {
-  
-  const idToken = sessionStorage.getItem("id_token");
-  const postLogoutRedirectUri = `${window.location.origin}/`;
+  const idToken = sessionStorage.getItem('id_token')
+  const postLogoutRedirectUri = `${window.location.origin}/`
 
-  sessionStorage.removeItem("access_token");
-  sessionStorage.removeItem("id_token");
-  sessionStorage.removeItem("pkce_verifier");
-  sessionStorage.removeItem("oidc_state");
+  sessionStorage.removeItem('access_token')
+  sessionStorage.removeItem('id_token')
+  sessionStorage.removeItem('pkce_verifier')
+  sessionStorage.removeItem('oidc_state')
 
   if (idToken) {
-  const logoutUrl =
-  `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
-  `?id_token_hint=${encodeURIComponent(idToken)}` +
-  `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-  `&client_id=${encodeURIComponent(CLIENT_ID)}`;
+    const logoutUrl =
+      `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
+      `?id_token_hint=${encodeURIComponent(idToken)}` +
+      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
+      `&client_id=${encodeURIComponent(CLIENT_ID)}`
 
-  window.location.assign(logoutUrl);
-  return;
+  window.location.assign(logoutUrl)
+  return
   }
-
-};
+}
 </script>
 
 <template>

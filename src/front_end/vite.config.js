@@ -11,6 +11,7 @@ export default defineConfig({
     }
   },
   // TESTING
+  /*
   server: { 
   setupMiddlewares(middlewares) {
     middlewares.use('/txt-content', (req, res, next) => {
@@ -20,5 +21,16 @@ export default defineConfig({
     return middlewares
   }
 }
+  */
+ server: {
+  proxy: {
+    "/api": {
+      target: "http://localhost:8000",
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, ""),
+    }
+  }
+
+ }
 // TESTING
 })

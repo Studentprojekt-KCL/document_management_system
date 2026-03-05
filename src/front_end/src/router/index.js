@@ -6,9 +6,7 @@ import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
-import NotFoundView from '@/views/errors/NotFoundView.vue'
-import UnauthorizedView from '@/views/errors/UnauthorizedView.vue'
-import ForbiddenView from '@/views/errors/ForbiddenView.vue'
+import ErrorStatusView from '../views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
 
 const routes = [
@@ -57,17 +55,20 @@ const routes = [
   {
     path: '/404',
     name: 'NotFound',
-    component: NotFoundView
+    component: ErrorStatusView,
+    props: { code: 404, title: 'Not Found', description: 'The requested page could not be found.' }
   },
   {
     path: '/401',
     name: 'Unauthorized',
-    component: UnauthorizedView
+    component: ErrorStatusView,
+    props: { code: 401, title: 'Unauthorized', description: 'You are not authorized to view this page.' }
   },
   {
     path: '/403',
     name: 'Forbidden',
-    component: ForbiddenView
+    component: ErrorStatusView,
+    props: { code: 403, title: 'Forbidden', description: 'You do not have permission to this page.' }
   },
   {
     path: '/:pathMatch(.*)*', // Regex for all unmatched paths

@@ -1,34 +1,47 @@
 <script setup>
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
-const route = useRoute();
-const router = useRouter();
+const props = defineProps({
+  code: {
+    type: [String, Number],
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    required: true
+  }
+})
 
-const attemptedPath = computed(() => route.fullPath);
+const route = useRoute()
+const router = useRouter()
+
+const attemptedPath = computed(() => route.fullPath)
 
 const goBack = () => {
-	router.back();
-};
+  router.back()
+}
 </script>
 
 <template>
-	<section class="not-found-wrapper">
-		<article class="not-found-card">
-			<p class="error-code">403</p>
-			<h1>Forbidden</h1>
-			<p class="text-secondary description">
-				You are signed in, but you do not have access to this page.
-			</p>
-			<p class="text-secondary path">Requested path: {{ attemptedPath }}</p>
+  <section class="not-found-wrapper">
+    <article class="not-found-card">
+      <p class="error-code">{{ code }}</p>
+      <h1>{{ title }}</h1>
+      <p class="text-secondary description">{{ description }}</p>
+     <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
 
-			<div class="actions">
-				<button class="btn-primary" @click="goBack">
-					Go back to previous page
-				</button>
-			</div>
-		</article>
-	</section>
+      <div class="actions">
+        <button class="btn-primary" @click="goBack">
+          Go back to previous page
+        </button>
+      </div>
+    </article>
+  </section>
 </template>
 
 <style scoped>
@@ -60,12 +73,12 @@ const goBack = () => {
 }
 
 .description {
-	margin-bottom: 0.5rem;
+	margin-bottom: 1.5rem;
 }
 
 .path {
 	font-size: 0.875rem;
-	margin-bottom: 1.5rem;
+	margin-bottom: 2rem;
 	word-break: break-word;
 }
 

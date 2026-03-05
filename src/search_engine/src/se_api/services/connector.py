@@ -51,7 +51,7 @@ class Connector:
         if self.subdata is not None:
             params.update({"subdata": self.subdata})
 
-        response = get(f"{self.address}/files", params=params).json()
+        response = get(f"{self.address}/files", params=params, timeout=120).json()
 
         if not isinstance(response, dict):
             return []
@@ -95,7 +95,7 @@ class Connector:
             s = session
 
         try:
-            response = get(f"{self.address}/file", params={"file_pointer": pointer}).json()
+            response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
             if not isinstance(response["metadata"], dict):
                 raise SeAPIException("")
 

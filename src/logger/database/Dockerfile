@@ -1,2 +1,2 @@
 FROM mysql:8.4
-COPY ./queries /docker-entrypoint-initdb.d
+COPY src/logger/database/queries /docker-entrypoint-initdb.d

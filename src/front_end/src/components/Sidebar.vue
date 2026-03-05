@@ -10,9 +10,7 @@ import {
   Menu
 } from 'lucide-vue-next'
 
-// TESTING
 import { hasRole } from '../utils/auth'
-
 const router = useRouter()
 const route = useRoute()
 const isOpen = ref(true)
@@ -34,11 +32,11 @@ const visibleMenuItems = computed(() => {
   if (isAdmin.value) {
     return menuItems
   }
+  // else if when we get another role higher than user
   else {
     return menuItems.filter(item => item.id === 'search')
   }
 })
-
 
 const activeItem = computed(() => {
   const currentPath = route.path

@@ -25,7 +25,11 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-const isAdmin = computed(() => hasRole('admin'))
+const isAdmin = computed(() => {
+  route.fullPath
+  return hasRole("admin")
+})
+
 const visibleMenuItems = computed(() => {
   if (isAdmin.value) {
     return menuItems

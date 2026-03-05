@@ -1,8 +1,7 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
-const props = defineProps({
+defineProps({
   code: {
     type: [String, Number],
     required: true
@@ -17,10 +16,7 @@ const props = defineProps({
   }
 })
 
-const route = useRoute()
 const router = useRouter()
-
-const attemptedPath = computed(() => route.fullPath)
 
 const goBack = () => {
   router.back()
@@ -33,12 +29,10 @@ const goBack = () => {
       <p class="error-code">{{ code }}</p>
       <h1>{{ title }}</h1>
       <p class="text-secondary description">{{ description }}</p>
-     <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
+      <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
 
       <div class="actions">
-        <button class="btn-primary" @click="goBack">
-          Go back to previous page
-        </button>
+        <button class="btn-primary" @click="goBack">Go back to previous page</button>
       </div>
     </article>
   </section>

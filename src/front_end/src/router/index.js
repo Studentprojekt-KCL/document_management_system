@@ -8,6 +8,7 @@ import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '../views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
+import TextViewer from '../components/TextViewer.vue'
 
 const routes = [
   // Public ~ish
@@ -74,7 +75,15 @@ const routes = [
     path: '/:pathMatch(.*)*', // Regex for all unmatched paths
     name: 'NotFoundRedirect', // This route will catch all unmatched paths
     redirect: '/404'
+  },
+  //TESTING
+  {
+    path: '/txt',
+    name: 'txt-viewer',
+    component: () => import('../components/textViewer.vue')
   }
+
+  //TESTING
 ]
 
 const router = createRouter({

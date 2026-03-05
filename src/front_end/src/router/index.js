@@ -4,12 +4,12 @@ import SourcesView from '@/views/SourcesView.vue'
 import IntelligenceView from '@/views/IntelligenceView.vue'
 import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
-import LoginView from '../views/LoginView.vue'
-import AuthCallbackView from '../views/AuthCallbackView.vue'
+import LoginView from '@/views/LoginView.vue'
+import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import UnauthorizedView from '@/views/errors/UnauthorizedView.vue'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
-import { hasRole } from '../utils/auth'
+import { hasRole } from '@/utils/auth'
 
 const routes = [
   // Public ~ish
@@ -34,13 +34,13 @@ const routes = [
     path: '/sources',
     name: 'Sources',
     component: SourcesView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/intelligence',
     name: 'Intelligence',
     component: IntelligenceView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/compliance',

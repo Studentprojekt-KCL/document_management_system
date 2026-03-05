@@ -10,11 +10,8 @@ import {
   Menu
 } from 'lucide-vue-next'
 
-
 // TESTING
 import { hasRole } from '../utils/auth'
-
-// TESTING
 
 const router = useRouter()
 const route = useRoute()
@@ -28,13 +25,15 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-// TESTING
-const isAdmin = computed(()=> hasRole('admin'));
-const visibleMenuItems = computed(()=> {
-  return menuItems.filter(item => item.id !== 'settings' || isAdmin.value)
+const isAdmin = computed(() => hasRole('admin'))
+const visibleMenuItems = computed(() => {
+  if (isAdmin.value) {
+    return menuItems
+  }
+  else {
+    return menuItems.filter(item => item.id === 'search')
+  }
 })
-
-// TESTING
 
 
 const activeItem = computed(() => {

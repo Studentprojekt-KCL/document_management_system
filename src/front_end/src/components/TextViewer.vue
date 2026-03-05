@@ -1,21 +1,20 @@
+
 <script setup>
-import { ref, onMounted } from "vue"
+// TEXT VIEWER, a component to see text
+import { ref, onMounted } from 'vue'
+import { loadTxt } from '../utils/api.js'
 
-const txt = ref("")
+const text = ref('')
 
-async function loadTxt() {
-  const res = await fetch("http://localhost:8000/txt-content")
-
-  if (!res.ok) {
-    throw new Error(`Failed: ${res.status}`)
+onMounted(async () => {
+  try {
+    text.value = await loadTxt()
+  } catch (err) {
+    console.error(err)
   }
-
-  txt.value = await res.text()
-}
-
-onMounted(loadTxt)
+})
 </script>
 
 <template>
-  <pre>{{ txt }}</pre>
+  <pre>{{ text }}</pre>
 </template>

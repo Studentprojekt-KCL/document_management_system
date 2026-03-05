@@ -9,5 +9,16 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
+  },
+  // TESTING
+  server: { 
+  setupMiddlewares(middlewares) {
+    middlewares.use('/txt-content', (req, res, next) => {
+      res.setHeader('Content-Type', 'text/plain')
+      res.end('Hello from the frontend mock endpoint!\nThis simulates your API txt response.')
+    })
+    return middlewares
   }
+}
+// TESTING
 })

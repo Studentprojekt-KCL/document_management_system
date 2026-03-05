@@ -8,7 +8,9 @@ import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '../views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
+// TESTING + Working
 import TextViewer from '../components/TextViewer.vue'
+// TESTING
 
 const routes = [
   // Public ~ish
@@ -76,11 +78,11 @@ const routes = [
     name: 'NotFoundRedirect', // This route will catch all unmatched paths
     redirect: '/404'
   },
-  //TESTING
+  //TESTING + Working
   {
     path: '/txt',
     name: 'txt-viewer',
-    component: () => import('../components/textViewer.vue')
+    component: TextViewer
   }
 
   //TESTING

@@ -27,6 +27,15 @@ ________________________________________
 ### Run npm
 ```npm run dev```
 
+### ESLint
+Check lint errors:
+
+```npm run lint```
+
+Auto-fix lint and formatting issues when possible:
+
+```npm run lint:fix```
+
 ### To stop
 ctrl + c
 ________________________________________

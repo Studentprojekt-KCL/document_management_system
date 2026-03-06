@@ -1,14 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { 
-  Search, 
-  Database, 
-  BarChart3, 
-  ShieldCheck, 
-  Settings,
-  Menu
-} from 'lucide-vue-next'
+import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
 
 import { hasRole } from '../utils/auth'
 const router = useRouter()
@@ -21,12 +14,12 @@ const menuItems = [
   { id: 'intelligence', label: 'Intelligence', icon: BarChart3, path: '/intelligence' },
   { id: 'compliance', label: 'Security & Compliance', icon: ShieldCheck, path: '/compliance' },
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' },
-  { id: 'text', label: 'Text Viewer', icon: Database, path: '/text'}
+  { id: 'text', label: 'Text Viewer', icon: Database, path: '/text' }
 ]
 
 const isAdmin = computed(() => {
   route.fullPath
-  return hasRole("admin")
+  return hasRole('admin')
 })
 
 const visibleMenuItems = computed(() => {
@@ -35,13 +28,13 @@ const visibleMenuItems = computed(() => {
   }
   // else if when we get another role higher than user
   else {
-    return menuItems.filter(item => item.id === 'search')
+    return menuItems.filter((item) => item.id === 'search')
   }
 })
 
 const activeItem = computed(() => {
   const currentPath = route.path
-  const found = menuItems.find(item => item.path === currentPath)
+  const found = menuItems.find((item) => item.path === currentPath)
   return found ? found.id : 'search'
 })
 
@@ -65,8 +58,8 @@ const navigateTo = (path) => {
 
     <!-- Navigation Menu -->
     <nav class="nav-menu">
-      <button 
-        v-for="item in visibleMenuItems" 
+      <button
+        v-for="item in visibleMenuItems"
         :key="item.id"
         @click="navigateTo(item.path)"
         :class="['nav-item', { active: activeItem === item.id }]"
@@ -146,11 +139,11 @@ const navigateTo = (path) => {
 }
 
 .nav-item:hover {
-  background: #F3F4F6;
+  background: #f3f4f6;
 }
 
 .nav-item.active {
-  background: linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%);
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
   color: white;
 }
 
@@ -162,7 +155,7 @@ const navigateTo = (path) => {
 }
 
 .nav-item:not(.active) .nav-icon {
-  color: #9CA3AF;
+  color: #9ca3af;
 }
 
 .nav-item.active .nav-icon {
@@ -176,7 +169,7 @@ const navigateTo = (path) => {
 }
 
 .nav-item:not(.active) .nav-label {
-  color: #6B7280;
+  color: #6b7280;
 }
 
 .nav-item.active .nav-label {

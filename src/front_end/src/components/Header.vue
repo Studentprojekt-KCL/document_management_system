@@ -33,10 +33,10 @@ const handleLogout = () => {
     <img src="@/assets/logo.png" alt="NexusUSI Logo" class="logo-image" />
     <div class="spacer"></div>
     <div class="header-actions">
-      <button @click="handleNotification" class="notification-btn" title="Notifications">
+      <button class="notification-btn" title="Notifications" @click="handleNotification">
         <Bell size="20" />
       </button>
-      <button @click="handleLogout" class="logout-btn" title="Logout">
+      <button class="logout-btn" title="Logout" @click="handleLogout" >
         <LogOut size="20" />
       </button>
     </div>
@@ -70,7 +70,7 @@ const handleLogout = () => {
 }
 
 .notification-btn,
-.logout-btn{
+.logout-btn {
   background: none;
   border: none;
   cursor: pointer;

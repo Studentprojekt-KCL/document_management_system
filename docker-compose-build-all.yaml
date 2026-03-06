@@ -23,7 +23,12 @@ services:
     image: front-end
     build: ./src/front_end
 
-  collector-gitlabs:
+  connector-gitlabs:
     image: connector-gitlabs
     build:
       dockerfile: src/connectors/gitlabs/Dockerfile
+
+  connector-minio:
+    image: connector-minio
+    build:
+      dockerfile: src/connectors/storage-infra/Dockerfile

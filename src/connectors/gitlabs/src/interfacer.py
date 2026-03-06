@@ -170,14 +170,12 @@ class GitLabs:
             files = self._unpack_zip(content)
 
             # pleace dont keep this
-            for i in range(len(files)):
-                files[i]["metadata"].update({"unique_pointer": file_pointers[i]})
+            for i, file in enumerate(files):
+                file["metadata"].update({"unique_pointer": file_pointers[i]})
 
             files_data.extend(files)
 
-        generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
-
-        return {"files": files_data, "subdata": generated_subdata}
+        return {"files": files_data, "subdata": base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()}
 
     def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
         """Retrieve a containing URLs pointing to all available individual files available, except those in projects

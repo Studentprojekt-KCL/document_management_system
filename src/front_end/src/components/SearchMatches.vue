@@ -3,9 +3,9 @@ const props = defineProps({
   matches: { type: Array, default: () => [] },   // ["MainAPI_to_FrontEnd_TEST.txt", ...]
   loading: { type: Boolean, default: false },
   selected: { type: String, default: "" },
-});
+})
 
-const emit = defineEmits(["select"]);
+const emit = defineEmits(['select'])
 </script>
 
 <template>
@@ -16,8 +16,8 @@ const emit = defineEmits(["select"]);
 
     <p v-else-if="!matches.length">No matches.</p>
 
-    <ul v-else style="padding-left: 1rem;">
-      <li v-for="name in matches" :key="name" style="margin-bottom: .5rem;">
+    <ul v-else style="padding-left: 1rem">
+      <li v-for="name in matches" :key="name" style='margin-bottom: .5rem'>
         <button
           @click="emit('select', name)"
           :style="{

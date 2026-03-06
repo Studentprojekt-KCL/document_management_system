@@ -21,7 +21,7 @@ def upload_file(content: dict | list, file_name: str, bucket: str = "slask") -> 
     try:
         client = boto3.client(
             "s3",
-            endpoint_url=os.environ.get("MINIO_ADDRESS"),
+            endpoint_url=os.environ.get("MINIO_ACCESS_ADDRESS"),
             aws_access_key_id=os.environ.get("MINIO_USERNAME"),
             aws_secret_access_key=os.environ.get("MINIO_PASSWORD"),
         )

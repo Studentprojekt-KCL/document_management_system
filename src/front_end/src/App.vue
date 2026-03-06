@@ -1,21 +1,22 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import MainLayout from "@/layouts/MainLayout.vue"
+import MainLayout from '@/layouts/MainLayout.vue'
+
+//TESTING
+
+//TESTING
 
 //TESTING
 import TextViewer from './components/TextViewer.vue'
 //TESTING
 
 const route = useRoute()
-const isPublicOrErrorPage = computed(() =>
-  ['/', '/401', '/403', '/404'].includes(route.path)
+const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
 
-  // TESTING
-  
+// TESTING
 
-  // TESTING
-)
+// TESTING
 </script>
 
 <template>

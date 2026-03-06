@@ -144,7 +144,7 @@ class SearchEngine:
             _ = writer.add_document(
                 Document(
                     name=file.metadata.name if file.metadata.name is not None else "",
-                    unique_pointer=file.metadata.unique_pointer if file.metadata.unique_pointer is not None else "",
+                    unique_pointer=file.metadata.unique_pointer,
                     edited=file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
                     type=file.metadata.type if file.metadata.type is not None else "",
                     size=file.metadata.size if file.metadata.size is not None else "",

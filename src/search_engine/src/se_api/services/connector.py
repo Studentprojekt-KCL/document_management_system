@@ -4,6 +4,7 @@ from itertools import count
 from logging import error
 from os import environ
 from datetime import datetime
+from typing import Any
 from requests import get, exceptions, Session
 
 from se_api.exceptions import SeAPIException
@@ -48,8 +49,8 @@ class Connector:
 
         params: dict[str, str] = {}
 
-        if self.subdata is not None:
-            params.update({"subdata": self.subdata})
+        # if self.subdata is not None:
+        #     params.update({"subdata": self.subdata})
 
         response = get(f"{self.address}/files", params=params, timeout=120).json()
 
@@ -69,11 +70,9 @@ class Connector:
             if isinstance(pointer, str):
                 file_pointers.append(pointer)
 
-        self.subdata = response["subdata"]
-
         return file_pointers
 
-    def get_file(self, pointer: str, session: Session | None = None) -> File | None:
+    def get_file(self, pointer: str) -> File | None:
         """Graps a file from the connectors.
 
         Args:
@@ -87,12 +86,6 @@ class Connector:
         """
 
         file: File | None = None
-
-        s: Session
-        if session is None:
-            s = Session()
-        else:
-            s = session
 
         try:
             response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
@@ -133,9 +126,6 @@ class Connector:
         except exceptions.InvalidJSONError as e:
             error(e.strerror if e.strerror is not None else "")
 
-        if session is None:
-            s.close()
-
         return file
 
     def get_files(self) -> list[File]:
@@ -144,18 +134,45 @@ class Connector:
         Returns:
             A list of files.
         """
-        pointers: list[str] = self.get_file_pointers()
+        # pointers: list[str] = self.get_file_pointers()
+        # files: list[File] = []
+
+        file_url = self._files_to_index()
+        response: dict[str, Any] = get(file_url).json()
+
+        data = response["files"]
         files: list[File] = []
 
-        counter: int = 0
-        with Session() as session:
-            for pointer in pointers:
-                file: File | None = self.get_file(pointer, session)
-                if file is not None:
-                    files.append(file)
-                print(f"{counter}/{50}")
-                counter += 1
-                if counter > 50:
-                    break
+        for item in data:
+            unique_pointer = item["metadata"]["unique_pointer"]
+            name = item["metadata"]["name"]
+            size = item["metadata"]["size"]
+            content = item["content"]
+
+            file = File(
+                content=content,
+                metadata=Metadata(
+                    unique_pointer=unique_pointer,
+                    name=name,
+                    size=size,
+                ),
+            )
+
+            files.append(file)
 
         return files
+
+    def _files_to_index(self) -> str:
+        param = {"subdata": self.subdata} if self.subdata is not None else None
+        response = get(f"{self.address}/files_to_index", params=param, timeout=120).json()
+        subdata = response["subdata"]
+        file_url = response["file_url"]
+
+        if not isinstance(subdata, str):
+            raise SeAPIException("Subdata is expected to be a str.")
+        if not isinstance(file_url, str):
+            raise SeAPIException("File URL is expected to be a str.")
+        
+        self.subdata = subdata
+
+        return file_url

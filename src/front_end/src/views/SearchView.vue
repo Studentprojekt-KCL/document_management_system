@@ -1,9 +1,9 @@
 <script setup>
-import { ref } from "vue";
+import { ref } from 'vue';
 
-import SearchBar from "@/components/SearchBar.vue";
-import SearchFiltersCard from "@/components/SearchFiltersCard.vue";
-import SearchMatches from "@/components/SearchMatches.vue"; // <-- your new component
+import SearchBar from '@/components/SearchBar.vue';
+import SearchFiltersCard from '@/components/SearchFiltersCard.vue';
+import SearchMatches from '@/components/SearchMatches.vue'; // <-- your new component
 
 const matches = ref([]);
 const selectedFile = ref("");
@@ -13,7 +13,7 @@ const isSearching = ref(false);
 const isLoadingFile = ref(false);
 
 const handleSearch = async (query) => {
-  console.log("Searching for:", query);
+  console.log('Searching for:', query);
 
   error.value = "";
   matches.value = [];
@@ -21,7 +21,7 @@ const handleSearch = async (query) => {
   fileContent.value = "";
 
   if (!query || !query.trim()) {
-    error.value = "Please enter a search term.";
+    error.value = 'Please enter a search term.';
     return;
   }
 
@@ -42,7 +42,7 @@ const handleSearch = async (query) => {
     matches.value = data.matches || [];
 
     if (matches.value.length === 0) {
-      error.value = "No matching files found.";
+      error.value = 'No matching files found.';
     }
   } catch (e) {
     error.value = `Search error: ${String(e)}`;
@@ -77,34 +77,34 @@ const fetchData = async (filename) => {
 };
 
 const handleFilterChange = (filter) => {
-  console.log("Filter changed:", filter);
+  console.log('Filter changed:', filter);
 };
 </script>
 
 <template>
-  <section class="search-view">
-    <SearchBar @search="handleSearch" />
-    <p class="search-hint">Click Search or press Enter to search.</p>
-    <SearchFiltersCard @filter-change="handleFilterChange" />
+  <section class='search-view'>
+    <SearchBar @search='handleSearch' />
+    <p class='search-hint'>Click Search or press Enter to search.</p>
+    <SearchFiltersCard @filter-change='handleFilterChange' />
 
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if='error' class='error'>{{ error }}</p>
 
-    <div class="results-layout">
+    <div class='results-layout'>
       <!-- Left: matches -->
       <SearchMatches
-        :matches="matches"
-        :loading="isSearching"
-        :selected="selectedFile"
-        @select="fetchData"
+        :matches='matches'
+        :loading='isSearching'
+        :selected='selectedFile'
+        @select='fetchData'
       />
 
       <!-- Right: preview -->
-      <div class="preview">
+      <div class='preview'>
         <h3>Preview</h3>
-        <p v-if="isLoadingFile">Loading {{ selectedFile }}…</p>
-        <p v-else-if="!fileContent">Select a file to preview.</p>
+        <p v-if='isLoadingFile'>Loading {{ selectedFile }}…</p>
+        <p v-else-if='!fileContent'>Select a file to preview.</p>
 
-        <pre v-else class="preview-box">{{ fileContent }}</pre>
+        <pre v-else class='preview-box'>{{ fileContent }}</pre>
       </div>
     </div>
   </section>

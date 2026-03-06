@@ -1,12 +1,12 @@
 <script setup>
-import Header from "@/components/Header.vue"
-import Sidebar from "@/components/Sidebar.vue"
-import Footer from "@/components/Footer.vue"
+import AppHeader from '@/components/AppHeader.vue'
+import Sidebar from '@/components/Sidebar.vue'
+import Footer from '@/components/Footer.vue'
 </script>
 
 <template>
   <div class="layout">
-    <Header />
+    <AppHeader />
 
     <div class="main">
       <Sidebar />
@@ -19,7 +19,6 @@ import Footer from "@/components/Footer.vue"
     <Footer />
   </div>
 </template>
-
 
 <style scoped>
 .layout {

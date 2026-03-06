@@ -1,5 +1,5 @@
 <script setup>
-import { Bell, LogOut } from 'lucide-vue-next';
+import { Bell, LogOut } from 'lucide-vue-next'
 
 // Keycloak attributes
 const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
@@ -22,8 +22,8 @@ const handleLogout = () => {
       `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
       `&client_id=${encodeURIComponent(CLIENT_ID)}`
 
-  window.location.assign(logoutUrl)
-  return
+    window.location.assign(logoutUrl)
+    return
   }
 }
 </script>
@@ -36,7 +36,7 @@ const handleLogout = () => {
       <button class="notification-btn" title="Notifications" @click="handleNotification">
         <Bell size="20" />
       </button>
-      <button class="logout-btn" title="Logout" @click="handleLogout" >
+      <button class="logout-btn" title="Logout" @click="handleLogout">
         <LogOut size="20" />
       </button>
     </div>

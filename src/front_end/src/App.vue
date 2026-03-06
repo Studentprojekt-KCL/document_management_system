@@ -10,9 +10,9 @@ import MainLayout from '@/layouts/MainLayout.vue'
 const route = useRoute()
 const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
 
-  // TESTING
+// TESTING
 
-  // TESTING
+// TESTING
 </script>
 
 <template>

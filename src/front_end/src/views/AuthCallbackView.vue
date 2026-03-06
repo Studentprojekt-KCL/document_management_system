@@ -14,7 +14,7 @@ const errorMsg = ref('')
 onMounted(async () => {
   // Keycloak might return errors
   if (route.query.error) {
-    errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`;
+    errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`
     return
   }
 
@@ -46,16 +46,16 @@ onMounted(async () => {
 
   try {
     const body = new URLSearchParams()
-    body.set("grant_type", "authorization_code")
-    body.set("client_id", CLIENT_ID)
-    body.set("code", String(code))
-    body.set("redirect_uri", redirectUri)
-    body.set("code_verifier", verifier)
+    body.set('grant_type', 'authorization_code')
+    body.set('client_id', CLIENT_ID)
+    body.set('code', String(code))
+    body.set('redirect_uri', redirectUri)
+    body.set('code_verifier', verifier)
 
     const resp = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      body: body.toString()
     })
 
     // response form token api

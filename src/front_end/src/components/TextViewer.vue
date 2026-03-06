@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted } from 'vue'
 
-const txt = ref("")
+const txt = ref('')
 
 async function loadTxt() {
-  const res = await fetch(import.meta.env.VITE_TXT_ENDPOINT) 
+  const res = await fetch(import.meta.env.VITE_TXT_ENDPOINT)
 
   if (!res.ok) {
     throw new Error(`Failed: ${res.status}`)

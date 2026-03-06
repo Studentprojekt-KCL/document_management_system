@@ -69,16 +69,12 @@ const handleEntraIdLogin = async () => {
       </div>
 
       <div class="login-content">
-        <button 
-          @click="handleEntraIdLogin" 
-          :disabled="isLoading"
-          class="entra-btn"
-        >
+        <button @click="handleEntraIdLogin" :disabled="isLoading" class="entra-btn">
           <svg v-if="!isLoading" class="microsoft-icon" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="11" height="11" fill="#F25022"/>
-            <rect x="12" width="11" height="11" fill="#7FBA00"/>
-            <rect y="12" width="11" height="11" fill="#00A4EF"/>
-            <rect x="12" y="12" width="11" height="11" fill="#FFB900"/>
+            <rect width="11" height="11" fill="#F25022" />
+            <rect x="12" width="11" height="11" fill="#7FBA00" />
+            <rect y="12" width="11" height="11" fill="#00A4EF" />
+            <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
           </svg>
           <span v-if="isLoading">Signing in...</span>
           <span v-else>Sign in with Microsoft Entra ID</span>
@@ -90,8 +86,8 @@ const handleEntraIdLogin = async () => {
 
         <div class="info-text">
           <p class="text-sm text-secondary">
-            Your organization uses Microsoft Entra ID for secure authentication.
-            Click the button above to sign in with your company credentials.
+            Your organization uses Microsoft Entra ID for secure authentication. Click the button above to sign in with your company
+            credentials.
           </p>
         </div>
       </div>
@@ -119,7 +115,7 @@ const handleEntraIdLogin = async () => {
 }
 
 .login-header {
-  background: linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%);
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
   color: white;
   padding: 3rem 2rem;
   text-align: center;

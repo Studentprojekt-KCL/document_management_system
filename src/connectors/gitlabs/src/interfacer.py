@@ -166,7 +166,14 @@ class GitLabs:
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
             content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content))
+            file_pointers = self.get_files_in_project(project_id)
+            files = self._unpack_zip(content)
+
+            # pleace dont keep this
+            for i in range(len(files)):
+                files[i]["metadata"].update({"unique_pointer": file_pointers[i]})
+
+            files_data.extend(files)
 
         generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
 

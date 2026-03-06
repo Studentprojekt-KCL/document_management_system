@@ -4,8 +4,10 @@ import SourcesView from '@/views/SourcesView.vue'
 import IntelligenceView from '@/views/IntelligenceView.vue'
 import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
-import LoginView from '../views/LoginView.vue'
-import AuthCallbackView from '../views/AuthCallbackView.vue'
+import LoginView from '@/views/LoginView.vue'
+import AuthCallbackView from '@/views/AuthCallbackView.vue'
+import ErrorStatusView from '../views/ErrorStatusView.vue'
+import { hasRole } from '@/utils/auth'
 
 const routes = [
   // Public ~ish
@@ -30,41 +32,48 @@ const routes = [
     path: '/sources',
     name: 'Sources',
     component: SourcesView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/intelligence',
     name: 'Intelligence',
     component: IntelligenceView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/compliance',
     name: 'Compliance',
     component: ComplianceView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/settings',
     name: 'Settings',
     component: SettingsView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
-  
-  /*
-  path: "/error",
-  name: "Error",
-  component: ErrorView, // You would need to create an ErrorView.vue for this to work
-  */
+  {
+    path: '/404',
+    name: 'NotFound',
+    component: ErrorStatusView,
+    props: { code: 404, title: 'Not Found', description: 'The requested page could not be found.' }
+  },
+  {
+    path: '/401',
+    name: 'Unauthorized',
+    component: ErrorStatusView,
+    props: { code: 401, title: 'Unauthorized', description: 'You are not authorized to view this page.' }
+  },
+  {
+    path: '/403',
+    name: 'Forbidden',
+    component: ErrorStatusView,
+    props: { code: 403, title: 'Forbidden', description: 'You do not have permission to this page.' }
+  },
   {
     path: '/:pathMatch(.*)*', // Regex for all unmatched paths
     name: 'NotFoundRedirect', // This route will catch all unmatched paths
-    redirect: () => {
-      const token = sessionStorage.getItem('access_token') 
-      return token ? '/search' : '/' // later return token ? '/error' : '/'
-      // I (Emma) think that if anything else is typed in the URL, it should redirect to an error page. 
-      // But for now, it just redirects to the login page if not logged in, and the search page if logged in.
-    }
+    redirect: '/404'
   }
 ]
 
@@ -84,17 +93,22 @@ router.beforeEach((to) => {
     const hasPkceVerifier = !!sessionStorage.getItem('pkce_verifier')
 
     if (!hasError && (!hasCode || !hasPkceVerifier)) {
-      return { path: '/' }
+      return { path: '/401' }
     }
     return true
   }
 
   if (to.name === 'Login' && isAuthed) {
-    return { path: '/search' } // may be changed to error page later.
+    return { path: '/search' }
   }
 
   if (to.meta?.requiresAuth && !isAuthed) {
-    return { path: '/' }
+    return { path: '/401' }
+  }
+
+  // admin only route
+  if (to.meta?.requiresAdmin && !hasRole("admin")){
+    return {path: "/403"}
   }
 
   return true

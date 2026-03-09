@@ -1,7 +1,7 @@
 <script setup>
 import AppHeader from '@/components/AppHeader.vue'
-import Sidebar from '@/components/Sidebar.vue'
-import Footer from '@/components/Footer.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
+import AppFooter from '@/components/AppFooter.vue'
 </script>
 
 <template>
@@ -9,14 +9,14 @@ import Footer from '@/components/Footer.vue'
     <AppHeader />
 
     <div class="main">
-      <Sidebar />
+      <AppSidebar />
 
       <div class="content">
         <router-view />
       </div>
     </div>
 
-    <Footer />
+    <AppFooter />
   </div>
 </template>
 

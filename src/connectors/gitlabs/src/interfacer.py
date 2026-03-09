@@ -133,7 +133,10 @@ class GitLabs:
                 files_data.append(
                     {
                         "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
-                        "metadata": {"file_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")), "size": info.file_size},
+                        "metadata": {
+                            "file_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
+                            "size": info.file_size,
+                        },
                     }
                 )
 

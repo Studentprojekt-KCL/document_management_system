@@ -13,8 +13,7 @@ const menuItems = [
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
   { id: 'intelligence', label: 'Intelligence', icon: BarChart3, path: '/intelligence' },
   { id: 'compliance', label: 'Security & Compliance', icon: ShieldCheck, path: '/compliance' },
-  { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' },
-  { id: 'text', label: 'Text Viewer', icon: Database, path: '/text' }
+  { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
 const isAdmin = computed(() => {

@@ -3,18 +3,19 @@
 from typing import Any
 import argparse
 import requests
+#from pathlib import Path
+from dmis_api.structures import IndexRequest
+# imported but not used for the time being
 
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse # PlainTextResponse
 from fastapi.encoders import jsonable_encoder
+#from fastapi.middleware.cors import CORSMiddleware
 
-from pathlib import Path
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Query
+#from fastapi import Query
 
-from dmis_api.structures import IndexRequest
 
 
 class API:

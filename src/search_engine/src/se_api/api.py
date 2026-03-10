@@ -2,8 +2,8 @@
 
 from typing import Any
 from collections.abc import Sequence
-from logging import error
 
+from dmis_logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -12,11 +12,8 @@ from fastapi.encoders import jsonable_encoder
 
 from se_api.exceptions import SeAPIException
 from se_api.handlers import Handler
-from se_api.models.file import File
-from se_api.models.query import Query
 from se_api.config import APIConfiguration
 
-# from logger import dms_error  # pylint: disable=no-name-in-module
 
 
 class API:
@@ -60,7 +57,7 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, request: Query) -> list[File] | None:
+    async def query(self, q: str, k: int) -> list[str] | None:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -71,9 +68,9 @@ class API:
         """
 
         try:
-            return self.handler.preform_search(request)
+            return self.handler.preform_search(q, k)
         except SeAPIException as e:
-            error(e.msg)
+            dms_error(e.msg)
             return None
 
     async def check_health(self) -> JSONResponse:

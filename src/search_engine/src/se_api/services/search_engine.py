@@ -1,14 +1,16 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import base64
-from logging import error
+import json
 from os import environ
+from dmis_logger import dms_error, dms_info, dms_warning
 from tantivy import (
     Document,
     Index,
     IndexWriter,
     Occur,
     Query,
+    Schema,
     SchemaBuilder,
     SearchResult,
     Searcher,
@@ -40,32 +42,36 @@ class SearchEngine:
     """
 
     index: Index
-    multiplier: Multiplier
+    categories: list[str]
 
     def __init__(self) -> None:
-        schema_builder = SchemaBuilder()
-        _ = schema_builder.add_text_field("name", stored=True)
-        _ = schema_builder.add_text_field("unique_pointer", stored=True)
-        _ = schema_builder.add_text_field("edited", stored=True)
-        _ = schema_builder.add_text_field("type", stored=True)
-        _ = schema_builder.add_text_field("content", stored=True)
-        _ = schema_builder.add_integer_field("size", stored=True)
-        schema = schema_builder.build()
+        dms_info("Initializes search engine.")
+        self.categories = ["unique_pointer", "content"]
+        self.rebuild()
 
-        # Memory only
+    def rebuild(self) -> None:
+        dms_info("Rebuilding schema.")
+        schema_builder = SchemaBuilder()
+        for category in self.categories:
+            _ = schema_builder.add_text_field(category, stored=True)
+        schema = schema_builder.build()
+        dms_info(f"New category set: {self.categories}")
         self.index = Index(schema)
 
-        # Configuration
-        name = float(environ.get("SE_API_MULTIPLIER_NAME", 1.0))
-        type = float(environ.get("SE_API_MULTIPLIER_TYPE", 1.0))
-        edited = float(environ.get("SE_API_MULTIPLIER_EDITED", 1.0))
-        content = float(environ.get("SE_API_MULTIPLIER_CONTENT", 1.0))
-        size = float(environ.get("SE_API_MULTIPLIER_SIZE", 1.0))
+    def have_new_category(self, categories: dict) -> bool:
+        new: bool = False
+        for key in categories.keys():
+            category = categories.get(key)
+            if isinstance(category, dict):
+                new = new or self.have_new_category(category)
+            elif key not in self.categories:
+                new = True
+                self.categories.append(key)
 
-        self.multiplier = Multiplier(name, type, edited, content, size)
+        return new
 
 
-    def query_files(self, q: query.Query, k: int = 50) -> list[str]:
+    def query_files(self, q: str, k: int = 50) -> list[str]:
         """Query through the files in the index.
 
         Args:
@@ -79,19 +85,8 @@ class SearchEngine:
             SeAPIException: Potential formatting errors.
         """
 
-        queries: list[Query] = []
-
-        content: Query = Query.boost_query(self.index.parse_query(q.query, ["content"]), self.multiplier.content) if isinstance(q.query, str) else Query.empty_query()
-
-        queries.append(content)
-
-        if isinstance(q.metadata, metadata.Metadata):
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.name, ["name"]), self.multiplier.name) if isinstance(q.metadata.name, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.edited, ["edited"]), self.multiplier.edited) if isinstance(q.metadata.edited, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.type, ["type"]), self.multiplier.type) if isinstance(q.metadata.type, str) else Query.empty_query())
-            queries.append(Query.boost_query(self.index.parse_query(q.metadata.size, ["size"]), self.multiplier.size) if isinstance(q.metadata.size, str) else Query.empty_query())
-
-        query = Query.boolean_query([(Occur.Must, Query.disjunction_max_query(queries, 0.3))])
+        dms_info("Quering")
+        query = self.index.parse_query(q, self.categories)
 
         searcher: Searcher = self.index.searcher()
         result: SearchResult = searcher.search(query, k)
@@ -99,10 +94,6 @@ class SearchEngine:
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
             unique_poinet = doc["unique_pointer"][0]
-
-            if not isinstance(unique_poinet, str):
-                raise SeAPIException("")
-
             pointers.append(unique_poinet)
 
         return pointers
@@ -113,44 +104,58 @@ class SearchEngine:
         Args:
             file: the file to add.
         """
-        writer: IndexWriter = self.index.writer()
-        content_byte = base64.b64decode(file.content)
-        content = content_byte.decode("utf-8")
-        _ = writer.add_document(
-            Document(
-                name=file.metadata.name if file.metadata.name is not None else "",
-                unique_pointer=file.metadata.unique_pointer,
-                edited=file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
-                type=file.metadata.type if file.metadata.type is not None else "",
-                size=file.metadata.size if file.metadata.size is not None else "",
-                content=content,
-            )
-        )
-        _ = writer.commit()
-        writer.wait_merging_threads()
+        # writer: IndexWriter = self.index.writer()
+        # content_byte = base64.b64decode(file.content)
+        # content = content_byte.decode("utf-8")
+        # _ = writer.add_document(
+        #     Document(
+        #     )
+        # )
+        # _ = writer.commit()
+        # writer.wait_merging_threads()
         self.index.reload()
 
-    def add_files(self, files: list[File]) -> None:
+    def add_files(self, files: list) -> None:
         """Add a list of files to the index.
 
         Args:
             files: list of files.
         """
+        dms_info("Adding new files to index.")
 
         writer: IndexWriter = self.index.writer()
         for file in files:
-            content_byte: bytes = base64.b64decode(file.content)
-            content: str = content_byte.decode("utf-8")
-            _ = writer.add_document(
-                Document(
-                    name=file.metadata.name if file.metadata.name is not None else "",
-                    unique_pointer=file.metadata.unique_pointer,
-                    edited=file.metadata.edited.isoformat() if file.metadata.edited is not None else "",
-                    type=file.metadata.type if file.metadata.type is not None else "",
-                    size=file.metadata.size if file.metadata.size is not None else "",
-                    content=content,
-                )
-            )
+            flat_file = self._flatten_dict(file)
+            content = flat_file.get("content")
+            unique_pointer = flat_file.get("unique_pointer")
+
+            if content is None:
+                dms_warning("File is missing content.")
+                continue
+            if unique_pointer is None:
+                dms_warning("File is missing unique pointer.")
+                continue
+
+            content_bytes: bytes = base64.b64decode(content)
+            content = content_bytes.decode("utf-8")
+            flat_file["content"] = content
+
+            _ = writer.add_json(json.dumps(flat_file))
+
         _ = writer.commit()
         writer.wait_merging_threads()
+
+        dms_info("Done adding new files to index.")
         self.index.reload()
+
+    def _flatten_dict(self, d: dict) -> dict:
+        flat: dict = {}
+
+        for (key, val) in d.items():
+            if isinstance(val, dict):
+                flat.update(self._flatten_dict(val))
+            else:
+                flat.update({key: str(val)})
+
+        return flat
+

@@ -1,11 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from itertools import count
-from logging import error
 from os import environ
 from datetime import datetime
-from typing import Any
-from requests import get, exceptions, Session
+from dmis_logger import dms_error, dms_warning
+from requests import get
+from requests.exceptions import JSONDecodeError
 
 from se_api.exceptions import SeAPIException
 from se_api.models.file import File
@@ -33,6 +32,9 @@ class Connector:
             raise SeAPIException("SE_API_CONNECTOR_ADDRESS is not defined.")
 
         self.address = address
+        self.subdata = None
+
+    def reset(self):
         self.subdata = None
 
     def get_file_pointers(self) -> list[str]:
@@ -72,7 +74,7 @@ class Connector:
 
         return file_pointers
 
-    def get_file(self, pointer: str) -> File | None:
+    def get_file(self, pointer: str) -> dict | None:
         """Graps a file from the connectors.
 
         Args:
@@ -85,50 +87,23 @@ class Connector:
             SeAPIException: Potential formatting errors.
         """
 
-        file: File | None = None
+        response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
 
-        try:
-            response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
-            if not isinstance(response["metadata"], dict):
-                raise SeAPIException("")
+        if not isinstance(response, dict):
+            dms_error("File is not formated as a dict.")
+            return
 
-            unique_pointer = response["metadata"]["unique_pointer"]
-            name = response["metadata"]["name"]
-            size = response["metadata"]["size"]
-            edited = response["metadata"]["last_edit_date"]
-            contnet_type = response["metadata"]["type"]
-            content = response["content"]
+        if response.get("metadata") is None:
+            dms_error("File has no metadata.")
+            return
+        
+        if response.get("content") is None:
+            dms_error("File has no content.")
+            return
 
-            if not isinstance(unique_pointer, str):
-                raise SeAPIException("")
-            if not isinstance(name, str):
-                raise SeAPIException("")
-            if not isinstance(size, int):
-                raise SeAPIException("")
-            if not isinstance(edited, str):
-                raise SeAPIException("")
-            if not isinstance(contnet_type, str):
-                raise SeAPIException("")
-            if not isinstance(content, str):
-                raise SeAPIException("")
+        return response
 
-            file = File(
-                content=content,
-                metadata=Metadata(
-                    unique_pointer=unique_pointer,
-                    name=name,
-                    size=size,
-                    edited=datetime.fromisoformat(edited),
-                    type=contnet_type,
-                ),
-            )
-
-        except exceptions.InvalidJSONError as e:
-            error(e.strerror if e.strerror is not None else "")
-
-        return file
-
-    def get_files(self) -> list[File]:
+    def get_files(self) -> list:
         """Grab all new files from connectors.
 
         Returns:
@@ -138,41 +113,41 @@ class Connector:
         # files: list[File] = []
 
         file_url = self._files_to_index()
-        response: dict[str, Any] = get(file_url).json()
+        if file_url is None:
+            return []
 
-        data = response["files"]
-        files: list[File] = []
+        response = get(file_url).json()
 
-        for item in data:
-            unique_pointer = item["metadata"]["unique_pointer"]
-            name = item["metadata"]["name"]
-            size = item["metadata"]["size"]
-            content = item["content"]
+        data = response.get("files")
 
-            file = File(
-                content=content,
-                metadata=Metadata(
-                    unique_pointer=unique_pointer,
-                    name=name,
-                    size=size,
-                ),
-            )
+        if data is None:
+            dms_error(f"No files in collector response.")
+            return []
 
-            files.append(file)
+        subdata = response.get("subdata")
 
-        return files
+        if subdata is None:
+            dms_warning(f"No subdata delievered by collector.")
 
-    def _files_to_index(self) -> str:
-        param = {"subdata": self.subdata} if self.subdata is not None else None
-        response = get(f"{self.address}/files_to_index", params=param, timeout=120).json()
-        subdata = response["subdata"]
-        file_url = response["file_url"]
-
-        if not isinstance(subdata, str):
-            raise SeAPIException("Subdata is expected to be a str.")
-        if not isinstance(file_url, str):
-            raise SeAPIException("File URL is expected to be a str.")
-        
         self.subdata = subdata
 
-        return file_url
+        return data
+
+    def _files_to_index(self) -> str | None:
+        try:
+            param = {"subdata": self.subdata} if self.subdata is not None else None
+            response = get(f"{self.address}/files_to_index", params=param, timeout=120).json()
+            subdata = response.get("subdata")
+            file_url = response.get("file_url")
+
+            if subdata is None:
+                dms_warning("No subdata delievered by collector.")
+            if file_url is None:
+                dms_error("No returned collection URL.")
+            
+            self.subdata = subdata
+
+            return file_url
+        except JSONDecodeError as e:
+            dms_error(e.msg)
+            return

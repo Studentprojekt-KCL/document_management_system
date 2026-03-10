@@ -21,7 +21,7 @@ class Handler:
         self.connector = Connector()
         self.search_engine = SearchEngine()
 
-    def preform_search(self, request: Query) -> list[File] | None:
+    def preform_search(self, request: str, k: int) -> list[str] | None:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
@@ -31,14 +31,17 @@ class Handler:
             Returns matching files or None.
         """
 
-        new_files: list[str] = self.connector.get_file_pointers()
-        if len(new_files) != 0:
-            files: list[File] = self.connector.get_files()
-            self.search_engine.add_files(files)
-        matches: list[str] = self.search_engine.query_files(request, k=10)
-        updated_files: list[File] = []
-        for match in matches:
-            file: File | None = self.connector.get_file(match)
-            if file is not None:
-                updated_files.append(file)
-        return updated_files
+        new_files: list = self.connector.get_file_pointers()
+
+        if new_files:
+            files = self.connector.get_files()
+            if files:
+                if self.search_engine.have_new_category(files[0]):
+                    self.search_engine.rebuild()
+                    self.connector.reset()
+                    files = self.connector.get_files()
+                self.search_engine.add_files(files)
+
+        matches: list = self.search_engine.query_files(request, k)
+        return matches
+

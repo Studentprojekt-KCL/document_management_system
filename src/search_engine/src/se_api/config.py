@@ -1,11 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from os import environ
-from logging import error
+from dmis_logger import dms_error
 import argparse
 
-# from logger import dms_error  # pylint: disable=no-name-in-module
-
+from se_api.exceptions import SeAPIException
 
 class APIConfiguration:
     """API Configuration
@@ -21,32 +20,24 @@ class APIConfiguration:
     log_level: str
 
     def __init__(self) -> None:
-        try:
-            self._load_port()
-            self._load_host()
-            self._load_log_level()
-        except RuntimeError as e:
-            self.port = 0
-            self.host = ""
-            self.log_level = ""
-            error(e)
+        self._load_port()
+        self._load_host()
+        self._load_log_level()
 
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
 
-        temp: str | None = environ.get("SE_API_PORT", None)
-        port: int = 0
+        port = environ.get("SE_API_PORT", None)
 
-        if temp is None:
+        if port is None:
             port = 8080
-        else:
-            try:
-                port = int(temp)
-            except ValueError as e:
-                raise e
+        elif not port.isdigit():
+            dms_error("Port is expected to be an integer.")
+
+        port = int(port)
 
         if port < 0 or port > 65536:
-            raise RuntimeError(f"SE_API_PORT expected value to be between 0 and 65536, but is {port}")
+            dms_error("Port should be between 0 and 65536.")
 
         self.port = port
 
@@ -57,6 +48,8 @@ class APIConfiguration:
 
     def _load_log_level(self) -> None:
         """Load log level from arguments."""
+        import logging
+        logging.basicConfig()
 
         parser = argparse.ArgumentParser()
         _ = parser.add_argument("--dev", action="store_true")
@@ -64,5 +57,7 @@ class APIConfiguration:
 
         if args.dev:
             self.log_level = "debug"
+            logging.getLogger().setLevel(logging.DEBUG)
         else:
+            logging.getLogger().setLevel(logging.INFO)
             self.log_level = "info"

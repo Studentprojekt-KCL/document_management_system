@@ -15,7 +15,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from dmis_logger import dms_error, dms_info, dms_warning  # pylint: disable=no-name-in-module
+from dmis_logger import dms_error, dms_info, dms_warning
 
 
 class GitLabs:
@@ -28,6 +28,11 @@ class GitLabs:
     def __init__(self) -> None:
         """Constructor."""
         address = os.environ.get("GITLAB_ADDRESS")
+        if address is None:
+            dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
+            return
+        if not address.endswith("/"):
+            address += "/"
         self.base = urljoin(str(address), self.API_URL)
 
     def _get_projects(self) -> dict | list:
@@ -218,8 +223,10 @@ class GitLabs:
             response = requests.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
-            dms_error(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
+            dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}
+        except requests.exceptions.MissingSchema as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
         if response.status_code != 200:
             dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
         return content

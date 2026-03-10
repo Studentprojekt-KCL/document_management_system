@@ -12,6 +12,7 @@ const error = ref('')
 const isSearching = ref(false)
 const isLoadingFile = ref(false)
 
+// --- Search for matches ---
 const handleSearch = async (query) => {
   console.log('Searching for:', query)
 
@@ -26,8 +27,8 @@ const handleSearch = async (query) => {
   }
 
   isSearching.value = true
-  try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+  try { // the endpoint is /search in main API.
+    const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
@@ -35,11 +36,13 @@ const handleSearch = async (query) => {
     }
 
     const data = await res.json()
-    matches.value = data.matches || []
+    console.log('Search response:', data)
+    matches.value = Array.isArray(data) ? data : data.results || data.matches || []
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
     }
+
   } catch (e) {
     error.value = `Search error: ${String(e)}`
   } finally {
@@ -47,25 +50,16 @@ const handleSearch = async (query) => {
   }
 }
 
-const fetchData = async (filename) => {
-  error.value = ''
-  selectedFile.value = filename
-  fileContent.value = ''
+// --- Handle selecting a match ---
+const selectMatch = (match) => {
+  if (!match) return
+  selectedFile.value = match.content // just use content as ID for now + add meta data when its finished.
 
-  isLoadingFile.value = true
-  try {
-    const res = await fetch(`api/${encodeURIComponent(filename)}`)
-
-    if (!res.ok) {
-      error.value = `Load failed: ${res.status} ${await res.text()}`
-      return
-    }
-
-    fileContent.value = await res.text()
+  try { // try to decode base64
+    fileContent.value = atob(match.content)
   } catch (e) {
-    error.value = `Load error: ${String(e)}`
-  } finally {
-    isLoadingFile.value = false
+    fileContent.value = '[Error decoding file content]'
+    console.error('Base64 decode error:', e)
   }
 }
 
@@ -84,7 +78,7 @@ const handleFilterChange = (filter) => {
 
     <div class="results-layout">
       <!-- Left: matches -->
-      <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" @select="fetchData" />
+      <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" @select="selectMatch" />
 
       <!-- Right: preview -->
       <div class="preview">

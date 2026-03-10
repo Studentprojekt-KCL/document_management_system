@@ -78,43 +78,6 @@ class API:
 
             return r.json()
 
-
-        # TEST
-
-        FILES_DIR = Path(__file__).resolve().parent / "data"
-        @self.app.get("/files/search")
-        async def search_files(q: str = Query(..., min_length=1)) -> dict:
-                """
-                Search for files by name (case-insensitive) in FILES_DIR.
-                Example: /files/search?q=MainAPI
-                """
-                if not FILES_DIR.exists():
-                    raise HTTPException(status_code=500, detail=f"FILES_DIR missing: {FILES_DIR}")
-
-                q_lower = q.lower()
-                matches = sorted(
-                    [p.name for p in FILES_DIR.iterdir() if p.is_file() and q_lower in p.name.lower()]
-                )
-
-                return {"query": q, "matches": matches}
-
-
-        @self.app.get("/files/{filename}", response_class=PlainTextResponse)
-        async def get_file(filename: str) -> str:
-            """
-            Get file contents from FILES_DIR by filename.
-            Example: /files/MainAPI_to_FrontEnd_TEST.txt
-            """
-            # Prevent path traversal like ../../etc/passwd
-            safe_name = Path(filename).name
-            file_path = FILES_DIR / safe_name
-
-            if not file_path.exists() or not file_path.is_file():
-                raise HTTPException(status_code=404, detail=f"File not found: {safe_name}")
-
-            return file_path.read_text(encoding="utf-8")
-
-
 api_instance = API()
 app = api_instance.app
 

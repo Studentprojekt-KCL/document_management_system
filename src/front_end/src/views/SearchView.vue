@@ -27,7 +27,8 @@ const handleSearch = async (query) => {
   }
 
   isSearching.value = true
-  try { // the endpoint is /search in main API.
+  try {
+    // the endpoint is /search in main API.
     const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
@@ -42,7 +43,6 @@ const handleSearch = async (query) => {
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
     }
-
   } catch (e) {
     error.value = `Search error: ${String(e)}`
   } finally {
@@ -55,7 +55,8 @@ const selectMatch = (match) => {
   if (!match) return
   selectedFile.value = match.content // just use content as ID for now + add meta data when its finished.
 
-  try { // try to decode base64
+  try {
+    // try to decode base64
     fileContent.value = atob(match.content)
   } catch (e) {
     fileContent.value = '[Error decoding file content]'

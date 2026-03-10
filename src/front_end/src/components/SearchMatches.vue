@@ -17,7 +17,7 @@ const emit = defineEmits(['select'])
     <p v-else-if="!matches.length">No matches.</p>
 
     <ul v-else style="padding-left: 1rem">
-      <li v-for="(match, index) in matches" :key="index" style="margin-bottom: 0.5rem">
+      <li v-for="(match, index) in props.matches" :key="index" style="margin-bottom: 0.5rem">
         <button
           @click="emit('select', match)"
           :style="{
@@ -34,4 +34,3 @@ const emit = defineEmits(['select'])
     </ul>
   </div>
 </template>
-

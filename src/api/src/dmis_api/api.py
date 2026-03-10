@@ -4,7 +4,7 @@ from typing import Any
 import argparse
 import requests
 #from pathlib import Path
-from dmis_api.structures import IndexRequest
+#from dmis_api.structures import IndexRequest
 # imported but not used for the time being
 
 import uvicorn

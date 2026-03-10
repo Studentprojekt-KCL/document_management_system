@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 import base64
 import json
 import io
+from pathlib import Path
 import zipfile
 from hashlib import md5
 from typing import Any
@@ -112,12 +113,15 @@ class GitLabs:
 
         return base_structure
 
-    @staticmethod
-    def _unpack_zip(content: bytes) -> list:
+    def _unpack_zip(self, content: bytes, project_id: int) -> list:
         """Unpack .zip content and return a list containing all the files."""
+        base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
+
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
             for file in zip_file.namelist():
+                file_path = Path(file)
+                intermediate_path = str(Path(*file_path.parts[1:]))
                 info = zip_file.getinfo(file)
                 if info.is_dir():
                     continue
@@ -129,7 +133,10 @@ class GitLabs:
                 files_data.append(
                     {
                         "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
-                        "metadata": {"name": file, "size": info.file_size},
+                        "metadata": {
+                            "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
+                            "size": info.file_size,
+                        },
                     }
                 )
 
@@ -166,7 +173,7 @@ class GitLabs:
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
             content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content))
+            files_data.extend(self._unpack_zip(content, project_id))
 
         generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
 

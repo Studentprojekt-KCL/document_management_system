@@ -47,41 +47,18 @@ class API:
     def _register_routes(self) -> None:
         """Register API endpoints."""
 
-        @self.app.get("/index", status_code=200)
-        async def index(item: IndexRequest) -> Any:
-            """DMIS API index endpoint definition."""
-            return item
-
-        # --- Testing functions ---
-
-        @self.app.get("/txt-content", response_class=PlainTextResponse)
-        async def txt_content() -> str:
-            """
-            Main API -> Front-end text test.
-
-            Looks for the test file in the same folder as this api.py file.
-            """
-            file_path = Path(__file__).resolve().parent / "MainAPI_to_FrontEnd_TEST.txt"
-
-            if not file_path.exists():
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Missing file: {file_path}. Create it to use /txt-content."
-                )
-
-            return file_path.read_text(encoding="utf-8")
-
-
         @self.app.get("/search")
         async def search(query: str) -> Any:
             """
                 This endpoint fetches data from the endpoint 10.3.0.2:8001/search
 
-                To grab the data form this endpoint you need to perform the curl:
+                To grab the data from this endpoint you need to perform the curl:
                 curl "http://127.0.0.1:8000/search?query=alibaba" 
             """
 
-            # TODO: add metadata
+            # - add metadata
+            # - the actual production api_url 
+            # - create environmental variables
 
             api_url = "http://10.3.0.2:8001/search"
 

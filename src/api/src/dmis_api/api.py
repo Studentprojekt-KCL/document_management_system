@@ -58,7 +58,7 @@ class API:
             """
 
             # - add metadata
-            # - the actual production api_url 
+            # - the actual production api_url
             # - create environmental variables
 
             api_url = "http://10.3.0.2:8001/search"
@@ -75,7 +75,7 @@ class API:
                 r.raise_for_status()
 
             except requests.RequestException as e:
-                raise HTTPException(status_code=502, detail=str(e))
+                raise HTTPException(status_code=502, detail=str(e)) from e
 
             return r.json()
 

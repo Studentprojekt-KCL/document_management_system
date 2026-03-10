@@ -71,8 +71,17 @@ class API:
 
             return file_path.read_text(encoding="utf-8")
 
+
         @self.app.get("/search")
         async def search(query: str) -> Any:
+            """
+                This endpoint fetches data from the endpoint 10.3.0.2:8001/search
+
+                To grab the data form this endpoint you need to perform the curl:
+                curl "http://127.0.0.1:8000/search?query=alibaba" 
+            """
+
+            # TODO: add metadata
 
             api_url = "http://10.3.0.2:8001/search"
 

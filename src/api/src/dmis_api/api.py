@@ -71,26 +71,26 @@ class API:
 
             return file_path.read_text(encoding="utf-8")
 
-    @self.app.get("/search")
+        @self.app.get("/search")
         async def search(query: str) -> Any:
 
             api_url = "http://10.3.0.2:8001/search"
 
-        try:
+            try:
                 r = requests.get(
-                api_url,
-                json={
-                    "user_id": "test",
-                    "query": query
-                },
-                timeout=5
-            )
-            r.raise_for_status()
+                    api_url,
+                    json={
+                        "user_id": "test",
+                        "query": query
+                    },
+                    timeout=5
+                )
+                r.raise_for_status()
 
-        except requests.RequestException as e:
-            raise HTTPException(status_code=502, detail=str(e))
+            except requests.RequestException as e:
+                raise HTTPException(status_code=502, detail=str(e))
 
-        return r.json()
+            return r.json()
 
 
         # TEST

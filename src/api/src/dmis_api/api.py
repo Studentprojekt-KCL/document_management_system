@@ -71,25 +71,28 @@ class API:
 
             return file_path.read_text(encoding="utf-8")
 
-        @self.app.get("/search")
+    @self.app.get("/search")
         async def search(query: str) -> Any:
-            """
-            Main API -> Search Endpoint test.
 
-            Example:
-              curl "http://127.0.0.1:8000/search?query=Linear"
+            api_url = "http://10.3.0.2:8001/search"
 
-            NOTE: This URL is currently a placeholder and should be moved to .env later.
-            """
-            api_url = "http://10.4.0.2:8000/titles"
+        try:
+                r = requests.get(
+                api_url,
+                json={
+                    "user_id": "test",
+                    "query": query
+                },
+                timeout=5
+            )
+            r.raise_for_status()
 
-            try:
-                r = requests.get(api_url, params={"title": query}, timeout=5)
-                r.raise_for_status()
-            except requests.RequestException as e:
-                raise HTTPException(status_code=502, detail=str(e))
+        except requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=str(e))
 
-            return r.json()
+        return r.json()
+
+
         # TEST
 
         FILES_DIR = Path(__file__).resolve().parent / "data"

@@ -27,7 +27,7 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`/api/files/search?q=${encodeURIComponent(query)}`)
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
@@ -54,7 +54,7 @@ const fetchData = async (filename) => {
 
   isLoadingFile.value = true
   try {
-    const res = await fetch(`api/files/${encodeURIComponent(filename)}`)
+    const res = await fetch(`api/${encodeURIComponent(filename)}`)
 
     if (!res.ok) {
       error.value = `Load failed: ${res.status} ${await res.text()}`

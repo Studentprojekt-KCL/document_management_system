@@ -1,10 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import logging
+import argparse
 from os import environ
 from dmis_logger import dms_error
-import argparse
 
-from se_api.exceptions import SeAPIException
 
 class APIConfiguration:
     """API Configuration
@@ -30,16 +30,13 @@ class APIConfiguration:
         port = environ.get("SE_API_PORT", None)
 
         if port is None:
-            port = 8080
+            self.port = 8080
         elif not port.isdigit():
             dms_error("Port is expected to be an integer.")
-
-        port = int(port)
-
-        if port < 0 or port > 65536:
+        elif int(port) < 0 or int(port) > 65536:
             dms_error("Port should be between 0 and 65536.")
-
-        self.port = port
+        else:
+            self.port = int(port)
 
     def _load_host(self) -> None:
         """Load host configuration."""
@@ -48,7 +45,7 @@ class APIConfiguration:
 
     def _load_log_level(self) -> None:
         """Load log level from arguments."""
-        import logging
+
         logging.basicConfig()
 
         parser = argparse.ArgumentParser()

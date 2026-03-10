@@ -3,17 +3,14 @@
 from typing import Any
 from collections.abc import Sequence
 
-from dmis_logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from se_api.exceptions import SeAPIException
 from se_api.handlers import Handler
 from se_api.config import APIConfiguration
-
 
 
 class API:
@@ -67,11 +64,7 @@ class API:
             List of found files or None.
         """
 
-        try:
-            return self.handler.preform_search(q, k)
-        except SeAPIException as e:
-            dms_error(e.msg)
-            return None
+        return self.handler.preform_search(q, k)
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""

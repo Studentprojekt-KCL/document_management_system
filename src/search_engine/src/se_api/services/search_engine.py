@@ -2,37 +2,16 @@
 
 import base64
 import json
-from os import environ
-from dmis_logger import dms_error, dms_info, dms_warning
+from dmis_logger import dms_info, dms_warning
 from tantivy import (
     Document,
     Index,
     IndexWriter,
-    Occur,
-    Query,
-    Schema,
     SchemaBuilder,
     SearchResult,
     Searcher,
 )
 
-from se_api.exceptions import SeAPIException
-from se_api.models.file import File
-from se_api.models import query, metadata
-
-class Multiplier:
-    name: float
-    type: float
-    edited: float
-    content: float
-    size: float
-
-    def __init__(self, name: float, type: float, edited: float, content: float, size: float) -> None:
-        self.name = name
-        self.type = type
-        self.edited = edited
-        self.content = content
-        self.size = size
 
 class SearchEngine:
     """Search engine service
@@ -45,11 +24,11 @@ class SearchEngine:
     categories: list[str]
 
     def __init__(self) -> None:
-        dms_info("Initializes search engine.")
         self.categories = ["unique_pointer", "content"]
         self.rebuild()
 
     def rebuild(self) -> None:
+        """Rebuild the index schema with the saved categories."""
         dms_info("Rebuilding schema.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
@@ -59,6 +38,15 @@ class SearchEngine:
         self.index = Index(schema)
 
     def have_new_category(self, categories: dict) -> bool:
+        """Check if there is an apsent category.
+
+        Args:
+            categories: the dict containing the categories.
+
+        Returns:
+        True if there are new ones, else False
+        """
+
         new: bool = False
         for key in categories.keys():
             category = categories.get(key)
@@ -69,7 +57,6 @@ class SearchEngine:
                 self.categories.append(key)
 
         return new
-
 
     def query_files(self, q: str, k: int = 50) -> list[str]:
         """Query through the files in the index.
@@ -97,23 +84,6 @@ class SearchEngine:
             pointers.append(unique_poinet)
 
         return pointers
-
-    def add_file(self, file: File) -> None:
-        """Add a file to the index.
-
-        Args:
-            file: the file to add.
-        """
-        # writer: IndexWriter = self.index.writer()
-        # content_byte = base64.b64decode(file.content)
-        # content = content_byte.decode("utf-8")
-        # _ = writer.add_document(
-        #     Document(
-        #     )
-        # )
-        # _ = writer.commit()
-        # writer.wait_merging_threads()
-        self.index.reload()
 
     def add_files(self, files: list) -> None:
         """Add a list of files to the index.
@@ -151,11 +121,10 @@ class SearchEngine:
     def _flatten_dict(self, d: dict) -> dict:
         flat: dict = {}
 
-        for (key, val) in d.items():
+        for key, val in d.items():
             if isinstance(val, dict):
                 flat.update(self._flatten_dict(val))
             else:
                 flat.update({key: str(val)})
 
         return flat
-

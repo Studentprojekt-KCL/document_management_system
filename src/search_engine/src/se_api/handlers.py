@@ -1,7 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from se_api.models.file import File
-from se_api.models.query import Query
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
@@ -44,4 +42,3 @@ class Handler:
 
         matches: list = self.search_engine.query_files(request, k)
         return matches
-

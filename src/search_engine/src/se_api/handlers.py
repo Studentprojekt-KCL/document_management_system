@@ -34,11 +34,9 @@ class Handler:
             dms_warning(f"Either page size or page index is invalid. (p: {p}, k: {k}).")
             return []
 
-        new_files: list = self.connector.get_file_pointers()
-
-        if new_files:
-            dms_info(f"New files in connector reindexing, number of files: {len(new_files)}.")
-            files = self.connector.get_files()
+        files: list = self.connector.get_files()
+        if files:
+            dms_info(f"New files in connector reindexing, number of files: {len(files)}.")
             if files:
                 if self.search_engine.have_new_category(files[0]):
                     self.search_engine.rebuild()

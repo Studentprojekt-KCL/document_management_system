@@ -112,7 +112,6 @@ class SearchEngine:
         _ = writer.commit()
         writer.wait_merging_threads()
 
-        dms_info("Done adding new files to index.")
         self.index.reload()
 
     def _flatten_dict(self, d: dict) -> dict:

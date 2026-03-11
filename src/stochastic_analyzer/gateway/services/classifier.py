@@ -1,7 +1,9 @@
 import json
 import httpx
-from gateway.config import settings
+from gateway.config import Settings
 from gateway.schemas import InputItem, ClassificationResult
+
+settings = Settings()
 
 async def classify_document(item: InputItem) -> ClassificationResult | None:
     truncated_content = item.content[:1500]

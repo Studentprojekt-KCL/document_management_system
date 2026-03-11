@@ -47,7 +47,7 @@ class Handler:
 
         matches: list = self.search_engine.query_files(request, k * p)
 
-        files: list = []
+        matching_files: list = []
 
         for i in range(k * (p - 1), len(matches)):
             file: dict | None = self.connector.get_file(matches[i])
@@ -59,6 +59,6 @@ class Handler:
             if metadata is None:
                 continue
 
-            files.append(metadata)
+            matching_files.append(metadata)
 
-        return files
+        return matching_files

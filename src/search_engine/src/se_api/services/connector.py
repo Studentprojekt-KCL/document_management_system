@@ -40,10 +40,9 @@ class Connector:
         Raises:
             SeAPIException: For potential formatting errors.
         """
-        params: dict[str, str] = {}
-        if self.subdata is not None:
-            params.update({"subdata": self.subdata})
-        response = get(f"{self.address}/files", params=params, timeout=120).json()
+        response = get(
+            f"{self.address}/files", params=("subdata", self.subdata) if self.subdata is not None else (), timeout=120
+        ).json()
 
         if not isinstance(response, dict):
             return []
@@ -63,8 +62,7 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-
-        response = get(f"{self.address}/file", params={"file_pointer": pointer, "include_content": False}, timeout=120).json()
+        response = get(f"{self.address}/file", params=[("file_pointer", pointer), ("include_content", False)], timeout=120).json()
 
         if not isinstance(response, dict):
             dms_error("File is not formated as a dict.")
@@ -77,7 +75,7 @@ class Connector:
         return response
 
     def get_files(self) -> list:
-        """Grab all new files from connectors.
+        """Grab all new files pointers from connectors.
 
         Returns:
             A list of files.

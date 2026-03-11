@@ -29,12 +29,11 @@ class SearchEngine:
 
     def rebuild(self) -> None:
         """Rebuild the index schema with the saved categories."""
-        dms_info("Rebuilding schema.")
+        dms_info(f"Rebuilding schema, new set: {self.categories}.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
             _ = schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
-        dms_info(f"New category set: {self.categories}")
         self.index = Index(schema)
 
     def have_new_category(self, categories: dict) -> bool:
@@ -72,7 +71,6 @@ class SearchEngine:
             SeAPIException: Potential formatting errors.
         """
 
-        dms_info("Quering")
         query = self.index.parse_query(q, self.categories)
 
         searcher: Searcher = self.index.searcher()
@@ -91,7 +89,6 @@ class SearchEngine:
         Args:
             files: list of files.
         """
-        dms_info("Adding new files to index.")
 
         writer: IndexWriter = self.index.writer()
         for file in files:

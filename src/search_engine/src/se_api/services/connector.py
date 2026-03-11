@@ -22,7 +22,7 @@ class Connector:
     def __init__(self) -> None:
         address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
         if address is None:
-            dms_error("Expected connector address.")
+            dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
 
         self.address = address
         self.subdata = None
@@ -116,7 +116,7 @@ class Connector:
             if subdata is None:
                 dms_warning("No subdata delievered by collector.")
             if file_url is None:
-                dms_error("No returned collection URL.")
+                dms_warning("No returned collection URL.")
 
             self.subdata = subdata
 

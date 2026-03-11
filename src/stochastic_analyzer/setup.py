@@ -9,14 +9,9 @@ setup(
     install_requires=[
         "fastapi[standard] >= 0.128",
         "pydantic-settings",
-        "numpy>=2.1.0",
-        "torch",
-        "transformers >= 4.51.0",
-        "safetensors >= 0.4.3",
-        "accelerate >= 0.30.0",
         "pydantic >= 2.0.0",
-        "sentence-transformers",
         "requests>=2.32",
+        "httpx",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

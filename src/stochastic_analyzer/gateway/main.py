@@ -12,15 +12,6 @@ from fastapi.encoders import jsonable_encoder
 
 from gateway.config import Settings
 from gateway.routes import router
-from gateway.services.ranker import RankerService
-
-
-@asynccontextmanager
-async def lifespan(fastapi_app: FastAPI) -> Any:
-    """Manage startup and shutdown of API."""
-    fastapi_app.state.model = RankerService()
-    yield
-    fastapi_app.state.model = None
 
 
 class API:
@@ -29,7 +20,7 @@ class API:
     def __init__(self) -> None:
         """Constructor."""
         self.settings = Settings()
-        self.app = FastAPI(title=self.settings.API_TITLE, version=self.settings.API_VERSION, lifespan=lifespan)
+        self.app = FastAPI(title=self.settings.API_TITLE, version=self.settings.API_VERSION)
         self.log_level: str | None = None
 
         self.app.include_router(router)

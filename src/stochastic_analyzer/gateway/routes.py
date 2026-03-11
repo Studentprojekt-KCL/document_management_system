@@ -5,6 +5,7 @@ from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthChe
 from gateway.config import Settings
 from gateway.services.classifier import classify_document
 from gateway.services.summarizer import summarize_documents
+from gateway.services.ranker import rank_documents
 
 router = APIRouter()
 
@@ -13,18 +14,17 @@ router = APIRouter()
 async def health_check(request: Request) -> dict:
     """Health checks"""
     settings = Settings()
-    model_loaded = hasattr(request.app.state, "model") and request.app.state.model is not None
-    return {"status": "active", "model_loaded": model_loaded, "device": settings.DEVICE}
+    return {"status": "active", "model_loaded": True, "device": settings.DEVICE}
 
 
 @router.post("/rerank", response_model=RankResponse)
-async def rerank_documents(request: Request, payload: RankRequest) -> dict:
-    """Endpoint for the embedded model."""
+async def rerank_documents(payload: RankRequest) -> dict:
+    """Endpoint for the external TEI model."""
     if not payload.documents:
         return {"ranked_results": []}
 
     try:
-        scores = request.app.state.model.rank(payload.query, payload.documents)
+        scores = await rank_documents(payload.query, payload.documents)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ranking engine failure: {str(e)}") from e
 

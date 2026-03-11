@@ -1,35 +1,37 @@
-"""Ranking logic for embedded model."""
+"""Ranking logic for external TEI model."""
 
-from sentence_transformers import CrossEncoder
-import torch
+import httpx
 from gateway.config import Settings
 from gateway.schemas import DocumentObject
 from dmis_logger import dms_info
 
+settings = Settings()
 
-class RankerService:
-    """Class for ranking."""
+async def rank_documents(query: str, documents: list[DocumentObject]) -> list[float]:
+    """Sends documents to the TEI container for semantic reranking."""
+    if not documents:
+        return []
 
-    def __init__(self) -> None:
-        """Start model."""
-        self.settings = Settings()  # Please migrate from this
-        dms_info(f"Loading Re-Ranker {self.settings} ON {self.settings}")
+    # TEI expects a list of strings mapped to 'texts'
+    texts = [f"{doc.title} {doc.content}"[:1024] for doc in documents]
+    
+    payload = {
+        "query": query,
+        "texts": texts
+    }
 
-        self.model = CrossEncoder(
-            self.settings.MODEL_NAME, device=self.settings.DEVICE, max_length=1024, model_kwargs={"torch_dtype": torch.bfloat16}
-        )
-
-    def rank(self, query: str, documents: list[DocumentObject]) -> list[float]:
-        """Ranking logic."""
-
-        if not documents:
-            return []
-
-        pairs = []
-        for doc in documents:
-            combined_text = f"{doc.title} {doc.content}"[:1024]
-            pairs.append([query, combined_text])
-
-        scores = self.model.predict(pairs, batch_size=256)
-
-        return scores.tolist()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(settings.TEI_URL, json=payload, timeout=30.0)
+            response.raise_for_status()
+            
+            # TEI returns [{"index": 0, "score": 0.98}, {"index": 1, "score": 0.12}]
+            results = response.json()
+            
+            # Sort them by index to ensure scores map perfectly to the original documents
+            results_sorted = sorted(results, key=lambda x: x["index"])
+            return [float(res["score"]) for res in results_sorted]
+            
+    except Exception as e:
+        dms_info(f"TEI Reranker failed: {e}")
+        raise e

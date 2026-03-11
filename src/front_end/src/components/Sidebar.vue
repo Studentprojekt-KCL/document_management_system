@@ -10,6 +10,7 @@ import {
   Menu
 } from 'lucide-vue-next'
 
+import { hasRole } from '../utils/auth'
 const router = useRouter()
 const route = useRoute()
 const isOpen = ref(true)
@@ -21,6 +22,21 @@ const menuItems = [
   { id: 'compliance', label: 'Security & Compliance', icon: ShieldCheck, path: '/compliance' },
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
+
+const isAdmin = computed(() => {
+  route.fullPath
+  return hasRole("admin")
+})
+
+const visibleMenuItems = computed(() => {
+  if (isAdmin.value) {
+    return menuItems
+  }
+  // else if when we get another role higher than user
+  else {
+    return menuItems.filter(item => item.id === 'search')
+  }
+})
 
 const activeItem = computed(() => {
   const currentPath = route.path
@@ -49,7 +65,7 @@ const navigateTo = (path) => {
     <!-- Navigation Menu -->
     <nav class="nav-menu">
       <button 
-        v-for="item in menuItems" 
+        v-for="item in visibleMenuItems" 
         :key="item.id"
         @click="navigateTo(item.path)"
         :class="['nav-item', { active: activeItem === item.id }]"

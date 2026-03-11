@@ -1,17 +1,19 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import DefaultLayout from "@/layouts/DefaultLayout.vue"
+import MainLayout from "@/layouts/MainLayout.vue"
 
 const route = useRoute()
-const isLoginPage = computed(() => route.path === '/')
+const isPublicOrErrorPage = computed(() =>
+  ['/', '/401', '/403', '/404'].includes(route.path)
+)
 </script>
 
 <template>
-  <div v-if="isLoginPage">
+  <div v-if="isPublicOrErrorPage">
     <router-view />
   </div>
-  <DefaultLayout v-else>
+  <MainLayout v-else>
     <router-view />
-  </DefaultLayout>
+  </MainLayout>
 </template>

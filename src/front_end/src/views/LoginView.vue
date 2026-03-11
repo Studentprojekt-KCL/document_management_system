@@ -1,21 +1,68 @@
 <script setup>
+
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const isLoading = ref(false)
 
-const handleEntraIdLogin = async () => {
-  isLoading.value = true
-  // TODO: Implement MSAL login here
-  console.log('Entra ID login clicked')
-  
-  // Temporary - remove this when MSAL is implemented
-  setTimeout(() => {
-    isLoading.value = false
-    router.push('/search')
-  }, 1000)
+// Keycloak attributes
+
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
+const REALM = import.meta.env.VITE_REALM;
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
+
+// Used for getting the token
+function base64UrlEncode(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
+
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  return await crypto.subtle.digest("SHA-256", data);
+}
+
+function randomString(bytesLen = 32) {
+  const bytes = new Uint8Array(bytesLen);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+async function createPkcePair() {
+  const verifier = randomString(64);
+  const challenge = base64UrlEncode(await sha256(verifier));
+  return { verifier, challenge };
+}
+
+const handleEntraIdLogin = async () => {
+  const { verifier, challenge } = await createPkcePair();
+
+  // Save for callback step
+  sessionStorage.setItem("pkce_verifier", verifier);
+
+  // Recommended: CSRF/state protection
+  const state = randomString(32);
+  sessionStorage.setItem("oidc_state", state);
+
+  const redirectUri = `${window.location.origin}/auth/callback`;
+
+  const authUrl =
+    `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/auth` +
+    `?client_id=${encodeURIComponent(CLIENT_ID)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=openid` +
+    `&state=${encodeURIComponent(state)}` +
+    `&code_challenge=${encodeURIComponent(challenge)}` +
+    `&code_challenge_method=S256`;
+
+  window.location.assign(authUrl);
+}
+
+
 </script>
 
 <template>

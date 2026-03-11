@@ -1,5 +1,5 @@
 # -------- Stage 1: Build --------
-FROM node:20.11.1-slim AS builder
+FROM node:20.19.0-slim AS builder
 
 WORKDIR /app
 
@@ -83,8 +83,8 @@ RUN chmod -R 755 /var/cache/nginx /var/log/nginx /var/run && \
     chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
+#HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+   # CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
 
 EXPOSE 80
 

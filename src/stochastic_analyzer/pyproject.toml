@@ -9,14 +9,7 @@ build-backend = "setuptools.build_meta"
 name = "stochastic-analyzer"
 version = "1.0.0"
 description = "Unified query gateway service"
-dependencies = [
-    "fastapi[standard] >= 0.128",
-    "pydantic-settings",
-    "numpy<2.0.0",
-    "torch",
-    "sentence-transformers",
-    "httpx",
-]
+dynamic = ["dependencies"]
 
 [tool.setuptools]
 packages = ["gateway", "gateway.services"]

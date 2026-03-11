@@ -4,6 +4,9 @@ import os
 from urllib.parse import urljoin
 import base64
 import json
+import io
+from pathlib import Path
+import zipfile
 from hashlib import md5
 from typing import Any
 
@@ -12,7 +15,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
-from logger import dms_error, dms_info  # pylint: disable=no-name-in-module
+from dmis_logger import dms_error, dms_info, dms_warning
 
 
 class GitLabs:
@@ -25,6 +28,11 @@ class GitLabs:
     def __init__(self) -> None:
         """Constructor."""
         address = os.environ.get("GITLAB_ADDRESS")
+        if address is None:
+            dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
+            return
+        if not address.endswith("/"):
+            address += "/"
         self.base = urljoin(str(address), self.API_URL)
 
     def _get_projects(self) -> dict | list:
@@ -110,6 +118,73 @@ class GitLabs:
 
         return base_structure
 
+    def _unpack_zip(self, content: bytes, project_id: int) -> list:
+        """Unpack .zip content and return a list containing all the files."""
+        base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
+
+        files_data: list = []
+        with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
+            for file in zip_file.namelist():
+                file_path = Path(file)
+                intermediate_path = str(Path(*file_path.parts[1:]))
+                info = zip_file.getinfo(file)
+                if info.is_dir():
+                    continue
+                try:
+                    file_content = zip_file.read(file).decode("utf-8")
+                except UnicodeDecodeError as err:
+                    file_content = ""
+                    dms_warning(f"Could not decode file: {file}. {err}")
+                files_data.append(
+                    {
+                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                        "metadata": {
+                            "name": file_path.name,
+                            "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
+                            "size": info.file_size,
+                        },
+                    }
+                )
+
+        return files_data
+
+    def files_to_index(self, subdata: str | None = None) -> dict:
+        """Retrieve a structure of files to index.
+
+        Args:
+        ----
+            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
+                 of the system, but should always be supplied).
+
+        Returns:
+        -------
+            Dict structure {"subdata": generated_subdata, "files": file_data}, where generated_subdata
+                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
+                (this should always be passed back by client from previous request).
+        """
+        subdata_dict: dict
+        files_data: list = []
+
+        if subdata is None:
+            subdata_dict = {}
+        else:
+            subdata_dict = json.loads(base64.b64decode(subdata))
+        current_subdata = self.get_project_ids()
+        projects = self._get_projects()
+        for project in projects:
+            project_id = project.get("id")
+            if current_subdata.get(project_id) == subdata_dict.get(str(project_id)):
+                continue
+
+            branch = project.get("default_branch")
+            url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
+            content = requests.get(url, timeout=120).content
+            files_data.extend(self._unpack_zip(content, project_id))
+
+        generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
+
+        return {"files": files_data, "subdata": generated_subdata}
+
     def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
         """Retrieve a containing URLs pointing to all available individual files available, except those in projects
             already indexed according to subdata.
@@ -146,11 +221,13 @@ class GitLabs:
     def _execute_request(url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
-            dms_error(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
+            dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}
+        except requests.exceptions.MissingSchema as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
         if response.status_code != 200:
             dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
         return content

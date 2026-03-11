@@ -1,0 +1,34 @@
+services:
+  log-api:
+    image: log-api
+    build:
+      dockerfile: src/logger/api/Dockerfile
+
+  log-database:
+    image: log-database
+    build: 
+      dockerfile: src/logger/database/Dockerfile
+
+  search-engine:
+    image: search-engine
+    build:
+      dockerfile: src/search_engine/Dockerfile
+
+  dmis-api:
+    image: dmis-api
+    build:
+      dockerfile: src/api/Dockerfile
+
+  front-end:
+    image: front-end
+    build: ./src/front_end
+
+  connector-gitlabs:
+    image: connector-gitlabs
+    build:
+      dockerfile: src/connectors/gitlabs/Dockerfile
+
+  connector-minio:
+    image: connector-minio
+    build:
+      dockerfile: src/connectors/storage-infra/Dockerfile

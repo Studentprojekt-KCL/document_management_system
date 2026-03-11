@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+import os
 from typing import Any
 import argparse
 
@@ -10,6 +11,9 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLabs
+from boto_tools import upload_file
+
+from dmis_logger import dms_error
 
 
 class API:
@@ -25,6 +29,7 @@ class API:
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
+        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -48,6 +53,12 @@ class API:
         """Endpoint for retrieving specific file."""
         return self.gitlabs_instance.get_file(file_pointer, include_content)
 
+    async def files_to_index(self, subdata: str | None = None) -> dict:
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        content = self.gitlabs_instance.files_to_index(subdata)
+        url = upload_file(content, "gitlabs_content.json")
+        return {"subdata": content.get("subdata"), "file_url": url}
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
@@ -59,4 +70,8 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level)
+    port = os.environ.get("GITLAB_CONNECTOR_PORT")
+    if port is None or not port.isdigit():
+        dms_error("Port for Gitlab connector not set in local environment, please export GITLAB_CONNECTOR_PORT.")
+        return
+    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Request, HTTPException
 from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
-from gateway.config import settings
+from gateway.config import Settings
 from gateway.services.classifier import classify_document
 from gateway.services.summarizer import summarize_documents
 
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/health", response_model=HealthCheck)
 async def health_check(request: Request) -> dict:
     """Health checks"""
-
+    settings = Settings()
     model_loaded = hasattr(request.app.state, "model") and request.app.state.model is not None
     return {"status": "active", "model_loaded": model_loaded, "device": settings.DEVICE}
 

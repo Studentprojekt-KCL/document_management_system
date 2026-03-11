@@ -65,11 +65,11 @@ class Connector:
         response = get(f"{self.address}/file", params=[("file_pointer", pointer), ("include_content", False)], timeout=120).json()
 
         if not isinstance(response, dict):
-            dms_error("File is not formated as a dict.")
+            dms_warning("File is not formated as a dict.")
             return None
 
         if response.get("metadata") is None:
-            dms_error("File has no metadata.")
+            dms_warning("File has no metadata.")
             return None
 
         return response
@@ -90,7 +90,7 @@ class Connector:
         data = response.get("files")
 
         if data is None:
-            dms_error("No files in collector response.")
+            dms_warning("No files in collector response.")
             return []
 
         subdata = response.get("subdata")
@@ -122,5 +122,5 @@ class Connector:
 
             return file_url
         except JSONDecodeError as e:
-            dms_error(e.msg)
+            dms_warning(e.msg)
             return None

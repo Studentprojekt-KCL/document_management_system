@@ -2,24 +2,41 @@ import { computed } from 'vue'
 
 // Find first non-empty value
 export const pick = (...values) => {
-  const found = values.find((value) => value !== undefined && value !== null)
+  const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== '')
   return found ?? ''
 }
 
+const getMetadata = (entry) => {
+  if (!entry || typeof entry !== 'object') {
+    return {}
+  }
+
+  if (entry.metadata && typeof entry.metadata === 'object') {
+    return entry.metadata
+  }
+
+  return entry
+}
+
 // Filnamn
-export const resolveFilename = (entry, index = 0) => pick(entry?.metadata?.name, `result-${index + 1}`)
+export const resolveFilename = (entry, index = 0) => {
+  const metadata = getMetadata(entry)
+
+  return pick(
+    metadata?.name,
+    metadata?.title,
+    metadata?.filename,
+    metadata?.file_name,
+    metadata?.unique_pointer,
+    metadata?.source_file,
+    entry?.filename,
+    entry?.name,
+    `result-${index + 1}`
+  )
+}
 
 // Datum
 export const resolveDateOnly = (value) => pick((value || '').split('T')[0])
-
-// Oklart om vi ens ska ha sen men vill kunna se att vi får content atm
-export const decodeContent = (encoded) => {
-  try {
-    return atob(encoded)
-  } catch {
-    return encoded
-  }
-}
 
 // Maybe we can get the file type from the header or content later.
 const TYPE_KEYWORDS = {
@@ -46,50 +63,65 @@ export const resolveDocumentType = ({ sourceType, sourceName }) => {
 }
 
 export const useSearchMetadata = (props) => {
-  const metadata = computed(() => props.selectedMatch?.metadata || {})
+  const metadata = computed(() => getMetadata(props.selectedMatch))
 
-  const previewTitle = computed(() => pick(metadata.value.name, 'Untitled'))
+  const previewTitle = computed(() =>
+    pick(metadata.value.name, metadata.value.title, metadata.value.filename, metadata.value.file_name, 'Untitled')
+  )
 
   const previewType = computed(() => {
-    const sourceType = pick(props.selectedMatch?.type, metadata.value.type)
-    const sourceName = pick(metadata.value.name, props.selectedFile)
+    const sourceType = pick(props.selectedMatch?.type, metadata.value.type, metadata.value.file_type, metadata.value.source_type)
+    const sourceName = pick(
+      metadata.value.name,
+      metadata.value.filename,
+      metadata.value.file_name,
+      metadata.value.unique_pointer,
+      metadata.value.source_file,
+      props.selectedFile
+    )
 
     return resolveDocumentType({ sourceType, sourceName })
   })
 
-  const previewCreatedAt = computed(() => resolveDateOnly(metadata.value.edited))
-  const previewSize = computed(() => pick(metadata.value.size))
-
-  const previewSummary = computed(() => {
-    const rawText = pick(props.fileContent, props.selectedMatch?.content)
-    const decoded = decodeContent(rawText)
-    const cleaned = String(decoded).replace(/\s+/g, ' ').trim()
-    return cleaned.slice(0, 500) || 'No preview text available'
-  })
+  const previewCreatedAt = computed(() =>
+    resolveDateOnly(
+      metadata.value.last_edit_date ||
+        metadata.value.edited ||
+        metadata.value.updated_at ||
+        metadata.value.created_at ||
+        metadata.value.date
+    )
+  )
+  const previewSize = computed(() => pick(metadata.value.size, metadata.value.file_size, metadata.value.bytes))
 
   const normalizeMatches = (matches = []) =>
     matches.map((entry, index) => {
+      const metadata = getMetadata(entry)
       const filename = resolveFilename(entry, index)
 
       return {
         rawMatch: entry,
         filename,
-        title: filename,
+        title: pick(metadata?.name, metadata?.title, metadata?.filename, metadata?.file_name, filename),
         type: resolveDocumentType({
-          sourceType: entry?.type || entry?.metadata?.type,
+          sourceType: entry?.type || metadata?.type || metadata?.file_type || metadata?.source_type,
           sourceName: filename
         })
       }
     })
 
-  const resolveMatchDate = (entry) => resolveDateOnly(entry?.metadata?.edited)
+  const resolveMatchDate = (entry) => {
+    const metadata = getMetadata(entry)
+    return resolveDateOnly(
+      metadata?.last_edit_date || metadata?.edited || metadata?.updated_at || metadata?.created_at || metadata?.date
+    )
+  }
 
   return {
     previewTitle,
     previewType,
     previewCreatedAt,
     previewSize,
-    previewSummary,
     normalizeMatches,
     resolveMatchDate
   }

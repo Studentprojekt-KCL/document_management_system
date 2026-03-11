@@ -1,17 +1,16 @@
 <script setup>
-import { X, CalendarDays, HardDrive, FileType2 } from 'lucide-vue-next'
+import { X, StarsIcon, CalendarDays, HardDrive, FileType2 } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   selectedFile: { type: String, default: '' },
   selectedMatch: { type: Object, default: null },
-  fileContent: { type: String, default: '' },
   matches: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['close'])
-const { previewTitle, previewType, previewCreatedAt, previewSize, previewSummary } = useSearchMetadata(props)
+const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMetadata(props)
 </script>
 
 <template>
@@ -32,8 +31,11 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewSummary
       </div>
 
       <section class="panel-section">
+        <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
         <p class="section-title">AI SUMMARY</p>
-        <p class="summary-card">{{ previewSummary }}</p>
+        <div class="generate-summary">
+          <p class="summary-card"><StarsIcon :size="13" />Generate AI summary</p>
+        </div>
       </section>
 
       <section class="panel-section">
@@ -146,12 +148,19 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewSummary
   align-items: center;
 }
 
+/* QUICK FIX: This should be a button, but we can iterate later */
 .summary-card {
   border: 1px solid #e2e8f0;
   background: #f8faff;
   border-radius: 12px;
   padding: 0.75rem;
   color: #334155;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .meta-grid {

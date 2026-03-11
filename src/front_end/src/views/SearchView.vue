@@ -4,12 +4,11 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue' // <-- your new component
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { decodeContent, resolveFilename } from '@/composables/useSearchMetadata'
+import { resolveFilename } from '@/composables/useSearchMetadata'
 
 const matches = ref([])
 const selectedFile = ref('')
 const selectedMatch = ref(null)
-const fileContent = ref('')
 const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
@@ -23,7 +22,6 @@ const handleSearch = async (query) => {
   matches.value = []
   selectedFile.value = ''
   selectedMatch.value = null
-  fileContent.value = ''
   isPreviewOpen.value = false
 
   if (!query || !query.trim()) {
@@ -62,7 +60,6 @@ const selectMatch = (match) => {
 
   selectedMatch.value = match
   selectedFile.value = resolveFilename(match)
-  fileContent.value = decodeContent(match.content || '')
 
   isPreviewOpen.value = true
 }
@@ -86,7 +83,6 @@ const handleFilterChange = (filter) => {
       :open="isPreviewOpen"
       :selected-file="selectedFile"
       :selected-match="selectedMatch"
-      :file-content="fileContent"
       :matches="matches"
       @close="closePreview"
     />

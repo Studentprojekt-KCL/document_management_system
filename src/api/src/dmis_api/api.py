@@ -2,6 +2,7 @@
 
 from typing import Any
 import argparse
+import os
 import requests
 #from pathlib import Path
 #from dmis_api.structures import IndexRequest
@@ -61,15 +62,12 @@ class API:
             # - the actual production api_url
             # - create environmental variables
 
-            api_url = "http://10.3.0.2:8001/search"
+            api_url = os.getenv("http://10.3.0.2:8001/search")
 
             try:
                 r = requests.get(
                     api_url,
-                    json={
-                        "user_id": "test",
-                        "query": query
-                    },
+                    params={"q": query},
                     timeout=5
                 )
                 r.raise_for_status()

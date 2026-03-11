@@ -20,6 +20,10 @@ class Handler:
         self.connector = Connector()
         self.search_engine = SearchEngine()
 
+    def reset_connector(self) -> None:
+        """Reset the connector."""
+        self.connector.reset()
+
     def preform_search(self, request: str, k: int, p: int) -> list[str]:
         """Get get files from collectors preform the search, returns a list.
 

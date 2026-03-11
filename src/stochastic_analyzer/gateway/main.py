@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from gateway.config import Settings
+from gateway.config import settings
 from gateway.routes import router
 
 
@@ -19,7 +19,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.settings = Settings()
+        self.settings = settings
         self.app = FastAPI(title=self.settings.API_TITLE, version=self.settings.API_VERSION)
         self.log_level: str | None = None
 
@@ -44,7 +44,6 @@ class API:
 
 def start() -> None:
     """Entry point for application."""
-    settings = Settings()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()

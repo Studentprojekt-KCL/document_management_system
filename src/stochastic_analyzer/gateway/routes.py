@@ -2,18 +2,16 @@
 
 from fastapi import APIRouter, Request, HTTPException
 from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
-from gateway.config import Settings
+from gateway.config import settings
 from gateway.services.classifier import classify_document
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 
 router = APIRouter()
 
-
 @router.get("/health", response_model=HealthCheck)
 async def health_check(request: Request) -> dict:
     """Health checks"""
-    settings = Settings()
     return {"status": "active", "model_loaded": True, "device": settings.DEVICE}
 
 

@@ -1,8 +1,8 @@
 import httpx
-from gateway.config import Settings
+from gateway.config import settings
 from gateway.schemas import InputItem, SummaryResult
+from gateway.preprompts import SUMMARIZER_PROMPT
 
-settings = Settings()
 async def summarize_documents(items: list[InputItem]) -> SummaryResult | None:
     
     combined_context = ""
@@ -10,12 +10,7 @@ async def summarize_documents(items: list[InputItem]) -> SummaryResult | None:
         doc_name = item.metadata.name or f"Document {i}"
         combined_context += f"\n--- {doc_name} ---\n{item.content}\n"
 
-    prompt = f"""Please provide a comprehensive, single summary based on the following batch of documents.
-    
-Documents:
-{combined_context}
-    
-Unified Summary:"""
+    prompt = SUMMARIZER_PROMPT.format(combined_context=combined_context)
 
     payload = {
         "model": settings.MINISTRAL_MODEL,

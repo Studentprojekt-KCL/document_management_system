@@ -1,25 +1,17 @@
 import json
 import httpx
-from gateway.config import Settings
+from gateway.config import settings
 from gateway.schemas import InputItem, ClassificationResult
-
-settings = Settings()
+from gateway.preprompts import CLASSIFIER_PROMPT
 
 async def classify_document(item: InputItem) -> ClassificationResult | None:
     truncated_content = item.content[:1500]
 
-    prompt = f"""Name: {item.metadata.name}
-Author: {item.metadata.author}
-Content: {truncated_content}
-
-You are a security classifier. 
-Classify the document into exactly one of these security levels:
-  Public       (no restrictions, safe for anyone)
-  Internal     (for internal use only, not for public release)
-  Sensitive    (restricted, limited distribution)
-  Confidential (strictly restricted, serious risk if disclosed)
-
-Return ONLY valid JSON: {{"Security-class": "<Public|Internal|Sensitive|Confidential>"}}"""
+    prompt = CLASSIFIER_PROMPT.format(
+        name=item.metadata.name,
+        author=item.metadata.author,
+        content=truncated_content
+    )
 
     payload = {
         "model": settings.QWEN_MODEL,

@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import os
+import re
 from urllib.parse import urljoin
 import base64
 import json
@@ -24,9 +25,11 @@ class GitLabs:
     API_URL: str = "api/v4/"
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
+    session: requests.Session
 
     def __init__(self) -> None:
         """Constructor."""
+        self.session = requests.session()
         address = os.environ.get("GITLAB_ADDRESS")
         if address is None:
             dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
@@ -88,6 +91,34 @@ class GitLabs:
             files.append(urljoin(base_path, file.get("path").replace("/", "%2F")))
         return files
 
+    @staticmethod
+    def _get_project_id(url: str) -> None | str:
+        """Unsafe parse of API URL to retrieve projectID"""
+        pattern = r"https:\/\/([^\/]+)\/api\/v4\/projects\/(\d+)\/repository\/files\/(.+)"
+        match = re.match(pattern, url)
+        if not match or len(match.groups()) < 3:
+            return None
+        return match.group(2)
+
+    def _get_clickable_url(self, url: str, file_path: str):
+        """Retrieve a clickable URL directing to the Gitlab frontend view.
+
+        Note:
+            This URL is not directly retrieved from Gitlabs, but rather synthetically constructed.
+
+        Args:
+        ----
+            url: API URL pointing at a specific file.
+            file_path: Precise path to file in project.
+        """
+        project_id = self._get_project_id(url)
+        projects_endpoint = urljoin(self.base, "projects/")
+        project_information = self._execute_request(urljoin(projects_endpoint, project_id))
+
+        web_url = project_information.get("web_url")
+        default_branch = project_information.get("default_branch")
+        return f"{web_url}/-/blob/{default_branch}/{file_path}"
+
     def get_file(self, url: str, include_content: bool = True) -> dict:
         """
 
@@ -98,7 +129,17 @@ class GitLabs:
             include_content: Determine if actual file content should be included or not.
 
         """
-        file = self._execute_request(urljoin(url, self.GIT_HEAD))
+        file: dict = {}
+        if include_content:
+            file = self._execute_request(urljoin(url, self.GIT_HEAD))
+        else:
+            content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
+            file |= {
+                "file_name": content.get("x-gitlab-size"),
+                "size": content.get("x-gitlab-file-name"),
+                "file_path": content.get("x-gitlab-file-path"),
+            }
+
         if isinstance(file, list):
             file = {}
         blame = self._execute_request(urljoin(url.rstrip("/") + "/", self.GIT_BLAME))
@@ -110,6 +151,7 @@ class GitLabs:
                 "size": file.get("size"),
                 "last_edit_date": unpack_values(blame, (0, "commit", "committed_date")),
                 "type": SOURCE_FILE,
+                "clickable_url": self._get_clickable_url(url, file.get("file_path")),
             }
         }
 
@@ -217,11 +259,10 @@ class GitLabs:
 
         return {"subdata": generated_subdata, "file_pointers": file_pointers}
 
-    @staticmethod
-    def _execute_request(url: str) -> dict | list:
+    def _execute_request(self, url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""
         try:
-            response = requests.get(url, timeout=120)
+            response = self.session.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")

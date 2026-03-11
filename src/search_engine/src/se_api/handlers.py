@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from dmis_logger import dms_warning
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
@@ -19,7 +20,7 @@ class Handler:
         self.connector = Connector()
         self.search_engine = SearchEngine()
 
-    def preform_search(self, request: str, k: int) -> list[str] | None:
+    def preform_search(self, request: str, k: int, p: int) -> list[str]:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
@@ -28,6 +29,10 @@ class Handler:
         Returns:
             Returns matching files or None.
         """
+
+        if k <= 0 or p < 1:
+            dms_warning(f"Either page size or page index is invalid. (p: {p}, k: {k}).")
+            return []
 
         new_files: list = self.connector.get_file_pointers()
 
@@ -40,5 +45,20 @@ class Handler:
                     files = self.connector.get_files()
                 self.search_engine.add_files(files)
 
-        matches: list = self.search_engine.query_files(request, k)
-        return matches
+        matches: list = self.search_engine.query_files(request, k * p)
+
+        files: list = []
+
+        for i in range(k * (p - 1), len(matches)):
+            file: dict | None = self.connector.get_file(matches[i])
+
+            if file is None:
+                continue
+
+            metadata: dict | None = file.get("metadata")
+            if metadata is None:
+                continue
+
+            files.append(metadata)
+
+        return files

@@ -54,7 +54,7 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, q: str, k: int) -> list[str] | None:
+    async def query(self, q: str, k: int = 10, p: int = 1) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -64,7 +64,7 @@ class API:
             List of found files or None.
         """
 
-        return self.handler.preform_search(q, k)
+        return self.handler.preform_search(q, k, p)
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""

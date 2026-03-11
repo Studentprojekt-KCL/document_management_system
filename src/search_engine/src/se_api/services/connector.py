@@ -64,7 +64,7 @@ class Connector:
             SeAPIException: Potential formatting errors.
         """
 
-        response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
+        response = get(f"{self.address}/file", params={"file_pointer": pointer, "include_content": False}, timeout=120).json()
 
         if not isinstance(response, dict):
             dms_error("File is not formated as a dict.")
@@ -72,10 +72,6 @@ class Connector:
 
         if response.get("metadata") is None:
             dms_error("File has no metadata.")
-            return None
-
-        if response.get("content") is None:
-            dms_error("File has no content.")
             return None
 
         return response

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Request, HTTPException
 from embedded_ranker.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck
-from embedded_ranker.config import settings
+from embedded_ranker.config import Settings
 
 router = APIRouter()
 
@@ -10,7 +10,7 @@ router = APIRouter()
 @router.get("/health", response_model=HealthCheck)
 async def health_check(request: Request) -> dict:
     """Health checks"""
-
+    settings = Settings()
     model_loaded = hasattr(request.app.state, "model") and request.app.state.model is not None
     return {"status": "active", "model_loaded": model_loaded, "device": settings.DEVICE}
 

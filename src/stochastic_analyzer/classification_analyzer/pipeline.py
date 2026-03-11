@@ -9,6 +9,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from schemas import ClassificationResult, InputItem
 
+from dmis_logger import dms_info, dms_warning
+
 _SYSTEM_PROMPT = """You are a document security classifier.
 Classify the document into exactly one of these security levels:
   Public       (no restrictions, safe for anyone)
@@ -38,7 +40,7 @@ class QwenClassificationPipeline:
     def __init__(self, model_path: str = "Qwen/Qwen3-0.6B", device: str = "cuda") -> None:
         """Initialise the tokenizer and model, moving to the appropriate device."""
         self.device = device if torch.cuda.is_available() else "cpu"
-        print(f"Loading pipeline on {self.device}...")
+        dms_info(f"Loading pipeline on {self.device}...")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -47,7 +49,7 @@ class QwenClassificationPipeline:
         )
         self.model.to(self.device)
         self.model.eval()
-        print("Pipeline ready.")
+        dms_info("Pipeline ready.")
 
     def _build_prompt(self, item: InputItem) -> str:
         """Format the classification prompt for a single validated item."""
@@ -96,12 +98,11 @@ class QwenClassificationPipeline:
                 **{"Security-class": security_class},
             )
         except (json.JSONDecodeError, KeyError, ValueError, ValidationError) as e:
-            print(f"Failed to parse model response: '{raw}' — {e}")
+            dms_info(f"Failed to parse model response: '{raw}' — {e}")
             return None
 
     def process(self, raw_data: List[dict]) -> List[Optional[ClassificationResult]]:
         """Validate, classify, and return results for a batch of raw input dicts."""
-        print(f"\n--- Validating {len(raw_data)} inputs ---")
 
         results: list[Optional[ClassificationResult]] = []
 
@@ -109,22 +110,18 @@ class QwenClassificationPipeline:
             try:
                 validated = InputItem(**item)
             except ValidationError as e:
-                print(f"REJECTED item #{i}: {e.errors()[0]['msg']}")
+                dms_warning(f"REJECTED item #{i}: {e.errors()[0]['msg']}")
                 results.append(None)
                 continue
 
-            print(f"Classifying item #{i}: '{validated.metadata.name}'...")
             prompt = self._build_prompt(validated)
             raw_response = self._generate(prompt)
 
             if raw_response is None:
-                print(f"  → No response generated for item #{i}.")
+                dms_warning(f"  → No response generated for item #{i}.")
                 results.append(None)
                 continue
 
-            result = self._parse_response(raw_response, validated.metadata.name)
-            if result:
-                print(f"  → {result.model_dump(by_alias=True)}")
-            results.append(result)
+            results.append(self._parse_response(raw_response, validated.metadata.name))
 
         return results

@@ -1,12 +1,7 @@
-FROM python:3.13-alpine AS build
-COPY src/search_engine/ /src
-WORKDIR /src
-RUN python -m pip install build
-RUN python -m build
+FROM python:3.13-alpine
+COPY src/search_engine /src/search_engine/
+COPY src/shared_functions /src/shared_functions
+WORKDIR /src/search_engine
+RUN apk add cargo; python -m pip install build; python -m build; python -m pip install .
 
-FROM python:3.13-alpine AS install
-COPY --from=build /src/dist/se_api-*.whl /src/
-WORKDIR /src
-RUN apk add cargo
-RUN python -m pip install se_api-*.whl
 ENTRYPOINT ["se_api"]

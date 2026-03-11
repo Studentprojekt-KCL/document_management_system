@@ -1,6 +1,5 @@
 """Base configs for the model."""
 
-import torch
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,8 +8,8 @@ class Settings(BaseSettings):
 
     MODEL_NAME: str
 
-    DEVICE: str = "cuda" if torch.cuda.is_available() else "cpu"
-
+    DEVICE: str = "external"
+    TEI_URL : str
     MINISTRAL_URL: str
     MINISTRAL_MODEL: str
 

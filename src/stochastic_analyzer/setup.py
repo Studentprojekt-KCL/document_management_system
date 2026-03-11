@@ -8,6 +8,7 @@ shared_lib_path = (Path(__file__).parent / "../shared_functions").resolve().as_u
 setup(
     install_requires=[
         "fastapi[standard] >= 0.128",
+        "uvicorn",
         "pydantic-settings",
         "pydantic >= 2.0.0",
         "requests>=2.32",

@@ -1,7 +1,8 @@
 import httpx
-from gateway.config import settings
+from gateway.config import Settings
 from gateway.schemas import InputItem, SummaryResult
 
+settings = Settings()
 async def summarize_documents(items: list[InputItem]) -> SummaryResult | None:
     
     combined_context = ""

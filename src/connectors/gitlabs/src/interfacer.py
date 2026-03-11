@@ -100,7 +100,7 @@ class GitLabs:
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str):
+    def _get_clickable_url(self, url: str, file_path: str) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -114,7 +114,9 @@ class GitLabs:
         project_id = self._get_project_id(url)
         projects_endpoint = urljoin(self.base, "projects/")
         project_information = self._execute_request(urljoin(projects_endpoint, project_id))
-
+        if isinstance(project_information, list):
+            dms_info(f"Was not able to generate clickable link for {url}")
+            return ""
         web_url = project_information.get("web_url")
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
@@ -129,12 +131,12 @@ class GitLabs:
             include_content: Determine if actual file content should be included or not.
 
         """
-        file: dict = {}
+        file: dict | list = {}
         if include_content:
             file = self._execute_request(urljoin(url, self.GIT_HEAD))
         else:
             content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
-            file |= {
+            file = {
                 "file_name": content.get("x-gitlab-size"),
                 "size": content.get("x-gitlab-file-name"),
                 "file_path": content.get("x-gitlab-file-path"),
@@ -151,9 +153,11 @@ class GitLabs:
                 "size": file.get("size"),
                 "last_edit_date": unpack_values(blame, (0, "commit", "committed_date")),
                 "type": SOURCE_FILE,
-                "clickable_url": self._get_clickable_url(url, file.get("file_path")),
             }
         }
+        file_path = file.get("file_path")
+        if isinstance(file_path, str):
+            base_structure["metadata"] |= {"clickable_url": self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}

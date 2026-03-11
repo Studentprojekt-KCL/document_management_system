@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from dmis_logger import dms_warning
+from dmis_logger import dms_info, dms_warning
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
@@ -37,6 +37,7 @@ class Handler:
         new_files: list = self.connector.get_file_pointers()
 
         if new_files:
+            dms_info(f"New files in connector reindexing, number of files: {len(new_files)}.")
             files = self.connector.get_files()
             if files:
                 if self.search_engine.have_new_category(files[0]):

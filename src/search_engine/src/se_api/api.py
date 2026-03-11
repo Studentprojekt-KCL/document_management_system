@@ -27,8 +27,8 @@ class API:
     handler: Handler
 
     def __init__(self) -> None:
-        self.handler = Handler()
         self.config = APIConfiguration()
+        self.handler = Handler()
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/search", self.query, methods=["GET"])

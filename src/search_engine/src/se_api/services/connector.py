@@ -41,7 +41,7 @@ class Connector:
             SeAPIException: For potential formatting errors.
         """
         response = get(
-            f"{self.address}/files", params=("subdata", self.subdata) if self.subdata is not None else (), timeout=120
+            f"{self.address}/files", params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
         ).json()
 
         if not isinstance(response, dict):
@@ -105,8 +105,11 @@ class Connector:
     def _files_to_index(self) -> str | None:
         """Get the url for the ziped file containing all new files."""
         try:
-            param = {"subdata": self.subdata} if self.subdata is not None else None
-            response = get(f"{self.address}/files_to_index", params=param, timeout=120).json()
+            response = get(
+                f"{self.address}/files_to_index",
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+                timeout=120,
+            ).json()
             subdata = response.get("subdata")
             file_url = response.get("file_url")
 

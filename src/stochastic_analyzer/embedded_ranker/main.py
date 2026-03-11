@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from embedded_ranker.config import settings
+from embedded_ranker.config import Settings
 from embedded_ranker.routes import router
 from embedded_ranker.ranker import RankerService
 
@@ -28,7 +28,8 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.app = FastAPI(title=settings.API_TITLE, version=settings.API_VERSION, lifespan=lifespan)
+        self.settings = Settings()
+        self.app = FastAPI(title=self.settings.API_TITLE, version=self.settings.API_VERSION, lifespan=lifespan)
         self.log_level: str | None = None
 
         self.app.include_router(router)
@@ -52,6 +53,7 @@ class API:
 
 def start() -> None:
     """Entry point for application."""
+    settings = Settings()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()

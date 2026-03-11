@@ -1,14 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from logging import error
 from os import environ
-from datetime import datetime
-from requests import get, exceptions, Session
-
-from se_api.exceptions import SeAPIException
-from se_api.models import File, Metadata
-
-# from logger import dms_error  # pylint: disable=no-name-in-module
+from dmis_logger import dms_error, dms_warning
+from requests import get
+from requests.exceptions import JSONDecodeError
 
 
 class Connector:
@@ -27,9 +22,13 @@ class Connector:
     def __init__(self) -> None:
         address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
         if address is None:
-            raise SeAPIException("SE_API_CONNECTOR_ADDRESS is not defined.")
+            dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
 
         self.address = address
+        self.subdata = None
+
+    def reset(self) -> None:
+        """Resets the subdata, getting all files."""
         self.subdata = None
 
     def get_file_pointers(self) -> list[str]:
@@ -41,37 +40,17 @@ class Connector:
         Raises:
             SeAPIException: For potential formatting errors.
         """
-        if self.address is None:
-            raise SeAPIException("SE_API_CONNECTOR_ADDRESS is not defined.")
-
-        params: dict[str, str] = {}
-
-        if self.subdata is not None:
-            params.update({"subdata": self.subdata})
-
-        response = get(f"{self.address}/files", params=params, timeout=120).json()
+        response = get(
+            f"{self.address}/files", params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
+        ).json()
 
         if not isinstance(response, dict):
             return []
 
-        file_pointers: list[str] = []
-        pointers = response["file_pointers"]
+        pointers = response.get("file_pointers")
+        return pointers if pointers is not None else []
 
-        if not isinstance(pointers, list):
-            raise SeAPIException("Expected results to be list[str].")
-
-        if not isinstance(response["subdata"], str):
-            raise SeAPIException("Expected subdata to be str.")
-
-        for pointer in pointers:
-            if isinstance(pointer, str):
-                file_pointers.append(pointer)
-
-        self.subdata = response["subdata"]
-
-        return file_pointers
-
-    def get_file(self, pointer: str, session: Session | None = None) -> File | None:
+    def get_file(self, pointer: str) -> dict | None:
         """Graps a file from the connectors.
 
         Args:
@@ -83,72 +62,65 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
+        response = get(f"{self.address}/file", params=[("file_pointer", pointer), ("include_content", False)], timeout=120).json()
 
-        file: File | None = None
+        if not isinstance(response, dict):
+            dms_warning("File is not formated as a dict.")
+            return None
 
-        s: Session
-        if session is None:
-            s = Session()
-        else:
-            s = session
+        if response.get("metadata") is None:
+            dms_warning("File has no metadata.")
+            return None
 
-        try:
-            response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
-            if not isinstance(response["metadata"], dict):
-                raise SeAPIException("")
+        return response
 
-            unique_pointer = response["metadata"]["unique_pointer"]
-            name = response["metadata"]["name"]
-            size = response["metadata"]["size"]
-            edited = response["metadata"]["last_edit_date"]
-            contnet_type = response["metadata"]["type"]
-            content = response["content"]
-
-            if not isinstance(unique_pointer, str):
-                raise SeAPIException("")
-            if not isinstance(name, str):
-                raise SeAPIException("")
-            if not isinstance(size, int):
-                raise SeAPIException("")
-            if not isinstance(edited, str):
-                raise SeAPIException("")
-            if not isinstance(contnet_type, str):
-                raise SeAPIException("")
-            if not isinstance(content, str):
-                raise SeAPIException("")
-
-            file = File(
-                content=content,
-                metadata=Metadata(
-                    unique_pointer=unique_pointer,
-                    name=name,
-                    size=size,
-                    edited=datetime.fromisoformat(edited),
-                    type=contnet_type,
-                ),
-            )
-
-        except exceptions.InvalidJSONError as e:
-            error(e.strerror if e.strerror is not None else "")
-
-        if session is None:
-            s.close()
-
-        return file
-
-    def get_files(self) -> list[File]:
-        """Grab all new files from connectors.
+    def get_files(self) -> list:
+        """Grab all new files pointers from connectors.
 
         Returns:
             A list of files.
         """
-        pointers: list[str] = self.get_file_pointers()
-        files: list[File] = []
 
-        with Session() as session:
-            for pointer in pointers:
-                file: File | None = self.get_file(pointer, session)
-                if file is not None:
-                    files.append(file)
+        file_url = self._files_to_index()
+        if file_url is None:
+            return []
 
-        return files
+        response = get(file_url, timeout=120).json()
+
+        data = response.get("files")
+
+        if data is None:
+            dms_warning("No files in collector response.")
+            return []
+
+        subdata = response.get("subdata")
+
+        if subdata is None:
+            dms_warning("No subdata delievered by collector.")
+
+        self.subdata = subdata
+
+        return data
+
+    def _files_to_index(self) -> str | None:
+        """Get the url for the ziped file containing all new files."""
+        try:
+            response = get(
+                f"{self.address}/files_to_index",
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+                timeout=120,
+            ).json()
+            subdata = response.get("subdata")
+            file_url = response.get("file_url")
+
+            if subdata is None:
+                dms_warning("No subdata delievered by collector.")
+            if file_url is None:
+                dms_warning("No returned collection URL.")
+
+            self.subdata = subdata
+
+            return file_url
+        except JSONDecodeError as e:
+            dms_warning(e.msg)
+            return None

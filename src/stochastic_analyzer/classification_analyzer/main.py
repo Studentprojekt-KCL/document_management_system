@@ -1,5 +1,7 @@
 """Entry point for the Qwen3 document classification pipeline."""
 
+from typing import Any
+
 from pipeline import QwenClassificationPipeline
 
 TEST_DATA = [
@@ -27,18 +29,13 @@ TEST_DATA = [
 ]
 
 
-def main() -> None:
+def main() -> list[dict[str, Any]]:
     """Run the classification pipeline against the test data and print results."""
     pipeline = QwenClassificationPipeline()
     results = pipeline.process(TEST_DATA)
 
-    print("\n--- Results ---")
+    end_results = []
     for result in results:
         if result:
-            print(result.model_dump(by_alias=True))
-        else:
-            print("None")
-
-
-if __name__ == "__main__":
-    main()
+            end_results.append(result.model_dump(by_alias=True))
+    return end_results

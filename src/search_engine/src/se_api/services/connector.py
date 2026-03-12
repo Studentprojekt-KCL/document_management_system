@@ -50,9 +50,7 @@ class Connector:
         response: Any | None = None
         try:
             response = get(
-                self.url_files,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                timeout=120
+                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
             ).json()
         except ConnectionError:
             dms_warning(f"Failed to connect, utl: {self.url_files}.")
@@ -91,7 +89,7 @@ class Connector:
             response = get(
                 self.url_file,
                 params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
-                timeout=120
+                timeout=120,
             ).json()
         except ConnectionError:
             dms_warning(f"Failed to connect, utl: {self.url_file}.")
@@ -160,9 +158,7 @@ class Connector:
         response: Any | None = None
         try:
             response = get(
-                self.url_files_to_index,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                timeout=120
+                self.url_files_to_index, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
             ).json()
         except ConnectionError:
             dms_warning(f"Failed to connect, utl: {self.url_files_to_index}.")

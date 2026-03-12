@@ -69,7 +69,6 @@ class API:
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""
-        # check connection with collectors
         return JSONResponse(status_code=200, content={"msg": "healthy"})
 
     async def reset(self) -> None:

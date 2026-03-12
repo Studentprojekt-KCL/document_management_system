@@ -20,7 +20,7 @@ class Handler:
         self.connector = Connector()
         self.search_engine = SearchEngine()
 
-    def reset_connector(self) -> None:
+    def reset(self) -> None:
         """Reset the connector."""
         self.search_engine = SearchEngine()
         self.connector = Connector()

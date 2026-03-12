@@ -74,7 +74,7 @@ class API:
 
     async def reset(self) -> None:
         """Reset connector."""
-        self.handler.reset_connector()
+        self.handler.reset()
 
 
 def run() -> None:

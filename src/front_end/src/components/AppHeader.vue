@@ -15,6 +15,8 @@ const handleLogout = () => {
   sessionStorage.removeItem('pkce_verifier')
   sessionStorage.removeItem('oidc_state')
 
+  localStorage.setItem('logout-event', Date.now().toString())
+
   if (idToken) {
     const logoutUrl =
       `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +

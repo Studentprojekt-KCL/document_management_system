@@ -1,9 +1,8 @@
 <script setup>
-import { computed, onMounted, onUnmounted} from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import router from './router'
-
 
 const route = useRoute()
 const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
@@ -18,15 +17,11 @@ const syncLogout = (event) => {
 }
 
 onMounted(() => {
-
   window.addEventListener('storage', syncLogout)
-  
 })
 
 onUnmounted(() => {
-
   window.removeEventListener('storage', syncLogout)
-
 })
 </script>
 

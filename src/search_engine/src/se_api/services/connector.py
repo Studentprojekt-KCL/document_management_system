@@ -4,7 +4,7 @@ from os import environ
 from typing import Any
 from dmis_logger import dms_error, dms_warning
 from requests import get
-from requests.exceptions import HTTPError, JSONDecodeError, RequestException, Timeout
+from requests.exceptions import HTTPError, JSONDecodeError, RequestException, Timeout, ConnectionError
 
 
 class Connector:
@@ -53,15 +53,15 @@ class Connector:
                 self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
             ).json()
         except ConnectionError:
-            dms_warning(f"Failed to connect, utl: {self.url_files}.")
+            dms_warning(f"Failed to connect, url: {self.url_files}.")
         except HTTPError:
             dms_warning(f"Invalid HTTP response, url: {self.url_files}.")
         except Timeout:
             dms_warning(f"Request timed out, url: {self.url_files}")
         except JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {self.url_files}.")
-        except RequestException as e:
-            dms_warning(f"{e.strerror}.")
+        except RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
         if response is None:
             return []
@@ -92,15 +92,15 @@ class Connector:
                 timeout=120,
             ).json()
         except ConnectionError:
-            dms_warning(f"Failed to connect, utl: {self.url_file}.")
+            dms_warning(f"Failed to connect, url: {self.url_file}.")
         except HTTPError:
             dms_warning(f"Invalid HTTP response, url: {self.url_file}.")
         except Timeout:
             dms_warning(f"Request timed out, url: {self.url_file}")
         except JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {self.url_file}.")
-        except RequestException as e:
-            dms_warning(f"{e.strerror}.")
+        except RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
         if response is None:
             return None
@@ -127,15 +127,15 @@ class Connector:
         try:
             response = get(file_url, timeout=120).json()
         except ConnectionError:
-            dms_warning(f"Failed to connect, utl: {file_url}.")
+            dms_warning(f"Failed to connect, url: {file_url}.")
         except HTTPError:
             dms_warning(f"Invalid HTTP response, url: {file_url}.")
         except Timeout:
             dms_warning(f"Request timed out, url: {file_url}")
         except JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {file_url}.")
-        except RequestException as e:
-            dms_warning(f"{e.strerror}.")
+        except RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
         if response is None:
             return []
@@ -161,7 +161,7 @@ class Connector:
                 self.url_files_to_index, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
             ).json()
         except ConnectionError:
-            dms_warning(f"Failed to connect, utl: {self.url_files_to_index}.")
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except HTTPError:
             dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
         except Timeout:
@@ -169,7 +169,7 @@ class Connector:
         except JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
         except RequestException as e:
-            dms_warning(f"{e.strerror}.")
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
         if response is None:
             return None

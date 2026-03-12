@@ -42,6 +42,7 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Warning message.
     """
+    warning(msg)
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):

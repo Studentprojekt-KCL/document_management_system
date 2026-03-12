@@ -31,8 +31,8 @@ class Connector:
         self.address = address
         self.subdata = None
         self.url_files = f"{self.address}/files"
-        self.url_files_to_index = f"{self.address}/file"
-        self.url_file = f"{self.address}/files_to_index"
+        self.url_files_to_index = f"{self.address}/files_to_index"
+        self.url_file = f"{self.address}/file"
 
     def reset(self) -> None:
         """Resets the subdata, getting all files."""
@@ -110,11 +110,6 @@ class Connector:
         if not isinstance(response, dict):
             dms_warning("File is not formated as a dict.")
             return None
-        #
-        # # TODO: validate if necessary
-        # if response.get("metadata") is None:
-        #     dms_warning("File has no metadata.")
-        #     return None
 
         return response
 

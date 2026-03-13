@@ -10,9 +10,12 @@ max-line-length = 132
 [tool.ruff]
 exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
 
+[tool.ruff.lint]
+select = ["T20", "PYI056"]
+
 [tool.mypy]
 disallow_untyped_defs = true
-exclude = '(\.env|venv|__pycache__|\.tox|^build/|setup\.py)'
+exclude = '(\.env|venv|__pycache__|\.tox|build/|setup\.py)'
 ignore_missing_imports = true
 
 

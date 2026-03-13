@@ -1,14 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from logging import error
 from os import environ
-from datetime import datetime
-from requests import get, exceptions, Session
-
-from se_api.exceptions import SeAPIException
-from se_api.models import File, Metadata
-
-# from logger import dms_error  # pylint: disable=no-name-in-module
+from typing import Any
+from dmis_logger import dms_error, dms_warning
+from requests import get
+from requests import exceptions
 
 
 class Connector:
@@ -24,12 +20,22 @@ class Connector:
     address: str | None
     subdata: str | None
 
+    url_files: str
+    url_files_to_index: str
+    url_file: str
+
     def __init__(self) -> None:
         address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
         if address is None:
-            raise SeAPIException("SE_API_CONNECTOR_ADDRESS is not defined.")
-
+            dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
         self.address = address
+        self.subdata = None
+        self.url_files = f"{self.address}/files"
+        self.url_files_to_index = f"{self.address}/files_to_index"
+        self.url_file = f"{self.address}/file"
+
+    def reset(self) -> None:
+        """Resets the subdata, getting all files."""
         self.subdata = None
 
     def get_file_pointers(self) -> list[str]:
@@ -41,37 +47,32 @@ class Connector:
         Raises:
             SeAPIException: For potential formatting errors.
         """
-        if self.address is None:
-            raise SeAPIException("SE_API_CONNECTOR_ADDRESS is not defined.")
+        response: Any | None = None
+        try:
+            response = get(
+                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
-        params: dict[str, str] = {}
-
-        if self.subdata is not None:
-            params.update({"subdata": self.subdata})
-
-        response = get(f"{self.address}/files", params=params, timeout=120).json()
+        if response is None:
+            return []
 
         if not isinstance(response, dict):
             return []
 
-        file_pointers: list[str] = []
-        pointers = response["file_pointers"]
+        pointers = response.get("file_pointers")
+        return pointers if pointers is not None else []
 
-        if not isinstance(pointers, list):
-            raise SeAPIException("Expected results to be list[str].")
-
-        if not isinstance(response["subdata"], str):
-            raise SeAPIException("Expected subdata to be str.")
-
-        for pointer in pointers:
-            if isinstance(pointer, str):
-                file_pointers.append(pointer)
-
-        self.subdata = response["subdata"]
-
-        return file_pointers
-
-    def get_file(self, pointer: str, session: Session | None = None) -> File | None:
+    def get_file(self, pointer: str) -> dict | None:
         """Graps a file from the connectors.
 
         Args:
@@ -83,72 +84,107 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-
-        file: File | None = None
-
-        s: Session
-        if session is None:
-            s = Session()
-        else:
-            s = session
-
+        response: Any | None = None
         try:
-            response = get(f"{self.address}/file", params={"file_pointer": pointer}, timeout=120).json()
-            if not isinstance(response["metadata"], dict):
-                raise SeAPIException("")
+            response = get(
+                self.url_file,
+                params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
+                timeout=120,
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_file}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_file}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_file}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_file}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
 
-            unique_pointer = response["metadata"]["unique_pointer"]
-            name = response["metadata"]["name"]
-            size = response["metadata"]["size"]
-            edited = response["metadata"]["last_edit_date"]
-            contnet_type = response["metadata"]["type"]
-            content = response["content"]
+        if response is None:
+            return None
 
-            if not isinstance(unique_pointer, str):
-                raise SeAPIException("")
-            if not isinstance(name, str):
-                raise SeAPIException("")
-            if not isinstance(size, int):
-                raise SeAPIException("")
-            if not isinstance(edited, str):
-                raise SeAPIException("")
-            if not isinstance(contnet_type, str):
-                raise SeAPIException("")
-            if not isinstance(content, str):
-                raise SeAPIException("")
+        if not isinstance(response, dict):
+            dms_warning("File is not formated as a dict.")
+            return None
 
-            file = File(
-                content=content,
-                metadata=Metadata(
-                    unique_pointer=unique_pointer,
-                    name=name,
-                    size=size,
-                    edited=datetime.fromisoformat(edited),
-                    type=contnet_type,
-                ),
-            )
+        return response
 
-        except exceptions.InvalidJSONError as e:
-            error(e.strerror if e.strerror is not None else "")
-
-        if session is None:
-            s.close()
-
-        return file
-
-    def get_files(self) -> list[File]:
-        """Grab all new files from connectors.
+    def get_files(self) -> list:
+        """Grab all new files pointers from connectors.
 
         Returns:
             A list of files.
         """
-        pointers: list[str] = self.get_file_pointers()
-        files: list[File] = []
 
-        with Session() as session:
-            for pointer in pointers:
-                file: File | None = self.get_file(pointer, session)
-                if file is not None:
-                    files.append(file)
+        file_url = self._files_to_index()
+        if file_url is None:
+            return []
 
-        return files
+        response: Any | None = None
+
+        try:
+            response = get(file_url, timeout=120).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {file_url}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {file_url}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {file_url}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {file_url}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+
+        if response is None:
+            return []
+
+        data = response.get("files")
+        subdata = response.get("subdata")
+
+        if data is None:
+            dms_warning("No files in collector response.")
+            return []
+        if subdata is None:
+            dms_warning("No subdata delievered by collector.")
+        self.subdata = subdata
+
+        return data
+
+    def _files_to_index(self) -> str | None:
+        """Get the url for the file containing all new files."""
+
+        response: Any | None = None
+        try:
+            response = get(
+                self.url_files_to_index, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+
+        if response is None:
+            return None
+        if not isinstance(response, dict):
+            dms_warning(f"Response is not formated as a dict, url: {self.url_files_to_index}.")
+            return None
+
+        subdata = response.get("subdata")
+        file_url = response.get("file_url")
+
+        if subdata is None:
+            dms_warning("No subdata delievered by collector.")
+        if file_url is None:
+            dms_warning("No returned collection URL.")
+
+        self.subdata = subdata
+
+        return file_url

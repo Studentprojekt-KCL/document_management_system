@@ -2,6 +2,48 @@
 
 The code in this subdirectory contains the package for the Search engine.
 
+## Endpoints
+
+### Search
+
+Performs a search and returns the metadata for the result.
+
+- `q`: search query, required.
+- `k`: page size, default 10.
+- `p`: page index, default 1.
+
+```url
+http://<host>:<port>/search?q=<search query>&k=<page size>&p=<page index>
+```
+
+Response can vary depending on what the connector gives.
+
+```json
+[
+    {
+        "unique_pointer": <file pointer>
+    },
+    {
+        "unique_pointer": <file pointer>
+    },
+    ...
+]
+```
+
+### Health
+
+Checks if the connection to connector is healthy, (doesnt atm).
+
+```url
+http://<host>:<port>/health
+```
+
+```json
+{
+    "msg":<status>
+}
+```
+
 ## Developer Instructions
 
 Run the Search Engine locally in developer mode, inside a virtual python environment do the following:

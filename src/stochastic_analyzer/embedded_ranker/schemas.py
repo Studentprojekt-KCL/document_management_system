@@ -9,7 +9,7 @@ class DocumentObject(BaseModel):
 
     title: str
     owner: Optional[str] = Field(default="")  # Variable can be str or none
-    reference: str = Field(...)  # Hard Ellipsis check due to requiered field
+    reference: str = Field(...)  # Hard Ellipsis check due to required field
     content: str = Field(...)
 
 

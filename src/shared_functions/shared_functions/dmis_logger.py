@@ -20,19 +20,19 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
-        error("Log service not set, export 'LOG_SERVICE'.")
-        return
-
-    _res = requests.post(
-        log_service,
-        json={
-            "service": gethostname(),  # Probably not the best solution
-            "message": msg,
-            "event_type": "ERROR",
-            "occured": timestamp.isoformat(),
-        },
-        timeout=60,
-    )
+        warning("Log service not set, export 'LOG_SERVICE'.")
+    else:
+        _res = requests.post(
+            log_service,
+            json={
+                "service": gethostname(),  # Probably not the best solution
+                "message": msg,
+                "event_type": "ERROR",
+                "occured": timestamp.isoformat(),
+            },
+            timeout=60,
+        )
+    os._exit(1)
 
 
 def dms_warning(msg: str, *_: Any, **__: Any) -> None:
@@ -46,7 +46,7 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
-        error("Log service not set, export 'LOG_SERVICE'.")
+        warning("Log service not set, export 'LOG_SERVICE'.")
         return
     _res = requests.post(
         log_service,
@@ -71,7 +71,7 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
-        error("Log service not set, export 'LOG_SERVICE'.")
+        warning("Log service not set, export 'LOG_SERVICE'.")
         return
     _res = requests.post(
         log_service,

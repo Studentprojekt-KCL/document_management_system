@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 
-defineProps({
+const props = defineProps({
   code: {
     type: [String, Number],
     required: true
@@ -19,7 +19,11 @@ defineProps({
 const router = useRouter()
 
 const goBack = () => {
-  router.back()
+  if (props.code == 401) {
+    router.push('/')
+  } else {
+    router.back()
+  }
 }
 </script>
 
@@ -32,7 +36,7 @@ const goBack = () => {
       <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
 
       <div class="actions">
-        <button class="btn-primary" @click="goBack">Go back to previous page</button>
+        <button class="btn-primary" @click="goBack">{{ code == 401 ? 'Go to login' : 'Go back to previous page' }}</button>
       </div>
     </article>
   </section>

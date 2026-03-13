@@ -57,7 +57,7 @@ class SearchEngine:
 
         return new
 
-    def query_files(self, q: str, k: int = 50) -> list[str]:
+    def query_files(self, q: str, k: int) -> list[str]:
         """Query through the files in the index.
 
         Args:

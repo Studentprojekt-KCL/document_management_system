@@ -33,6 +33,7 @@ class API:
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/search", self.query, methods=["GET"])
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
+        self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
 
     def start(self) -> None:
         """Start the API."""
@@ -68,8 +69,11 @@ class API:
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""
-        # check connection with collectors
         return JSONResponse(status_code=200, content={"msg": "healthy"})
+
+    async def reset(self) -> None:
+        """Reset connector."""
+        self.handler.reset()
 
 
 def run() -> None:

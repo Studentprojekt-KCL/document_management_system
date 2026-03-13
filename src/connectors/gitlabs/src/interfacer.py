@@ -137,8 +137,8 @@ class GitLabs:
         else:
             content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
             file = {
-                "file_name": content.get("x-gitlab-size"),
-                "size": content.get("x-gitlab-file-name"),
+                "file_name": content.get("x-gitlab-file-name"),
+                "size": content.get("x-gitlab-size"),
                 "file_path": content.get("x-gitlab-file-path"),
             }
 

@@ -63,7 +63,9 @@ class API:
             # - the actual production api_url
             # - create environmental variables
 
-            api_url = os.getenv("http://10.3.0.2:8001/search")
+            api_url = os.getenv("DMIS_SEARCH_API_URL", "http://10.3.0.2:8001/search")
+            if not api_url:
+                raise HTTPException(status_code=502, detail="Search backend URL is not configured.")
 
             try:
                 r = requests.get(

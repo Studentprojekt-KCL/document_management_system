@@ -4,19 +4,20 @@ from typing import Any
 import argparse
 import os
 import requests
-#from pathlib import Path
-#from dmis_api.structures import IndexRequest
+
+# from pathlib import Path
+# from dmis_api.structures import IndexRequest
 # imported but not used for the time being
 
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse # PlainTextResponse
+from fastapi.responses import JSONResponse  # PlainTextResponse
 from fastapi.encoders import jsonable_encoder
-#from fastapi.middleware.cors import CORSMiddleware
 
-#from fastapi import Query
+# from fastapi.middleware.cors import CORSMiddleware
 
+# from fastapi import Query
 
 
 class API:
@@ -52,10 +53,10 @@ class API:
         @self.app.get("/search")
         async def search(query: str) -> Any:
             """
-                This endpoint fetches data from the endpoint 10.3.0.2:8001/search
+            This endpoint fetches data from the endpoint 10.3.0.2:8001/search
 
-                To grab the data from this endpoint you need to perform the curl:
-                curl "http://127.0.0.1:8000/search?query=alibaba" 
+            To grab the data from this endpoint you need to perform the curl:
+            curl "http://127.0.0.1:8000/search?query=alibaba"
             """
 
             # - add metadata
@@ -76,6 +77,7 @@ class API:
                 raise HTTPException(status_code=502, detail=str(e)) from e
 
             return r.json()
+
 
 api_instance = API()
 app = api_instance.app

@@ -1,25 +1,28 @@
 <script setup>
 import { ref } from 'vue'
-
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue' // <-- your new component
+import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
+import { resolveFilename } from '@/composables/useSearchMetadata'
 
 const matches = ref([])
 const selectedFile = ref('')
-const fileContent = ref('')
+const selectedMatch = ref(null)
 const error = ref('')
 const isSearching = ref(false)
-const isLoadingFile = ref(false)
+const lastQuery = ref('')
+const isPreviewOpen = ref(false)
 
 // --- Search for matches ---
 const handleSearch = async (query) => {
-  console.log('Searching for:', query)
+  lastQuery.value = query
 
   error.value = ''
   matches.value = []
   selectedFile.value = ''
-  fileContent.value = ''
+  selectedMatch.value = null
+  isPreviewOpen.value = false
 
   if (!query || !query.trim()) {
     error.value = 'Please enter a search term.'
@@ -42,6 +45,7 @@ const handleSearch = async (query) => {
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
+      return
     }
   } catch (e) {
     error.value = `Search error: ${String(e)}`
@@ -53,15 +57,15 @@ const handleSearch = async (query) => {
 // --- Handle selecting a match ---
 const selectMatch = (match) => {
   if (!match) return
-  selectedFile.value = match.content // just use content as ID for now + add meta data when its finished.
 
-  try {
-    // try to decode base64
-    fileContent.value = atob(match.content)
-  } catch (e) {
-    fileContent.value = '[Error decoding file content]'
-    console.error('Base64 decode error:', e)
-  }
+  selectedMatch.value = match
+  selectedFile.value = resolveFilename(match)
+
+  isPreviewOpen.value = true
+}
+
+const closePreview = () => {
+  isPreviewOpen.value = false
 }
 
 const handleFilterChange = (filter) => {
@@ -72,55 +76,21 @@ const handleFilterChange = (filter) => {
 <template>
   <section class="search-view">
     <SearchBar @search="handleSearch" />
-    <p class="search-hint">Click Search or press Enter to search.</p>
     <SearchFiltersCard @filter-change="handleFilterChange" />
 
-    <p v-if="error" class="error">{{ error }}</p>
-
-    <div class="results-layout">
-      <!-- Left: matches -->
-      <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" @select="selectMatch" />
-
-      <!-- Right: preview -->
-      <div class="preview">
-        <h3>Preview</h3>
-        <p v-if="isLoadingFile">Loading {{ selectedFile }}…</p>
-        <p v-else-if="!fileContent">Select a file to preview.</p>
-
-        <pre v-else class="preview-box">{{ fileContent }}</pre>
-      </div>
-    </div>
+    <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+    <SearchPreviewDrawer
+      :open="isPreviewOpen"
+      :selected-file="selectedFile"
+      :selected-match="selectedMatch"
+      :matches="matches"
+      @close="closePreview"
+    />
   </section>
 </template>
 
 <style scoped>
 .search-view {
   padding: 1rem;
-}
-
-.search-hint {
-  font-size: 0.85rem;
-  margin: 0.45rem 0 0;
-}
-
-.error {
-  margin-top: 1rem;
-  color: #b91c1c;
-  white-space: pre-wrap;
-}
-
-.results-layout {
-  margin-top: 1.25rem;
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 1rem;
-  align-items: start;
-}
-
-.preview-box {
-  white-space: pre-wrap;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 0.75rem;
 }
 </style>

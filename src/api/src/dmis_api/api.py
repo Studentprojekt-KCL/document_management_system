@@ -2,6 +2,7 @@
 
 from typing import Any
 import argparse
+import os
 import requests
 
 # from pathlib import Path
@@ -62,10 +63,13 @@ class API:
             # - the actual production api_url
             # - create environmental variables
 
-            api_url = "http://10.3.0.2:8001/search"
-
+            api_url = os.getenv("DMIS_SEARCH_API_URL", "http://10.3.0.2:8001/search")
             try:
-                r = requests.get(api_url, json={"user_id": "test", "query": query}, timeout=5)
+                r = requests.get(
+                    api_url,
+                    params={"q": query},
+                    timeout=5
+                )
                 r.raise_for_status()
 
             except requests.RequestException as e:

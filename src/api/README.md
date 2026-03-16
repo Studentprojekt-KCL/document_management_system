@@ -19,3 +19,9 @@ This should result in a 422 response containing the following content:
 
 ### Further API documentation
 An automated API documentation is constructed when the API service is initiaded, and can be found at http://127.0.0.1:8000/docs
+
+
+## Create a .env file inside of dmis_api with the following:
+```
+DMIS_SEARCH_API_URL=http://@ip-address/@endpoint
+```

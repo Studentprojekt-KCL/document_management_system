@@ -54,7 +54,6 @@ class API:
                 raise HTTPException(status_code=502, detail="Upstream search API returned invalid JSON") from e
 
             return JSONResponse(content=data)
-        
         # Summarize
 
 

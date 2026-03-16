@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
-import SearchMatches from '@/components/SearchMatches.vue' // <-- your new component
+import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveFilename } from '@/composables/useSearchMetadata'
 

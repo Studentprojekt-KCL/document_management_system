@@ -112,10 +112,3 @@ VITE_KEYCLOAK_BASE =https://ad.dms-lookup.com:8443
 VITE_REALM =master
 VITE_CLIENT_ID =dms-frontend
 ```
-
-## testing roles
-### Web Browser Testing
-f12 -> console:
-
-`hasRole("admin")`
-`hasRole("user")`

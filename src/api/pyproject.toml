@@ -8,19 +8,9 @@ version = "0.0.1"
 description = "Library for main DMIS main API."
 dependencies = [
     "fastapi[standard]>=0.128",
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     "requests>=2.32"
-=======
-    "requests>=2.32",
-    "uvicorn>=0.30",
     "python.dotenv>=1.0",
->>>>>>> Stashed changes
-=======
-    "requests>=2.32",
     "uvicorn>=0.30",
-    "python.dotenv>=1.0",
->>>>>>> Stashed changes
 ]
 
 [tool.setuptools]

@@ -108,7 +108,8 @@ Before running the service, you must create a `.env` file in the /front_end/ dir
 Create `.env` file following this structure:
 
 ```
-VITE_KEYCLOAK_BASE =https://ad.dms-lookup.com:8443
-VITE_REALM =master
-VITE_CLIENT_ID =dms-frontend
+VITE_KEYCLOAK_BASE=https://ad.dms-lookup.com:8443
+VITE_REALM=master
+VITE_CLIENT_ID=dms-frontend
+VITE_API_BASE_URL=http://api:8000
 ```

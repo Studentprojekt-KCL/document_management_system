@@ -7,6 +7,7 @@ name = "dmis_api"
 description = "Library for main DMIS main API."
 dependencies = [
     "fastapi[standard]>=0.128",
+    "requests>=2.32"
 ]
 dynamic = ["version"]
 

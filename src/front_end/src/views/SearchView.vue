@@ -13,6 +13,7 @@ const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
 // --- Search for matches ---
 const handleSearch = async (query) => {
@@ -32,7 +33,7 @@ const handleSearch = async (query) => {
   isSearching.value = true
   try {
     // the endpoint is /search in main API.
-    const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`)
+    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`

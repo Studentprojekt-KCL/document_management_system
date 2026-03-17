@@ -8,7 +8,6 @@ from pathlib import Path
 
 import requests
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -39,7 +38,7 @@ class API:
                 response = requests.get(
                     api_url,
                     params={"q": query},
-                    timeout=5,
+                    timeout=120, # May be changed later based on expected response times
                 )
                 response.raise_for_status()
 
@@ -67,11 +66,6 @@ def run() -> None:
         level=logging.DEBUG if args.dev else logging.INFO,
         format="%(levelname)s:%(name)s:%(message)s",
     )
-
-    # loading env
-    env_file = Path.cwd() / ".env"
-    if env_file.is_file():
-        load_dotenv(env_file)
 
     api = API()
     if args.dev:

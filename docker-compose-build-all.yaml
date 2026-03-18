@@ -28,6 +28,11 @@ services:
     build:
       dockerfile: src/connectors/gitlabs/Dockerfile
 
+  connector-samba:
+    image: connector-samba
+    build:
+      dockerfile: src/connectors/samba/Dockerfile
+
   connector-minio:
     image: connector-minio
     build:

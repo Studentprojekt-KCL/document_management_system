@@ -6,12 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dmis_api"
 version = "0.0.1"
 description = "Library for main DMIS main API."
-dependencies = [
-    "fastapi[standard]>=0.128",
-    "requests>=2.32",
-    "python.dotenv>=1.0",
-    "uvicorn>=0.30",
-]
+dynamic = ["dependencies"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

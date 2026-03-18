@@ -61,12 +61,12 @@ class API:
             dms_warning("DMIS_SEARCH_API_URL is not set.")
             return JSONResponse(
                 status_code=500,
-                content={"detail": "Search API URL is not configured."},
+                content="D"
             )
 
         try:
             response = requests.get(
-                search_api_url,
+                f"{search_api_url.rstrip('/')}/search",
                 params={"q": query},
                 timeout=120,
             )
@@ -74,14 +74,14 @@ class API:
             dms_warning(f"Search request to upstream API failed: {exc}")
             return JSONResponse(
                 status_code=502,
-                content={"detail": "Upstream search API request failed."},
+                content="A"
             )
 
         if not response.ok:
             dms_warning(f"Upstream search API returned status code {response.status_code}.")
             return JSONResponse(
                 status_code=502,
-                content={"detail": "Upstream search API returned an error."},
+                content="B"
             )
 
         try:
@@ -90,12 +90,10 @@ class API:
             dms_warning(f"Upstream search API returned invalid JSON: {exc}")
             return JSONResponse(
                 status_code=502,
-                content={"detail": "Upstream search API returned invalid JSON."},
+                content="C"
             )
 
-        dms_info("Search request completed successfully.")
         return JSONResponse(status_code=200, content=data)
-
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

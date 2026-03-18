@@ -14,8 +14,8 @@ pip install -e src/api
 
 nano .env
 
-DMIS_SEARCH_API_URL=http://<ip-address>/<endpoint>
-PORT=8000
+DMIS_SEARCH_API_URL=http://<ip-address>
+PORT=XXXX
 
 ### 3. Start the API
 

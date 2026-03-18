@@ -18,10 +18,12 @@ const props = defineProps({
 
 const router = useRouter()
 
-const isAuthorized = () => props.code === 401
+const isLoggedIn = () => !!sessionStorage.getItem('access_token')
+const isUnauthorized = () => Number(props.code) === 401
+const shouldGoToLogin = () => isUnauthorized() && !isLoggedIn()
 
 const goBack = () => {
-  if (isAuthorized()) {
+  if (shouldGoToLogin()) {
     router.push('/')
   } else {
     router.back()
@@ -38,7 +40,9 @@ const goBack = () => {
       <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
 
       <div class="actions">
-        <button class="btn-primary" @click="goBack">{{ isAuthorized() ? 'Go to login' : 'Go back to previous page' }}</button>
+        <button class="btn-primary" @click="goBack">
+          {{ shouldGoToLogin() ? 'Go to login' : 'Go back to previous page' }}
+        </button>
       </div>
     </article>
   </section>

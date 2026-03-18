@@ -1,8 +1,10 @@
+from os import environ
 from typing import Any, Sequence
+from dmis_logger import dms_error
 from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
 import uvicorn
-from samba import Samba
+from services.samba import Samba
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -15,9 +17,17 @@ class API:
     log_level: str
 
     def __init__(self) -> None:
+        host: str = environ.get("SC_HOST", "0.0.0.0")
+        port: str = environ.get("SC_PORT", "8000")
+
+        if not port.isdigit():
+            dms_error("SC_PORT is expected to be a number.")
+        self.port = int(port)
+        if self.port <= 0 or self.port > 65534:
+            dms_error("SC_PORT has to be between 0 and 65535.")
+
+        self.host = host
         # TODO: remove hard code
-        self.host = "0.0.0.0"
-        self.port = 8000
         self.log_level = "debug"
 
         self.samba_service = Samba()
@@ -47,8 +57,14 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self) -> None:
-        pass
+    async def files(self) -> JSONResponse:
+        pointers = self.samba_service.get_files()
+        return JSONResponse(
+            content={
+                "subdata": None,
+                "file_pointers": pointers
+            }
+        )
 
 def run() -> None:
     api: API = API()

@@ -1,4 +1,4 @@
-from os import environ
+from os import environ, walk
 from subprocess import run, CompletedProcess
 from dmis_logger import dms_error
 
@@ -7,12 +7,14 @@ class Samba:
     share: str | None
     user: str | None
     password: str | None
+    path: str
 
     def __init__(self) -> None:
         host: str | None = environ.get("SC_SAMBA_HOST")
         share: str | None = environ.get("SC_SAMBA_SHARE")
         user: str | None = environ.get("SC_SAMBA_USER")
         password: str | None = environ.get("SC_SAMBA_PASS")
+        path: str = environ.get("SC_SAMBA_PATH", "/mnt")
 
         if host is None: dms_error("Expected variable SC_SAMBA_HOST to be defined.")
         if share is None: dms_error("Expected variable SC_SAMBA_SHARE to be defined.")
@@ -23,9 +25,26 @@ class Samba:
         self.share = share
         self.user = user
         self.password = password
+        self.path = path
 
     def mount(self) -> None:
-        command: str = f"mount --mkdir -t cifs //{self.host}/{self.share} /mnt -o username={self.user},password={self.password},iocharset=utf8,uid=1000,gid=1000"
+        command: list = [
+            "mount",
+            "-t", "cifs",
+            "-o", f"username={self.user},password={self.password},iocharset=utf8",
+            f"//{self.host}/{self.share}",
+            f"{self.path}"
+        ]
         res: CompletedProcess = run(command)
         if res.returncode != 0:
             dms_error(f"Failed to mount Samba share {self.host}/{self.share} with user {self.user}.")
+
+    def get_files(self) -> list:
+        pointers: list = []
+
+        for (root, dirs, files) in walk("/mnt"):
+            path = "".join(dirs)
+            for file in files:
+                pointers.append(f"//{self.host}/{self.share}{root}/{path}{file}")
+
+        return pointers

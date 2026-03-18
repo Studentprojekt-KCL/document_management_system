@@ -1,74 +1,119 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-from typing import Any
+from __future__ import annotations
+
 import argparse
-import logging
 import os
-from pathlib import Path
+from typing import Any, Sequence
 
 import requests
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
+from dmis_api.structures import IndexRequest
+from dmis_logger import dms_info, dms_warning
+
 
 class API:
     """Management class for main API."""
 
-    log_level: str = "info"
+    app: FastAPI = FastAPI()
+    log_level: str | None = None
 
     def __init__(self) -> None:
-        self.app = FastAPI()
+        """Constructor."""
+        self.app.add_exception_handler(
+            RequestValidationError,
+            self.validation_exception_handler,
+        )
 
-        # Register routes
-        self._register_routes()
+    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+        """Overwrite FastAPI exception handler."""
+        errors: dict[str, str | Sequence[Any]]
+        if isinstance(exc, RequestValidationError):
+            errors = {"detail": exc.errors(), "body": exc.body}
+        else:
+            errors = {"detail": str(exc)}
 
-    def _register_routes(self) -> None:
-        """Register API endpoints."""
+        content: str | dict[str, Any]
+        if self.log_level == "debug":
+            content = jsonable_encoder(errors)
+        else:
+            content = "ERROR"
 
-        @self.app.get("/search")
-        async def search(query: str) -> Any:
-            api_url = os.getenv("DMIS_SEARCH_API_URL")
-            if not api_url:
-                logger.error("DMIS_SEARCH_API_URL is not set")
-                raise HTTPException(status_code=500, detail="Search API URL is not configured")
+        return JSONResponse(status_code=422, content=content)
 
-            try:
-                response = requests.get(
-                    api_url,
-                    params={"q": query},
-                    timeout=120, # May be changed later based on expected response times
-                )
-                response.raise_for_status()
+    @staticmethod
+    @app.get("/index", status_code=200)
+    async def index(item: IndexRequest) -> Any:
+        """DMIS API index endpoint definition."""
+        return item
 
-            except requests.RequestException as e:
-                logger.exception("Search request to upstream API failed")
-                raise HTTPException(status_code=502, detail="Upstream search API request failed") from e
+    @staticmethod
+    @app.get("/search", status_code=200)
+    async def search(query: str) -> JSONResponse:
+        """Forward search request to upstream search API."""
+        search_api_url = os.getenv("DMIS_SEARCH_API_URL")
+        if not isinstance(search_api_url, str) or not search_api_url:
+            dms_warning("DMIS_SEARCH_API_URL is not set.")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Search API URL is not configured."},
+            )
 
-            try:
-                data = response.json()
-            except ValueError as e:
-                logger.exception("Upstream search API returned invalid JSON")
-                raise HTTPException(status_code=502, detail="Upstream search API returned invalid JSON") from e
+        try:
+            response = requests.get(
+                search_api_url,
+                params={"q": query},
+                timeout=120,
+            )
+        except requests.RequestException as exc:
+            dms_warning(f"Search request to upstream API failed: {exc}")
+            return JSONResponse(
+                status_code=502,
+                content={"detail": "Upstream search API request failed."},
+            )
 
-            return JSONResponse(content=data)
-        # Summarize
+        if not response.ok:
+            dms_warning(
+                f"Upstream search API returned status code {response.status_code}."
+            )
+            return JSONResponse(
+                status_code=502,
+                content={"detail": "Upstream search API returned an error."},
+            )
+
+        try:
+            data = response.json()
+        except requests.JSONDecodeError as exc:
+            dms_warning(f"Upstream search API returned invalid JSON: {exc}")
+            return JSONResponse(
+                status_code=502,
+                content={"detail": "Upstream search API returned invalid JSON."},
+            )
+
+        dms_info("Search request completed successfully.")
+        return JSONResponse(status_code=200, content=data)
 
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dev", action="store_true")
+    _ = parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
-
-    logging.basicConfig(
-        level=logging.DEBUG if args.dev else logging.INFO,
-        format="%(levelname)s:%(name)s:%(message)s",
-    )
 
     api = API()
     if args.dev:
         api.log_level = "debug"
 
-    uvicorn.run(api.app, host="0.0.0.0", port=8000, log_level=api.log_level)
+    port = int(os.getenv("PORT", "8000"))
+
+    uvicorn.run(
+        api.app,
+        host="0.0.0.0",
+        port=port,
+        log_level=api.log_level,
+    )

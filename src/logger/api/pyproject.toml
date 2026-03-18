@@ -1,22 +1,21 @@
 [build-system]
-requires = [
-  "setuptools >= 77.0.3",
-  "mysql-connector-python >= 9.5",
-  "fastapi[standard] >= 0.128",
-]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "log_api"
+name = "dmis_api"
 version = "0.0.1"
-description = "Logging API"
+description = "Library for main DMIS main API."
 dependencies = [
-  "mysql-connector-python >= 9.5",
-  "fastapi[standard] >= 0.128",
+    "fastapi[standard]>=0.128",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+    "uvicorn>=0.30",
+    "shared-functions",
 ]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [project.scripts]
-log_api = "log_api.api:run"
+dmis_api = "dmis_api.api:run"

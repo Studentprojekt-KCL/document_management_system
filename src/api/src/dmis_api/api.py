@@ -78,9 +78,7 @@ class API:
             )
 
         if not response.ok:
-            dms_warning(
-                f"Upstream search API returned status code {response.status_code}."
-            )
+            dms_warning(f"Upstream search API returned status code {response.status_code}.")
             return JSONResponse(
                 status_code=502,
                 content={"detail": "Upstream search API returned an error."},

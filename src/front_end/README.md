@@ -13,7 +13,7 @@ ________________________________________
 ```docker build -t test_frontend .```
 
 ### Run instructions after build
-```docker run --rm -d --name test_frontend_run -p 8080:80 test_frontend```
+```docker run --rm -d -e API_HOST=<adress> --name test_frontend_run -p 8080:80 test_frontend```
 
 **Open a brower and enter:** ```http://localhost:8080```
 

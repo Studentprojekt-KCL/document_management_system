@@ -1,34 +1,14 @@
-FROM python:3.13-alpine AS build
+FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --upgrade pip build
+COPY src/shared_functions ./shared_functions
 
-# Build shared package
-COPY src/shared_functions /app/shared_functions
-WORKDIR /app/shared_functions
-RUN python -m build
+COPY src/api ./api
 
-# Build API package
 WORKDIR /app/api
-COPY src/api/pyproject.toml /app/api/
-COPY src/api/src /app/api/src
-RUN python -m build
-
-# Runtime stage
-FROM python:3.13-alpine
-
-WORKDIR /app
 
 RUN pip install --upgrade pip
+RUN pip install .
 
-COPY --from=build /app/api/dist/*.whl /tmp/
-COPY --from=build /app/shared_functions/dist/*.whl /tmp/
-
-RUN ls -l /tmp \
-    && python -m pip install --no-cache-dir /tmp/*.whl \
-    && python -m pip list \
-    && python -c "import dmis_api; print(dmis_api.__file__)" \
-    && rm -rf /tmp/*.whl
-
-ENTRYPOINT ["python", "-c", "from dmis_api.api import run; run()"]
+CMD ["dmis_api"]

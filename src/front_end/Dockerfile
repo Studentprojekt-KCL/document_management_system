@@ -32,14 +32,16 @@ RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 RUN apk add --no-cache dumb-init
 
 # Copy nginx config and built app
-COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Copy built app from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Security: Set proper permissions (nginx runs as nginx user)
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
+    chmod -R 755 /usr/share/nginx/html && \
+    chown -R nginx:nginx /etc/nginx/templates /etc/nginx/conf.d && \
+    chmod -R 755 /etc/nginx/templates /etc/nginx/conf.d
 
 # Security: Make filesystem read-only where possible
 RUN chmod -R 755 /var/cache/nginx /var/log/nginx /var/run && \
@@ -56,5 +58,5 @@ EXPOSE 80
 USER nginx
 
 # Use dumb-init to handle signals properly
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

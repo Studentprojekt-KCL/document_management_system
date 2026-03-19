@@ -6,7 +6,7 @@ import ComplianceView from '@/views/ComplianceView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
-import ErrorStatusView from '../views/ErrorStatusView.vue'
+import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
 
 const routes = [
@@ -17,8 +17,8 @@ const routes = [
     component: LoginView
   },
   {
-    path: "/auth/callback",
-    name: "AuthCallback",
+    path: '/auth/callback',
+    name: 'AuthCallback',
     component: AuthCallbackView
   },
   // Requires Auth
@@ -26,7 +26,7 @@ const routes = [
     path: '/search',
     name: 'Search',
     component: SearchView,
-    meta: { requiresAuth: true}
+    meta: { requiresAuth: true }
   },
   {
     path: '/sources',
@@ -56,19 +56,31 @@ const routes = [
     path: '/404',
     name: 'NotFound',
     component: ErrorStatusView,
-    props: { code: 404, title: 'Not Found', description: 'The requested page could not be found.' }
+    props: {
+      code: 404,
+      title: 'Not Found',
+      description: 'The requested page could not be found.'
+    }
   },
   {
     path: '/401',
     name: 'Unauthorized',
     component: ErrorStatusView,
-    props: { code: 401, title: 'Unauthorized', description: 'You are not authorized to view this page.' }
+    props: {
+      code: 401,
+      title: 'Unauthorized',
+      description: 'You are not authorized to view this page.'
+    }
   },
   {
     path: '/403',
     name: 'Forbidden',
     component: ErrorStatusView,
-    props: { code: 403, title: 'Forbidden', description: 'You do not have permission to this page.' }
+    props: {
+      code: 403,
+      title: 'Forbidden',
+      description: 'You do not have permission to this page.'
+    }
   },
   {
     path: '/:pathMatch(.*)*', // Regex for all unmatched paths
@@ -107,8 +119,8 @@ router.beforeEach((to) => {
   }
 
   // admin only route
-  if (to.meta?.requiresAdmin && !hasRole("admin")){
-    return {path: "/403"}
+  if (to.meta?.requiresAdmin && !hasRole('admin')) {
+    return { path: '/403' }
   }
 
   return true

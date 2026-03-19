@@ -1,36 +1,33 @@
 <script setup>
-import { Bell, LogOut } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
+import { Bell, LogOut } from 'lucide-vue-next'
 
 // Keycloak attributes
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
-const REALM = import.meta.env.VITE_REALM;
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
+const REALM = import.meta.env.VITE_REALM
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
 
 const handleLogout = () => {
-  
-  const idToken = sessionStorage.getItem("id_token");
-  const postLogoutRedirectUri = `${window.location.origin}/`;
+  const idToken = sessionStorage.getItem('id_token')
+  const postLogoutRedirectUri = `${window.location.origin}/`
 
-  sessionStorage.removeItem("access_token");
-  sessionStorage.removeItem("id_token");
-  sessionStorage.removeItem("pkce_verifier");
-  sessionStorage.removeItem("oidc_state");
+  sessionStorage.removeItem('access_token')
+  sessionStorage.removeItem('id_token')
+  sessionStorage.removeItem('pkce_verifier')
+  sessionStorage.removeItem('oidc_state')
+
+  localStorage.setItem('logout-event', Date.now().toString())
 
   if (idToken) {
-  const logoutUrl =
-  `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
-  `?id_token_hint=${encodeURIComponent(idToken)}` +
-  `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-  `&client_id=${encodeURIComponent(CLIENT_ID)}`;
+    const logoutUrl =
+      `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
+      `?id_token_hint=${encodeURIComponent(idToken)}` +
+      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
+      `&client_id=${encodeURIComponent(CLIENT_ID)}`
 
-  window.location.assign(logoutUrl);
-  return;
+    window.location.assign(logoutUrl)
+    return
   }
-
-};
+}
 </script>
 
 <template>
@@ -38,10 +35,10 @@ const handleLogout = () => {
     <img src="@/assets/logo.png" alt="NexusUSI Logo" class="logo-image" />
     <div class="spacer"></div>
     <div class="header-actions">
-      <button @click="handleNotification" class="notification-btn" title="Notifications">
+      <button class="notification-btn" title="Notifications" @click="handleNotification">
         <Bell size="20" />
       </button>
-      <button @click="handleLogout" class="logout-btn" title="Logout">
+      <button class="logout-btn" title="Logout" @click="handleLogout">
         <LogOut size="20" />
       </button>
     </div>
@@ -75,7 +72,7 @@ const handleLogout = () => {
 }
 
 .notification-btn,
-.logout-btn{
+.logout-btn {
   background: none;
   border: none;
   cursor: pointer;

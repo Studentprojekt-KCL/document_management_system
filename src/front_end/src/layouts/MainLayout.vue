@@ -1,25 +1,24 @@
 <script setup>
-import Header from "@/components/Header.vue"
-import Sidebar from "@/components/Sidebar.vue"
-import Footer from "@/components/Footer.vue"
+import AppHeader from '@/components/AppHeader.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
+import AppFooter from '@/components/AppFooter.vue'
 </script>
 
 <template>
   <div class="layout">
-    <Header />
+    <AppHeader />
 
     <div class="main">
-      <Sidebar />
+      <AppSidebar />
 
       <div class="content">
         <router-view />
       </div>
     </div>
 
-    <Footer />
+    <AppFooter />
   </div>
 </template>
-
 
 <style scoped>
 .layout {

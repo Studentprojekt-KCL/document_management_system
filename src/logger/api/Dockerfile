@@ -10,3 +10,4 @@ WORKDIR /app
 COPY --from=build /app/dist/log_api-*.whl .
 RUN python -m pip install log_api-*.whl
 ENTRYPOINT ["log_api"]
+

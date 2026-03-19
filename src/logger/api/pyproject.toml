@@ -20,3 +20,4 @@ package-dir = {"" = "src"}
 
 [project.scripts]
 log_api = "log_api.api:run"
+

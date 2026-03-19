@@ -1,40 +1,97 @@
 <script setup>
+import { ref } from 'vue'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
+import SearchMatches from '@/components/SearchMatches.vue'
+import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
+import { resolveFilename } from '@/composables/useSearchMetadata'
 
-// Placeholder for the search view. 
-// It currently includes the SearchBar and a static SearchFiltersCard.
+const matches = ref([])
+const selectedFile = ref('')
+const selectedMatch = ref(null)
+const error = ref('')
+const isSearching = ref(false)
+const lastQuery = ref('')
+const isPreviewOpen = ref(false)
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
-// The handleSearch function is a placeholder for the actual search logic. 
-// It currently just logs the search query to the console. 
-// In a later implementation, this will probably be what makes the API call to perform the search
-const handleSearch = (query) => {
-	console.log('Searching for:', query) // enter and button works
+// --- Search for matches ---
+const handleSearch = async (query) => {
+  lastQuery.value = query
+
+  error.value = ''
+  matches.value = []
+  selectedFile.value = ''
+  selectedMatch.value = null
+  isPreviewOpen.value = false
+
+  if (!query || !query.trim()) {
+    error.value = 'Please enter a search term.'
+    return
+  }
+
+  isSearching.value = true
+  try {
+    // the endpoint is /search in main API.
+    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
+
+    if (!res.ok) {
+      error.value = `Search failed: ${res.status} ${await res.text()}`
+      return
+    }
+
+    const data = await res.json()
+    console.log('Search response:', data)
+    matches.value = Array.isArray(data) ? data : data.results || data.matches || []
+
+    if (matches.value.length === 0) {
+      error.value = 'No matching files found.'
+      return
+    }
+  } catch (e) {
+    error.value = `Search error: ${String(e)}`
+  } finally {
+    isSearching.value = false
+  }
 }
 
-// same as handleSearch, this is a placeholder for handling filter changes. 
-// It currently just logs the changed filter to the console.
-// I like to see that things happens :)
+// --- Handle selecting a match ---
+const selectMatch = (match) => {
+  if (!match) return
+
+  selectedMatch.value = match
+  selectedFile.value = resolveFilename(match)
+
+  isPreviewOpen.value = true
+}
+
+const closePreview = () => {
+  isPreviewOpen.value = false
+}
+
 const handleFilterChange = (filter) => {
-	console.log('Filter changed:', filter) // placeholder for handling filter changes
+  console.log('Filter changed:', filter)
 }
 </script>
 
 <template>
-	<section class="search-view">
-		<SearchBar @search="handleSearch" />
-		<p class="search-hint">Click Search or press Enter to search.</p>
-		<SearchFiltersCard @filter-change="handleFilterChange" />
-	</section>
+  <section class="search-view">
+    <SearchBar @search="handleSearch" />
+    <SearchFiltersCard @filter-change="handleFilterChange" />
+
+    <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+    <SearchPreviewDrawer
+      :open="isPreviewOpen"
+      :selected-file="selectedFile"
+      :selected-match="selectedMatch"
+      :matches="matches"
+      @close="closePreview"
+    />
+  </section>
 </template>
 
 <style scoped>
 .search-view {
-	padding: 1rem;
-}
-
-.search-hint {
-	font-size: 0.85rem;
-	margin: 0.45rem 0 0;
+  padding: 1rem;
 }
 </style>

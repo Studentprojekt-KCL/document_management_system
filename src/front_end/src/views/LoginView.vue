@@ -1,53 +1,50 @@
 <script setup>
-
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
 const isLoading = ref(false)
 
 // Keycloak attributes
 
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE;
-const REALM = import.meta.env.VITE_REALM;
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID;
+const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
+const REALM = import.meta.env.VITE_REALM
+const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
 
 // Used for getting the token
 function base64UrlEncode(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
 }
 
 async function sha256(input) {
-  const data = new TextEncoder().encode(input);
-  return await crypto.subtle.digest("SHA-256", data);
+  const data = new TextEncoder().encode(input)
+  return await crypto.subtle.digest('SHA-256', data)
 }
 
 function randomString(bytesLen = 32) {
-  const bytes = new Uint8Array(bytesLen);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
+  const bytes = new Uint8Array(bytesLen)
+  crypto.getRandomValues(bytes)
+  return base64UrlEncode(bytes)
 }
 
 async function createPkcePair() {
-  const verifier = randomString(64);
-  const challenge = base64UrlEncode(await sha256(verifier));
-  return { verifier, challenge };
+  const verifier = randomString(64)
+  const challenge = base64UrlEncode(await sha256(verifier))
+  return { verifier, challenge }
 }
 
 const handleEntraIdLogin = async () => {
-  const { verifier, challenge } = await createPkcePair();
+  const { verifier, challenge } = await createPkcePair()
 
   // Save for callback step
-  sessionStorage.setItem("pkce_verifier", verifier);
+  sessionStorage.setItem('pkce_verifier', verifier)
 
   // Recommended: CSRF/state protection
-  const state = randomString(32);
-  sessionStorage.setItem("oidc_state", state);
+  const state = randomString(32)
+  sessionStorage.setItem('oidc_state', state)
 
-  const redirectUri = `${window.location.origin}/auth/callback`;
+  const redirectUri = `${window.location.origin}/auth/callback`
 
   const authUrl =
     `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/auth` +
@@ -57,12 +54,10 @@ const handleEntraIdLogin = async () => {
     `&scope=openid` +
     `&state=${encodeURIComponent(state)}` +
     `&code_challenge=${encodeURIComponent(challenge)}` +
-    `&code_challenge_method=S256`;
+    `&code_challenge_method=S256`
 
-  window.location.assign(authUrl);
+  window.location.assign(authUrl)
 }
-
-
 </script>
 
 <template>
@@ -74,16 +69,12 @@ const handleEntraIdLogin = async () => {
       </div>
 
       <div class="login-content">
-        <button 
-          @click="handleEntraIdLogin" 
-          :disabled="isLoading"
-          class="entra-btn"
-        >
+        <button @click="handleEntraIdLogin" :disabled="isLoading" class="entra-btn">
           <svg v-if="!isLoading" class="microsoft-icon" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="11" height="11" fill="#F25022"/>
-            <rect x="12" width="11" height="11" fill="#7FBA00"/>
-            <rect y="12" width="11" height="11" fill="#00A4EF"/>
-            <rect x="12" y="12" width="11" height="11" fill="#FFB900"/>
+            <rect width="11" height="11" fill="#F25022" />
+            <rect x="12" width="11" height="11" fill="#7FBA00" />
+            <rect y="12" width="11" height="11" fill="#00A4EF" />
+            <rect x="12" y="12" width="11" height="11" fill="#FFB900" />
           </svg>
           <span v-if="isLoading">Signing in...</span>
           <span v-else>Sign in with Microsoft Entra ID</span>
@@ -95,8 +86,8 @@ const handleEntraIdLogin = async () => {
 
         <div class="info-text">
           <p class="text-sm text-secondary">
-            Your organization uses Microsoft Entra ID for secure authentication.
-            Click the button above to sign in with your company credentials.
+            Your organization uses Microsoft Entra ID for secure authentication. Click the button above to sign in with your company
+            credentials.
           </p>
         </div>
       </div>
@@ -124,7 +115,7 @@ const handleEntraIdLogin = async () => {
 }
 
 .login-header {
-  background: linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%);
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
   color: white;
   padding: 3rem 2rem;
   text-align: center;

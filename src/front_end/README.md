@@ -13,7 +13,7 @@ ________________________________________
 ```docker build -t test_frontend .```
 
 ### Run instructions after build
-```docker run --rm -d --name test_frontend_run -p 8080:80 test_frontend```
+```docker run --rm -d -e API_HOST=<adress> --name test_frontend_run -p 8080:80 test_frontend```
 
 **Open a brower and enter:** ```http://localhost:8080```
 
@@ -26,6 +26,15 @@ ________________________________________
 
 ### Run npm
 ```npm run dev```
+
+### ESLint
+Check lint errors:
+
+```npm run lint```
+
+Auto-fix lint and formatting issues when possible:
+
+```npm run lint:fix```
 
 ### To stop
 ctrl + c
@@ -99,14 +108,8 @@ Before running the service, you must create a `.env` file in the /front_end/ dir
 Create `.env` file following this structure:
 
 ```
-VITE_KEYCLOAK_BASE =https://ad.dms-lookup.com:8443
-VITE_REALM =master
-VITE_CLIENT_ID =dms-frontend
+VITE_KEYCLOAK_BASE=https://ad.dms-lookup.com:8443
+VITE_REALM=master
+VITE_CLIENT_ID=dms-frontend
+VITE_API_BASE_URL=http://api:8000
 ```
-
-## testing roles
-### Web Browser Testing
-f12 -> console:
-
-`hasRole("admin")`
-`hasRole("user")`

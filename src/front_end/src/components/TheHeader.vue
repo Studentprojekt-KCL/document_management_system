@@ -1,11 +1,21 @@
 <script setup>
+/**
+TheHeader Component
+Application header displaying logo, logout (and notification) buttons.
+Handles user authentication through Keycloak.
+@component
+@example usage:
+<TheHeader />
+*/
+
 import { Bell, LogOut } from 'lucide-vue-next'
 
-// Keycloak attributes
+/* Keycloak attributes */
 const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
 const REALM = import.meta.env.VITE_REALM
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
 
+/* Handles user logout by clearing session storage and redirecting to login page. */
 const handleLogout = () => {
   const idToken = sessionStorage.getItem('id_token')
   const postLogoutRedirectUri = `${window.location.origin}/`
@@ -31,9 +41,14 @@ const handleLogout = () => {
 </script>
 
 <template>
+  <!--- Main Header container-->
   <header class="header">
     <img src="@/assets/logo.png" alt="NexusUSI Logo" class="logo-image" />
+
+    <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
+
+    <!--- Header actions (notifications, logout) -->
     <div class="header-actions">
       <button class="notification-btn" title="Notifications" @click="handleNotification">
         <Bell size="20" />

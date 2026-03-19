@@ -57,8 +57,8 @@ class API:
             content = "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self) -> JSONResponse:
-        pointers = self.samba_service.get_files()
+    async def files(self, subdata: str | None = None) -> JSONResponse:
+        pointers = self.samba_service.get_files(subdata)
         return JSONResponse(
             content={
                 "subdata": None,

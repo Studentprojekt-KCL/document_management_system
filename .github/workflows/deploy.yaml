@@ -5,11 +5,8 @@ on:
     branches: ["develop"]
 
 env:
-  REGISTRY: registry.dms-lookup.com
-  REGISTRY_USER: prod
   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
   WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-  COMPOSE_FILE: docker-compose-build-all.yaml
 
 jobs:
   deploy:
@@ -20,56 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # For some reason won't next job work if this does not run.
-      - name: Curl registry (warm-up)
-        run: curl -v https://registry.dms-lookup.com/v2/
-
-      - name: Log in to registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_PASS }}
-
-      - name: Build all images
-        working-directory: .
-        run: docker compose -f ${{ env.COMPOSE_FILE }} build
-
-      - name: Tag and push images to registry with :${{ github.sha }} and :latest
-        working-directory: .
-        run: |
-          set -euo pipefail
-
-          IMAGES="$(docker compose -f ${{ env.COMPOSE_FILE }} config --images)"
-          echo "Images from compose:"
-          echo "$IMAGES"
-
-          REGISTRY="${{ env.REGISTRY }}"
-
-          # Give every image a tag
-          # <image>:latest
-          # <image>:sha_sum
-          while IFS= read -r img; do
-            [ -z "$img" ] && continue
-            base="$img"
-            if echo "$img" | grep -qE ':[^/]+$'; then
-              base="${img%:*}"
-            fi
-
-            # Strip registry if already present
-            base_no_registry="${base#*/}"
-
-            full="$REGISTRY/$base_no_registry"
-
-            echo "Tagging $img -> $full:latest and $full:${GITHUB_SHA}"
-            docker tag "$img" "$full:latest"
-            docker tag "$img" "$full:${GITHUB_SHA}"
-            echo "Pushing $full:latest"
-            docker push "$full:latest"
-            echo "Pushing $full:${GITHUB_SHA}"
-            docker push "$full:${GITHUB_SHA}"
-          done <<< "$IMAGES"
 
       - name: Trigger deploy webhook (HMAC SHA-256)
         run: |

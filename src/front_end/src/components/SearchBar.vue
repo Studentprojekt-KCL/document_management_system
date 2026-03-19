@@ -1,13 +1,23 @@
 <script setup>
+/**
+ * SearchBar Component
+ * A simple search input component that emits a search event with the user's query.
+ *
+ * @component
+ * @example usage in SearchView.vue:
+ * <SearchBar @search="handleSearch" />
+ */
+
 import { ref } from 'vue'
 import { Search as SearchIcon } from 'lucide-vue-next'
 
+/* Emit to parent component (SearchView) when a search is performed */
 const emit = defineEmits(['search'])
 
-// Search query empty first
+/* Search query state */
 const searchQuery = ref('')
 
-// Handle search action when user clicks the search button or presses Enter
+/* Handle search action when user clicks the search button or presses Enter */
 const handleSearch = () => {
   const query = searchQuery.value.trim()
   if (!query) {
@@ -20,9 +30,12 @@ const handleSearch = () => {
 </script>
 
 <template>
+  <!-- Search Bar Form -->
   <form class="search-input-wrap" @submit.prevent="handleSearch">
     <SearchIcon class="search-icon" :size="28" />
     <input v-model="searchQuery" class="search-input" type="text" placeholder="Search for documents across all sources..." />
+
+    <!-- Search button to trigger the search action -->
     <button class="search-button" type="submit">Search</button>
   </form>
 </template>

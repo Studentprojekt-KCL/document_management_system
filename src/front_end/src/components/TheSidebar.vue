@@ -3,7 +3,7 @@
  * TheSidebar Component
  * Application sidebar for navigation between main sections of the app.
  * Role-based access control to show/hide menu items based on user permissions.
-
+ *
  * @component
  * @example usage:
  * <TheSidebar />

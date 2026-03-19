@@ -2,7 +2,7 @@
 /**
  * TheFooter Component
  * Displays the application footer with copyright information.
-
+ *
  * @component
  * @example usage:
  * <AppFooter />

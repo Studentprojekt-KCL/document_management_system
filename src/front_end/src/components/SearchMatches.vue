@@ -1,8 +1,19 @@
 <script setup>
+/**
+ * SearchMatches Component
+ * Displays a list of search results (matches) based on the query.
+ * Each match shows the file title, type, and date, and allows the user to select it for preview.
+ *
+ * @component
+ * @example usage in SearchView.vue:
+ * <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+ */
+
 import { computed } from 'vue'
 import { Calendar, FileText } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 
+/* Props received from parent component (SearchView) */
 const props = defineProps({
   matches: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
@@ -10,11 +21,16 @@ const props = defineProps({
   query: { type: String, default: '' }
 })
 
+/* Emit to parent (SearchView) component when a match is selected */
 const emit = defineEmits(['select'])
+
+/* Custom composable to normalize matches and resolve match dates for display */
 const { normalizeMatches, resolveMatchDate } = useSearchMetadata(props)
 
+/* Computed property to normalize matches for consistent display */
 const normalizedMatches = computed(() => normalizeMatches(props.matches))
 
+/* Computed property to generate a user-friendly label for the number of search results */
 const resultsLabel = computed(() => {
   const count = normalizedMatches.value.length
   if (count === 0) {
@@ -25,10 +41,12 @@ const resultsLabel = computed(() => {
 </script>
 
 <template>
+  <!-- Container for search results with conditional states for loading and no results -->
   <div class="results-shell">
     <p v-if="loading" class="state-text">Searching…</p>
     <p v-else-if="query" class="results-count">{{ resultsLabel }}</p>
 
+    <!-- List of search result matches with titles, types, and dates -->
     <ul class="results-list">
       <li v-for="item in normalizedMatches" :key="item.filename" class="result-item">
         <button class="result-card" :class="{ active: selected === item.filename }" @click="emit('select', item.rawMatch)">

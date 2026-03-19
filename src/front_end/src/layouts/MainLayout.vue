@@ -8,7 +8,7 @@
  * ├── Sidebar (left)
  * └── Content (router-view)
  * Footer (bottom)
-
+ *
  * @component
  * @example usage:
  * <MainLayout />

@@ -3,7 +3,7 @@
  * TheHeader Component
  * Application header displaying logo, logout (and notification) buttons.
  * Handles user authentication through Keycloak.
-
+ *
  * @component
  * @example usage:
  * <TheHeader />

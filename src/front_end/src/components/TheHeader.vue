@@ -1,12 +1,13 @@
 <script setup>
 /**
-TheHeader Component
-Application header displaying logo, logout (and notification) buttons.
-Handles user authentication through Keycloak.
-@component
-@example usage:
-<TheHeader />
-*/
+ * TheHeader Component
+ * Application header displaying logo, logout (and notification) buttons.
+ * Handles user authentication through Keycloak.
+
+ * @component
+ * @example usage:
+ * <TheHeader />
+ */
 
 import { Bell, LogOut } from 'lucide-vue-next'
 

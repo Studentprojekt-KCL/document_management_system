@@ -1,3 +1,5 @@
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+
 from os import environ
 from typing import Any, Sequence
 from dmis_logger import dms_error
@@ -9,7 +11,18 @@ from services.samba import Samba
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 
+
 class API:
+    """Samba connector API.
+
+    Variables:
+        app: the fastapi object.
+        samba_service: The local samba service.
+        host: The API host.
+        port: The API port.
+        log_level: the log level.
+    """
+
     app: FastAPI
     samba_service: Samba
     host: str
@@ -17,6 +30,7 @@ class API:
     log_level: str
 
     def __init__(self) -> None:
+        """constructor"""
         host: str = environ.get("SC_HOST", "0.0.0.0")
         port: str = environ.get("SC_PORT", "8000")
 
@@ -37,9 +51,9 @@ class API:
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])
-    
 
     def start(self) -> None:
+        """Start the API."""
         uvicorn.run(self.app, host=self.host, port=self.port, log_level=self.log_level)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
@@ -58,14 +72,11 @@ class API:
         return JSONResponse(status_code=422, content=content)
 
     async def files(self, subdata: str | None = None) -> JSONResponse:
-        pointers = self.samba_service.get_files(subdata)
-        return JSONResponse(
-            content={
-                "subdata": None,
-                "file_pointers": pointers
-            }
-        )
+        response = self.samba_service.get_files(subdata)
+        return JSONResponse(content=response)
+
 
 def run() -> None:
+    """Connector entrypoint."""
     api: API = API()
     api.start()

@@ -1,3 +1,10 @@
+<script setup>
+/**
+ * SourcesView.vue - Placeholder for the sources management view.
+ * If we want it
+ */
+</script>
+
 <template>
   <section class="sources-view">
     <h1>Sources</h1>

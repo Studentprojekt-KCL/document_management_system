@@ -1,3 +1,17 @@
+/**
+ * Vue Router setup for the frontend.
+ *
+ * Includes:
+ * - Public routes: login (and OAuth callback).
+ * - Protected routes: search (auth required) and admin pages (auth + admin role).
+ * - Error routes: 401, 403, 404, plus a catch-all redirect to 404.
+ *
+ * Global guard behavior:
+ * - Validates OAuth callback query/state.
+ * - Redirects authenticated users away from login to search.
+ * - Blocks unauthenticated access to protected routes (401).
+ * - Blocks non-admin users from admin routes (403).
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import SearchView from '@/views/SearchView.vue'
 import SourcesView from '@/views/SourcesView.vue'
@@ -10,24 +24,26 @@ import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
 
 const routes = [
-  // Public ~ish
+  /* Public */
   {
     path: '/',
     name: 'Login',
     component: LoginView
   },
+  /* OAuth callback route, not reachable for users. */
   {
     path: '/auth/callback',
     name: 'AuthCallback',
     component: AuthCallbackView
   },
-  // Requires Auth
+  /* Protected */
   {
     path: '/search',
     name: 'Search',
     component: SearchView,
     meta: { requiresAuth: true }
   },
+  /* Admin only routes */
   {
     path: '/sources',
     name: 'Sources',
@@ -52,6 +68,7 @@ const routes = [
     component: SettingsView,
     meta: { requiresAuth: true, requiresAdmin: true }
   },
+  /* Error routes */
   {
     path: '/404',
     name: 'NotFound',
@@ -89,12 +106,13 @@ const routes = [
   }
 ]
 
+/* Vue Router instance with history mode and defined routes. */
 const router = createRouter({
   history: createWebHistory(),
   routes
 })
 
-// router guard so that you can't go to protected pages without logging in
+/* router guard so that you can't go to protected pages without logging in */
 router.beforeEach((to) => {
   const token = sessionStorage.getItem('access_token')
   const isAuthed = !!token
@@ -118,7 +136,7 @@ router.beforeEach((to) => {
     return { path: '/401' }
   }
 
-  // admin only route
+  /* Admin only route */
   if (to.meta?.requiresAdmin && !hasRole('admin')) {
     return { path: '/403' }
   }

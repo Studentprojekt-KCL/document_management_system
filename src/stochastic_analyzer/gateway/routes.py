@@ -1,11 +1,13 @@
 """Define API and routes"""
 
 from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import Response
 from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
 from gateway.config import settings
 from gateway.services.classifier import classify_document
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
+from gateway.services.summarizer_pdf import md_to_pdf
 
 router = APIRouter()
 
@@ -54,3 +56,9 @@ async def summarize_batch(payload: list[InputItem]) -> dict:
         return result.model_dump()
     else:
         raise HTTPException(status_code=500, detail="Failed to generate a summary from the provided documents.")
+
+@router.post("/md-to-pdf")
+async def md_pdf_converter(summary: SummaryResult) -> Response:
+    """Endpoint to convert from markdown to pdf."""
+    pdf: bytes = md_to_pdf(summary.summary)
+    return Response(content=pdf, status_code=200, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename='summary.pdf'"})

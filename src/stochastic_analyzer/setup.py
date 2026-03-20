@@ -13,6 +13,7 @@ setup(
         "pydantic >= 2.0.0",
         "requests>=2.32",
         "httpx",
+        "markdown-pdf>=1.13.1",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

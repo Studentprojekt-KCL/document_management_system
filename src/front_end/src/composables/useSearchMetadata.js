@@ -1,11 +1,18 @@
+/**
+ * Composable for extracting and normalizing metadata from search results.
+ * Utility functions to resolve filename, document type, and dates etc.
+ * Functions are used in other files.
+ */
+
 import { computed } from 'vue'
 
-// Find first non-empty value
+/* Function to pick the first non-empty value from a list of candidates.*/
 export const pick = (...values) => {
   const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== '')
   return found ?? ''
 }
 
+/* Function to extract metadata from an entry. */
 const getMetadata = (entry) => {
   if (!entry || typeof entry !== 'object') {
     return {}
@@ -18,7 +25,7 @@ const getMetadata = (entry) => {
   return entry
 }
 
-// Filnamn
+/* Function to resolve the filename from metadata or entry. Can differ between sources. */
 export const resolveFilename = (entry, index = 0) => {
   const metadata = getMetadata(entry)
 
@@ -35,10 +42,10 @@ export const resolveFilename = (entry, index = 0) => {
   )
 }
 
-// Datum
+/* Function to resolve the date from a value. */
 export const resolveDateOnly = (value) => pick((value || '').split('T')[0])
 
-// Maybe we can get the file type from the header or content later.
+/* Function to resolve the document type from source type and name. */
 const TYPE_KEYWORDS = {
   'PDF Document': ['pdf'],
   'Word Document': ['word', 'doc', 'docx'],
@@ -47,7 +54,7 @@ const TYPE_KEYWORDS = {
   'Markdown Document': ['markdown', 'md']
 }
 
-// Har bara hittat markdown och text i test annars returnerar den source_file
+/* Function to resolve the document type from source type and name. */
 export const resolveDocumentType = ({ sourceType, sourceName }) => {
   const type = String(sourceType || '').toLowerCase()
   const name = String(sourceName || '').toLowerCase()
@@ -62,6 +69,11 @@ export const resolveDocumentType = ({ sourceType, sourceName }) => {
   return pick(sourceType, sourceName)
 }
 
+/**
+ * Function to extract and normalize metadata for search results.
+ * @param {Object} props - The props object containing the selected match to preview.
+ * @returns {Object} An object containing computed properties and utility functions for search metadata.
+ */
 export const useSearchMetadata = (props) => {
   const metadata = computed(() => getMetadata(props.selectedMatch))
 
@@ -92,6 +104,7 @@ export const useSearchMetadata = (props) => {
         metadata.value.date
     )
   )
+
   const previewSize = computed(() => pick(metadata.value.size, metadata.value.file_size, metadata.value.bytes))
 
   const normalizeMatches = (matches = []) =>

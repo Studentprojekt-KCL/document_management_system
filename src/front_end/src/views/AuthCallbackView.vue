@@ -1,8 +1,12 @@
 <script setup>
+/**
+ * AuthCallbackView.vue - Handles the OAuth callback from Keycloak.
+ * This view handles the redirection from Keycloak after the user has authenticated.
+ */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-// Keycloak attributes
+/* Keycloak attributes */
 const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
 const REALM = import.meta.env.VITE_REALM
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
@@ -11,37 +15,40 @@ const route = useRoute()
 const router = useRouter()
 const errorMsg = ref('')
 
+/**
+ * On mount, handle the OAuth callback from Keycloak
+ * Different errors can occur during the authentication process.
+ */
 onMounted(async () => {
-  // Keycloak might return errors
   if (route.query.error) {
     errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`
     return
   }
 
+  /* Authorization code returned by Keycloak */
   const code = route.query.code
   const returnedState = route.query.state
-
   if (!code) {
     errorMsg.value = 'No authorization code found in callback URL.'
     return
   }
 
-  // Verify state
+  /* Check state to prevent CSRF attacks */
   const expectedState = sessionStorage.getItem('oidc_state')
   if (expectedState && returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
     return
   }
 
-  // Verifier that is exchanged for tokens
+  /* Verifier that is exchanged for tokens */
   const verifier = sessionStorage.getItem('pkce_verifier')
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
     return
   }
-  // redirection url
+  /* Redirection URL */
   const redirectUri = `${window.location.origin}/auth/callback`
-  // Api address to get tokens
+  /* API address to get tokens */
   const tokenUrl = `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/token`
 
   try {
@@ -58,24 +65,22 @@ onMounted(async () => {
       body: body.toString()
     })
 
-    // response form token api
+    /* Response from token API */
     const data = await resp.json()
 
-    // error with response
     if (!resp.ok) {
       errorMsg.value = `Token exchange failed: ${data.error || resp.status} ${data.error_description || ''}`
       return
     }
 
-    // Store token(s) and data in sessionStorage
+    /* Store token(s) and data in sessionStorage */
     if (data.access_token) sessionStorage.setItem('access_token', data.access_token)
     if (data.id_token) sessionStorage.setItem('id_token', data.id_token)
 
-    // Cleanup old items
+    /* Cleanup old items */
     sessionStorage.removeItem('pkce_verifier')
     sessionStorage.removeItem('oidc_state')
 
-    // Go to protected page
     router.replace('/search')
   } catch (e) {
     errorMsg.value = `Unexpected error: ${String(e)}`
@@ -84,8 +89,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div style="padding: 2rem">
+  <section class="auth-callback-view">
     <h2>Signing you in…</h2>
-    <p v-if="errorMsg" style="white-space: pre-wrap"><b>Error:</b> {{ errorMsg }}</p>
-  </div>
+    <p class="error-message" v-if="errorMsg"><b>Error:</b> {{ errorMsg }}</p>
+  </section>
 </template>
+
+<style scoped>
+.auth-callback-view {
+  padding: 2rem;
+}
+.error-message {
+  white-space: pre-wrap;
+}
+</style>

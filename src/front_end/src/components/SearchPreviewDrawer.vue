@@ -1,7 +1,17 @@
 <script setup>
+/**
+ * SearchPreviewDrawer Component
+ * Displays a sliding drawer with detailed information about a selected file from the search results.
+ *
+ * @component
+ * @example usage in SearchView.vue:
+ * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
+ */
+
 import { X, StarsIcon, CalendarDays, HardDrive, FileType2 } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 
+/* Props received from parent component (SearchView) */
 const props = defineProps({
   open: { type: Boolean, default: false },
   selectedFile: { type: String, default: '' },
@@ -9,13 +19,19 @@ const props = defineProps({
   matches: { type: Array, default: () => [] }
 })
 
+/* Emit event to parent component to signal closing the preview drawer */
 const emit = defineEmits(['close'])
+
+/* Use custom composable to extract metadata for the selected file */
 const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMetadata(props)
 </script>
 
 <template>
   <div v-if="open" class="preview-backdrop" @click="emit('close')" />
+
+  <!-- Drawer container with dynamic classes based on open state -->
   <aside class="preview-drawer" :class="{ open }">
+    <!-- Header section with title and close button -->
     <div class="preview-header">
       <p class="panel-kicker">DOCUMENT INTELLIGENCE</p>
       <button class="close-btn" type="button" @click="emit('close')" aria-label="Close preview" title="Close preview">
@@ -23,6 +39,7 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
       </button>
     </div>
 
+    <!-- Main content area of the preview drawer -->
     <div class="preview-body">
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
@@ -30,6 +47,7 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
         <span class="tag">{{ previewType }}</span>
       </div>
 
+      <!-- AI Summary section -->
       <section class="panel-section">
         <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
         <p class="section-title">AI SUMMARY</p>
@@ -38,6 +56,7 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
         </div>
       </section>
 
+      <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
         <div class="meta-grid">

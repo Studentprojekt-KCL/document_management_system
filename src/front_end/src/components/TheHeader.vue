@@ -44,7 +44,7 @@ const handleLogout = () => {
 <template>
   <!--- Main Header container-->
   <header class="header">
-    <img src="@/assets/logo.png" alt="NexusUSI Logo" class="logo-image" />
+    <img src="@/assets/logo.png" alt="Logo" class="logo-image" />
 
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>

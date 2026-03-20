@@ -1,5 +1,11 @@
-// auth.js
-// read the Jason Web Token
+/**
+ * Decode the payload of a JSON Web Token (JWT).
+ *
+ * @param {string} token - The JWT string.
+ * @returns {Object|null} The decoded payload, or null if decoding fails.
+ */
+
+/* Read the JSON Web Token */
 function decodeJwtPayload(token) {
   try {
     const base64Url = token.split('.')[1]
@@ -11,6 +17,7 @@ function decodeJwtPayload(token) {
   }
 }
 
+/* Check if the user has a specific role */
 export function hasRole(role) {
   const token = sessionStorage.getItem('access_token')
   if (!token) return false

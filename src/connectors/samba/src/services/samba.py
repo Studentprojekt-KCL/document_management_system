@@ -89,7 +89,7 @@ class Samba:
                     latest_edit = edited
 
                 if last_edit is None or (last_edit - edited).total_seconds() < 0:
-                    pointers.append(f"{file_path}")
+                    pointers.append(f"//{self.host}/{self.share}{file_path}")
 
         if latest_edit is not None:
             subdata = base64.b64encode(latest_edit.isoformat().encode("utf-8")).decode("utf-8")

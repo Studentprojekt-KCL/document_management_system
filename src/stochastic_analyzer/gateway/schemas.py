@@ -37,8 +37,7 @@ class HealthCheck(BaseModel):
     """Health checks for model and GPU."""
 
     status: str
-    model_loaded: bool
-    device: str
+    message: str
 
 #Classification Schemas
 

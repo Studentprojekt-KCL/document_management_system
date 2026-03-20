@@ -12,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 
 from gateway.config import settings
 from gateway.routes import router
-
+ 
 
 class API:
     """Management class for main API."""

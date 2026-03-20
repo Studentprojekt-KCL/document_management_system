@@ -4,7 +4,6 @@ import httpx
 import asyncio
 from gateway.config import Settings
 from gateway.schemas import DocumentObject
-from dmis_logger import dms_info
 settings = Settings()
 
 async def rank_documents(query: str, documents: list[DocumentObject]) -> list[float]:

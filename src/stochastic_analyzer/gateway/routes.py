@@ -71,6 +71,11 @@ def create_router(config: APIConfiguration) -> APIRouter:
     async def md_pdf_converter(summary: SummaryResult) -> Response:
         """Endpoint to convert from markdown to pdf."""
         pdf: bytes = md_to_pdf(summary.summary)
-        return Response(content=pdf, status_code=200, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename='summary.pdf'"})
+        return Response(
+            content=pdf,
+            status_code=200,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename='summary.pdf'"},
+        )
 
     return router

@@ -46,10 +46,7 @@ async def classify_documents(items: list[InputItem], classifier_url: str) -> lis
 
     try:
         async with httpx.AsyncClient() as client:
-            tasks = [
-                fetch_batch(client, i, inputs[i : i + batch_size])
-                for i in range(0, len(inputs), batch_size)
-            ]
+            tasks = [fetch_batch(client, i, inputs[i : i + batch_size]) for i in range(0, len(inputs), batch_size)]
             await asyncio.gather(*tasks)
     except httpx.HTTPStatusError as err:
         dms_warning(f"Unexpected response from {classifier_url}, {err}")

@@ -29,7 +29,7 @@ dmis_api --dev
 
 ### 4. Test request to API:
 
-curl "http://127.0.0.1:8000/search?query=test"
+curl "http://127.0.0.1:8000/docs"
 
 Expected "200 ok" code
 
@@ -45,6 +45,6 @@ sudo docker run --rm -p 8000:8000 --env-file .env dmis_api
 
 ### 3. Test the API
 
-curl "http://127.0.0.1:8000/search?query=test"
+curl "http://127.0.0.1:8000/docs"
 
 Expected result "200 OK"

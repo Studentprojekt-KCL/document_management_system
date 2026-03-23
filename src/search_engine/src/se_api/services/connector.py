@@ -17,7 +17,7 @@ class Connector:
         subdata: connector file status.
     """
 
-    address: str | None
+    address: str
     subdata: str | None
 
     url_files: str
@@ -28,7 +28,8 @@ class Connector:
         address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
         if address is None:
             dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
-        self.address = address
+            return
+        self.address = address.rstrip("/")
         self.subdata = None
         self.url_files = f"{self.address}/files"
         self.url_files_to_index = f"{self.address}/files_to_index"

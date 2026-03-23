@@ -9,9 +9,9 @@ import { ref } from 'vue'
 const isLoading = ref(false)
 
 /* Keycloak configuration from environment variables. */
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
-const REALM = import.meta.env.VITE_REALM
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
+const KEYCLOAK_BASE = import.meta.env.KEYCLOAK_BASE_URL
+const REALM = import.meta.env.KEYCLOAK_REALM
+const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
 
 /* Used for getting the token */
 function base64UrlEncode(buffer) {

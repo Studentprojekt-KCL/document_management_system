@@ -2,13 +2,22 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
-from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
+
+from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
+from gateway.schemas import (
+    RankRequest,
+    RankResponse,
+    ScoredDocument,
+    HealthCheck,
+    InputItem,
+    ClassificationResult,
+    SummaryResult,
+)
 from gateway.services.classifier import classify_documents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
-from dmis_logger import dms_warning
 
 
 def create_router(config: APIConfiguration) -> APIRouter:
@@ -34,7 +43,7 @@ def create_router(config: APIConfiguration) -> APIRouter:
             return {"ranked_results": []}
 
         try:
-            scores = await rank_documents(payload.query, payload.documents, config.tei_url)
+            scores = await rank_documents(payload.query, payload.documents, config.services.tei_url)
         except Exception as e:
             dms_warning(f"Ranking engine failure: {e}")
             raise HTTPException(status_code=500, detail="Ranking engine failure.") from e
@@ -53,13 +62,13 @@ def create_router(config: APIConfiguration) -> APIRouter:
         if not payload:
             return []
 
-        results = await classify_documents(payload, config.classifier_url)
+        results = await classify_documents(payload, config.services.classifier_url)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
     async def summarize_batch(payload: list[InputItem]) -> dict:
         """Endpoint to summarize a batch of documents into a single summary."""
-        result = await summarize_documents(payload, config.ministral_url, config.ministral_model)
+        result = await summarize_documents(payload, config.services.ministral_url, config.services.ministral_model)
 
         if result is None:
             dms_warning("Summarization returned no result.")

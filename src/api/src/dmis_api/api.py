@@ -87,7 +87,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = os.getenv("API_PORT", "8000")
+    port = os.getenv("API_PORT")
     if port is None or not port.isdigit():
         dms_error("Port for DMIS API not set  as digit in local environment, please export API_PORT.")
         return

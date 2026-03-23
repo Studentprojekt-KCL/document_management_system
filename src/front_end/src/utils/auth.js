@@ -5,6 +5,8 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 
+const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
+
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {
   try {
@@ -25,7 +27,7 @@ export function hasRole(role) {
   const payload = decodeJwtPayload(token)
   if (!payload) return false
 
-  const clientRoles = payload?.resource_access?.['dms-frontend']?.roles ?? []
+  const clientRoles = payload?.resource_access?.[CLIENT_ID]?.roles ?? []
   const realmRoles = payload?.realm_access?.roles ?? []
 
   return clientRoles.includes(role) || realmRoles.includes(role)

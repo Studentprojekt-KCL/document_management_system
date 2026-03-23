@@ -59,7 +59,7 @@ class API:
 
         self.app.add_api_route("/logs", self.get_logs, methods=["GET"])
         self.app.add_api_route("/logs", self.get_logs, methods=["POST"])
-        self.app.add_api_route("/health", self.get_logs, methods=["GET"])
+        self.app.add_api_route("/health", self.check_health, methods=["GET"])
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 

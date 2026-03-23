@@ -1,13 +1,7 @@
-FROM python:3.13-alpine AS build
-WORKDIR /app
-COPY src/logger/api/pyproject.toml .
-COPY src/logger/api/src src/
-RUN python -m pip install build
-RUN python -m build
-
-FROM python:3.13-alpine AS install
-WORKDIR /app
-COPY --from=build /app/dist/log_api-*.whl .
-RUN python -m pip install log_api-*.whl
+FROM python:3.13-alpine
+COPY src/logger/api /src/logger/api/
+COPY src/shared_functions /src/shared_functions
+WORKDIR /src/logger/api
+RUN python -m pip install build; python -m build; python -m pip install .
 ENTRYPOINT ["log_api"]
 

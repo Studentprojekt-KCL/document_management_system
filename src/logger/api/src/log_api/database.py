@@ -9,7 +9,10 @@ from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
+
 class Database:
+    """Service class for the database."""
+
     host: str
     user: str
     password: str
@@ -43,7 +46,6 @@ class Database:
         """Return database connection."""
         return mysql.connector.connect(host=self.host, user=self.user, database=self.database, password=self.password)
 
-
     def extract_row_data(self, row: RowType | dict[str, RowItemType]) -> Log:
         """Extract each values from a row validating the type.
 
@@ -73,7 +75,6 @@ class Database:
 
         return Log(id=log_id, occured=occured, message=message, event_type=event_type, service=service)
 
-
     def database_get_logs(self, start: datetime, end: datetime) -> list[Log]:
         """Grab all logs."""
 
@@ -84,7 +85,6 @@ class Database:
         result = cursor.fetchall()
 
         return [self.extract_row_data(row) for row in result]
-
 
     def database_add_log(self, log: Log) -> Log:
         """Add new log to database and return a Log."""

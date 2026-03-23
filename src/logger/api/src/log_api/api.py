@@ -52,8 +52,8 @@ class API:
         if args.dev:
             self.log_level = "debug"
 
-        self.bind = bind;
-        self.port = int(port);
+        self.bind = bind
+        self.port = int(port)
 
         self.app = FastAPI()
 
@@ -65,7 +65,7 @@ class API:
 
         self.database = Database()
 
-    def start(self):
+    def start(self) -> None:
         """Start the api."""
         uvicorn.run(self.app, host=self.bind, log_level=self.log_level)
 

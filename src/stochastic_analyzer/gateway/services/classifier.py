@@ -1,8 +1,8 @@
 """Zero-shot NLI classification via external TEI container."""
 
-import httpx
 import asyncio
 from json.decoder import JSONDecodeError
+import httpx
 from gateway.schemas import InputItem, ClassificationResult
 from dmis_logger import dms_warning
 

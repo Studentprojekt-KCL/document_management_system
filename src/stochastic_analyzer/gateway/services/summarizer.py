@@ -1,13 +1,16 @@
 """Batch document summarization via external Ministral LLM."""
 
-import httpx
 from json.decoder import JSONDecodeError
+
+import httpx
+
+from dmis_logger import dms_warning
 from gateway.schemas import InputItem, SummaryResult
 from gateway.preprompts import SUMMARIZER_PROMPT
-from dmis_logger import dms_warning
 
 
 async def summarize_documents(items: list[InputItem], ministral_url: str, ministral_model: str) -> SummaryResult | None:
+    """Synthesize multiple documents into a single summary via the Ministral LLM."""
     combined_context = ""
     for i, item in enumerate(items, 1):
         doc_name = item.metadata.name or f"Document {i}"

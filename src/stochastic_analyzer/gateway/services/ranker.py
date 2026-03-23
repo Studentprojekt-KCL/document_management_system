@@ -1,7 +1,7 @@
 """Ranking logic for external TEI model."""
 
-import httpx
 import asyncio
+import httpx
 from gateway.schemas import DocumentObject
 
 
@@ -14,7 +14,7 @@ async def rank_documents(query: str, documents: list[DocumentObject], tei_url: s
     max_chars = 3000
     all_scores = [0.0] * len(documents)
 
-    async def fetch_batch(client: httpx.AsyncClient, start_idx: int, batch: list[DocumentObject]):
+    async def fetch_batch(client: httpx.AsyncClient, start_idx: int, batch: list[DocumentObject]) -> None:
         texts = [f"{doc.title} {doc.content}"[:max_chars] for doc in batch]
         response = await client.post(tei_url, json={"query": query, "texts": texts}, timeout=60.0)
         response.raise_for_status()

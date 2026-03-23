@@ -1,5 +1,7 @@
-from markdown_pdf import MarkdownPdf, Section
+"""Batch document summarization via external Ministral LLM."""
+
 from io import BytesIO
+from markdown_pdf import MarkdownPdf, Section
 
 
 def md_to_pdf(md: str) -> bytes:

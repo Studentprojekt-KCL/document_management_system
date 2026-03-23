@@ -78,6 +78,7 @@ An automated API documentation is constructed when the API service is initiaded,
 Configuration is done through environment variables.
 
 - `SE_API_PORT` Search engine port.
+- `SE_API_HOST` Search engine bind address.
 - `SE_API_CONNECTOR_ADDRESS` Connector address.
 
 Optional flags:

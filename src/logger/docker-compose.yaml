@@ -2,6 +2,8 @@ services:
   log-api:
     image: log-api:latest
     environment:
+      LOGGER_BIND_ADDRESS: "0.0.0.0"
+      LOGGER_PORT: 8000
       LOGGER_DB_HOST: "log-database"
       LOGGER_DB_USER: "logger"
       LOGGER_DB_PASS: "changeme"

@@ -12,9 +12,9 @@
 import { Bell, LogOut } from 'lucide-vue-next'
 
 /* Keycloak attributes */
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
-const REALM = import.meta.env.VITE_REALM
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
+const KEYCLOAK_BASE = import.meta.env.KEYCLOAK_BASE_URL
+const REALM = import.meta.env.KEYCLOAK_REALM
+const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
 
 /* Handles user logout by clearing session storage and redirecting to login page. */
 const handleLogout = () => {

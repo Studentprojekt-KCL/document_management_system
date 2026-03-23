@@ -1,8 +1,12 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import argparse
+import logging
+from os import environ
 from typing import Any
 from collections.abc import Sequence
 
+from dmis_logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -10,7 +14,6 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
-from se_api.config import APIConfiguration
 
 
 class API:
@@ -22,13 +25,48 @@ class API:
         handler: data handler and processor.
     """
 
-    app: FastAPI = FastAPI()
-    config: APIConfiguration
+    app: FastAPI
     handler: Handler
 
+    port: int
+    host: str
+    log_level: str
+
     def __init__(self) -> None:
-        self.config = APIConfiguration()
+        logging.basicConfig()
+
+        parser = argparse.ArgumentParser()
+        _ = parser.add_argument("--dev", action="store_true")
+        args = parser.parse_args()
+
+        if args.dev:
+            self.log_level = "debug"
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
+            self.log_level = "info"
+
+        port: str | None = environ.get("SE_API_PORT")
+        host: str | None = environ.get("SE_API_HOST")
+
+        if port is None:
+            dms_error("SE_API_PORT is not defined.")
+            return
+        if host is None:
+            dms_error("SE_API_HOST is not defined.")
+            return
+
+        if not port.isdigit():
+            dms_error("Port is expected to be an integer.")
+        elif int(port) < 0 or int(port) >= 65536:
+            dms_error("Port should be between 0 and 65536.")
+
+        self.port = int(port)
+        self.host = host
+
         self.handler = Handler()
+
+        self.app = FastAPI()
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/search", self.query, methods=["GET"])
@@ -38,7 +76,7 @@ class API:
     def start(self) -> None:
         """Start the API."""
 
-        uvicorn.run(self.app, host=self.config.host, log_level=self.config.log_level)
+        uvicorn.run(self.app, host=self.host, log_level=self.log_level)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -49,7 +87,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
         content: str | dict[str, str]
-        if self.config.log_level == "debug":
+        if self.log_level == "debug":
             content = jsonable_encoder(errors)
         else:
             content = "ERROR"

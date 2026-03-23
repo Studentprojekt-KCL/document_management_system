@@ -1,7 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import argparse
-from typing import Any, Sequence
+import logging
+from typing import Any
+from collections.abc import Sequence
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -9,21 +10,38 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from gateway.config import Settings
-from gateway.routes import router
- 
+from gateway.config import APIConfiguration
+from gateway.routes import create_router
+
 
 class API:
-    """Management class for main API."""
+    """API object, holds all endpoints and configuration.
+
+    Attributes:
+        app: FastAPI application.
+        config: API configuration.
+    """
+
+    app: FastAPI
+    config: APIConfiguration
 
     def __init__(self) -> None:
-        """Constructor."""
-        self.settings = Settings()
-        self.app = FastAPI(title=self.settings.API_TITLE, version=self.settings.API_VERSION)
-        self.log_level: str | None = None
+        logging.basicConfig()
+        self.config = APIConfiguration()
 
-        self.app.include_router(router)
+        if self.config.log_level == "debug":
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
+
+        self.app = FastAPI(title="stochastic analyzer gateway", version="1.0.0")
+
+        self.app.include_router(create_router(self.config))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+
+    def start(self) -> None:
+        """Start the API."""
+        uvicorn.run(self.app, host=self.config.host, port=self.config.port, log_level=self.config.log_level)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -34,7 +52,7 @@ class API:
             errors = {"detail": str(exc)}
 
         content: str | dict[str, str]
-        if self.log_level == "debug":
+        if self.config.log_level == "debug":
             content = jsonable_encoder(errors)
         else:
             content = "ERROR"
@@ -43,13 +61,5 @@ class API:
 
 def start() -> None:
     """Entry point for application."""
-    settings = Settings()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dev", action="store_true")
-    args = parser.parse_args()
-
-    api = API()
-    if args.dev:
-        api.log_level = "debug"
-
-    uvicorn.run(api.app, host=settings.HOST, port=settings.PORT, log_level=api.log_level)
+    api: API = API()
+    api.start()

@@ -3,14 +3,12 @@
 import httpx
 import asyncio
 from json.decoder import JSONDecodeError
-from gateway.config import Settings
 from gateway.schemas import InputItem, ClassificationResult
 from dmis_logger import dms_warning
 
 
-async def classify_documents(items: list[InputItem]) -> list[ClassificationResult]:
+async def classify_documents(items: list[InputItem], classifier_url: str) -> list[ClassificationResult]:
     """Classify a batch of documents using parallel NLI inference against a TEI container."""
-    settings = Settings()
     labels = ["Public", "Internal", "Sensitive", "Confidential"]
     batch_size = 32
     max_chars = 800
@@ -35,9 +33,9 @@ async def classify_documents(items: list[InputItem]) -> list[ClassificationResul
 
     async def fetch_batch(client: httpx.AsyncClient, start_idx: int, batch: list[list[str]]):
         response = await client.post(
-            f"{settings.CLASSIFIER_URL}/predict",
+            f"{classifier_url}/predict",
             json={"inputs": batch},
-            timeout=60.0,
+            timeout=15.0,
         )
         response.raise_for_status()
         predictions = response.json()
@@ -54,13 +52,13 @@ async def classify_documents(items: list[InputItem]) -> list[ClassificationResul
             ]
             await asyncio.gather(*tasks)
     except httpx.HTTPStatusError as err:
-        dms_warning(f"Unexpected response from {settings.CLASSIFIER_URL}, {err}")
+        dms_warning(f"Unexpected response from {classifier_url}, {err}")
         return []
     except JSONDecodeError as err:
-        dms_warning(f"Response from {settings.CLASSIFIER_URL} could not be decoded, {err}")
+        dms_warning(f"Response from {classifier_url} could not be decoded, {err}")
         return []
     except httpx.TimeoutException as err:
-        dms_warning(f"Connection to {settings.CLASSIFIER_URL} timed out, {err}")
+        dms_warning(f"Connection to {classifier_url} timed out, {err}")
         return []
 
     results = []

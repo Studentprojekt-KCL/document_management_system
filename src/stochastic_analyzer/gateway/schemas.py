@@ -1,4 +1,4 @@
-"""Definitions for Pydantic schemas used in the embedded rankers API."""
+"""Definitions for Pydantic schemas used in the gateway API."""
 
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, StrictStr
@@ -8,8 +8,8 @@ class DocumentObject(BaseModel):
     """Define object for content passing."""
 
     title: str
-    owner: Optional[str] = Field(default="")  # Variable can be str or none
-    reference: str = Field(...)  # Hard Ellipsis check due to requiered field
+    owner: Optional[str] = Field(default="")
+    reference: str = Field(...)
     content: str = Field(...)
 
 
@@ -37,21 +37,22 @@ class HealthCheck(BaseModel):
     """Health checks for model and GPU."""
 
     status: str
-    message: str
+    model_loaded: bool
+    device: str
 
-#Classification Schemas
 
 class MetadataTemplate(BaseModel):
-    """Metadata fields attached to each documents input """
+    """Metadata fields attached to each document input."""
 
     name: Optional[StrictStr] = None
     author: Optional[StrictStr] = None
 
     model_config = {"extra": "ignore"}
 
+
 class InputItem(BaseModel):
     """A single document item submitted for classification."""
-    
+
     content: StrictStr = Field(..., min_length=1)
     metadata: MetadataTemplate
 
@@ -60,13 +61,12 @@ class InputItem(BaseModel):
 
 class ClassificationResult(BaseModel):
     """Output schema for a classified document."""
-    
+
     name: Optional[StrictStr] = None
     security_class: Literal["Public", "Internal", "Sensitive", "Confidential"] = Field(..., alias="Security-class")
 
     model_config = {"populate_by_name": True}
 
-#Summarization schema
 
 class SummaryResult(BaseModel):
     """Output schema for a summarized document."""

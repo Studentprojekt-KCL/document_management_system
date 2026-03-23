@@ -7,4 +7,4 @@ COPY src/stochastic_analyzer/ src/stochastic_analyzer/
 
 RUN pip install --no-cache-dir ./src/stochastic_analyzer
 
-ENTRYPOINT ["reranker"]
+ENTRYPOINT ["gateway"]

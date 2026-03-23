@@ -12,4 +12,4 @@ dynamic = ["dependencies"]
 packages = ["gateway", "gateway.services"]
 
 [project.scripts]
-reranker = "gateway.main:start"
+gateway = "gateway.main:start"

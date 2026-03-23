@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import Response, JSONResponse
 from gateway.schemas import RankRequest, RankResponse, ScoredDocument, HealthCheck, InputItem, ClassificationResult, SummaryResult
 from gateway.config import Settings
-from gateway.services.classifier import classify_document
+from gateway.services.classifier import classify_documents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
@@ -39,13 +39,14 @@ async def rerank_documents(payload: RankRequest) -> dict:
     return {"ranked_results": scored_docs}
 
 @router.post("/classify", response_model=list[ClassificationResult])
-async def classify_documents(payload: list[InputItem]) -> list[dict]:
-    results = []
-    for item in payload:
-        result = await classify_document(item)
-        if result:
-            results.append(result.model_dump(by_alias=True))
-    return results
+async def classify_endpoint(payload: list[InputItem]) -> list[dict]:
+    """Endpoint to classify documents via batched NLI inference."""
+    if not payload:
+        return []
+ 
+    results = await classify_documents(payload)
+    return [r.model_dump(by_alias=True) for r in results]
+
 
 @router.post("/summarize", response_model=SummaryResult)
 async def summarize_batch(payload: list[InputItem]) -> dict:

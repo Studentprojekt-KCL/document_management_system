@@ -46,8 +46,15 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
             self.log_level = "info"
 
-        port: str = environ.get("SE_API_PORT", "8000")
-        host: str = environ.get("SE_API_HOST", "0.0.0.0")
+        port: str | None = environ.get("SE_API_PORT")
+        host: str | None = environ.get("SE_API_HOST")
+
+        if port is None:
+            dms_error("SE_API_PORT is not defined.")
+            return
+        if host is None:
+            dms_error("SE_API_HOST is not defined.")
+            return
 
         if not port.isdigit():
             dms_error("Port is expected to be an integer.")

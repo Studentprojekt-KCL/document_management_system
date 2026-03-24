@@ -26,14 +26,14 @@ class APIConfiguration:
     """API Configuration.
 
     Attributes:
-        host: which address to bind to.
-        port: port to host on.
+        BIND: which address to bind to.
+        port: port to bind on.
         log_level: log level.
         device: compute device identifier.
         services: external service configuration.
     """
 
-    host: str
+    bind: str
     port: int
     log_level: str
     device: str
@@ -41,7 +41,7 @@ class APIConfiguration:
 
     def __init__(self) -> None:
         self._load_log_level()
-        self._load_host()
+        self._load_bind()
         self._load_port()
         self._load_service_config()
 
@@ -56,15 +56,15 @@ class APIConfiguration:
         else:
             self.log_level = "info"
 
-    def _load_host(self) -> None:
-        """Load host configuration."""
-        host: str | None = environ.get("HOST")
+    def _load_bind(self) -> None:
+        """Load bind configuration."""
+        bind: str | None = environ.get("BIND")
 
-        if host is None:
-            dms_error("HOST is not defined.")
+        if bind is None:
+            dms_error("BIND is not defined.")
             return
 
-        self.host = host
+        self.bind = bind
 
     def _load_port(self) -> None:
         """Load and verify port environment variable."""

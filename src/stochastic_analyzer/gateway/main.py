@@ -41,7 +41,7 @@ class API:
 
     def start(self) -> None:
         """Start the API."""
-        uvicorn.run(self.app, host=self.config.host, port=self.config.port, log_level=self.config.log_level)
+        uvicorn.run(self.app, host=self.config.bind, port=self.config.port, log_level=self.config.log_level)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""

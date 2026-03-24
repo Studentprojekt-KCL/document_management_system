@@ -11,7 +11,7 @@ async def rank_documents(query: str, documents: list[DocumentObject], tei_url: s
         return []
 
     batch_size = 250
-    max_chars = 3000
+    max_chars = 3000 #Change variables depending on hardware
     all_scores = [0.0] * len(documents)
 
     async def fetch_batch(client: httpx.AsyncClient, start_idx: int, batch: list[DocumentObject]) -> None:

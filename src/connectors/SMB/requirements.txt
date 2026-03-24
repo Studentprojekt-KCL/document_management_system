@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+pdfplumber
+docx
+openpyxl
+hashlib
+base64
+typing 
+concurrent.futures 
+boto_tools

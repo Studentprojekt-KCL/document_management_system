@@ -16,13 +16,7 @@ from logs import smb_error
 class SMBCollector:
     """SMB connector methods as GitLab, at least as close as possible"""
 
-    BASE_PATH = "/mnt/Kernel"
-    MAX_FILE_SIZE = 5_000_000  # 5 MB limit
-    ALLOWED_EXTENSIONS = (
-    ".txt", ".md", ".xml",
-    ".pdf", ".docx", ".xlsx"
-    )
-    SKIP_DIRS = {"drivers", "tools", ".git", "Documentation"}
+
 
     def __init__(self) -> None:
         pass
@@ -64,7 +58,7 @@ class SMBCollector:
         try:
             stat = os.stat(path)
             raw = f"{path}-{stat.st_size}-{stat.st_mtime}"
-            return hashlib.md5(raw.encode()).hexdigest()
+            return md5(raw.encode()).hexdigest()
         except Exception:
             return ""
     #----------------------------
@@ -105,7 +99,7 @@ class SMBCollector:
             path = os.path.join(self.BASE_PATH, project)
             ids[project] = self._hash_project(path)
 
-        return 
+        return ids
     
     def get_projects_as_units(self) -> dict:
         projects: dict = {}

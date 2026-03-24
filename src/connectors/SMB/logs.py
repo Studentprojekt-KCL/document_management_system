@@ -1,3 +1,4 @@
 # logger.py
 def dms_error(message: str):
-    print(f"ERROR: {message}")
+    """Log an error message for the Document Management System."""
+    return f"ERROR: {message}"

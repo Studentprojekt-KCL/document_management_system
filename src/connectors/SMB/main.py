@@ -1,4 +1,4 @@
-""" import os
+"""import os
 from smb import SMBCollector
 
 
@@ -69,4 +69,4 @@ def main():
 
 if __name__ == "__main__":
     main()
- """
+"""

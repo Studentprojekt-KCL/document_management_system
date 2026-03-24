@@ -1,0 +1,19 @@
+[build-system]
+requires = [
+    "setuptools >= 77.0.3",
+    "fastapi[standard] >= 0.128",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embedded-ranker"
+version = "1.0.0"
+description = "Embedded Ranker Service"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = ["embedded_ranker", "classification_analyzer"]
+
+[project.scripts]
+reranker = "embedded_ranker.main:start"
+classification_analyzer = "classification_analyzer.main:main"

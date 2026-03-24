@@ -1,0 +1,27 @@
+services:
+  log-api:
+    image: log-api:latest
+    environment:
+      LOGGER_BIND_ADDRESS: "0.0.0.0"
+      LOGGER_PORT: 8000
+      LOGGER_DB_HOST: "log-database"
+      LOGGER_DB_USER: "logger"
+      LOGGER_DB_PASS: "changeme"
+      LOGGER_DB_DATABASE: "logger"
+
+
+    build: ./api/
+    # command: "--dev" # To enable devloper mode
+    ports:
+      - "8000:8000"
+
+  log-database:
+    image: log-database:latest
+    build: ./database
+    environment:
+      MYSQL_DATABASE: "logger"
+      MYSQL_USER: "logger"
+      MYSQL_PASSWORD: "changeme"
+      MYSQL_RANDOM_ROOT_PASSWORD: "true"
+    # ports:
+    #   - "3306:3306"

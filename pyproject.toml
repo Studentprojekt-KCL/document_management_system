@@ -1,0 +1,24 @@
+[tool.pylint.MASTER]
+ignore = [".env", "venv", "__pycache__", ".tox", "build", ".venv", "flatted"]
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = ["too-few-public-methods", "import-error", "R0801"]
+
+[tool.pylint.format]
+max-line-length = 132
+
+[tool.ruff]
+exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv"]
+
+[tool.ruff.lint]
+select = ["T20", "PYI056"]
+
+[tool.mypy]
+disallow_untyped_defs = true
+exclude = '(\.env|venv|__pycache__|\.tox|build/|setup\.py)'
+ignore_missing_imports = true
+
+
+[tool.black]
+line-length = 132
+exclude = '/(\.env|venv|__pycache__|\.tox|build)/'

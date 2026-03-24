@@ -1,15 +1,17 @@
 """SMB API - GitLab compatible"""
 
+import json
 import os
 import argparse
 from typing import Any
-from boto_tools import upload_file
+
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.staticfiles import StaticFiles
 
 from smb import SMBCollector
 from logs import dms_error
@@ -23,6 +25,8 @@ class API:
 
     def __init__(self) -> None:
         self.smb_instance = SMBCollector()
+
+        self.app.mount("/files", StaticFiles(directory="output"), name="files")
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
@@ -64,14 +68,26 @@ class API:
     # ----------------------------
     # /files_to_index → full/incremental
     # ----------------------------
+
+    def save_locally(self, data: dict, filename: str) -> str:
+        """Save data locally and return the file URL."""
+        path = os.path.join("output", filename)
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        return f"/files/{filename}"
+
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Return list of files to index, with optional incremental update based on subdata."""
         content = self.smb_instance.files_to_index(subdata)
 
-        url = upload_file(content, "smb_content.json")
+        url = self.save_locally(content, "smb_content.json")
 
-        return {"subdata": content.get("subdata"), "file_url": url}
-
+        return {
+            "subdata": content.get("subdata"),
+            "file_url": url
+        }
 
 # ----------------------------
 # Run server

@@ -12,7 +12,6 @@ from variables import PROJECT, SOURCE_FILE
 from logs import dms_error
 import variables
 
-
 class SMBCollector:
     """SMB connector methods as GitLab, at least as close as possible"""
 
@@ -50,6 +49,7 @@ class SMBCollector:
 
         return True
 
+
     def _get_file_signature(self, path: str) -> str:
         try:
             stat = os.stat(path)
@@ -81,7 +81,10 @@ class SMBCollector:
     # Get PROJECTS
     # ----------------------------
     def _get_projects(self) -> list[str]:
-        return [d for d in os.listdir(self.base_path) if os.path.isdir(os.path.join(self.base_path, d))]
+        return [
+            d for d in os.listdir(self.base_path)
+            if os.path.isdir(os.path.join(self.base_path, d))
+        ]
 
     def get_project_ids(self) -> dict[str, str]:
         """Return a dict of project names to their change hashes."""
@@ -92,7 +95,6 @@ class SMBCollector:
             ids[project] = self._hash_project(path)
 
         return ids
-
     def get_projects_as_units(self) -> dict:
         """Return project metadata as units for indexing."""
         projects: dict = {}
@@ -109,10 +111,9 @@ class SMBCollector:
             }
 
         return projects
-
     # ----------------------------
     # PDF
-    def parse_pdf(self, path):
+    def parse_pdf(self,path):
         """Extract text from PDF, handling errors gracefully."""
         parts = []
         try:
@@ -124,11 +125,10 @@ class SMBCollector:
         except (OSError, ValueError):
             return ""
         return "\n".join(parts)
-
     # ----------------------------
     # DOCX
     # ----------------------------
-    def parse_docx(self, path):
+    def parse_docx(self,path):
         """Extract text from DOCX, handling errors gracefully."""
         try:
             doc = Document(path)
@@ -186,6 +186,8 @@ class SMBCollector:
                 files.append(os.path.join(root, f))
         return files
 
+
+
     def get_file(self, path: str, include_content: bool = True) -> dict:
         """Return file metadata and optionally content, handling errors gracefully."""
         stat = os.stat(path)
@@ -206,7 +208,7 @@ class SMBCollector:
                 result["content"] = content
             except (UnicodeDecodeError, TypeError, ValueError) as err:
                 dms_error(f"Could not read file {path}: {err}")
-                result["content"] = ""
+                result["content"]=""
         return result
 
     def files_to_index(self, subdata: str | None = None) -> dict:
@@ -217,7 +219,6 @@ class SMBCollector:
             subdata_dict = {}
         else:
             subdata_dict = json.loads(base64.b64decode(subdata))
-
         current_subdata = self.get_project_ids()
 
         for project, change_hash in current_subdata.items():
@@ -241,7 +242,9 @@ class SMBCollector:
                     except (OSError, ValueError, UnicodeDecodeError, TypeError) as err:
                         dms_error(f"Error processing file: {err}")
 
-        generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
+        generated_subdata = base64.urlsafe_b64encode(
+            json.dumps(current_subdata).encode()
+        ).decode()
 
         return {"files": files_data, "subdata": generated_subdata}
 
@@ -265,6 +268,8 @@ class SMBCollector:
                 if self._is_valid_file(f):
                     file_pointers.append(f)
 
-        generated_subdata = base64.urlsafe_b64encode(json.dumps(project_ids).encode()).decode()
+        generated_subdata = base64.urlsafe_b64encode(
+            json.dumps(project_ids).encode()
+        ).decode()
 
         return {"subdata": generated_subdata, "file_pointers": file_pointers}

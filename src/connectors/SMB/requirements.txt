@@ -8,4 +8,4 @@ hashlib
 base64
 typing 
 concurrent.futures 
-boto_tools
+boto3

@@ -7,7 +7,7 @@
 import { computed } from 'vue'
 
 /* Function to pick the first non-empty value from a list of candidates.*/
-export const pick = (...values) => {
+const pick = (...values) => {
   const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== '')
   return found ?? ''
 }
@@ -43,7 +43,7 @@ export const resolveFilename = (entry, index = 0) => {
 }
 
 /* Function to resolve the date from a value. */
-export const resolveDateOnly = (value) => pick((value || '').split('T')[0])
+const resolveDateOnly = (value) => pick((value || '').split('T')[0])
 
 /* Function to resolve the document type from source type and name. */
 const TYPE_KEYWORDS = {
@@ -55,7 +55,7 @@ const TYPE_KEYWORDS = {
 }
 
 /* Function to resolve the document type from source type and name. */
-export const resolveDocumentType = ({ sourceType, sourceName }) => {
+const resolveDocumentType = ({ sourceType, sourceName }) => {
   const type = String(sourceType || '').toLowerCase()
   const name = String(sourceName || '').toLowerCase()
   const typeOrName = `${type} ${name}`

@@ -8,7 +8,7 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2 } from 'lucide-vue-next'
+import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 
 /* Props received from parent component (SearchView) */
@@ -23,7 +23,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMetadata(props)
+const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } = useSearchMetadata(props)
 </script>
 
 <template>
@@ -75,6 +75,17 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
         </div>
       </section>
     </div>
+
+    <div class="preview-footer">
+      <a v-if="previewLink" class="open-file-btn" :href="previewLink" target="_blank" rel="noopener noreferrer">
+        <ExternalLink :size="14" />
+        Open file
+      </a>
+      <button v-else class="open-file-btn" type="button" disabled>
+        <ExternalLink :size="14" />
+        No file link available
+      </button>
+    </div>
   </aside>
 </template>
 
@@ -96,6 +107,8 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
   transform: translateX(100%);
   transition: transform 0.25s ease;
   z-index: 50;
+  display: flex;
+  flex-direction: column;
 }
 
 .preview-drawer.open {
@@ -209,5 +222,35 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
   gap: 0.32rem;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.preview-footer {
+  border-top: 1px solid #eef2f7;
+  padding: 0.85rem 1rem 1rem;
+}
+
+.open-file-btn {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.open-file-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.open-file-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 </style>

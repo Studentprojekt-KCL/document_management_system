@@ -36,6 +36,7 @@ export const resolveFilename = (entry, index = 0) => {
     metadata?.file_name,
     metadata?.unique_pointer,
     metadata?.source_file,
+    metadata?.clickable_url,
     entry?.filename,
     entry?.name,
     `result-${index + 1}`
@@ -44,6 +45,12 @@ export const resolveFilename = (entry, index = 0) => {
 
 /* Function to resolve the date from a value. */
 const resolveDateOnly = (value) => pick((value || '').split('T')[0])
+
+const resolveLink = (entry) => {
+  const metadata = getMetadata(entry)
+
+  return pick(metadata?.clickable_url, entry?.clickable_url)
+}
 
 /* Function to resolve the document type from source type and name. */
 const TYPE_KEYWORDS = {
@@ -89,6 +96,7 @@ export const useSearchMetadata = (props) => {
       metadata.value.file_name,
       metadata.value.unique_pointer,
       metadata.value.source_file,
+      metadata.value.clickable_url,
       props.selectedFile
     )
 
@@ -106,6 +114,8 @@ export const useSearchMetadata = (props) => {
   )
 
   const previewSize = computed(() => pick(metadata.value.size, metadata.value.file_size, metadata.value.bytes))
+
+  const previewLink = computed(() => resolveLink(props.selectedMatch))
 
   const normalizeMatches = (matches = []) =>
     matches.map((entry, index) => {
@@ -135,6 +145,7 @@ export const useSearchMetadata = (props) => {
     previewType,
     previewCreatedAt,
     previewSize,
+    previewLink,
     normalizeMatches,
     resolveMatchDate
   }

@@ -32,3 +32,8 @@ services:
     image: connector-minio
     build:
       dockerfile: src/connectors/storage-infra/Dockerfile
+
+  stochastic-analyzer:
+    image: stochastic-analyzer
+    build:
+      dockerfile: src/stochastic_analyzer/Dockerfile

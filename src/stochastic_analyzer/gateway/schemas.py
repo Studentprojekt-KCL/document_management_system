@@ -72,3 +72,10 @@ class SummaryResult(BaseModel):
     """Output schema for a summarized document."""
 
     summary: StrictStr
+
+
+class UniqueIdRequest(BaseModel):
+    """Request payload for ID-based document operations."""
+
+    unique_ids: list[StrictStr] = Field(..., min_length=1)
+    connector_url: StrictStr = Field(..., min_length=1)

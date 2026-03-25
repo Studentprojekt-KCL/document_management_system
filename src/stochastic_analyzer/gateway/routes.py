@@ -13,12 +13,13 @@ from gateway.schemas import (
     InputItem,
     ClassificationResult,
     SummaryResult,
+    UniqueIdRequest,
 )
 from gateway.services.classifier import classify_documents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
-
+from gateway.services.id_operations import summarize_by_unique_id, classify_by_unique_id
 
 def create_router(config: APIConfiguration) -> APIRouter:
     """Create router with configuration bound via closure.
@@ -75,6 +76,37 @@ def create_router(config: APIConfiguration) -> APIRouter:
             return JSONResponse(status_code=500, content={"detail": "Summarization failed."})
 
         return result.model_dump()
+
+    @router.post("/summarize-by-id", response_model=SummaryResult)
+    async def summarize_by_id_endpoint(payload: UniqueIdRequest) -> dict:
+        """Endpoint to summarize documents by their unique IDs."""
+        result = await summarize_by_unique_id(
+            payload.unique_ids,
+            config.services.ministral_url,
+            config.services.ministral_model,
+            payload.connector_url,
+        )
+
+        if result is None:
+            dms_warning("Summarization by ID returned no result.")
+            return JSONResponse(status_code=500, content={"detail": "Summarization failed or no valid documents found."})
+
+        return result.model_dump()
+
+    @router.post("/classify-by-id", response_model=list[ClassificationResult])
+    async def classify_by_id_endpoint(payload: UniqueIdRequest) -> list[dict]:
+        """Endpoint to classify documents by their unique IDs."""
+        results = await classify_by_unique_id(
+            payload.unique_ids,
+            config.services.classifier_url,
+            payload.connector_url,
+        )
+
+        if not results:
+            dms_warning("Classification by ID returned no results.")
+            return []
+
+        return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/md-to-pdf")
     def md_pdf_converter(summary: SummaryResult) -> Response:

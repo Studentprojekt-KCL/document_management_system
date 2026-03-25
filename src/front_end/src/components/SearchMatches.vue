@@ -10,7 +10,7 @@
  */
 
 import { computed } from 'vue'
-import { Calendar, FileText } from 'lucide-vue-next'
+import { Calendar, FileText, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 
 /* Props received from parent component (SearchView) */
@@ -24,8 +24,8 @@ const props = defineProps({
 /* Emit to parent (SearchView) component when a match is selected */
 const emit = defineEmits(['select'])
 
-/* Custom composable to normalize matches and resolve match dates for display */
-const { normalizeMatches, resolveMatchDate } = useSearchMetadata(props)
+/* Custom composable to normalize matches, resolve match dates, and resolve sources for display */
+const { normalizeMatches, resolveMatchDate, resolveSource } = useSearchMetadata(props)
 
 /* Computed property to normalize matches for consistent display */
 const normalizedMatches = computed(() => normalizeMatches(props.matches))
@@ -46,7 +46,7 @@ const resultsLabel = computed(() => {
     <p v-if="loading" class="state-text">Searching…</p>
     <p v-else-if="query" class="results-count">{{ resultsLabel }}</p>
 
-    <!-- List of search result matches with titles, types, and dates -->
+    <!-- List of search result matches with titles, types, dates and source -->
     <ul class="results-list">
       <li v-for="item in normalizedMatches" :key="item.filename" class="result-item">
         <button class="result-card" :class="{ active: selected === item.filename }" @click="emit('select', item.rawMatch)">
@@ -57,6 +57,7 @@ const resultsLabel = computed(() => {
               <div class="meta-row">
                 <span><FileText :size="13" /> {{ item.type }}</span>
                 <span><Calendar :size="13" /> {{ resolveMatchDate(item.rawMatch) }}</span>
+                <span><ExternalLink :size="13" /> {{ resolveSource(item.rawMatch) }}</span>
               </div>
             </div>
           </div>

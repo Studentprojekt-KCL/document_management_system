@@ -51,5 +51,5 @@ jobs:
         run: |
           set -euo pipefail
           cd $DEPLOY_DIR
-          docker compose pull
-          docker compose up -d --remove-orphans
+          docker compose -f docker-compose.yaml pull
+          docker compose -f docker-compose.yaml up -d --remove-orphans

@@ -18,7 +18,7 @@ async def get_content(unique_id: str, connector_url: str) -> InputItem | None:
         dms_warning("Cannot retrieve content without a connector URL.")
         return None
 
-    params = {
+    params: dict[str, str | bool] = {
         "file_pointer": unique_id,
         "include_content": True,
     }

@@ -11,7 +11,7 @@ Put the following in a .env file.
     API_PORT=<PORT_TO_EXPOSE>
 
 
-## Developer instructions
+# Developer instructions
 
 
 Run the API locally in developer mode inside a Python virtual environment
@@ -55,13 +55,13 @@ sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
 
 ### 3. Test the API's
 
-# Testing main API endpoint
+#### Testing main API endpoint
 curl "http://127.0.0.1:8001/docs"
 
-# Testing search API endpoint
+#### Testing search API endpoint
 curl "http://127.0.0.1:8001/search?query=test"
 
-# Testing summary API endpoint
+#### Testing summary API endpoint
 curl "http://127.0.0.1:8001/summary?file_pointer="THEPOINTER"
 
 

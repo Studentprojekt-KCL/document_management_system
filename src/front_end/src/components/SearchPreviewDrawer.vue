@@ -23,7 +23,24 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } = useSearchMetadata(props)
+const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, uniquePointer } = useSearchMetadata(props)
+
+/* Generate AI summary, send request to backend to get summary for selected file */
+const generateAISummary = async () => {
+  if (!props.selectedFile) {
+    return
+  }
+
+  try {
+    // Placeholder for API call to generate AI summary for teh selected file's unique pointer or link.
+    // This will likely involve sending a request to the backend with the file's unique identifier and receiving a summary in response.
+    console.log('Generating AI summary for:', uniquePointer.value)
+    alert('AI summary generation is not implemented yet.')
+  } catch (err) {
+    console.error('Error generating AI summary:', err)
+    alert('Failed to generate AI summary. Please try again later.')
+  }
+}
 </script>
 
 <template>
@@ -52,7 +69,9 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
         <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
         <p class="section-title">AI SUMMARY</p>
         <div class="generate-summary">
-          <p class="summary-card"><StarsIcon :size="13" />Generate AI summary</p>
+          <button class="summary-button" type="button" @click="generateAISummary">
+            <StarsIcon :size="13" />Generate AI summary
+          </button>
         </div>
       </section>
 
@@ -181,7 +200,7 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
 }
 
 /* QUICK FIX: This should be a button, but we can iterate later */
-.summary-card {
+.summary-button {
   border: 1px solid #e2e8f0;
   background: #f8faff;
   border-radius: 12px;

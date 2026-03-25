@@ -21,6 +21,7 @@ from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
 from gateway.services.id_operations import summarize_by_unique_id, classify_by_unique_id
 
+
 def create_router(config: APIConfiguration) -> APIRouter:
     """Create router with configuration bound via closure.
 

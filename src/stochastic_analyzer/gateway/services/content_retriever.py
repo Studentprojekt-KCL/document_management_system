@@ -8,6 +8,7 @@ import httpx
 from dmis_logger import dms_warning
 from gateway.schemas import InputItem, MetadataTemplate
 
+
 async def get_content(unique_id: str, connector_url: str) -> InputItem | None:
     """Resolve a unique file pointer into the `InputItem` expected by downstream services."""
     if not unique_id.strip():
@@ -22,21 +23,31 @@ async def get_content(unique_id: str, connector_url: str) -> InputItem | None:
         "include_content": True,
     }
 
+    data = await _fetch_content_payload(unique_id, connector_url, params)
+    if data is None:
+        return None
+
+    return _build_input_item(unique_id, data)
+
+
+async def _fetch_content_payload(unique_id: str, connector_url: str, params: dict[str, str | bool]) -> dict | None:
+    """Fetch raw payload from the connector."""
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{connector_url.rstrip('/')}/file", params=params, timeout=60)
             response.raise_for_status()
-            data = response.json()
+            return response.json()
     except httpx.HTTPStatusError as err:
         dms_warning(f"HTTP error when retrieving content for {unique_id}: {err}")
-        return None
     except httpx.TimeoutException as err:
         dms_warning(f"Timeout when retrieving content for {unique_id}: {err}")
-        return None
     except Exception as err:  # pylint: disable=broad-except
         dms_warning(f"Error retrieving content for {unique_id}: {err}")
-        return None
+    return None
 
+
+def _build_input_item(unique_id: str, data: dict) -> InputItem | None:
+    """Convert connector payload into the summarizer/classifier input shape."""
     raw_content = data.get("content", "")
     content = _decode_content(raw_content)
     if not content.strip():

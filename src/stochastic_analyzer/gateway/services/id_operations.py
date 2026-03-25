@@ -1,9 +1,9 @@
 """Service functions for operations based on unique document IDs."""
 
-from gateway.schemas import ClassificationResult, InputItem, SummaryResult
 from dmis_logger import dms_warning
-from gateway.services.content_retriever import get_content
+from gateway.schemas import ClassificationResult, InputItem, SummaryResult
 from gateway.services.classifier import classify_documents
+from gateway.services.content_retriever import get_content
 from gateway.services.summarizer import summarize_documents
 
 

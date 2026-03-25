@@ -21,6 +21,7 @@ jobs:
 
       - name: Push images to registry
         run: |
+          set -euo pipefail
           IMAGES="$(docker compose -f $COMPOSE_FILE config --images)"
           echo "Images from compose:"
           echo "$IMAGES"
@@ -48,6 +49,7 @@ jobs:
 
       - name: Redeploy images
         run: |
+          set -euo pipefail
           cd $DEPLOY_DIR
           docker compose pull
           docker compose up -d --remove-orphans

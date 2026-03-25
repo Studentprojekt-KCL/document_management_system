@@ -37,12 +37,19 @@ Expected "200 ok" code
 
 ## Run with Docker
 
+Create .env in src/api/src
+
+nano .env
+DMIS_SEARCH_API_URL=http://<ip-address>
+API_PORT=XXXX
+
 ### 1. Build the image from the project root: 
 
 sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 ### 2. Run the container
 
+<<<<<<< HEAD
 sudo docker run --rm -p 8001:8001 --env-file .env dmis_api
 
 ### 3. Test the API
@@ -55,6 +62,13 @@ curl "http://127.0.0.1:8001/search?query=test"
 
 Testing summary
 curl "http://127.0.0.1:8001/summary?file_pointer="THEPOINTER"
+=======
+sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
+
+### 3. Test the API
+
+curl "http://127.0.0.1:8001/search?query=test"
+>>>>>>> c11e490b01b117322531786dac417dcd0d5a8320
 
 Expected result "200 OK"
 

@@ -94,7 +94,7 @@ const handleFilterChange = (filter) => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" />
 
     <!-- Search Filters Component -->
     <SearchFiltersCard @filter-change="handleFilterChange" />

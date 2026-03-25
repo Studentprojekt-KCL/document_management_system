@@ -13,6 +13,7 @@ Put the following in a .env file.
 
 ## Developer instructions
 
+
 Run the API locally in developer mode inside a Python virtual environment
 
 ### 1. Export variables in local env
@@ -31,7 +32,7 @@ dmis_api --dev
 
 ### 4. Test request to API:
 
-curl "http://127.0.0.1:8000/docs"
+curl "http://127.0.0.1:8001/docs"
 
 Expected "200 ok" code
 
@@ -41,6 +42,7 @@ Create .env in src/api/src
 
 nano .env
 DMIS_SEARCH_API_URL=http://<ip-address>
+DMIS_SUMMARY_API_URL=http://<ip-adress>
 API_PORT=XXXX
 
 ### 1. Build the image from the project root: 
@@ -49,28 +51,18 @@ sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 ### 2. Run the container
 
-<<<<<<< HEAD
-sudo docker run --rm -p 8001:8001 --env-file .env dmis_api
-
-### 3. Test the API
-
-Testing API
-curl "http://127.0.0.1:8001/docs"
-
-Testing search
-curl "http://127.0.0.1:8001/search?query=test"
-
-Testing summary
-curl "http://127.0.0.1:8001/summary?file_pointer="THEPOINTER"
-=======
 sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
 
-### 3. Test the API
+### 3. Test the API's
 
+# Testing main API endpoint
+curl "http://127.0.0.1:8001/docs"
+
+# Testing search API endpoint
 curl "http://127.0.0.1:8001/search?query=test"
->>>>>>> c11e490b01b117322531786dac417dcd0d5a8320
 
-Expected result "200 OK"
+# Testing summary API endpoint
+curl "http://127.0.0.1:8001/summary?file_pointer="THEPOINTER"
 
 
 ## Endpoint List ! OBS ! REMOVE WHEN PUSHING INTO DEVELOP BRANCH

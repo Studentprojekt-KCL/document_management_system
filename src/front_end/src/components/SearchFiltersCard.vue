@@ -1,45 +1,54 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, watch, reactive } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 
-const sourceFilters = ['GitHub', 'GitLab', 'Network File System'] // Add more sources needed if possible
+const sourceFilters = ['GitHub', 'GitLab', 'Network File System']
 const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
 const securityFilters = ['Public', 'Internal', 'Sensitive', 'Confidential']
 
-const selectedFilters = ref({
-  source: [],
-  type: [],
-  security: []
+const props = defineProps({
+  selectedFilters: Object
 })
+const emit = defineEmits(['update:filters'])
+
+// Make reactive local copy
+const localFilters = reactive({
+  source: [...props.selectedFilters.source],
+  type: [...props.selectedFilters.type],
+  security: [...props.selectedFilters.security]
+})
+
+// Keep local filters in sync with parent
+watch(
+  () => props.selectedFilters,
+  (newFilters) => {
+    localFilters.source = [...newFilters.source]
+    localFilters.type = [...newFilters.type]
+    localFilters.security = [...newFilters.security]
+  },
+  { deep: true, immediate: true }
+)
 
 const hasActiveFilters = computed(() => {
-  return (
-    selectedFilters.value.source.length > 0 || selectedFilters.value.type.length > 0 || selectedFilters.value.security.length > 0
-  )
+  return localFilters.source.length > 0 || localFilters.type.length > 0 || localFilters.security.length > 0
 })
 
-const isSelected = (filterType, value) => {
-  return selectedFilters.value[filterType].includes(value)
-}
+const isSelected = (filterType, value) => localFilters[filterType].includes(value)
 
-// Placeholder for handling filter changes.
-// In a later implementation, this will probably update the search query or trigger a new search with the applied filters.
 const handleFilterChange = (filterType, value) => {
   if (isSelected(filterType, value)) {
-    selectedFilters.value[filterType] = selectedFilters.value[filterType].filter((item) => item !== value)
+    localFilters[filterType] = localFilters[filterType].filter((item) => item !== value)
   } else {
-    selectedFilters.value[filterType] = [...selectedFilters.value[filterType], value]
+    localFilters[filterType] = [...localFilters[filterType], value]
   }
-
-  console.log(`Selected ${filterType} filters:`, selectedFilters.value[filterType])
+  emit('update:filters', { ...localFilters })
 }
 
 const clearAllFilters = () => {
-  selectedFilters.value = {
-    source: [],
-    type: [],
-    security: []
-  }
+  localFilters.source = []
+  localFilters.type = []
+  localFilters.security = []
+  emit('update:filters', { ...localFilters })
 }
 </script>
 
@@ -104,9 +113,17 @@ their search queries.
           {{ item }}
         </button>
       </div>
-      <div class="filters-header">
-        <button v-if="hasActiveFilters" class="clear-button" type="button" @click="clearAllFilters">Clear all</button>
-      </div>
+    </div>
+
+    <div class="filters-header">
+      <button
+        v-if="hasActiveFilters"
+        class="clear-button"
+        type="button"
+        @click="clearAllFilters"
+      >
+        Clear all
+      </button>
     </div>
   </div>
 </template>
@@ -122,27 +139,16 @@ their search queries.
 
 .filters-header {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  margin-left: auto;
-}
-
-.filters-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #99a4b8;
-  text-transform: uppercase;
+  margin-top: 0.5rem;
 }
 
 .clear-button {
   border: none;
   background: transparent;
   color: #7c3aed;
-  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0.1rem 0.2rem;
 }
 
 .clear-button:hover {
@@ -168,9 +174,7 @@ their search queries.
   align-items: center;
   gap: 0.35rem;
   color: #99a4b8;
-  font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
   margin-right: 0.15rem;
 }
 
@@ -180,8 +184,6 @@ their search queries.
   padding: 0.35rem 0.82rem;
   background: #edf0f4;
   color: #6f7e95;
-  font-size: 0.93rem;
-  line-height: 1;
   font-weight: 600;
   cursor: pointer;
 }
@@ -202,15 +204,6 @@ their search queries.
 }
 
 @media (max-width: 768px) {
-  .filters-card {
-    padding: 0.9rem;
-  }
-
-  .filters-header {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
   .group-divider {
     display: none;
   }

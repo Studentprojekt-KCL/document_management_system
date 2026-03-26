@@ -20,6 +20,7 @@ import { resolveFilename } from '@/composables/useSearchMetadata'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
+const allMatches = ref([])
 const selectedFile = ref('')
 const selectedMatch = ref(null)
 const error = ref('')
@@ -30,10 +31,17 @@ const isPreviewOpen = ref(false)
 /* Base URL for API requests, configurable via environment variable */
 const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
 
+/* Filters so it can access matches */
+const selectedFilters = ref ({
+  source: [],
+  type: [],
+  security: []
+})
+
+
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {
   lastQuery.value = query
-
   error.value = ''
   matches.value = []
   selectedFile.value = ''
@@ -56,7 +64,10 @@ const handleSearch = async (query) => {
 
     const data = await res.json()
     console.log('Search response:', data)
-    matches.value = Array.isArray(data) ? data : data.results || data.matches || []
+    const resultArray = Array.isArray(data) ? data : data.results || data.matches || []
+
+    allMatches.value = resultArray
+    matches.value = resultArray
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
@@ -85,8 +96,47 @@ const closePreview = () => {
 }
 
 /* Handle changes to search filters (currently just logs the change) */
-const handleFilterChange = (filter) => {
-  console.log('Filter changed:', filter)
+const handleFilterChange = (filters) => {
+  console.log('Filter changed:', filters)
+  // If no filters → show everything
+  if (
+    filters.source.length === 0 &&
+    filters.type.length === 0 &&
+    filters.security.length === 0
+  ) {
+    matches.value = allMatches.value
+    return
+  }
+  matches.value = allMatches.value.filter((match) => {
+    const filename = (match.filename || match.name || '').toLowerCase()
+    const source = (match.source || '').toLowerCase()
+    const security = (match.security || '').toLowerCase()
+
+    // TYPE FILTER
+    const typeMatch =
+      filters.type.length === 0 ||
+      filters.type.some((type) => {
+        if (type.includes('.pdf')) return filename.endsWith('.pdf')
+        if (type.includes('.docx')) return filename.endsWith('.docx')
+        if (type.includes('.xlsx')) return filename.endsWith('.xlsx')
+        if (type.includes('.txt') || type.includes('.md')) {
+          return filename.endsWith('.txt') || filename.endsWith('.md')
+        }
+        return false
+      })
+
+    // SOURCE FILTER
+    const sourceMatch =
+      filters.source.length === 0 ||
+      filters.source.some((s) => source.includes(s.toLowerCase()))
+
+    // SECURITY FILTER
+    const securityMatch =
+      filters.security.length === 0 ||
+      filters.security.some((s) => security.includes(s.toLowerCase()))
+
+    return typeMatch && sourceMatch && securityMatch
+  })
 }
 </script>
 
@@ -94,10 +144,10 @@ const handleFilterChange = (filter) => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard @filter-change="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange"/>
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

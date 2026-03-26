@@ -46,6 +46,7 @@ export const resolveFilename = (entry, index = 0) => {
 /* Function to resolve the date from a value. */
 const resolveDateOnly = (value) => pick((value || '').split('T')[0])
 
+/* Function to resolve the clickable link from metadata or entry. */
 const resolveLink = (entry) => {
   const metadata = getMetadata(entry)
 
@@ -80,6 +81,19 @@ const resolveDocumentType = ({ sourceType, sourceName }) => {
   }
 
   return pick(sourceType, sourceName)
+}
+
+/* Function to resolve the source of the document from metadata. */
+const resolveSource = (entry) => {
+  const metadata = getMetadata(entry)
+
+  if (metadata?.unique_pointer) {
+    const pointer = metadata.unique_pointer.toLowerCase()
+    if (pointer.includes('gitlab')) return 'GitLab'
+    if (pointer.includes('github')) return 'GitHub'
+    // etc...
+    // More sources can be added
+  }
 }
 
 /**
@@ -156,6 +170,7 @@ export const useSearchMetadata = (props) => {
     previewLink,
     uniquePointer,
     normalizeMatches,
-    resolveMatchDate
+    resolveMatchDate,
+    resolveSource
   }
 }

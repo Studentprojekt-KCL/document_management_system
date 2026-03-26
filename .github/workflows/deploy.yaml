@@ -5,12 +5,13 @@ on:
     branches: ["develop"]
 
 env:
-  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-  WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+  DEPLOY_DIR: "/opt/dev/"
+  COMPOSE_FILE: "docker-compose-build-all.yaml"
+  REGISTRY: "registry.dms-lookup.com"
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
 
@@ -18,14 +19,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Trigger deploy webhook (HMAC SHA-256)
+      - name: Push images to registry
         run: |
           set -euo pipefail
+          IMAGES="$(docker compose -f $COMPOSE_FILE config --images)"
+          echo "Images from compose:"
+          echo "$IMAGES"
+          
+          # Give every image a tag
+          # <image>:latest
+          #
+          while IFS= read -r img; do
+            [ -z "$img" ] && continue
+            base="$img"
+            if echo "$img" | grep -qE ':[^/]+$'; then
+              base="${img%:*}"
+            fi
+        
+            # Strip registry if already present
+            base_no_registry="${base#*/}"
+        
+            full="$REGISTRY/$base_no_registry"
+        
+            echo "Tagging $img -> $full:latest"
+            docker tag "$img" "$full:latest"
+            echo "Pushing $full:latest"
+            docker push "$full:latest"
+          done <<< "$IMAGES"
 
-          BODY='{"tag":"'"${GITHUB_SHA}"'"}'
-          SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')"
-
-          curl -sS -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-Hub-Signature-256: $SIG" \
-            -d "$BODY"
+      - name: Redeploy images
+        run: |
+          set -euo pipefail
+          cd $DEPLOY_DIR
+          docker compose -f docker-compose.yaml pull
+          docker compose -f docker-compose.yaml up -d --remove-orphans

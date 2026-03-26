@@ -14,12 +14,14 @@ class ServiceConfig:
         classifier_url: URL for the TEI classifier container.
         ministral_url: URL for the Ministral LLM container.
         ministral_model: model identifier for Ministral.
+        connector_url: connector url
     """
 
     tei_url: str
     classifier_url: str
     ministral_url: str
     ministral_model: str
+    connector_url: str
 
 
 class APIConfiguration:
@@ -93,6 +95,10 @@ class APIConfiguration:
         classifier_url: str | None = environ.get("CLASSIFIER_URL")
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
+        address: str | None = environ.get("CONNECTOR_ADDRESS")
+
+
+
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
@@ -110,7 +116,12 @@ class APIConfiguration:
             dms_error("MINISTRAL_MODEL is not defined.")
             return
 
+        if address is None:
+            dms_error("CONNECTOR_ADDRESS is not defined.")
+            return
+
         self.services.tei_url = tei_url
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
+        self.services.connector_url = address.rstrip("/") + "/file"

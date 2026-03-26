@@ -63,7 +63,7 @@ class API:
 
     @staticmethod
     @app.get("/search", status_code=200)
-    async def search(query: str) -> JSONResponse:
+    async def search(query = Query(..., min_length=1, max_length=200)) -> JSONResponse:
         """Forward search request to upstream search API."""
         search_api_url = os.getenv("DMIS_SEARCH_API_URL")
         if not isinstance(search_api_url, str) or not search_api_url:
@@ -95,12 +95,12 @@ class API:
     # Currently works with the example form query, we will change the payload to have unique pointer once that has been fixed.
     @staticmethod
     @app.get("/summary")
-    async def summary(file_pointer: str):
+    async def summary(file_pointer: str = Query(..., min_length=1, max_length=500)) :
         """Forward summary request to upstream summary API and return plain text."""
         dmis_summary_url = os.getenv("DMIS_SUMMARY_API_URL")
         if not dmis_summary_url:
             dms_warning("DMIS_SUMMARY_API_URL is not set.")
-            return JSONResponse(status_code=500, content={"error": "Summary API URL not set"})
+            return JSONResponse(status_code=500, content="")
 
         # For testing: transform file_pointer into a payload
         payload = [
@@ -131,12 +131,11 @@ class API:
             response.raise_for_status()
         except requests.RequestException as exc:
             dms_warning(f"Summary request to upstream API failed: {exc}")
-            return JSONResponse(status_code=502, content={"error": "Upstream request failed"})
+            return JSONResponse(status_code=502, content="")
 
         # Return as plain text if upstream is text
         return PlainTextResponse(content=response.text, status_code=200)
         
-
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

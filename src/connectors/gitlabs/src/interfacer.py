@@ -8,8 +8,9 @@ import json
 import io
 from pathlib import Path
 import zipfile
-from hashlib import md5
 from typing import Any
+from datetime import datetime, timezone
+import binascii
 
 import requests
 
@@ -52,8 +53,10 @@ class GitLabs:
         """
         ids: dict[int, str] = {}
         for project in self._get_projects():
-            hash_object = md5(project.get("last_activity_at").encode()).hexdigest()
-            ids[project.get("id")] = hash_object
+            last_activity = project.get("last_activity_at")
+            if not last_activity:
+                continue #Entails there was no activity for this project
+            ids[project.get("id")] = last_activity
 
         return ids
 
@@ -208,26 +211,41 @@ class GitLabs:
                 contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
                 (this should always be passed back by client from previous request).
         """
-        subdata_dict: dict
+        provided_date: datetime
         files_data: list = []
 
         if subdata is None:
-            subdata_dict = {}
+            provided_date = datetime.min.replace(tzinfo=timezone.utc)
         else:
-            subdata_dict = json.loads(base64.b64decode(subdata))
+            try:
+                subdata_bytes = base64.b64decode(subdata)
+            except binascii.Error:
+                dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
+            subdata_str = subdata_bytes.decode("utf-8")
+            try:
+                provided_date = datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
+            except ValueError:
+                dms_error("Gitlab connector could not interpret subdata: %s", subdata)
+
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
+
+        latest_update = datetime.min.replace(tzinfo=timezone.utc)
         for project in projects:
             project_id = project.get("id")
-            if current_subdata.get(project_id) == subdata_dict.get(str(project_id)):
+            new_timestamp = current_subdata.get(project_id)
+            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
+            if new_timestamp_object < provided_date:
                 continue
+            if new_timestamp_object > latest_update:
+                latest_update = new_timestamp_object
 
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
             content = requests.get(url, timeout=120).content
             files_data.extend(self._unpack_zip(content, project_id))
 
-        generated_subdata = base64.urlsafe_b64encode(json.dumps(current_subdata).encode()).decode()
+        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
         return {"files": files_data, "subdata": generated_subdata}
 

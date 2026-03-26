@@ -84,10 +84,8 @@ class API:
 
         url = self.save_locally(content, "smb_content.json")
 
-        return {
-            "subdata": content.get("subdata"),
-            "file_url": url
-        }
+        return {"subdata": content.get("subdata"), "file_url": url}
+
 
 # ----------------------------
 # Run server

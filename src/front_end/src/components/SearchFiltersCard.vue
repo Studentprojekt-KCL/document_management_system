@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, reactive } from 'vue'
+import { ref, computed } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 
 const sourceFilters = ['GitHub', 'GitLab', 'Network File System']
@@ -11,54 +11,62 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:filters'])
 
-// Make reactive local copy
-const localFilters = reactive({
-  source: [...props.selectedFilters.source],
-  type: [...props.selectedFilters.type],
-  security: [...props.selectedFilters.security]
-})
+/* Local refs for filter selection */
+const localSource = ref([...props.selectedFilters.source])
+const localType = ref([...props.selectedFilters.type])
+const localSecurity = ref([...props.selectedFilters.security])
 
-// Keep local filters in sync with parent
-watch(
-  () => props.selectedFilters,
-  (newFilters) => {
-    localFilters.source = [...newFilters.source]
-    localFilters.type = [...newFilters.type]
-    localFilters.security = [...newFilters.security]
-  },
-  { deep: true, immediate: true }
+/* Computed to check if any filters are active */
+const hasActiveFilters = computed(() => 
+  localSource.value.length > 0 || localType.value.length > 0 || localSecurity.value.length > 0
 )
 
-const hasActiveFilters = computed(() => {
-  return localFilters.source.length > 0 || localFilters.type.length > 0 || localFilters.security.length > 0
-})
-
-const isSelected = (filterType, value) => localFilters[filterType].includes(value)
-
-const handleFilterChange = (filterType, value) => {
-  if (isSelected(filterType, value)) {
-    localFilters[filterType] = localFilters[filterType].filter((item) => item !== value)
-  } else {
-    localFilters[filterType] = [...localFilters[filterType], value]
-  }
-  emit('update:filters', { ...localFilters })
+/* Check if a filter is selected */
+const isSelected = (filterType, value) => {
+  if (filterType === 'source') return localSource.value.includes(value)
+  if (filterType === 'type') return localType.value.includes(value)
+  if (filterType === 'security') return localSecurity.value.includes(value)
+  return false
 }
 
+/* Toggle filter selection */
+const toggleFilter = (filterType, value) => {
+  let refArray
+  if (filterType === 'source') refArray = localSource
+  else if (filterType === 'type') refArray = localType
+  else if (filterType === 'security') refArray = localSecurity
+  else return
+
+  if (refArray.value.includes(value)) {
+    refArray.value = refArray.value.filter((f) => f !== value)
+  } else {
+    refArray.value = [...refArray.value, value]
+  }
+
+  emit('update:filters', {
+    source: localSource.value,
+    type: localType.value,
+    security: localSecurity.value
+  })
+}
+
+/* Clear all filters */
 const clearAllFilters = () => {
-  localFilters.source = []
-  localFilters.type = []
-  localFilters.security = []
-  emit('update:filters', { ...localFilters })
+  localSource.value = []
+  localType.value = []
+  localSecurity.value = []
+  emit('update:filters', {
+    source: [],
+    type: [],
+    security: []
+  })
 }
 </script>
-
-// This component is a placeholder for the search filters UI. It currently displays static filter options for demonstration
-purposes. // Later on these filter section needs to be more dynamic and interactive, allowing users to select and apply them to
-their search queries.
 
 <template>
   <div class="filters-card">
     <div class="filters-row">
+      <!-- Source Filters -->
       <div class="filter-group">
         <span class="group-label">
           <Grid2X2 :size="14" />
@@ -68,9 +76,7 @@ their search queries.
           v-for="item in sourceFilters"
           :key="item"
           :class="['chip', { active: isSelected('source', item) }]"
-          type="button"
-          :aria-pressed="isSelected('source', item)"
-          @click="handleFilterChange('source', item)"
+          @click="toggleFilter('source', item)"
         >
           {{ item }}
         </button>
@@ -78,6 +84,7 @@ their search queries.
 
       <span class="group-divider" aria-hidden="true"></span>
 
+      <!-- Type Filters -->
       <div class="filter-group">
         <span class="group-label">
           <FileText :size="14" />
@@ -87,9 +94,7 @@ their search queries.
           v-for="item in typeFilters"
           :key="item"
           :class="['chip', { active: isSelected('type', item) }]"
-          type="button"
-          :aria-pressed="isSelected('type', item)"
-          @click="handleFilterChange('type', item)"
+          @click="toggleFilter('type', item)"
         >
           {{ item }}
         </button>
@@ -97,6 +102,7 @@ their search queries.
 
       <span class="group-divider" aria-hidden="true"></span>
 
+      <!-- Security Filters -->
       <div class="filter-group">
         <span class="group-label">
           <Shield :size="14" />
@@ -106,17 +112,17 @@ their search queries.
           v-for="item in securityFilters"
           :key="item"
           :class="['chip', { active: isSelected('security', item) }]"
-          type="button"
-          :aria-pressed="isSelected('security', item)"
-          @click="handleFilterChange('security', item)"
+          @click="toggleFilter('security', item)"
         >
           {{ item }}
         </button>
-      </div>
-    </div>
 
-    <div class="filters-header">
-      <button v-if="hasActiveFilters" class="clear-button" type="button" @click="clearAllFilters">Clear all</button>
+      </div>
+      <div class="filters-header">
+      <button v-if="hasActiveFilters" class="clear-button" @click="clearAllFilters">
+        Clear all
+      </button>
+    </div>
     </div>
   </div>
 </template>
@@ -132,16 +138,27 @@ their search queries.
 
 .filters-header {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  margin-top: 0.5rem;
+  margin-left: auto;
+}
+
+.filters-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #99a4b8;
+  text-transform: uppercase;
 }
 
 .clear-button {
   border: none;
   background: transparent;
   color: #7c3aed;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  padding: 0.1rem 0.2rem;
 }
 
 .clear-button:hover {
@@ -167,7 +184,9 @@ their search queries.
   align-items: center;
   gap: 0.35rem;
   color: #99a4b8;
+  font-size: 0.82rem;
   font-weight: 700;
+  letter-spacing: 0.03em;
   margin-right: 0.15rem;
 }
 
@@ -177,6 +196,8 @@ their search queries.
   padding: 0.35rem 0.82rem;
   background: #edf0f4;
   color: #6f7e95;
+  font-size: 0.93rem;
+  line-height: 1;
   font-weight: 600;
   cursor: pointer;
 }
@@ -197,6 +218,15 @@ their search queries.
 }
 
 @media (max-width: 768px) {
+  .filters-card {
+    padding: 0.9rem;
+  }
+
+  .filters-header {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .group-divider {
     display: none;
   }

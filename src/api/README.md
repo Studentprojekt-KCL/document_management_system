@@ -75,3 +75,6 @@ DMIS_SEARCH_API_URL=DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:
 DMIS_SUMMARY_API_URL=http://gpu-srv-1.prod.h472c.bth.dms-lookup.com:8000/
 
 API_PORT=8001
+
+API_BIND_ADDRESS = 0.0.0.0
+API_ALLOW_ORIGIN = 127.0.0.1:8000

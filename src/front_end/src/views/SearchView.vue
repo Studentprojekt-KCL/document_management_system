@@ -32,12 +32,11 @@ const isPreviewOpen = ref(false)
 const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
 
 /* Filters so it can access matches */
-const selectedFilters = ref ({
+const selectedFilters = ref({
   source: [],
   type: [],
   security: []
 })
-
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {
@@ -99,11 +98,7 @@ const closePreview = () => {
 const handleFilterChange = (filters) => {
   console.log('Filter changed:', filters)
   // If no filters → show everything
-  if (
-    filters.source.length === 0 &&
-    filters.type.length === 0 &&
-    filters.security.length === 0
-  ) {
+  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
     matches.value = allMatches.value
     return
   }
@@ -126,14 +121,10 @@ const handleFilterChange = (filters) => {
       })
 
     // SOURCE FILTER
-    const sourceMatch =
-      filters.source.length === 0 ||
-      filters.source.some((s) => source.includes(s.toLowerCase()))
+    const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
-    const securityMatch =
-      filters.security.length === 0 ||
-      filters.security.some((s) => security.includes(s.toLowerCase()))
+    const securityMatch = filters.security.length === 0 || filters.security.some((s) => security.includes(s.toLowerCase()))
 
     return typeMatch && sourceMatch && securityMatch
   })
@@ -147,7 +138,7 @@ const handleFilterChange = (filters) => {
     <SearchBar :loading="isSearching" @search="handleSearch" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange"/>
+    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

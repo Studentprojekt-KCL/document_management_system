@@ -116,14 +116,7 @@ their search queries.
     </div>
 
     <div class="filters-header">
-      <button
-        v-if="hasActiveFilters"
-        class="clear-button"
-        type="button"
-        @click="clearAllFilters"
-      >
-        Clear all
-      </button>
+      <button v-if="hasActiveFilters" class="clear-button" type="button" @click="clearAllFilters">Clear all</button>
     </div>
   </div>
 </template>

@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
-
 from dmis_logger import dms_warning
+
 from gateway.config import APIConfiguration
 from gateway.schemas import (
     RankRequest,
@@ -15,11 +15,14 @@ from gateway.schemas import (
     SummaryResult,
     UniqueIdRequest,
 )
+from gateway.services.content_retriever import (
+    summarize_by_unique_id,
+    classify_by_unique_id,
+)
 from gateway.services.classifier import classify_documents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
-from gateway.services.id_operations import summarize_by_unique_id, classify_by_unique_id
 
 
 def create_router(config: APIConfiguration) -> APIRouter:
@@ -59,59 +62,72 @@ def create_router(config: APIConfiguration) -> APIRouter:
         return {"ranked_results": scored_docs}
 
     @router.post("/classify", response_model=list[ClassificationResult])
-    async def classify_endpoint(payload: list[InputItem]) -> list[dict]:
-        """Endpoint to classify documents via batched NLI inference."""
-        if not payload:
+    async def classify_endpoint(payload: list[InputItem] | UniqueIdRequest) -> list[dict]:
+        """Endpoint to classify documents.
+
+        Supports two modes:
+        - Direct document classification: Pass list of InputItem objects with content
+        - By unique ID: Pass UniqueIdRequest with list of unique IDs
+
+        Args:
+            payload: Either a list of InputItem objects or a UniqueIdRequest.
+
+        Returns:
+            List of ClassificationResult objects serialized with aliases.
+        """
+        if isinstance(payload, UniqueIdRequest):
+            results = await classify_by_unique_id(payload.unique_ids, config)
+        else:
+            if not payload:
+                return []
+            results = await classify_documents(payload, config.services.classifier_url)
+
+        if not results:
+            dms_warning("Classification returned no results.")
             return []
 
-        results = await classify_documents(payload, config.services.classifier_url)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
-    async def summarize_batch(payload: list[InputItem]) -> dict:
-        """Endpoint to summarize a batch of documents into a single summary."""
-        result = await summarize_documents(payload, config.services.ministral_url, config.services.ministral_model)
+    async def summarize_endpoint(payload: list[InputItem] | UniqueIdRequest) -> dict:
+        """Endpoint to summarize documents.
+
+        Supports two modes:
+        - Direct document summarization: Pass list of InputItem objects with content
+        - By unique ID: Pass UniqueIdRequest with list of unique IDs
+
+        Args:
+            payload: Either a list of InputItem objects or a UniqueIdRequest.
+
+        Returns:
+            SummaryResult with the generated summary.
+        """
+        result = None
+
+        if isinstance(payload, UniqueIdRequest):
+            result = await summarize_by_unique_id(payload.unique_ids, config)
+        else:
+            if not payload:
+                dms_warning("Empty document list provided for summarization.")
+                return JSONResponse(status_code=400, content={"detail": "Document list cannot be empty."})
+            result = await summarize_documents(payload, config.services.ministral_url, config.services.ministral_model)
 
         if result is None:
             dms_warning("Summarization returned no result.")
-            return JSONResponse(status_code=500, content={"detail": "Summarization failed."})
-
-        return result.model_dump()
-
-    @router.post("/summarize-by-id", response_model=SummaryResult)
-    async def summarize_by_id_endpoint(payload: UniqueIdRequest) -> dict:
-        """Endpoint to summarize documents by their unique IDs."""
-        result = await summarize_by_unique_id(
-            payload.unique_ids,
-            config.services.ministral_url,
-            config.services.ministral_model,
-            payload.connector_url,
-        )
-
-        if result is None:
-            dms_warning("Summarization by ID returned no result.")
             return JSONResponse(status_code=500, content={"detail": "Summarization failed or no valid documents found."})
 
         return result.model_dump()
 
-    @router.post("/classify-by-id", response_model=list[ClassificationResult])
-    async def classify_by_id_endpoint(payload: UniqueIdRequest) -> list[dict]:
-        """Endpoint to classify documents by their unique IDs."""
-        results = await classify_by_unique_id(
-            payload.unique_ids,
-            config.services.classifier_url,
-            payload.connector_url,
-        )
-
-        if not results:
-            dms_warning("Classification by ID returned no results.")
-            return []
-
-        return [r.model_dump(by_alias=True) for r in results]
-
     @router.post("/md-to-pdf")
     def md_pdf_converter(summary: SummaryResult) -> Response:
-        """Endpoint to convert from markdown to pdf."""
+        """Endpoint to convert from markdown to pdf.
+
+        Args:
+            summary: SummaryResult containing markdown text.
+
+        Returns:
+            PDF response with attachment header.
+        """
         pdf: bytes = md_to_pdf(summary.summary)
         return Response(
             content=pdf,

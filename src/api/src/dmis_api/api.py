@@ -14,12 +14,28 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from dmis_logger import dms_warning, dms_error
+from fastapi import Query
+
+# Testing
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+
 
 
 class API:
     """Management class for main API."""
 
+
     app: FastAPI = FastAPI()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:8080"],  # frontend URL
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        )
+    
     log_level: str | None = None
 
     def __init__(self) -> None:
@@ -76,36 +92,51 @@ class API:
 
         return JSONResponse(status_code=200, content=data)
     
+    # Currently works with the example form query, we will change the payload to have unique pointer once that has been fixed.
     @staticmethod
-    @app.get("/summary", status_code=200)
-    async def summary(file_pointer: str) -> JSONResponse:
-        """Forward summary request to upstream summary API."""
+    @app.get("/summary")
+    async def summary(file_pointer: str):
+        """Forward summary request to upstream summary API and return plain text."""
         dmis_summary_url = os.getenv("DMIS_SUMMARY_API_URL")
-        if not isinstance(dmis_summary_url, str) or not dmis_summary_url:
+        if not dmis_summary_url:
             dms_warning("DMIS_SUMMARY_API_URL is not set.")
-            return JSONResponse(status_code=500, content="")
+            return JSONResponse(status_code=500, content={"error": "Summary API URL not set"})
+
+        # For testing: transform file_pointer into a payload
+        payload = [
+            {
+                "content": "The servers went down at 2 AM due to a power outage. Backup generators kicked in successfully.",
+                "metadata": {
+                    "name": "Incident_Report_1.txt",
+                    "author": "IT Admin",
+                },
+
+            },
+            {
+                "content": "Power was fully restored to the main grid by 4 AM. No data loss was reported.",
+                "metadata": {
+                    "name": "Incident_Report_2.txt",
+                    "author": "IT Admin",
+                },
+
+            }
+        ]
 
         try:
-            response = requests.get(
+            response = requests.post(
                 f"{dmis_summary_url.rstrip('/')}/summarize",
-                params={"unique_pointer": file_pointer},
-                timeout=120,
+                json=payload,
+                timeout=120
             )
+            response.raise_for_status()
         except requests.RequestException as exc:
             dms_warning(f"Summary request to upstream API failed: {exc}")
-            return JSONResponse(status_code=502, content="")
+            return JSONResponse(status_code=502, content={"error": "Upstream request failed"})
 
-        if not response.ok:
-            dms_warning(f"Upstream summary API returned status code {response.status_code}.")
-            return JSONResponse(status_code=502, content="")
+        # Return as plain text if upstream is text
+        return PlainTextResponse(content=response.text, status_code=200)
+        
 
-        try:
-            data = response.json()
-        except requests.JSONDecodeError as exc:
-            dms_warning(f"Upstream summary API returned invalid JSON: {exc}")
-            return JSONResponse(status_code=502, content="")
-
-        return JSONResponse(status_code=200, content=data)
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

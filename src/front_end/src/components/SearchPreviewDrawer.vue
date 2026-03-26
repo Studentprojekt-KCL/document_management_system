@@ -26,21 +26,23 @@ const emit = defineEmits(['close'])
 const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, uniquePointer } = useSearchMetadata(props)
 
 /* Generate AI summary, send request to backend to get summary for selected file */
-const generateAISummary = async () => {
-  if (!props.selectedFile) {
-    return
-  }
 
+// WORKS currently with pipeline to get summary from query.
+const generateAISummary = async () => {
+  const AI_SUMMARY = import.meta.env.API_AI_SUMMARY
   try {
-    // Placeholder for API call to generate AI summary for teh selected file's unique pointer or link.
-    // This will likely involve sending a request to the backend with the file's unique identifier and receiving a summary in response.
-    console.log('Generating AI summary for:', uniquePointer.value)
-    alert('AI summary generation is not implemented yet.')
+    const response_summary = await fetch(
+      `${AI_SUMMARY}/summary?file_pointer=${encodeURIComponent(uniquePointer.value)}`
+    );
+    const data = await response_summary.text();
+    const ai_summary = data
+    console.log("ai_summary:",ai_summary)
+
   } catch (err) {
-    console.error('Error generating AI summary:', err)
-    alert('Failed to generate AI summary. Please try again later.')
+    console.error("Error generating AI summary:", err);
+    alert("Failed to generate AI summary. Please try again later.");
   }
-}
+};
 </script>
 
 <template>

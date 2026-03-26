@@ -21,6 +21,8 @@ Run the API locally in developer mode inside a Python virtual environment
     export DMIS_SEARCH_API_URL = <SEARCH_ENGINE_ADDRESS>
     export DMIS_SUMMARY_API_URL = <SUMMARY_ADDRESS>
     export API_PORT = <PORT_TO_EXPOSE>
+    export API_BIND_ADDRESS = <ADDRESS_TO_BIND_TO>
+    export API_ALLOW_ORIGIN = <COMMA_SEPERATED_LIST_OF_ALLOWED_ORIGINS (localhost:8000,127.0.0.1:1919,...)>
 
 ### 2. Install the package
 

@@ -17,8 +17,8 @@ const localType = ref([...props.selectedFilters.type])
 const localSecurity = ref([...props.selectedFilters.security])
 
 /* Computed to check if any filters are active */
-const hasActiveFilters = computed(() => 
-  localSource.value.length > 0 || localType.value.length > 0 || localSecurity.value.length > 0
+const hasActiveFilters = computed(
+  () => localSource.value.length > 0 || localType.value.length > 0 || localSecurity.value.length > 0
 )
 
 /* Check if a filter is selected */
@@ -116,13 +116,10 @@ const clearAllFilters = () => {
         >
           {{ item }}
         </button>
-
       </div>
       <div class="filters-header">
-      <button v-if="hasActiveFilters" class="clear-button" @click="clearAllFilters">
-        Clear all
-      </button>
-    </div>
+        <button v-if="hasActiveFilters" class="clear-button" @click="clearAllFilters">Clear all</button>
+      </div>
     </div>
   </div>
 </template>
@@ -141,14 +138,6 @@ const clearAllFilters = () => {
   align-items: center;
   justify-content: flex-end;
   margin-left: auto;
-}
-
-.filters-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #99a4b8;
-  text-transform: uppercase;
 }
 
 .clear-button {

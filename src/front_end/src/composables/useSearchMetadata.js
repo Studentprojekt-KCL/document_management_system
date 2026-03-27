@@ -55,11 +55,11 @@ export const TYPE_KEYWORDS = {
 }
 
 /* Used for filtering doc types (SearchView, SearchFilterCard)*/
-export const TYPE_FILTERS = { 
+export const TYPE_FILTERS = {
   'PDF (.pdf)': ['.pdf'],
   'Word (.docx)': ['.doc', '.docx', 'word'],
   'Excel (.xlsx)': ['.xlsx'],
-  'Text / Markdown (.txt, .md)': ['.md',  '.txt']
+  'Text / Markdown (.txt, .md)': ['.md', '.txt']
 }
 /* Function to resolve the document type from source type and name. */
 export const resolveDocumentType = ({ sourceType, sourceName }) => {

@@ -109,13 +109,11 @@ const handleFilterChange = (filters) => {
     // const security = (match.security || '').toLowerCase()
 
     // TYPE FILTER
-     const typeMatch =
+    const typeMatch =
       filters.type.length === 0 ||
       filters.type.some((filterLabel) => {
         // Find the TYPE_KEYWORDS entry that matches the selected filter
-        const keywordsEntry = Object.entries(TYPE_FILTERS).find(
-          ([docType]) => docType === filterLabel
-        )
+        const keywordsEntry = Object.entries(TYPE_FILTERS).find(([docType]) => docType === filterLabel)
 
         if (!keywordsEntry) return false
 
@@ -124,7 +122,6 @@ const handleFilterChange = (filters) => {
         // Only match filename against the keywords for this filter
         return keywords.some((kw) => filename.endsWith(kw))
       })
-  
 
     // SOURCE FILTER
     // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
@@ -134,7 +131,7 @@ const handleFilterChange = (filters) => {
 
     // add sourceMatch and secuirtyMatch later
     // return typeMatch && sourceMatch && secuirtyMatch
-    return typeMatch 
+    return typeMatch
   })
 }
 </script>

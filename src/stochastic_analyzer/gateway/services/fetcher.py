@@ -2,6 +2,7 @@
 
 import os
 import base64
+import binascii
 import httpx
 from gateway.schemas import InputItem, MetadataTemplate, SummaryResult
 from gateway.services.summarizer import summarize_documents
@@ -31,8 +32,7 @@ async def get_content(unique_id: str) -> InputItem:
     base64_content = data.get("content", "")
     try:
         content_str = base64.b64decode(base64_content).decode("utf-8") if base64_content else " "
-
-    except (base64.binascii.Error, UnicodeDecodeError, ValueError):
+    except (binascii.Error, UnicodeDecodeError, ValueError):
         content_str = " "
 
     # Map metadata from response

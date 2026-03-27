@@ -100,31 +100,100 @@ class API:
     async def search(self, query=Query(..., min_length=1, max_length=200)) -> JSONResponse:
         """Forward search request to upstream search API."""
         search_api_url = os.getenv("DMIS_SEARCH_API_URL")
+        query_api_url = os.getenv("DMIS_QUERY_API_URL")
+
         if not isinstance(search_api_url, str) or not search_api_url:
             dms_warning("DMIS_SEARCH_API_URL is not set.")
             return JSONResponse(status_code=500, content="")
 
+        if not isinstance(query_api_url, str) or not query_api_url:
+            dms_warning("DMIS_QUERY_API_URL is not set.")
+            return JSONResponse(status_code=500, content="")
+
+        query = query.strip()
+        if not query:
+            return JSONResponse(status_code=422, content="")
+
+        # calling the search engine
         try:
-            response = requests.get(
+            search_response = requests.get(
                 f"{search_api_url.rstrip('/')}/search",
                 params={"q": query},
-                timeout=120,
+                timeout=30,
             )
         except requests.RequestException as exc:
             dms_warning(f"Search request to upstream API failed: {exc}")
             return JSONResponse(status_code=502, content="")
 
-        if not response.ok:
-            dms_warning(f"Upstream search API returned status code {response.status_code}.")
+        if not search_response.ok:
+            dms_warning(f"Upstream search API returned status code {search_response.status_code}.")
             return JSONResponse(status_code=502, content="")
 
         try:
-            data = response.json()
+            search_data = search_response.json()
         except requests.JSONDecodeError as exc:
             dms_warning(f"Upstream search API returned invalid JSON: {exc}")
             return JSONResponse(status_code=502, content="")
 
-        return JSONResponse(status_code=200, content=data)
+        # return JSONResponse(status_code=200, content=data)
+
+        # extract unique pointers from search metadata
+        results = search_data.get("results", [])
+        if not isinstance(results, list):
+            dms_warning("Search API response missing valid 'results' list.")
+            return JSONResponse(status_code=502, content="")
+        
+        unique_pointers = list[str] = []
+        for entry in results:
+            if not isinstance(entry, dict):
+                continue
+            
+            metadata = entry.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+
+            unique_pointer = metadata.get("unique_pointer")
+            if isinstance(unique_pointer, str) and unique_pointer.strip():
+                unique_pointers.append(unique_pointer.strip())
+
+        if not unique_pointers:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "results"; [],
+                    "query": query,
+                    "detail": ""
+                },
+            )
+        
+        # send pointers to query service for classification and rerank
+        query_payload: dict[str, Any] = {
+            "query": query,
+            "unique_pointers": unique_pointers,
+        }
+
+        try:
+            query_response = requests.post(
+                f"{query_api_url.rstrip('/')}/rerank",
+                json=query_payload,
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            dms_warning(f"Query service request failed: {exc}")
+            return JSONResponse(status_code=502, content=""),
+        
+        if not query_response.ok:
+            dms_warning(f"Query service returned status code {query_response.status_code}.")
+            return JSONResponse(status_code=502, content="")
+
+        try:
+            query_data = query_response.json()
+        except requests.JSONDecodeError as exc:
+            dms_warning(f"Query service returned invalid JSON: {exc}")
+            return JSONResponse(status_code=502, content="")
+        
+        # return the final result to frontend
+        return JSONResponse(status_code=200, content=query_data)
 
     # Currently works with the example form query, we will change the payload to have unique pointer once that has been fixed.
     async def summary(self, file_pointer: str = Query(..., min_length=1, max_length=500)):

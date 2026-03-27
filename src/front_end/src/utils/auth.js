@@ -5,7 +5,112 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 
+const KEYCLOAK_BASE = import.meta.env.KEYCLOAK_BASE_URL
+const REALM = import.meta.env.KEYCLOAK_REALM
 const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
+
+const TOKEN_URL = `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/token`
+
+function storeTokens(data) {
+  if (data.access_token) {
+    sessionStorage.setItem('access_token', data.access_token)
+  }
+
+  if (data.refresh_token) {
+    sessionStorage.setItem('refresh_token', data.refresh_token)
+  }
+
+  if (data.id_token) {
+    sessionStorage.setItem('id_token', data.id_token)
+  }
+
+  if (data.expires_in) {
+    const expiresAt = Date.now() + data.expires_in * 1000
+    sessionStorage.setItem('expires_at', expiresAt.toString())
+  }
+}
+
+function clearAuth() {
+  sessionStorage.removeItem('access_token')
+  sessionStorage.removeItem('refresh_token')
+  sessionStorage.removeItem('id_token')
+  sessionStorage.removeItem('expires_at')
+}
+
+/* Generic Token Request */
+
+async function requestToken(params) {
+  const body = new URLSearchParams(params)
+
+  const response = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body.toString()
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(`${data.error || response.status} ${data.error_description || ''}`)
+  }
+
+  storeTokens(data)
+  return data
+}
+
+/* Exchange authorization code for tokens (login) */
+export async function exchangeCodeForToken(code, verifier, redirectUri) {
+  return await requestToken({
+    grant_type: 'authorization_code',
+    client_id: CLIENT_ID,
+    code,
+    redirect_uri: redirectUri,
+    code_verifier: verifier
+  })
+}
+
+/*Refresh access token using refresh token */
+export async function refreshTokenRequest(refreshToken) {
+  try {
+    const data = await requestToken({
+      grant_type: 'refresh_token',
+      client_id: CLIENT_ID,
+      refresh_token: refreshToken
+    })
+
+    return data.access_token
+  } catch (error) {
+    console.error('Refresh failed:', error)
+
+    // If refresh fails → force logout
+    clearAuth()
+    window.location.href = '/login'
+
+    return null
+  }
+}
+
+/* Get a valid access token (refresh if needed) */
+export async function getValidToken() {
+  const accessToken = sessionStorage.getItem('access_token')
+  const refreshToken = sessionStorage.getItem('refresh_token')
+  const expiresAt = sessionStorage.getItem('expires_at')
+
+  if (!accessToken || !refreshToken) {
+    return null
+  }
+
+  // Refresh if token expires within 10 seconds
+  const isExpiringSoon = expiresAt && Date.now() + 10000 > parseInt(expiresAt)
+  if (isExpiringSoon) {
+    console.log('Token expiring soon, refreshing...')
+    return await refreshTokenRequest(refreshToken)
+  }
+
+  return accessToken
+}
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {

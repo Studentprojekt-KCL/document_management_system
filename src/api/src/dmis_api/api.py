@@ -135,9 +135,6 @@ class API:
             dms_warning(f"Upstream search API returned invalid JSON: {exc}")
             return JSONResponse(status_code=502, content="")
 
-        # return JSONResponse(status_code=200, content=data)
-
-        # extract unique pointers from search metadata
         if isinstance(search_data, list):
             results = search_data
         elif isinstance(search_data, dict):
@@ -149,17 +146,13 @@ class API:
         if not isinstance(results, list):
             dms_warning("Search API response missing valid 'results' list.")
             return JSONResponse(status_code=502, content="")
-                
+
         unique_pointers: list[str] = []
         for entry in results:
             if not isinstance(entry, dict):
                 continue
-            
-            metadata = entry.get("metadata", {})
-            if not isinstance(metadata, dict):
-                metadata = {}
 
-            unique_pointer = metadata.get("unique_pointer")
+            unique_pointer = entry.get("unique_pointer")
             if isinstance(unique_pointer, str) and unique_pointer.strip():
                 unique_pointers.append(unique_pointer.strip())
 
@@ -169,38 +162,94 @@ class API:
                 content={
                     "results": [],
                     "query": query,
-                    "detail": ""
+                    "detail": "",
                 },
             )
         
-        # send pointers to query service for classification and rerank
-        query_payload: dict[str, Any] = {
+        # send pointers to query service rerank with keyword and list of pointers
+        rerank_payload: dict[str, Any] = {
             "query": query,
-            "unique_pointers": unique_pointers,
+            "file_pointers": unique_pointers,
         }
 
         try:
-            query_response = requests.post(
+            rerank_response = requests.post(
                 f"{query_api_url.rstrip('/')}/rerank",
-                json=query_payload,
+                json=rerank_payload,
                 timeout=30,
             )
         except requests.RequestException as exc:
-            dms_warning(f"Query service request failed: {exc}")
+            dms_warning(f"Rerank request failed: {exc}")
             return JSONResponse(status_code=502, content="")
         
-        if not query_response.ok:
-            dms_warning(f"Query service returned status code {query_response.status_code}.")
+        if not rerank_response.ok:
+            dms_warning(f"Rerank service returned status code {rerank_response.status_code}.")
             return JSONResponse(status_code=502, content="")
 
         try:
-            query_data = query_response.json()
+            rerank_data = rerank_response.json()
         except requests.JSONDecodeError as exc:
-            dms_warning(f"Query service returned invalid JSON: {exc}")
+            dms_warning(f"Rerank service returned invalid JSON: {exc}")
             return JSONResponse(status_code=502, content="")
         
+        rerank_map = rerank_data.get("scores", rerank_data.get("rerank", {}))
+        if not isinstance(rerank_map, dict):
+            rerank_map = {}
+
+        # classification per file pointer
+        classification_map: dict[str, Any] = {}
+        for file_pointer in unique_pointers:
+            try:
+                classification_response = requests.post(
+                    f"{query_api_url.rstrip('/')}/classify",
+                    json={"file_pointer": file_pointer},
+                    timeout=30,
+                )
+            except requests.RequestException as exc:
+                dms_warning(f"Classification request failed for {file_pointer}: {exc}")
+                continue
+    
+            if not classification_response.ok:
+                dms_warning(
+                    f"Classification service returned status code"
+                    f"{classification_response.status_code} for {file_pointer}. "
+                    f"Body: {classification_response.text}"
+                )
+                continue
+            
+            try:
+                classification_data = classification_response.json()
+            except requests.JSONDecodeError as exc:
+                dms_warning(f"Classification service returned invalid JSON for {file_pointer}: {exc}")
+                continue
+            
+            classification_map[file_pointer] = classification_data
+
+        for entry in results:
+            if not isinstance(entry, dict):
+                continue
+            
+            file_pointer = entry.get("unique_pointer")
+            if not isinstance(file_pointer, str) or not file_pointer.strip():
+                continue
+
+            metadata = entry.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+                entry["metadata"] = metadata
+
+            metadata["classification"] = classification_map.get(file_pointer)
+            metadata["rerank"] = rerank_map.get(file_pointer)
+
+
         # return the final result to frontend
-        return JSONResponse(status_code=200, content=query_data)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "results": results,
+                "query": query,
+            },
+        )
 
     # Currently works with the example form query, we will change the payload to have unique pointer once that has been fixed.
     async def summary(self, file_pointer: str = Query(..., min_length=1, max_length=500)):

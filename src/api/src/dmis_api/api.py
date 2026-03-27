@@ -138,12 +138,19 @@ class API:
         # return JSONResponse(status_code=200, content=data)
 
         # extract unique pointers from search metadata
-        results = search_data.get("results", [])
+        if isinstance(search_data, list):
+            results = search_data
+        elif isinstance(search_data, dict):
+            results = search_data.get("results", [])
+        else:
+            dms_warning("Search API returned unexpected JSON shape.")
+            return JSONResponse(status_code=502, content="")
+
         if not isinstance(results, list):
             dms_warning("Search API response missing valid 'results' list.")
             return JSONResponse(status_code=502, content="")
-        
-        unique_pointers = list[str] = []
+                
+        unique_pointers: list[str] = []
         for entry in results:
             if not isinstance(entry, dict):
                 continue
@@ -160,7 +167,7 @@ class API:
             return JSONResponse(
                 status_code=200,
                 content={
-                    "results"; [],
+                    "results": [],
                     "query": query,
                     "detail": ""
                 },
@@ -180,7 +187,7 @@ class API:
             )
         except requests.RequestException as exc:
             dms_warning(f"Query service request failed: {exc}")
-            return JSONResponse(status_code=502, content=""),
+            return JSONResponse(status_code=502, content="")
         
         if not query_response.ok:
             dms_warning(f"Query service returned status code {query_response.status_code}.")

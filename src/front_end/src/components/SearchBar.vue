@@ -8,8 +8,13 @@
  * <SearchBar @search="handleSearch" />
  */
 
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Search as SearchIcon } from 'lucide-vue-next'
+
+/* Props received from SearchView */
+const props = defineProps({
+  loading: { type: Boolean, default: false }
+})
 
 /* Emit to parent component (SearchView) when a search is performed */
 const emit = defineEmits(['search'])
@@ -27,16 +32,25 @@ const handleSearch = () => {
   emit('search', query)
   searchQuery.value = ''
 }
+
+/* Disable search button if query is empty or currently searching */
+const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loading)
 </script>
 
 <template>
   <!-- Search Bar Form -->
   <form class="search-input-wrap" @submit.prevent="handleSearch">
     <SearchIcon class="search-icon" :size="28" />
-    <input v-model="searchQuery" class="search-input" type="text" placeholder="Search for documents across all sources..." />
+    <input
+      v-model="searchQuery"
+      class="search-input"
+      type="text"
+      :disabled="loading"
+      :placeholder="loading ? 'Searching...' : 'Search for documents across all sources...'"
+    />
 
     <!-- Search button to trigger the search action -->
-    <button class="search-button" type="submit">Search</button>
+    <button class="search-button" type="submit" :disabled="isSearchDisabled">Search</button>
   </form>
 </template>
 
@@ -70,6 +84,11 @@ const handleSearch = () => {
 
 .search-input::placeholder {
   color: #6f7e95;
+}
+
+.search-input:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
 }
 
 .search-button {

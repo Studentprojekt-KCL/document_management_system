@@ -144,10 +144,10 @@ const clearAllFilters = () => {
   border: none;
   background: transparent;
   color: #7c3aed;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0.1rem 0.2rem;
+  padding: 0.1rem 0.6rem;
 }
 
 .clear-button:hover {

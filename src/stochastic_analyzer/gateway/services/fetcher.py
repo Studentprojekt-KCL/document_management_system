@@ -32,7 +32,7 @@ async def get_content(unique_id: str) -> InputItem:
     try:
         content_str = base64.b64decode(base64_content).decode("utf-8") if base64_content else " "
 
-    except Exception:
+    except (base64.binascii.Error, UnicodeDecodeError, ValueError):
         content_str = " "
 
     # Map metadata from response

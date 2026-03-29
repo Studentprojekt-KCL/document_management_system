@@ -6,9 +6,9 @@ from fastapi.responses import Response
 from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
 from gateway.schemas import (
-    RankRequest,
+    RerankRequest,
     RankResponse,
-    ScoredDocument,
+    ScoredPointer,
     HealthCheck,
     ClassificationResult,
     PointerRequest,
@@ -38,24 +38,29 @@ def create_router(config: APIConfiguration) -> APIRouter:
         return {"status": "active", "model_loaded": True, "device": config.device}
 
     @router.post("/rerank", response_model=RankResponse)
-    async def rerank_documents(payload: RankRequest) -> dict:
-        """Endpoint for the external TEI model."""
-        if not payload.documents:
-            return {"ranked_results": []}
+    async def rerank_documents(payload: RerankRequest) -> dict:
+        """Endpoint for pointer-based semantic reranking."""
+        reference_items = await get_file_contents(config.services.connector_url, [payload.reference])
+        if not reference_items:
+            dms_warning("Failed to retrieve reference document from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
-        try:
-            scores = await rank_documents(payload.query, payload.documents, config.services.tei_url)
-        except Exception as e:
-            dms_warning(f"Ranking engine failure: {e}")
-            raise HTTPException(status_code=500, detail="Ranking engine failure.") from e
+        compare_items = await get_file_contents(config.services.connector_url, payload.pointers)
+        if not compare_items:
+            dms_warning("Failed to retrieve comparison documents from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
 
-        scored_docs = sorted(
-            [ScoredDocument(score=float(score), document=doc) for score, doc in zip(scores, payload.documents)],
+        query = reference_items[0].content
+        texts = [item.content for item in compare_items]
+        scores = await rank_documents(query, texts, config.services.tei_url)
+
+        scored = sorted(
+            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers)],
             key=lambda x: x.score,
             reverse=True,
         )
 
-        return {"ranked_results": scored_docs}
+        return {"ranked_results": scored}
 
     @router.post("/classify", response_model=list[ClassificationResult])
     async def classify_endpoint(payload: PointerRequest) -> list[dict]:

@@ -124,4 +124,4 @@ class APIConfiguration:
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
-        self.services.connector_url = address.rstrip("/") + "/file"
+        self.services.connector_url = address

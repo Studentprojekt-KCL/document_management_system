@@ -1,7 +1,7 @@
 """Define API and routes."""
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response
 
 from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
@@ -12,9 +12,11 @@ from gateway.schemas import (
     HealthCheck,
     InputItem,
     ClassificationResult,
+    SummarizeRequest,
     SummaryResult,
 )
 from gateway.services.classifier import classify_documents
+from gateway.services.connector import get_file_contents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
@@ -66,13 +68,19 @@ def create_router(config: APIConfiguration) -> APIRouter:
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
-    async def summarize_batch(payload: list[InputItem]) -> dict:
-        """Endpoint to summarize a batch of documents into a single summary."""
-        result = await summarize_documents(payload, config.services.ministral_url, config.services.ministral_model)
+    async def summarize_batch(payload: SummarizeRequest) -> dict:
+        """Endpoint to summarize documents by fetching content via file pointers."""
+        items = await get_file_contents(config.services.connector_url, payload.pointers)
+
+        if not items:
+            dms_warning("No documents could be retrieved from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
+
+        result = await summarize_documents(items, config.services.ministral_url, config.services.ministral_model)
 
         if result is None:
             dms_warning("Summarization returned no result.")
-            return JSONResponse(status_code=500, content={"detail": "Summarization failed."})
+            raise HTTPException(status_code=500, detail="Summarization failed.")
 
         return result.model_dump()
 

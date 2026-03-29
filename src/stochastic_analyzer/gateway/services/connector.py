@@ -1,56 +1,59 @@
-"""Services regarding the connector."""
+"""File content retrieval from the connector microservice."""
 
-from json.decoder import JSONDecodeError
+import asyncio
+from base64 import b64decode
 
-from asyncio import create_task
+import httpx
 
 from dmis_logger import dms_warning
-from httpx import AsyncClient, HTTPError
-
 from gateway.schemas import InputItem, MetadataTemplate
 
-async def _get_content(url: str, pointer: str, client: AsyncClient) -> InputItem | None:
-    """Get the content of a file.
+
+async def _get_content(url: str, pointer: str, client: httpx.AsyncClient) -> InputItem | None:
+    """Fetch and decode a single file from the connector.
 
     Args:
-        url: Connector url
-        pointer: file pointer
-        client: AsyncClient connection.
-    Returns: InputItem on success else None
+        url: Connector file endpoint URL.
+        pointer: Unique file pointer.
+        client: Shared async HTTP client.
+
+    Returns:
+        InputItem on success, None on failure.
     """
-
-    content: str | None = None
     try:
-        response = (await client.get(url, params=[("file_pointer", pointer)], timeout=120)).json()
-        content = response.get("content")
-    except HTTPError as err:
-        dms_warning(f"HTTP Exception for {err.request.url} - {err}")
-    except JSONDecodeError as err:
-        dms_warning(f"Failed parsing JSON response: {err.doc}")
-
-    if content is None:
-        dms_warning(f"Content is none, pointer: {pointer}")
+        response = await client.get(url, params={"file_pointer": pointer}, timeout=120)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as err:
+        dms_warning(f"Connector request failed for pointer '{pointer}': {err}")
         return None
 
-    return InputItem(content=content, metadata=MetadataTemplate()) # What is metadata? IDK
+    encoded_content = data.get("content")
+    if encoded_content is None:
+        dms_warning(f"No content returned for pointer '{pointer}'")
+        return None
+
+    try:
+        content = b64decode(encoded_content).decode("utf-8")
+    except Exception:
+        dms_warning(f"Base64 decode failed for pointer '{pointer}'")
+        return None
+
+    return InputItem(content=content, metadata=MetadataTemplate())
+
 
 async def get_file_contents(connector_url: str, pointers: list[str]) -> list[InputItem]:
-    """Get the contents from all files pointed at.
+    """Fetch contents for all file pointers from the connector.
 
     Args:
-        connector_url: url to connector
-        pointers: list of unique file pointers
-    
-    Returns: list of InputItems
+        connector_url: Base URL for the connector file endpoint.
+        pointers: List of unique file pointers.
+
+    Returns:
+        List of successfully retrieved InputItems.
     """
+    async with httpx.AsyncClient() as client:
+        tasks = [_get_content(connector_url, pointer, client) for pointer in pointers]
+        results = await asyncio.gather(*tasks)
 
-    async with AsyncClient() as client:
-        file_gatherers = [create_task(_get_content(connector_url, pointer, client)) for pointer in pointers]
-        results: list[InputItem] = []
-        for gatherer in file_gatherers:
-            result: InputItem | None = await gatherer
-            if result is not None:
-                results.append(result)
-
-    return results
-
+    return [item for item in results if item is not None]

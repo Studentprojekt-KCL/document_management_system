@@ -1,6 +1,7 @@
 """File content retrieval from the connector microservice."""
 
 import asyncio
+import binascii
 from base64 import b64decode
 
 import httpx
@@ -24,7 +25,7 @@ async def _get_content(url: str, pointer: str, client: httpx.AsyncClient) -> Inp
         response = await client.get(url, params={"file_pointer": pointer}, timeout=120)
         response.raise_for_status()
         data = response.json()
-    except Exception as err:
+    except (httpx.HTTPStatusError, httpx.TimeoutException, ValueError) as err:
         dms_warning(f"Connector request failed for pointer '{pointer}': {err}")
         return None
 
@@ -35,7 +36,7 @@ async def _get_content(url: str, pointer: str, client: httpx.AsyncClient) -> Inp
 
     try:
         content = b64decode(encoded_content).decode("utf-8")
-    except Exception:
+    except (binascii.Error, UnicodeDecodeError):
         dms_warning(f"Base64 decode failed for pointer '{pointer}'")
         return None
 

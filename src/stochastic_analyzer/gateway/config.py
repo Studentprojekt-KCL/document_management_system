@@ -97,9 +97,6 @@ class APIConfiguration:
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
         address: str | None = environ.get("CONNECTOR_ADDRESS")
 
-
-
-
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
             return

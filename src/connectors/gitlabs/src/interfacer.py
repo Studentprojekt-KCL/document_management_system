@@ -4,7 +4,6 @@ import os
 import re
 from urllib.parse import urljoin
 import base64
-import json
 import io
 from pathlib import Path
 import zipfile
@@ -55,7 +54,7 @@ class GitLabs:
         for project in self._get_projects():
             last_activity = project.get("last_activity_at")
             if not last_activity:
-                continue #Entails there was no activity for this project
+                continue  # Entails there was no activity for this project
             ids[project.get("id")] = last_activity
 
         return ids
@@ -211,21 +210,8 @@ class GitLabs:
                 contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
                 (this should always be passed back by client from previous request).
         """
-        provided_date: datetime
+        provided_date: datetime = self._provided_date(subdata)
         files_data: list = []
-
-        if subdata is None:
-            provided_date = datetime.min.replace(tzinfo=timezone.utc)
-        else:
-            try:
-                subdata_bytes = base64.b64decode(subdata)
-            except binascii.Error:
-                dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
-            subdata_str = subdata_bytes.decode("utf-8")
-            try:
-                provided_date = datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
-            except ValueError:
-                dms_error("Gitlab connector could not interpret subdata: %s", subdata)
 
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
@@ -234,11 +220,12 @@ class GitLabs:
         for project in projects:
             project_id = project.get("id")
             new_timestamp = current_subdata.get(project_id)
-            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object < provided_date:
+            if not isinstance(new_timestamp, str):
                 continue
-            if new_timestamp_object > latest_update:
-                latest_update = new_timestamp_object
+            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
+            if new_timestamp_object <= provided_date:
+                continue
+            latest_update = max(latest_update, new_timestamp_object)
 
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
@@ -264,22 +251,39 @@ class GitLabs:
                 contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
                 (this should always be passed back by client from previous request).
         """
-        subdata_dict: dict
+        provided_date = self._provided_date(subdata)
 
-        if subdata is None:
-            subdata_dict = {}
-        else:
-            subdata_dict = json.loads(base64.b64decode(subdata))
         file_pointers: list = []
         project_ids = self.get_project_ids()
-        for project_id, change_hash in project_ids.items():
-            if change_hash == subdata_dict.get(str(project_id)):
+        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+        for project_id, change_time in project_ids.items():
+            if not isinstance(change_time, str):
                 continue
+            new_timestamp_object = datetime.fromisoformat(change_time.replace("Z", "+00:00"))
+            if new_timestamp_object <= provided_date:
+                continue
+            latest_update = max(latest_update, new_timestamp_object)
+
             file_pointers.extend(self.get_files_in_project(project_id))
 
-        generated_subdata = base64.urlsafe_b64encode(json.dumps(project_ids).encode()).decode()
+        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
         return {"subdata": generated_subdata, "file_pointers": file_pointers}
+
+    @staticmethod
+    def _provided_date(subdata: str | None) -> datetime:
+        """Parse string dateobject from iso format to datetime object."""
+        if subdata is not None:
+            try:
+                subdata_bytes = base64.b64decode(subdata)
+            except binascii.Error:
+                dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
+            subdata_str = subdata_bytes.decode("utf-8")
+            try:
+                return datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
+            except ValueError:
+                dms_error("Gitlab connector could not interpret subdata: %s", subdata)
+        return datetime.min.replace(tzinfo=timezone.utc)
 
     def _execute_request(self, url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""

@@ -40,7 +40,8 @@ async def _get_content(url: str, pointer: str, client: httpx.AsyncClient) -> Inp
         dms_warning(f"Base64 decode failed for pointer '{pointer}'")
         return None
 
-    return InputItem(content=content, metadata=MetadataTemplate())
+    name = data.get("metadata", {}).get("name")
+    return InputItem(content=content, metadata=MetadataTemplate(name=name))
 
 
 async def get_file_contents(connector_url: str, pointers: list[str]) -> list[InputItem]:

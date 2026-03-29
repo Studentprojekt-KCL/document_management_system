@@ -68,8 +68,8 @@ class ClassificationResult(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class SummarizeRequest(BaseModel):
-    """Request schema for pointer-based summarization."""
+class PointerRequest(BaseModel):
+    """Request schema for pointer-based endpoints."""
 
     pointers: list[StrictStr] = Field(..., min_length=1)
 

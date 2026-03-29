@@ -10,9 +10,8 @@ from gateway.schemas import (
     RankResponse,
     ScoredDocument,
     HealthCheck,
-    InputItem,
     ClassificationResult,
-    SummarizeRequest,
+    PointerRequest,
     SummaryResult,
 )
 from gateway.services.classifier import classify_documents
@@ -59,16 +58,19 @@ def create_router(config: APIConfiguration) -> APIRouter:
         return {"ranked_results": scored_docs}
 
     @router.post("/classify", response_model=list[ClassificationResult])
-    async def classify_endpoint(payload: list[InputItem]) -> list[dict]:
+    async def classify_endpoint(payload: PointerRequest) -> list[dict]:
         """Endpoint to classify documents via batched NLI inference."""
-        if not payload:
-            return []
+        items = await get_file_contents(config.services.connector_url, payload.pointers)
 
-        results = await classify_documents(payload, config.services.classifier_url)
+        if not items:
+            dms_warning("No documents could be retrieved from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
+
+        results = await classify_documents(items, config.services.classifier_url)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
-    async def summarize_batch(payload: SummarizeRequest) -> dict:
+    async def summarize_batch(payload: PointerRequest) -> dict:
         """Endpoint to summarize documents by fetching content via file pointers."""
         items = await get_file_contents(config.services.connector_url, payload.pointers)
 

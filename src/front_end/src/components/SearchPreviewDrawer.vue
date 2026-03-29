@@ -9,9 +9,21 @@
  */
 
 import { computed, ref, watch } from 'vue'
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink, Pencil, Save, XCircle, CheckCircle, AlertCircle } from 'lucide-vue-next'
+import {
+  X,
+  StarsIcon,
+  CalendarDays,
+  HardDrive,
+  FileType2,
+  ExternalLink,
+  Pencil,
+  Save,
+  XCircle,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
-import {hasRole} from "@/utils/auth";
+import { hasRole } from '@/utils/auth'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -29,11 +41,11 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
 
 /* Base URL for API requests */
 const API_BASE_URL = import.meta.env.API_BASE_URL?.replace(/\/$/, '') ?? ''
- 
-/* ── Edit mode state ── */
+
+/* Edit mode state */
 const isEditing = ref(false)
 const isSaving = ref(false)
- 
+
 /* Editable field values (populated when entering edit mode) */
 const editFields = ref({
   title: '',
@@ -41,14 +53,14 @@ const editFields = ref({
   created: '',
   size: ''
 })
- 
+
 /* Status toast for save feedback */
 const toast = ref({ visible: false, success: true, message: '' })
 let toastTimer = null
- 
+
 /* Check if the current user is allowed to edit metadata */
 const canEdit = computed(() => hasRole('admin'))
- 
+
 /* Enter edit mode: snapshot current values into the form */
 const startEditing = () => {
   editFields.value = {
@@ -59,17 +71,17 @@ const startEditing = () => {
   }
   isEditing.value = true
 }
- 
+
 /* Cancel editing: reset form and exit edit mode */
 const cancelEditing = () => {
   isEditing.value = false
   editFields.value = { title: '', type: '', created: '', size: '' }
 }
- 
+
 /* Save metadata changes */
 const saveMetadata = async () => {
   isSaving.value = true
- 
+
   try {
     // TODO: Replace with real endpoint when backend supports metadata updates.
     // The endpoint should accept the document identifier and updated fields.
@@ -81,11 +93,11 @@ const saveMetadata = async () => {
         metadata: { ...editFields.value }
       })
     })
- 
+
     if (!res.ok) {
       throw new Error(`Server responded with ${res.status}`)
     }
- 
+
     showToast(true, 'Metadata updated successfully.')
     isEditing.value = false
   } catch (err) {
@@ -94,7 +106,7 @@ const saveMetadata = async () => {
     isSaving.value = false
   }
 }
- 
+
 /* Toast helper */
 const showToast = (success, message) => {
   if (toastTimer) clearTimeout(toastTimer)
@@ -103,7 +115,7 @@ const showToast = (success, message) => {
     toast.value.visible = false
   }, 4000)
 }
- 
+
 /* Reset edit state when a different document is selected or drawer closes */
 watch(
   () => [props.selectedFile, props.open],
@@ -129,7 +141,6 @@ watch(
 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
-
       <Transition name="toast-fade">
         <div v-if="toast.visible" :class="['toast', toast.success ? 'toast-success' : 'toast-error']">
           <CheckCircle v-if="toast.success" :size="16" />
@@ -161,14 +172,14 @@ watch(
       <section class="panel-section">
         <div class="section-header">
           <p class="section-title">TECHNICAL METADATA</p>
- 
+
           <!-- Edit button – only visible to authorized users when not already editing -->
           <button v-if="canEdit && !isEditing" class="edit-btn" type="button" title="Edit metadata" @click="startEditing">
             <Pencil :size="14" />
             Edit
           </button>
         </div>
- 
+
         <!-- ── Read-only metadata grid ── -->
         <div v-if="!isEditing" class="meta-grid">
           <div class="meta-cell">
@@ -199,7 +210,7 @@ watch(
             <label class="edit-label" for="edit-type">Format</label>
             <input id="edit-type" v-model="editFields.type" class="edit-input" type="text" placeholder="e.g. PDF Document" />
           </div>
- 
+
           <!-- Save / Cancel actions -->
           <div class="edit-actions">
             <button class="action-btn cancel-btn" type="button" :disabled="isSaving" @click="cancelEditing">
@@ -318,7 +329,7 @@ watch(
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  margin : 0;
+  margin: 0;
 }
 
 .section-header {
@@ -415,25 +426,25 @@ watch(
   font-weight: 600;
   cursor: pointer;
 }
- 
+
 .edit-btn:hover {
   border-color: #7c3aed;
   color: #7c3aed;
   background: #faf5ff;
 }
- 
+
 .meta-edit-form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
- 
+
 .edit-field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
- 
+
 .edit-label {
   font-size: 0.7rem;
   font-weight: 700;
@@ -441,7 +452,7 @@ watch(
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
- 
+
 .edit-input {
   border: 1px solid #d8dee7;
   border-radius: 8px;
@@ -452,25 +463,25 @@ watch(
   outline: none;
   font-family: inherit;
 }
- 
+
 .edit-input:focus {
   border-color: #7c3aed;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
 }
- 
+
 .edit-title {
   margin-top: 2rem;
   text-align: center;
   font-size: 1.25rem;
   font-weight: 600;
 }
- 
+
 .edit-actions {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
- 
+
 .action-btn {
   flex: 1;
   display: inline-flex;
@@ -483,33 +494,33 @@ watch(
   font-weight: 600;
   cursor: pointer;
 }
- 
+
 .cancel-btn {
   border: 1px solid #d8dee7;
   background: #f8fafc;
   color: #475569;
 }
- 
+
 .cancel-btn:hover:not(:disabled) {
   background: #f1f5f9;
   border-color: #94a3b8;
 }
- 
+
 .save-btn {
   border: none;
   background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
   color: #ffffff;
 }
- 
+
 .save-btn:hover:not(:disabled) {
   opacity: 0.92;
 }
- 
+
 .action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
- 
+
 .toast {
   display: flex;
   align-items: center;
@@ -520,24 +531,26 @@ watch(
   font-weight: 600;
   margin-bottom: 0.75rem;
 }
- 
+
 .toast-success {
   background: #ecfdf5;
   color: #065f46;
   border: 1px solid #a7f3d0;
 }
- 
+
 .toast-error {
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
 }
- 
+
 .toast-fade-enter-active,
 .toast-fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
- 
+
 .toast-fade-enter-from,
 .toast-fade-leave-to {
   opacity: 0;

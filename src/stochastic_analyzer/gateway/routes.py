@@ -1,7 +1,8 @@
 """Define API and routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response, JSONResponse
+import asyncio
 
 from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
@@ -13,11 +14,13 @@ from gateway.schemas import (
     InputItem,
     ClassificationResult,
     SummaryResult,
+    SummarizeRequest,
 )
 from gateway.services.classifier import classify_documents
 from gateway.services.ranker import rank_documents
 from gateway.services.summarizer_pdf import md_to_pdf
-from gateway.services.fetcher import summarize_by_id
+from gateway.services.fetcher import fetch_file
+from gateway.services.summarizer import summarize_documents
 
 
 def create_router(config: APIConfiguration) -> APIRouter:
@@ -55,22 +58,52 @@ def create_router(config: APIConfiguration) -> APIRouter:
         results = await classify_documents(payload, config.services.classifier_url)
         return [r.model_dump(by_alias=True) for r in results]
 
-    @router.post("/summarize-by-id", response_model=SummaryResult)
-    async def summarize_by_id_endpoint(unique_id: str) -> dict:
+    @router.post("/summarize", response_model=SummaryResult)
+    async def summarize_endpoint(payload: SummarizeRequest) -> dict:
         """
-        Endpoint to fetch a document by its ID and summarize it via LLM.
-
-        Args:
-            unique_id: The connector file pointer / unique ID
+        Fetch one or more files by unique_id(s) from the connector, then summarize them via LLM.
         """
         try:
-            result = await summarize_by_id(unique_id, config.services.ministral_url, config.services.ministral_model)
+            if not payload.unique_ids:
+                raise HTTPException(status_code=400, detail="unique_ids cannot be empty")
+
+            # Fetch all files in parallel using the connector URL from config
+            contents = await asyncio.gather(
+                *(fetch_file(uid, config.services.connector_url) for uid in payload.unique_ids)
+            )
+
+            # Convert fetched content into InputItem objects
+            items: list[InputItem] = [
+                InputItem(
+                    content=content,
+                    metadata={"name": f"Document {i+1}"}
+                )
+                for i, content in enumerate(contents)
+                if content is not None
+            ]
+
+            if not items:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to fetch any documents from the connector."
+                )
+
+            # Send all fetched documents to the summarizer
+            result = await summarize_documents(
+                items,
+                config.services.ministral_url,
+                config.services.ministral_model,
+            )
+
         except Exception as e:
             dms_warning(f"Summarization failure: {e}")
             raise HTTPException(status_code=500, detail="Summarization failed.") from e
 
         if result is None:
-            return JSONResponse(status_code=500, content={"detail": "Summarization returned no result."})
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Summarization returned no result."
+            )
 
         return result.model_dump()
 

@@ -30,7 +30,7 @@ class API:
         """Constructor."""
         bind_address = os.environ.get("API_BIND_ADDRESS")
         port = os.environ.get("API_PORT")
-        allowed_origins = os.environ.get("API_ALLOWED_ORIGINS")
+        allowed_origins = os.environ.get("API_ALLOW_ORIGIN")
 
         if bind_address is None:
             dms_error("API_BIND_ADDRESS is not defined.")

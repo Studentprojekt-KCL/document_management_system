@@ -1,60 +1,38 @@
-"""Fetcher module for retrieving and processing document content from the connector service."""
+"""Fetch file content from connector service."""
 
-import os
 import base64
-import binascii
 import httpx
-from gateway.schemas import InputItem, MetadataTemplate, SummaryResult
-from gateway.services.summarizer import summarize_documents
 
-async def get_content(unique_id: str) -> InputItem:
-    """
-    Fetches file content from the connector and decodes it from Base64.
+from dmis_logger import dms_warning
 
-    Args:
-        unique_id: The file_pointer / unique identifier for the file.
 
-    Returns:
-        An InputItem containing decoded content and metadata.
-    """
-    # Connector URL from environment
-    connector_url = os.getenv("CONNECTOR_URL", "http://localhost:8080/file")
+async def fetch_file(file_pointer: str, connector_url: str) -> str | None:
+    """Fetch raw file content from the connector service."""
 
-    params = {"file_pointer": unique_id, "include_content": "true"}
-    headers = {"accept": "application/json"}
+    params = {
+        "file_pointer": file_pointer,
+        "include_content": "true",
+    }
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(connector_url, params=params, headers=headers)
-        response.raise_for_status()
-        data = await response.json()
-
-    # Decode Base64 content safely
-    base64_content = data.get("content", "")
     try:
-        content_str = base64.b64decode(base64_content).decode("utf-8") if base64_content else " "
-    except (binascii.Error, UnicodeDecodeError, ValueError):
-        content_str = " "
+        async with httpx.AsyncClient() as client:
+            response = await client.get(connector_url, params=params, timeout=60)
+            response.raise_for_status()
 
-    # Map metadata from response
-    resp_metadata = data.get("metadata", {})
-    metadata = MetadataTemplate(name=resp_metadata.get("name", "unknown"))
+            data = response.json()
 
-    return InputItem(content=content_str, metadata=metadata)
+            content_encoded = data.get("content", "")
+            content_bytes = base64.b64decode(content_encoded)
 
-async def summarize_by_id(unique_id: str, ministral_url: str, ministral_model: str) -> SummaryResult | None:
-    """
-    Fetches content by ID and returns its summary via the summarizer.
+            return content_bytes.decode("utf-8")
 
-    Args:
-        unique_id: File identifier (file_pointer)
-        ministral_url: URL of the Ministral LLM service
-        ministral_model: Model identifier for summarization
+    except httpx.HTTPStatusError as err:
+        dms_warning(f"Connector returned unexpected status from {connector_url}, {err}")
 
-    Returns:
-        SummaryResult object or None if summarization fails
-    """
-    # Fetch and decode content
-    item = await get_content(unique_id)
+    except httpx.TimeoutException as err:
+        dms_warning(f"Connector request timed out ({connector_url}), {err}")
 
-    # Wrap single document into a list and summarize
-    return await summarize_documents([item], ministral_url, ministral_model)
+    except Exception as err:
+        dms_warning(f"Unexpected error while fetching file from {connector_url}, {err}")
+
+    return None

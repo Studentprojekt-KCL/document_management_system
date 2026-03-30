@@ -8,8 +8,11 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
+import { ref } from 'vue'
 import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
+
+const API_AI_SUMMARY = import.meta.env.API_AI_SUMMARY.replace(/\/$/, '')
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -25,24 +28,31 @@ const emit = defineEmits(['close'])
 /* Use custom composable to extract metadata for the selected file */
 const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, uniquePointer } = useSearchMetadata(props)
 
-/* Generate AI summary, send request to backend to get summary for selected file */
+/* Summary state */
+const aiSummary = ref('')
+const summaryError = ref('')
+const isGeneratingSummary = ref(false)
 
-// WORKS currently with pipeline to get summary from query.
+/* When clicking button Generate AI summary */
 const generateAISummary = async () => {
-  const AI_SUMMARY = import.meta.env.API_AI_SUMMARY
-  try {
-    const response_summary = await fetch(
-      `${AI_SUMMARY}/summary?file_pointer=${encodeURIComponent(uniquePointer.value)}`
-    );
-    const data = await response_summary.text();
-    const ai_summary = data
-    console.log("ai_summary:",ai_summary)
+  isGeneratingSummary.value = true
+  summaryError.value = ''
+  aiSummary.value = ''
 
-  } catch (err) {
-    console.error("Error generating AI summary:", err);
-    alert("Failed to generate AI summary. Please try again later.");
+  try {
+    const response = await fetch(`${API_AI_SUMMARY}/summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_pointer: uniquePointer.value })
+    })
+    const text = await response.text()
+    aiSummary.value = text
+  } catch (error) {
+    summaryError.value = error.message
+  } finally {
+    isGeneratingSummary.value = false
   }
-};
+}
 </script>
 
 <template>
@@ -71,9 +81,13 @@ const generateAISummary = async () => {
         <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
         <p class="section-title">AI SUMMARY</p>
         <div class="generate-summary">
-          <button class="summary-button" type="button" @click="generateAISummary">
-            <StarsIcon :size="13" />Generate AI summary
+          <button class="summary-button" type="button" :disabled="isGeneratingSummary || !uniquePointer" @click="generateAISummary">
+            <StarsIcon :size="13" />{{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
           </button>
+
+          <!-- Display AI summary if available -->
+          <p v-if="aiSummary">{{ aiSummary }}</p>
+          <p v-else-if="summaryError" class="error">{{ summaryError }}</p>
         </div>
       </section>
 

@@ -72,3 +72,7 @@ class SummaryResult(BaseModel):
     """Output schema for a summarized document."""
 
     summary: StrictStr
+
+class SummarizeRequest(BaseModel):
+    """Request schema for summarizing a document by its unique ID."""
+    unique_ids: list[str]

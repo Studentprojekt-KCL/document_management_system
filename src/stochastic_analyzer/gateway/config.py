@@ -20,7 +20,7 @@ class ServiceConfig:
     classifier_url: str
     ministral_url: str
     ministral_model: str
-
+    connector_url: str
 
 class APIConfiguration:
     """API Configuration.
@@ -93,6 +93,7 @@ class APIConfiguration:
         classifier_url: str | None = environ.get("CLASSIFIER_URL")
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
+        connector_url: str | None = environ.get("CONNECTOR_URL")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
@@ -110,7 +111,13 @@ class APIConfiguration:
             dms_error("MINISTRAL_MODEL is not defined.")
             return
 
+        if connector_url is None:
+            dms_error("CONNECTOR_URL is not defined.")
+            return
+
         self.services.tei_url = tei_url
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
+        self.services.connector_url = connector_url
+

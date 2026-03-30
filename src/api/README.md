@@ -74,8 +74,8 @@ curl -X POST "http://127.0.0.1:8001/summary" \
 curl -i -X POST "http://127.0.0.1:8001/rerank"   -H "Content-Type: application/json"   -d '{
     "reference_pointer": "Reference Pointer",
     "pointers": [
-	"Pointer 1"
-	"Pointer ..."
+	"Pointer 1",
+	"Pointer ...",
 	"Pointer n"
     ]
   }'

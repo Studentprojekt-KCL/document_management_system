@@ -70,6 +70,16 @@ curl -X POST "http://127.0.0.1:8001/summary" \
   -H "Content-Type: application/json" \
   -d '{"file_pointer":"THEFILEPOINTER"}'
 
+#### Testing rerank API endpoint
+curl -i -X POST "http://127.0.0.1:8001/rerank"   -H "Content-Type: application/json"   -d '{
+    "reference_pointer": "Reference Pointer",
+    "pointers": [
+	"Pointer 1"
+	"Pointer ..."
+	"Pointer n"
+    ]
+  }'
+
 ## Endpoint List ! OBS ! REMOVE WHEN PUSHING INTO DEVELOP BRANCH
 DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:8000
 API_PORT=8001

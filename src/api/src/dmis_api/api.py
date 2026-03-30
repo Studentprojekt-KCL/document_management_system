@@ -73,6 +73,7 @@ class API:
 
         self.app.add_api_route("/search", self.search, methods=["GET"])
         self.app.add_api_route("/summary", self.summary, methods=["POST"])
+        self.app.add_api_route("/rerank", self.rerank, methods=["POST"])
 
     def start(self) -> None:
         """Start API"""
@@ -99,6 +100,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
+    # Search endpoint
     async def search(self, query: str = Query(..., min_length=1, max_length=200)) -> JSONResponse:
         """Forward search request to upstream search API, enrich results with classification, and return results."""
         search_api_url = os.getenv("DMIS_SEARCH_API_URL")
@@ -257,7 +259,7 @@ class API:
             },
         )
 
-
+    # Summary endpoint
     async def summary(self, body: dict[str, Any]) -> JSONResponse:
         """Forward summary request to upstream summary API and return response."""
         query_api_url = os.getenv("DMIS_QUERY_API_URL")
@@ -308,6 +310,98 @@ class API:
 
         return PlainTextResponse(content=response.text, status_code=200)
 
+    # Rerank endpoint
+    async def rerank(self, body: dict[str, Any]) -> JSONResponse:
+        """Forward rerank request to upsream rerank API and return results."""
+        query_api_url = os.getenv("DMIS_QUERY_API_URL")
+        if not query_api_url:
+            dms_warning("DMIS_QUERY_API_URL is not set.")
+            return self._error_response(500)
+        
+        reference_pointer = body.get("reference_pointer")
+        if not isinstance(reference_pointer, str):
+            dms_warning("Rerank request missing reference_pointer.")
+            return self._error_response(422)
+        
+        reference_pointer = reference_pointer.strip()
+        if not reference_pointer:
+            dms_warning("Rerank request recieved empty reference_pointer.")
+            return self._error_response(422)
+        
+        raw_pointers = body.get("pointers")
+        if not isinstance(raw_pointers, list):
+            dms_warning("Rerank request missing pointers list.")
+            return self._error_response(422)
+        
+        cleaned_pointers: list[str] = []
+        seen_pointers: set[str] = set()
+
+        for pointer in raw_pointers:
+            if not isinstance(pointer, str):
+                continue
+
+            cleaned_pointer = pointer.strip()
+            if not cleaned_pointer:
+                continue
+
+            if cleaned_pointer == reference_pointer:
+                continue
+
+            if cleaned_pointer in seen_pointers:
+                continue
+
+            cleaned_pointers.append(cleaned_pointer)
+            seen_pointers.add(cleaned_pointer)
+
+        if not cleaned_pointers:
+            dms_warning("Rerank request has no valid candidate pointers after filtering.")
+            return self._error_response(422)
+        
+        payload = {
+            "reference": reference_pointer,
+            "pointers": cleaned_pointers,
+        }
+
+        try:
+            response = requests.post(
+                f"{query_api_url.rstrip('/')}/rerank",
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            response_text = ""
+            if hasattr(exc, "response") and exc.resonse is not None:
+                response_text = exc.response.text
+
+            dms_warning(
+                f"Rerank request to upstream API failed: {exc}. "
+                f"Response body: {response_text}"
+            )
+            return self._error_response(502)
+        
+        try:
+            rerank_data = response.json()
+        except requests.JSONDecodeError as exc:
+            dms_warning(f"Rerank API returned invalid JSON: {exc}")
+            return self._error_response(502)
+        
+        if not isinstance(rerank_data, dict):
+            dms_warning("Rerank API returned unexpected JSON shape.")
+            return self._error_response(502)
+
+        ranked_results = rerank_data.get("ranked_results")
+        if not isinstance(ranked_results, list):
+            dms_warning("Rerank API response missing valid 'ranked results' list.")
+            return self._error_response(502)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "reference_pointer": reference_pointer,
+                "ranked_results": ranked_results,
+            },
+        )
 
 
 

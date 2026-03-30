@@ -8,17 +8,13 @@ from typing import Any, Sequence
 
 import requests
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from dmis_logger import dms_info, dms_warning, dms_error
-from fastapi import Query
-
-# Testing
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
 
 
 class API:
@@ -65,21 +61,27 @@ class API:
         )
 
         if allowed_origins is not None:
-            dms_info(f"Allowing origins: {allowed_origins.split(',')}")
+            origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
+            dms_info(f"Allowing origins: {origins}")
             self.app.add_middleware(
                 CORSMiddleware,
-                allow_origins=allowed_origins.split(","),
+                allow_origins=origins,
                 allow_credentials=True,
                 allow_methods=["*"],
                 allow_headers=["*"],
             )
 
         self.app.add_api_route("/search", self.search, methods=["GET"])
-        self.app.add_api_route("/summary", self.summary, methods=["GET"])
+        self.app.add_api_route("/summary", self.summary, methods=["POST"])
 
     def start(self) -> None:
         """Start API"""
         uvicorn.run(self.app, host=self.bind_address, port=self.port, log_level=self.log_level)
+
+    @staticmethod
+    def _error_response(status_code: int) -> JSONResponse:
+        """Return empty error body to client."""
+        return JSONResponse(status_code=status_code, content="")
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -97,43 +99,40 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def search(self, query=Query(..., min_length=1, max_length=200)) -> JSONResponse:
-        """Forward search request to upstream search API."""
+    async def search(self, query: str = Query(..., min_length=1, max_length=200)) -> JSONResponse:
+        """Forward search request to upstream search API, enrich results with classification, and return results."""
         search_api_url = os.getenv("DMIS_SEARCH_API_URL")
         query_api_url = os.getenv("DMIS_QUERY_API_URL")
 
-        if not isinstance(search_api_url, str) or not search_api_url:
+        if not search_api_url:
             dms_warning("DMIS_SEARCH_API_URL is not set.")
-            return JSONResponse(status_code=500, content="")
+            return self._error_response(500)
 
-        if not isinstance(query_api_url, str) or not query_api_url:
+        if not query_api_url:
             dms_warning("DMIS_QUERY_API_URL is not set.")
-            return JSONResponse(status_code=500, content="")
+            return self._error_response(500)
 
         query = query.strip()
         if not query:
-            return JSONResponse(status_code=422, content="")
+            dms_warning("Search request received empty query.")
+            return self._error_response(422)
 
-        # calling the search engine
         try:
             search_response = requests.get(
                 f"{search_api_url.rstrip('/')}/search",
                 params={"q": query},
                 timeout=30,
             )
+            search_response.raise_for_status()
         except requests.RequestException as exc:
             dms_warning(f"Search request to upstream API failed: {exc}")
-            return JSONResponse(status_code=502, content="")
-
-        if not search_response.ok:
-            dms_warning(f"Upstream search API returned status code {search_response.status_code}.")
-            return JSONResponse(status_code=502, content="")
+            return self._error_response(502)
 
         try:
             search_data = search_response.json()
         except requests.JSONDecodeError as exc:
             dms_warning(f"Upstream search API returned invalid JSON: {exc}")
-            return JSONResponse(status_code=502, content="")
+            return self._error_response(502)
 
         if isinstance(search_data, list):
             results = search_data
@@ -141,20 +140,27 @@ class API:
             results = search_data.get("results", [])
         else:
             dms_warning("Search API returned unexpected JSON shape.")
-            return JSONResponse(status_code=502, content="")
+            return self._error_response(502)
 
         if not isinstance(results, list):
             dms_warning("Search API response missing valid 'results' list.")
-            return JSONResponse(status_code=502, content="")
+            return self._error_response(502)
 
         unique_pointers: list[str] = []
+        seen_pointers: set[str] = set()
+
         for entry in results:
             if not isinstance(entry, dict):
                 continue
 
             unique_pointer = entry.get("unique_pointer")
-            if isinstance(unique_pointer, str) and unique_pointer.strip():
-                unique_pointers.append(unique_pointer.strip())
+            if not isinstance(unique_pointer, str):
+                continue
+
+            pointer = unique_pointer.strip()
+            if pointer and pointer not in seen_pointers:
+                unique_pointers.append(pointer)
+                seen_pointers.add(pointer)
 
         if not unique_pointers:
             return JSONResponse(
@@ -165,72 +171,66 @@ class API:
                     "detail": "",
                 },
             )
-        
-        # send pointers to query service rerank with keyword and list of pointers
-        rerank_payload: dict[str, Any] = {
-            "query": query,
-            "file_pointers": unique_pointers,
+
+        classification_payload: dict[str, Any] = {
+            "pointers": unique_pointers,
         }
 
         try:
-            rerank_response = requests.post(
-                f"{query_api_url.rstrip('/')}/rerank",
-                json=rerank_payload,
+            classification_response = requests.post(
+                f"{query_api_url.rstrip('/')}/classify",
+                json=classification_payload,
                 timeout=30,
             )
+            classification_response.raise_for_status()
         except requests.RequestException as exc:
-            dms_warning(f"Rerank request failed: {exc}")
-            return JSONResponse(status_code=502, content="")
-        
-        if not rerank_response.ok:
-            dms_warning(f"Rerank service returned status code {rerank_response.status_code}.")
-            return JSONResponse(status_code=502, content="")
+            response_text = ""
+            if hasattr(exc, "response") and exc.response is not None:
+                response_text = exc.response.text
+
+            dms_warning(
+                f"Classification request failed: {exc}. "
+                f"Response body: {response_text}"
+            )
+            return self._error_response(502)
 
         try:
-            rerank_data = rerank_response.json()
+            classification_data = classification_response.json()
         except requests.JSONDecodeError as exc:
-            dms_warning(f"Rerank service returned invalid JSON: {exc}")
-            return JSONResponse(status_code=502, content="")
-        
-        rerank_map = rerank_data.get("scores", rerank_data.get("rerank", {}))
-        if not isinstance(rerank_map, dict):
-            rerank_map = {}
+            dms_warning(f"Classification service returned invalid JSON: {exc}")
+            return self._error_response(502)
 
-        # classification per file pointer
-        classification_map: dict[str, Any] = {}
-        for file_pointer in unique_pointers:
-            try:
-                classification_response = requests.post(
-                    f"{query_api_url.rstrip('/')}/classify",
-                    json={"file_pointer": file_pointer},
-                    timeout=30,
-                )
-            except requests.RequestException as exc:
-                dms_warning(f"Classification request failed for {file_pointer}: {exc}")
-                continue
-    
-            if not classification_response.ok:
-                dms_warning(
-                    f"Classification service returned status code"
-                    f"{classification_response.status_code} for {file_pointer}. "
-                    f"Body: {classification_response.text}"
-                )
-                continue
-            
-            try:
-                classification_data = classification_response.json()
-            except requests.JSONDecodeError as exc:
-                dms_warning(f"Classification service returned invalid JSON for {file_pointer}: {exc}")
-                continue
-            
-            classification_map[file_pointer] = classification_data
+        classification_map_by_pointer: dict[str, Any] = {}
+        classification_map_by_name: dict[str, Any] = {}
+
+        classification_items: list[dict[str, Any]] = []
+        if isinstance(classification_data, list):
+            classification_items = [item for item in classification_data if isinstance(item, dict)]
+        elif isinstance(classification_data, dict):
+            classification_items = [classification_data]
+        else:
+            dms_warning("Classification service returned unexpected JSON shape.")
+            return self._error_response(502)
+
+        for item in classification_items:
+            pointer = item.get("pointer")
+            if isinstance(pointer, str) and pointer.strip():
+                classification_map_by_pointer[pointer.strip()] = item
+
+            name = item.get("name")
+            if isinstance(name, str) and name.strip():
+                classification_map_by_name[name.strip()] = item
 
         for entry in results:
             if not isinstance(entry, dict):
                 continue
-            
+
             file_pointer = entry.get("unique_pointer")
-            if not isinstance(file_pointer, str) or not file_pointer.strip():
+            if not isinstance(file_pointer, str):
+                continue
+
+            file_pointer = file_pointer.strip()
+            if not file_pointer:
                 continue
 
             metadata = entry.get("metadata")
@@ -238,11 +238,17 @@ class API:
                 metadata = {}
                 entry["metadata"] = metadata
 
-            metadata["classification"] = classification_map.get(file_pointer)
-            metadata["rerank"] = rerank_map.get(file_pointer)
+            classification_value = classification_map_by_pointer.get(file_pointer)
 
+            if classification_value is None:
+                entry_name = entry.get("name")
+                if isinstance(entry_name, str):
+                    entry_name = entry_name.strip()
+                    if entry_name:
+                        classification_value = classification_map_by_name.get(entry_name)
 
-        # return the final result to frontend
+            metadata["classification"] = classification_value
+
         return JSONResponse(
             status_code=200,
             content={
@@ -251,41 +257,58 @@ class API:
             },
         )
 
-    # Currently works with the example form query, we will change the payload to have unique pointer once that has been fixed.
-    async def summary(self, file_pointer: str = Query(..., min_length=1, max_length=500)):
-        """Forward summary request to upstream summary API and return plain text."""
-        dmis_summary_url = os.getenv("DMIS_SUMMARY_API_URL")
-        if not dmis_summary_url:
-            dms_warning("DMIS_SUMMARY_API_URL is not set.")
-            return JSONResponse(status_code=500, content="")
 
-        # For testing: transform file_pointer into a payload
-        payload = [
-            {
-                "content": "The servers went down at 2 AM due to a power outage. Backup generators kicked in successfully.",
-                "metadata": {
-                    "name": "Incident_Report_1.txt",
-                    "author": "IT Admin",
-                },
-            },
-            {
-                "content": "Power was fully restored to the main grid by 4 AM. No data loss was reported.",
-                "metadata": {
-                    "name": "Incident_Report_2.txt",
-                    "author": "IT Admin",
-                },
-            },
-        ]
+    async def summary(self, body: dict[str, Any]) -> JSONResponse:
+        """Forward summary request to upstream summary API and return response."""
+        query_api_url = os.getenv("DMIS_QUERY_API_URL")
+        if not query_api_url:
+            dms_warning("DMIS_QUERY_API_URL is not set.")
+            return self._error_response(500)
+
+        file_pointer = body.get("file_pointer")
+        if not isinstance(file_pointer, str):
+            dms_warning("Summary request missing file_pointer.")
+            return self._error_response(422)
+
+        file_pointer = file_pointer.strip()
+        if not file_pointer:
+            dms_warning("Summary request received empty file_pointer.")
+            return self._error_response(422)
+
+        payload = {
+            "pointers": [file_pointer],
+        }
 
         try:
-            response = requests.post(f"{dmis_summary_url.rstrip('/')}/summarize", json=payload, timeout=120)
+            response = requests.post(
+                f"{query_api_url.rstrip('/')}/summarize",
+                json=payload,
+                timeout=100,
+            )
             response.raise_for_status()
         except requests.RequestException as exc:
-            dms_warning(f"Summary request to upstream API failed: {exc}")
-            return JSONResponse(status_code=502, content="")
+            response_text = ""
+            if hasattr(exc, "response") and exc.response is not None:
+                response_text = exc.response.text
 
-        # Return as plain text if upstream is text
+            dms_warning(
+                f"Summary request to upstream API failed: {exc}. "
+                f"Response body: {response_text}"
+            )
+            return self._error_response(502)
+
+        content_type = response.headers.get("content-type", "")
+
+        if "application/json" in content_type:
+            try:
+                return JSONResponse(status_code=200, content=response.json())
+            except requests.JSONDecodeError as exc:
+                dms_warning(f"Summary API returned invalid JSON: {exc}")
+                return self._error_response(502)
+
         return PlainTextResponse(content=response.text, status_code=200)
+
+
 
 
 def run() -> None:

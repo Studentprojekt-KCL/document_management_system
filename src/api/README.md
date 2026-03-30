@@ -44,8 +44,10 @@ Create .env in src/api/src
 
 nano .env
 DMIS_SEARCH_API_URL=http://<ip-address>
-DMIS_SUMMARY_API_URL=http://<ip-adress>
+DMIS_QUERY_API_URL=http://<ip-adress>
 API_PORT=XXXX
+API_BIND_ADDRESS=0.0.0.0
+API_ALLOW_ORIGIN=http://localhost:8000
 
 ### 1. Build the image from the project root: 
 
@@ -64,17 +66,13 @@ curl "http://127.0.0.1:8001/docs"
 curl "http://127.0.0.1:8001/search?query=test"
 
 #### Testing summary API endpoint
-curl "http://127.0.0.1:8001/summary?file_pointer="THEPOINTER"
-
+curl -X POST "http://127.0.0.1:8001/summary" \
+  -H "Content-Type: application/json" \
+  -d '{"file_pointer":"THEFILEPOINTER"}'
 
 ## Endpoint List ! OBS ! REMOVE WHEN PUSHING INTO DEVELOP BRANCH
-/search
-DMIS_SEARCH_API_URL=DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:8000
-
-/summarize
-DMIS_SUMMARY_API_URL=http://gpu-srv-1.prod.h472c.bth.dms-lookup.com:8000/
-
+DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:8000
 API_PORT=8001
-
-API_BIND_ADDRESS = 0.0.0.0
-API_ALLOW_ORIGIN = 127.0.0.1:8000
+DMIS_QUERY_API_URL=http://gpu-srv-1.prod.h472c.bth.dms-lookup.com:8000
+API_BIND_ADDRESS=0.0.0.0
+API_ALLOW_ORIGIN=http://localhost:8000

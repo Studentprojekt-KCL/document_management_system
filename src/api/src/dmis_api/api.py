@@ -242,13 +242,13 @@ class API:
                         classification_value = classification_map_by_name.get(entry_name)
 
             if isinstance(classification_value, dict):
-                security_class = classification_value.get("Security-class")
+                security_class = classification_value.get("security_class")
                 if isinstance(security_class, str) and security_class.strip():
-                    entry["Security-class"] = security_class.strip()
+                    entry["security_class"] = security_class.strip()
                 else:
-                    entry["Security-class"] = None
+                    entry["security_class"] = None
             else:
-                entry["Security-class"] = None
+                entry["security_class"] = None
 
         return JSONResponse(
             status_code=200,

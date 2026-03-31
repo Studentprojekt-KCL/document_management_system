@@ -10,6 +10,7 @@
  */
 
 import { Bell, LogOut } from 'lucide-vue-next'
+import { clearAuth } from '@/utils/auth.js'
 
 /* Keycloak attributes */
 const KEYCLOAK_BASE = import.meta.env.KEYCLOAK_BASE_URL
@@ -21,12 +22,7 @@ const handleLogout = () => {
   const idToken = sessionStorage.getItem('id_token')
   const postLogoutRedirectUri = `${window.location.origin}/`
 
-  sessionStorage.removeItem('access_token')
-  sessionStorage.removeItem('id_token')
-  sessionStorage.removeItem('pkce_verifier')
-  sessionStorage.removeItem('oidc_state')
-
-  localStorage.setItem('logout-event', Date.now().toString())
+  clearAuth()
 
   if (idToken) {
     const logoutUrl =

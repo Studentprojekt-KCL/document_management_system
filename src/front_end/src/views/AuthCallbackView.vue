@@ -5,7 +5,7 @@
  */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { exchangeCodeForToken } from '../utils/auth'
+import { exchangeCodeForToken } from '@/utils/auth'
 
 /* State variables */
 const route = useRoute()

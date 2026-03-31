@@ -35,6 +35,10 @@ function clearAuth() {
   sessionStorage.removeItem('refresh_token')
   sessionStorage.removeItem('id_token')
   sessionStorage.removeItem('expires_at')
+  sessionStorage.removeItem('pkce_verifier')
+  sessionStorage.removeItem('oidc_state')
+
+  localStorage.setItem('logout_event', Date.now().toString())
 }
 
 /* Generic Token Request */
@@ -86,13 +90,14 @@ export async function refreshTokenRequest(refreshToken) {
 
     // If refresh fails → force logout
     clearAuth()
-    window.location.href = '/login'
+    window.location.href = '/' // send user to login page 
 
     return null
   }
 }
 
 /* Get a valid access token (refresh if needed) */
+let refreshPromise = null
 export async function getValidToken() {
   const accessToken = sessionStorage.getItem('access_token')
   const refreshToken = sessionStorage.getItem('refresh_token')
@@ -105,11 +110,34 @@ export async function getValidToken() {
   // Refresh if token expires within 10 seconds
   const isExpiringSoon = expiresAt && Date.now() + 10000 > parseInt(expiresAt)
   if (isExpiringSoon) {
-    console.log('Token expiring soon, refreshing...')
-    return await refreshTokenRequest(refreshToken)
+    if (!refreshPromise) {
+      refreshPromise = refreshTokenRequest(refreshToken).finally(() => {
+        refreshPromise = null
+      })
+    }
+    await refreshPromise
+  }
+  return accessToken
+}
+
+/* Authenticated fetch wrapper */
+
+export async function authFetch(url, options = {}) {
+  const token = await getValidToken()
+
+  if (!token) {
+    clearAuth()
+    window.location.href = '/'
+    return null
   }
 
-  return accessToken
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`
+    }
+  })
 }
 
 /* Read the JSON Web Token */

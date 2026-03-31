@@ -17,6 +17,7 @@ import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveFilename, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { authFetch } from '@/utils/Auth.js'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
@@ -54,8 +55,9 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
-
+    const res = await authFetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
+    if(!res) return //authFetch returned null → redirect already happening
+    
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return

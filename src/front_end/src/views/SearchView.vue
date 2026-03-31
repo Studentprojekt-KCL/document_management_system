@@ -16,7 +16,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveFilename, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { resolveFilename, TYPE_FILTERS, resolveSecurityClass } from '@/composables/useSearchMetadata'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
@@ -97,6 +97,7 @@ const closePreview = () => {
 /* Handle changes to search filters  */
 // TODO: add source & security filtering.
 const handleFilterChange = (filters) => {
+  selectedFilters.value = filters
   console.log('Filter changed:', filters)
   // If no filters → show everything
   if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
@@ -105,8 +106,8 @@ const handleFilterChange = (filters) => {
   }
   matches.value = allMatches.value.filter((match) => {
     const filename = (match.filename || match.name || '').toLowerCase()
+    const securityClass = resolveSecurityClass(match).toLowerCase()
     // const source = (match.source || '').toLowerCase()
-    // const security = (match.security || '').toLowerCase()
 
     // TYPE FILTER
     const typeMatch =
@@ -127,11 +128,12 @@ const handleFilterChange = (filters) => {
     // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
-    // const securityMatch = filters.security.length === 0 || filters.security.some((s) => security.includes(s.toLowerCase()))
+    const securityMatch =
+      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
     // add sourceMatch and secuirtyMatch later
     // return typeMatch && sourceMatch && secuirtyMatch
-    return typeMatch
+    return typeMatch && securityMatch
   })
 }
 </script>

@@ -5,7 +5,7 @@ export function useAISummary(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
-  const API_AI_SUMMARY = import.meta.env.API_AI_SUMMARY.replace(/\/$/, '')
+  const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
 
   /* Summary state */
   const aiSummary = ref('')
@@ -34,7 +34,7 @@ export function useAISummary(props) {
     summaryPointer.value = ''
 
     try {
-      const response = await globalThis.fetch(`${API_AI_SUMMARY}/summary`, {
+      const response = await globalThis.fetch(`${API_BASE_URL}/summary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_pointer: uniquePointer.value })

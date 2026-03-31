@@ -115,3 +115,12 @@ API_BASE_URL=/api
 API_HOST=http://dmis-api.dev.dms-lookup.com:8000/
 API_AI_SUMMARY=http://localhost:8001/
 ```
+
+During Dev if something is changed in api!
+```
+KEYCLOAK_BASE_URL=https://ad.dms-lookup.com:8443
+KEYCLOAK_REALM=master
+KEYCLOAK_CLIENT_ID=dms-frontend
+API_BASE_URL=http://127.0.0.1:8001/
+API_HOST=http://dmis-api.dev.dms-lookup.com:8000/
+```

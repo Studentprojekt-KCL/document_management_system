@@ -56,8 +56,8 @@ const handleSearch = async (query) => {
   isSearching.value = true
   try {
     const res = await authFetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
-    if(!res) return //authFetch returned null → redirect already happening
-    
+    if (!res) return //authFetch returned null → redirect already happening
+
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return

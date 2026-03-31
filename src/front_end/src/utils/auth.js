@@ -90,7 +90,7 @@ export async function refreshTokenRequest(refreshToken) {
 
     // If refresh fails → force logout
     clearAuth()
-    window.location.href = '/' // send user to login page 
+    window.location.href = '/' // send user to login page
 
     return null
   }

@@ -233,13 +233,7 @@ class API:
             if not file_pointer:
                 continue
 
-            metadata = entry.get("metadata")
-            if not isinstance(metadata, dict):
-                metadata = {}
-                entry["metadata"] = metadata
-
             classification_value = classification_map_by_pointer.get(file_pointer)
-
             if classification_value is None:
                 entry_name = entry.get("name")
                 if isinstance(entry_name, str):
@@ -247,7 +241,14 @@ class API:
                     if entry_name:
                         classification_value = classification_map_by_name.get(entry_name)
 
-            metadata["classification"] = classification_value
+            if isinstance(classification_value, dict):
+                security_class = classification_value.get("Security-class")
+                if isinstance(security_class, str) and security_class.strip():
+                    entry["Security-class"] = security_class.strip()
+                else:
+                    entry["Security-class"] = None
+            else:
+                entry["Security-class"] = None
 
         return JSONResponse(
             status_code=200,

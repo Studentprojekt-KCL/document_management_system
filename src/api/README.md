@@ -65,24 +65,28 @@ curl "http://127.0.0.1:8001/docs"
 #### Testing search API endpoint
 curl "http://127.0.0.1:8001/search?query=test"
 
-#### Testing summary API endpoint
-curl -X POST "http://127.0.0.1:8001/summary" \
-  -H "Content-Type: application/json" \
-  -d '{"file_pointer":"THEFILEPOINTER"}'
-
-#### Testing rerank API endpoint
-curl -i -X POST "http://127.0.0.1:8001/rerank"   -H "Content-Type: application/json"   -d '{
-    "reference_pointer": "Reference Pointer",
+#### Testing summary API endpoint (Single file pointer)
+curl -s -X POST "http://127.0.0.1:8001/summary"   -H "Content-Type: application/json"   -d '{
     "pointers": [
-	"Pointer 1",
-	"Pointer ...",
-	"Pointer n"
+      "file_pointer"
     ]
   }'
 
-## Endpoint List ! OBS ! REMOVE WHEN PUSHING INTO DEVELOP BRANCH
-DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:8000
-API_PORT=8001
-DMIS_QUERY_API_URL=http://gpu-srv-1.prod.h472c.bth.dms-lookup.com:8000
-API_BIND_ADDRESS=0.0.0.0
-API_ALLOW_ORIGIN=http://localhost:8000
+#### Testing summary API endpoint (Multiple file pointers)
+curl -s -X POST "http://127.0.0.1:8001/summary"   -H "Content-Type: application/json"   -d '{
+    "pointers": [
+      "file_pointer1",
+      "file_pointer2",
+      "file_pointer3"
+    ]
+  }'
+
+#### Testing rerank API endpoint
+curl -i -X POST "http://127.0.0.1:8001/rerank"   -H "Content-Type: application/json"   -d '{
+    "reference_pointer": "reference_pointer",
+    "pointers": [
+	"pointer_1",
+	"pointer_2",
+	"pointer_3"
+    ]
+  }'

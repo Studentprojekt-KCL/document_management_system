@@ -8,11 +8,9 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { ref } from 'vue'
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
+import { X, CalendarDays, HardDrive, FileType2, ExternalLink, StarsIcon } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
-
-const API_AI_SUMMARY = import.meta.env.API_AI_SUMMARY.replace(/\/$/, '')
+import { useAISummary } from '@/composables/aiSummary'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -26,33 +24,10 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, uniquePointer } = useSearchMetadata(props)
+const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } = useSearchMetadata(props)
 
-/* Summary state */
-const aiSummary = ref('')
-const summaryError = ref('')
-const isGeneratingSummary = ref(false)
-
-/* When clicking button Generate AI summary */
-const generateAISummary = async () => {
-  isGeneratingSummary.value = true
-  summaryError.value = ''
-  aiSummary.value = ''
-
-  try {
-    const response = await fetch(`${API_AI_SUMMARY}/summary`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_pointer: uniquePointer.value })
-    })
-    const text = await response.text()
-    aiSummary.value = text
-  } catch (error) {
-    summaryError.value = error.message
-  } finally {
-    isGeneratingSummary.value = false
-  }
-}
+/* AI summary composable */
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 </script>
 
 <template>
@@ -76,21 +51,6 @@ const generateAISummary = async () => {
         <span class="tag">{{ previewType }}</span>
       </div>
 
-      <!-- AI Summary section -->
-      <section class="panel-section">
-        <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
-        <p class="section-title">AI SUMMARY</p>
-        <div class="generate-summary">
-          <button class="summary-button" type="button" :disabled="isGeneratingSummary || !uniquePointer" @click="generateAISummary">
-            <StarsIcon :size="13" />{{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
-          </button>
-
-          <!-- Display AI summary if available -->
-          <p v-if="aiSummary">{{ aiSummary }}</p>
-          <p v-else-if="summaryError" class="error">{{ summaryError }}</p>
-        </div>
-      </section>
-
       <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
@@ -108,6 +68,27 @@ const generateAISummary = async () => {
             <p><FileType2 :size="13" /> {{ previewType }}</p>
           </div>
         </div>
+      </section>
+
+      <!-- AI Summary section -->
+      <section class="panel-section">
+        <p class="section-title">AI SUMMARY</p>
+        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
+          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isGeneratingSummary"
+          @click="generateAISummary"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
+          </p>
+          <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
+        </button>
       </section>
     </div>
 
@@ -129,7 +110,7 @@ const generateAISummary = async () => {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.22);
-  z-index: 40;
+  z-index: 50;
 }
 
 .preview-drawer {
@@ -137,7 +118,7 @@ const generateAISummary = async () => {
   top: 0;
   right: 0;
   height: 100vh;
-  width: min(520px, 92vw);
+  width: min(700px, 100vw);
   background: #ffffff;
   transform: translateX(100%);
   transition: transform 0.25s ease;
@@ -215,21 +196,6 @@ const generateAISummary = async () => {
   align-items: center;
 }
 
-/* QUICK FIX: This should be a button, but we can iterate later */
-.summary-button {
-  border: 1px solid #e2e8f0;
-  background: #f8faff;
-  border-radius: 12px;
-  padding: 0.75rem;
-  color: #334155;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -241,6 +207,33 @@ const generateAISummary = async () => {
   border-radius: 10px;
   padding: 0.55rem;
   background: #fbfdff;
+}
+
+.meta-cell-summary {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.summary-markdown {
+  padding: 1rem 1.5rem;
+}
+
+.summary-cell-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+
+.summary-cell-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-cell-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
 }
 
 .meta-cell span {

@@ -242,7 +242,7 @@ class API:
                         classification_value = classification_map_by_name.get(entry_name)
 
             if isinstance(classification_value, dict):
-                security_class = classification_value.get("security_class")
+                security_class = classification_value.get("Security-class")
                 if isinstance(security_class, str) and security_class.strip():
                     entry["security_class"] = security_class.strip()
                 else:

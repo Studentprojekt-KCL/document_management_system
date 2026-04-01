@@ -1,8 +1,8 @@
 # Vue 3 + Vite
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<scri>
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling>
 ________________________________________
 
 # Building and Running Code
@@ -41,7 +41,7 @@ ctrl + c
 ________________________________________
 
 ## Troubleshooting, If you get errors:
-### Note: Vite might require node of 20.19+ 
+### Note: Vite might require node of 20.19+
 **check node.js version**
 
 ```node -v```
@@ -74,9 +74,9 @@ Any attempt to bypass the path by adding /search would result in being redirecte
 ________________________________________
 
 # Keycloak
-To access keycloak you can go to: ```https://ad.dms-lookup.com:8443/```
-## Create a user
-Use the admin credentials to log in (*admin, pass*).
+To access keycloak you can go to: ```https://Keycloak```
+
+Log in as admin
 
 Choose User from the left side bar.
 
@@ -96,22 +96,14 @@ Choose User from the left side bar.
 5. **Save password**
 ________________________________________
 
-### Test account
-**username:** frontend_tester
-**password:** password
-
-________________________________________
-
 # Environment Setup
 Before running the service, you must create a `.env` file in the /front_end/ directory.
 
 Create `.env` file following this structure:
 
 ```
-KEYCLOAK_BASE_URL=https://ad.dms-lookup.com:8443
+KEYCLOAK_BASE_URL= Keykloak Base URL
 KEYCLOAK_REALM=master
-KEYCLOAK_CLIENT_ID=dms-frontend
-API_BASE_URL=/api
-API_HOST=http://dmis-api.dev.dms-lookup.com:8000/
-API_AI_SUMMARY=http://localhost:8001/
-```
+KEYCLOAK_CLIENT_ID= Keyloak Client ID
+API_BASE_URL=/api/
+API_HOST= The develop API URL for frontend

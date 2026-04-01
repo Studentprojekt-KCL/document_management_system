@@ -59,6 +59,12 @@ const resolveUniquePointer = (entry) => {
   return pick(metadata?.unique_pointer, entry?.unique_pointer)
 }
 
+export const resolveSecurityClass = (entry) => {
+  const metadata = getMetadata(entry)
+
+  return pick(metadata?.security_class, entry?.security_class)
+}
+
 /* Function to resolve the document type from source type and name. */
 export const TYPE_KEYWORDS = {
   'PDF Document': ['.pdf'],
@@ -142,6 +148,8 @@ export const useSearchMetadata = (props) => {
 
   const previewSize = computed(() => pick(metadata.value.size, metadata.value.file_size, metadata.value.bytes))
 
+  const previewSecurityClass = computed(() => resolveSecurityClass(props.selectedMatch))
+
   const previewLink = computed(() => resolveLink(props.selectedMatch))
 
   const uniquePointer = computed(() => resolveUniquePointer(props.selectedMatch))
@@ -155,6 +163,7 @@ export const useSearchMetadata = (props) => {
         rawMatch: entry,
         filename,
         title: pick(metadata?.name, metadata?.title, metadata?.filename, metadata?.file_name, filename),
+        securityClass: resolveSecurityClass(entry),
         type: resolveDocumentType({
           sourceType: entry?.type || metadata?.type || metadata?.file_type || metadata?.source_type,
           sourceName: filename
@@ -174,10 +183,12 @@ export const useSearchMetadata = (props) => {
     previewType,
     previewCreatedAt,
     previewSize,
+    previewSecurityClass,
     previewLink,
     uniquePointer,
     normalizeMatches,
     resolveMatchDate,
-    resolveSource
+    resolveSource,
+    resolveSecurityClass
   }
 }

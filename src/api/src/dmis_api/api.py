@@ -188,10 +188,7 @@ class API:
             if hasattr(exc, "response") and exc.response is not None:
                 response_text = exc.response.text
 
-            dms_warning(
-                f"Classification request failed: {exc}. "
-                f"Response body: {response_text}"
-            )
+            dms_warning(f"Classification request failed: {exc}. " f"Response body: {response_text}")
             return self._error_response(502)
 
         try:
@@ -258,7 +255,6 @@ class API:
             },
         )
 
-
     async def summary(self, body: dict[str, Any]) -> JSONResponse:
         """Forward summary request to upstream summary API and return response."""
         query_api_url = os.getenv("DMIS_QUERY_API_URL")
@@ -292,10 +288,7 @@ class API:
             if hasattr(exc, "response") and exc.response is not None:
                 response_text = exc.response.text
 
-            dms_warning(
-                f"Summary request to upstream API failed: {exc}. "
-                f"Response body: {response_text}"
-            )
+            dms_warning(f"Summary request to upstream API failed: {exc}. " f"Response body: {response_text}")
             return self._error_response(502)
 
         content_type = response.headers.get("content-type", "")
@@ -308,8 +301,6 @@ class API:
                 return self._error_response(502)
 
         return PlainTextResponse(content=response.text, status_code=200)
-
-
 
 
 def run() -> None:

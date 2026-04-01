@@ -4,33 +4,17 @@ from typing import Optional, Literal
 from pydantic import BaseModel, Field, StrictStr
 
 
-class DocumentObject(BaseModel):
-    """Define object for content passing."""
-
-    title: str
-    owner: Optional[str] = Field(default="")
-    reference: str = Field(...)
-    content: str = Field(...)
-
-
-class RankRequest(BaseModel):
-    """Define requests."""
-
-    query: str
-    documents: list[DocumentObject]
-
-
-class ScoredDocument(BaseModel):
-    """Definition for similarity scores."""
+class ScoredPointer(BaseModel):
+    """A pointer with its relevance score."""
 
     score: float
-    document: DocumentObject
+    pointer: StrictStr
 
 
 class RankResponse(BaseModel):
     """Returned response."""
 
-    ranked_results: list[ScoredDocument]
+    ranked_results: list[ScoredPointer]
 
 
 class HealthCheck(BaseModel):
@@ -66,6 +50,19 @@ class ClassificationResult(BaseModel):
     security_class: Literal["Public", "Internal", "Sensitive", "Confidential"] = Field(..., alias="Security-class")
 
     model_config = {"populate_by_name": True}
+
+
+class PointerRequest(BaseModel):
+    """Request schema for pointer-based endpoints."""
+
+    pointers: list[StrictStr] = Field(..., min_length=1)
+
+
+class RerankRequest(BaseModel):
+    """Request schema for pointer-based reranking."""
+
+    reference: StrictStr = Field(...)
+    pointers: list[StrictStr] = Field(..., min_length=1)
 
 
 class SummaryResult(BaseModel):

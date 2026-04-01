@@ -39,10 +39,24 @@ def _build_inputs(items: list[InputItem], max_chars: int) -> list[list[str]]:
     return inputs
 
 
+def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: float) -> int:
+    """Bump classification up if a higher-ranked label is within threshold."""
+    label_rank = {"Public": 0, "Internal": 1, "Sensitive": 2, "Confidential": 3}
+    best_score = doc_scores[best_index]
+
+    for i, score in enumerate(doc_scores):
+        is_higher_rank = label_rank[LABELS[i]] > label_rank[LABELS[best_index]]
+        is_within_threshold = (best_score - score) < escalation_threshold
+
+        if is_higher_rank and is_within_threshold:
+            best_index = i
+            best_score = score
+
+    return best_index
+
+
 def _resolve_labels(items: list[InputItem], all_scores: list[float], escalation_threshold: float) -> list[ClassificationResult]:
     """Map entailment scores back to classification labels per document."""
-    label_rank = {"Public": 0, "Internal": 1, "Sensitive": 2, "Confidential": 3}
-
     results = []
     num_labels = len(LABELS)
 
@@ -53,17 +67,9 @@ def _resolve_labels(items: list[InputItem], all_scores: list[float], escalation_
 
         # Start with the highest score label as our best guess
         best_index = doc_scores.index(max(doc_scores))
-        best_score = doc_scores[best_index]
 
-        # Chained escalation: step through ranks, escalating if each gap is within threshold
-        for i, score in enumerate(doc_scores):
-            is_higher_rank = label_rank[LABELS[i]] > label_rank[LABELS[best_index]]
-            is_within_threshold = (best_score - score) < escalation_threshold
-
-            # Is the next label within the threshold or not?
-            if is_higher_rank and is_within_threshold:
-                best_index = i
-                best_score = score
+        # Chained escalation: bump up if a higher-ranked label is close enough
+        best_index = _escalate(doc_scores, best_index, escalation_threshold)
 
         results.append(
             ClassificationResult(
@@ -75,7 +81,9 @@ def _resolve_labels(items: list[InputItem], all_scores: list[float], escalation_
     return results
 
 
-async def classify_documents(items: list[InputItem], classifier_url: str, escalation_threshold: float) -> list[ClassificationResult]:
+async def classify_documents(
+    items: list[InputItem], classifier_url: str, escalation_threshold: float
+) -> list[ClassificationResult]:
     """Classify a batch of documents using parallel NLI inference against a TEI container."""
     inputs = _build_inputs(items, max_chars=800)
     all_scores = [0.0] * len(inputs)

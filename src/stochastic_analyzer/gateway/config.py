@@ -14,12 +14,14 @@ class ServiceConfig:
         classifier_url: URL for the TEI classifier container.
         ministral_url: URL for the Ministral LLM container.
         ministral_model: model identifier for Ministral.
+        escalation_threshold: score gap threshold for security-first classification escalation.
     """
 
     tei_url: str
     classifier_url: str
     ministral_url: str
     ministral_model: str
+    escalation_threshold: float
 
 
 class APIConfiguration:
@@ -93,6 +95,7 @@ class APIConfiguration:
         classifier_url: str | None = environ.get("CLASSIFIER_URL")
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
+        escalation_threshold = environ.get("ESCALATION_THRESHOLD")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
@@ -109,8 +112,13 @@ class APIConfiguration:
         if ministral_model is None:
             dms_error("MINISTRAL_MODEL is not defined.")
             return
+        
+        if escalation_threshold is None:
+            dms_error("ESCALATION_THRESHOLD is not defined.")
+            return
 
         self.services.tei_url = tei_url
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
+        self.services.escalation_threshold = float(escalation_threshold)

@@ -62,7 +62,7 @@ def create_router(config: APIConfiguration) -> APIRouter:
         if not payload:
             return []
 
-        results = await classify_documents(payload, config.services.classifier_url)
+        results = await classify_documents(payload, config.services.classifier_url, config.services.escalation_threshold)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)

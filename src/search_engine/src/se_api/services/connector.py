@@ -137,6 +137,7 @@ class Connector:
         return file_url
 
     def _get_file_pointers(self) -> Any | None:
+        """Get file pointers"""
         try:
             return get(
                 self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
@@ -153,8 +154,8 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
 
-
     def _get_file_from_pointer(self, pointer: str) -> Any | None:
+        """Get file from pointer"""
         try:
             return get(
                 self.url_file,
@@ -173,8 +174,8 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
 
-
     def _get_files_from_url(self, url: str) -> Any | None:
+        """Get files from url"""
         try:
             return get(url, timeout=Connector.TIMEOUT).json()
         except exceptions.ConnectionError:
@@ -190,6 +191,7 @@ class Connector:
         return None
 
     def _get_file_to_index(self) -> Any | None:
+        """Get file to index"""
         try:
             return get(
                 self.url_files_to_index,
@@ -207,4 +209,3 @@ class Connector:
         except exceptions.RequestException:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
-

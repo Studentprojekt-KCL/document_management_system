@@ -69,10 +69,3 @@ curl "http://127.0.0.1:8001/search?query=test"
 curl -X POST "http://127.0.0.1:8001/summary" \
   -H "Content-Type: application/json" \
   -d '{"file_pointer":"THEFILEPOINTER"}'
-
-## Endpoint List ! OBS ! REMOVE WHEN PUSHING INTO DEVELOP BRANCH
-DMIS_SEARCH_API_URL=http://search-engine.dev.dms-lookup.com:8000
-API_PORT=8001
-DMIS_QUERY_API_URL=http://gpu-srv-1.prod.h472c.bth.dms-lookup.com:8000
-API_BIND_ADDRESS=0.0.0.0
-API_ALLOW_ORIGIN=http://localhost:8080

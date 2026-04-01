@@ -52,27 +52,22 @@ def _resolve_labels(items: list[InputItem], all_scores: list[float]) -> list[Cla
         offset = doc_idx * num_labels
         doc_scores = all_scores[offset : offset + num_labels]
 
-        # Pair each label with its score, sorted highest score first
-        scored = sorted(
-            [(LABELS[i], doc_scores[i]) for i in range(num_labels)],
-            key=lambda x: x[1],
-            reverse=True,
-        )
         # Start with the highest score label as our best guess
-        best_label, best_score = scored[0]
+        best_index = doc_scores.index(max(doc_scores))
+        best_score = doc_scores[best_index]
 
         # Chained escalation: step through ranks, escalating if each gap is within threshold (escalation_threshold)
-        for label, score in sorted(scored, key=lambda x: label_rank[x[0]]):
+        for i, score in enumerate(doc_scores):
 
             # Is the next label within the threshold or not?
-            if label_rank[label] > label_rank[best_label] and (best_score - score) < escalation_threshold:
-                best_label = label
+            if label_rank[LABELS[i]] > label_rank[LABELS[best_index]] and (best_score - score) < escalation_threshold:
+                best_index = i
                 best_score = score
 
         results.append(
             ClassificationResult(
                 name=item.metadata.name or "Unknown Document",
-                **{"Security-class": best_label},
+                **{"Security-class": LABELS[best_index]},
             )
         )
 

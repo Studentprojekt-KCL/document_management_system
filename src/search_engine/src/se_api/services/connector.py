@@ -50,19 +50,7 @@ class Connector:
         Raises:
             SeAPIException: For potential formatting errors.
         """
-        response: Any | None = None
-        try:
-            response = self._get_file_pointers()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        response: Any | None = self._get_file_pointers()
 
         if response is None:
             return []
@@ -85,19 +73,7 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        response: Any | None = None
-        try:
-            response = self._get_file_from_pointer(pointer)
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_file}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_file}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_file}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_file}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        response: Any | None = self._get_file_from_pointer(pointer)
 
         if response is None:
             return None
@@ -119,21 +95,7 @@ class Connector:
         if file_url is None:
             return []
 
-        response: Any | None = None
-
-        try:
-            response = self._get_files_from_url(file_url)
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {file_url}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {file_url}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {file_url}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {file_url}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
-
+        response: Any | None = self._get_files_from_url(file_url)
         if response is None:
             return []
         if not isinstance(response, dict):
@@ -155,20 +117,7 @@ class Connector:
     def _files_to_index(self) -> str | None:
         """Get the url for the file containing all new files."""
 
-        response: Any | None = None
-        try:
-            response = self._get_file_to_index()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
-
+        response: Any | None = self._get_file_to_index()
         if response is None:
             return None
         if not isinstance(response, dict):
@@ -188,23 +137,74 @@ class Connector:
         return file_url
 
     def _get_file_pointers(self) -> Any | None:
-        return get(
-            self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
-        ).json()
+        try:
+            return get(
+                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        return None
+
 
     def _get_file_from_pointer(self, pointer: str) -> Any | None:
-        return get(
-            self.url_file,
-            params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
-            timeout=Connector.TIMEOUT,
-        ).json()
+        try:
+            return get(
+                self.url_file,
+                params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
+                timeout=Connector.TIMEOUT,
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        return None
+
 
     def _get_files_from_url(self, url: str) -> Any | None:
-        return get(url, timeout=Connector.TIMEOUT).json()
+        try:
+            return get(url, timeout=Connector.TIMEOUT).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        return None
 
     def _get_file_to_index(self) -> Any | None:
-        return get(
-            self.url_files_to_index,
-            params=[("subdata", self.subdata)] if self.subdata is not None else None,
-            timeout=Connector.TIMEOUT,
-        ).json()
+        try:
+            return get(
+                self.url_files_to_index,
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+                timeout=Connector.TIMEOUT,
+            ).json()
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        return None
+

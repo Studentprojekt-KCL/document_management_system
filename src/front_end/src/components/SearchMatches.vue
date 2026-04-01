@@ -61,7 +61,9 @@ const resultsLabel = computed(() => {
               </div>
             </div>
 
-            <span class="security-badge">{{ resolveSecurityClass(item.rawMatch) }}</span>
+            <span class="security-badge" :class="`security-${resolveSecurityClass(item.rawMatch).toLowerCase()}`">{{
+              resolveSecurityClass(item.rawMatch)
+            }}</span>
           </div>
         </button>
       </li>
@@ -131,21 +133,25 @@ const resultsLabel = computed(() => {
   border-radius: 6px;
   border: 1px solid;
 }
+
 .security-public {
   color: #16a34a;
   background: #f0fdf4;
   border-color: #bbf7d0;
 }
+
 .security-internal {
   color: #2563eb;
   background: #eff6ff;
   border-color: #bfdbfe;
 }
+
 .security-sensitive {
   color: #aa7560;
   background: #fff7ed;
   border-color: #fed7aa;
 }
+
 .security-confidential {
   color: #dc2626;
   background: #fef2f2;

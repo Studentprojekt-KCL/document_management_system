@@ -112,7 +112,7 @@ class APIConfiguration:
         if ministral_model is None:
             dms_error("MINISTRAL_MODEL is not defined.")
             return
-        
+
         if escalation_threshold is None:
             dms_error("ESCALATION_THRESHOLD is not defined.")
             return

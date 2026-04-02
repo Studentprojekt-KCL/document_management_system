@@ -2,6 +2,7 @@
 
 from dmis_logger import dms_info, dms_warning
 from se_api.services.connector import Connector
+from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
 
 
@@ -14,16 +15,19 @@ class Handler:
     """
 
     connector: Connector
+    query: Query
     search_engine: SearchEngine
 
     def __init__(self) -> None:
         self.connector = Connector()
         self.search_engine = SearchEngine()
+        self.query = Query()
 
     def reset(self) -> None:
         """Reset the connector."""
         self.search_engine = SearchEngine()
         self.connector = Connector()
+        self.query = Query()
         dms_info("Search engine was reset.")
 
     def preform_search(self, request: str, k: int, p: int) -> list[str]:
@@ -56,6 +60,7 @@ class Handler:
 
         for i in range(k * (p - 1), len(matches)):
             file: dict | None = self.connector.get_file(matches[i])
+            classification = self.query.classify([matches[i]])
 
             if file is None:
                 continue
@@ -63,7 +68,7 @@ class Handler:
             metadata: dict | None = file.get("metadata")
             if metadata is None:
                 continue
-
+            metadata.update({"security_class": classification[0]["Security-class"]})
             matching_files.append(metadata)
 
         return matching_files

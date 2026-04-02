@@ -6,8 +6,30 @@ import httpx
 
 from dmis_logger import dms_warning
 from gateway.schemas import InputItem, SummaryResult
-from gateway.preprompts import SUMMARIZER_PROMPT
+from gateway.preprompts import SUMMARIZER_PROMPT, SUMMARIZER_SYSTEM_PROMPT
 
+SWEDISH_WORDS = {
+    "och", "att", "för", "med", "som", "är", "av", "på",
+    "det", "en", "till", "inom", "mot", "men", "har", "vid",
+    "sin", "sig", "den", "de", "om", "ett", "kan", "ska"
+}
+
+HEADERS = {
+    "swedish": {
+        "highlights": "**Viktiga Höjdpunkter:**",
+        "summary":    "**Sammanfattning:**",
+    },
+    "english": {
+        "highlights": "**Key Highlights:**",
+        "summary":    "**Executive Summary:**",
+    },
+}
+
+def detect_language(text: str) -> str:
+    """Detect language from Swedish function words. Defaults to English."""
+    words = set(text.lower().split())
+    sw_hits = len(words & SWEDISH_WORDS)
+    return "swedish" if sw_hits >= 3 else "english"
 
 async def summarize_documents(items: list[InputItem], ministral_url: str, ministral_model: str) -> SummaryResult | None:
     """Synthesize multiple documents into a single summary via the Ministral LLM."""
@@ -16,10 +38,19 @@ async def summarize_documents(items: list[InputItem], ministral_url: str, minist
         doc_name = item.metadata.name or f"Document {i}"
         combined_context += f"\n--- {doc_name} ---\n{item.content}\n"
 
-    prompt = SUMMARIZER_PROMPT.format(combined_context=combined_context)
+    language = detect_language(combined_context)
+    headers = HEADERS[language]
+
+    prompt = SUMMARIZER_PROMPT.format(
+        combined_context=combined_context,
+        language=language,
+        highlights_header=headers["highlights"],
+        summary_header=headers["summary"],
+    )
 
     payload = {
         "model": ministral_model,
+        "system": SUMMARIZER_SYSTEM_PROMPT,
         "prompt": prompt,
         "stream": False,
     }

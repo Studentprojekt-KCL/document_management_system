@@ -142,16 +142,8 @@ class Connector:
             return get(
                 self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
             ).json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        except Exception as e:
+            self._exception_handler(e, self.url_files)
         return None
 
     def _get_file_from_pointer(self, pointer: str) -> Any | None:
@@ -162,32 +154,16 @@ class Connector:
                 params=[("file_pointer", pointer), ("include_content", False)],
                 timeout=Connector.TIMEOUT,
             ).json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        except Exception as e:
+            self._exception_handler(e, self.url_file)
         return None
 
     def _get_files_from_url(self, url: str) -> Any | None:
         """Get files from url"""
         try:
             return get(url, timeout=Connector.TIMEOUT).json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        except Exception as e:
+            self._exception_handler(e, url)
         return None
 
     def _get_file_to_index(self) -> Any | None:
@@ -198,14 +174,21 @@ class Connector:
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
                 timeout=Connector.TIMEOUT,
             ).json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+        except Exception as e:
+            self._exception_handler(e, self.url_files_to_index)
         return None
+
+    def _exception_handler(self, exception: Exception, url: str) -> None:
+        """Handle the exception passed down."""
+        if isinstance(exception, exceptions.ConnectionError):
+            dms_warning(f"Failed to connect, url: {url}.")
+        elif isinstance(exception, exceptions.HTTPError):
+            dms_warning(f"Invalid HTTP response, url: {url}.")
+        elif isinstance(exception, exceptions.Timeout):
+            dms_warning(f"Request timed out, url: {url}")
+        elif isinstance(exception, exceptions.JSONDecodeError):
+            dms_warning(f"Failed to parse JSON, url: {url}.")
+        elif isinstance(exception, exceptions.RequestException):
+            dms_warning(f"Something went wrong with the request, url: {url}.")
+        else:
+            dms_warning(f"Something went wrong, url: {url}.")

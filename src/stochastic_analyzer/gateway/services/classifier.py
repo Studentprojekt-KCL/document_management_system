@@ -44,8 +44,8 @@ def _resolve_labels(items: list[InputItem], all_scores: list[float]) -> list[Cla
 
         results.append(
             ClassificationResult(
-                name=item.metadata.name or "Unknown Document",
-                **{"Security-class": LABELS[best_index]},
+                unique_pointer=item.metadata.unique_pointer or "Unknown Document",
+                **{"security_class": LABELS[best_index]},
             )
         )
 

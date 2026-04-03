@@ -33,7 +33,7 @@ class Query:
         classifications: dict[str, str] = {}
         for r in response:
             unique_pointer = r.get("unique_pointer")
-            classification = r.get("security_class")
+            classification = r.get("Security-class")
             if unique_pointer is None or classifications is None:
                 dms_warning(f"Returned invalid response from classifier.")
                 continue

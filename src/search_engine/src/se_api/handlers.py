@@ -43,7 +43,7 @@ class Handler:
         if count <= 0:
             dms_warning(f"Count result count is invalid. (count: {count}).")
             return []
-        if offset <= 0:
+        if offset < 0:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 

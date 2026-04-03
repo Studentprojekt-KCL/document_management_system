@@ -95,7 +95,10 @@ class Connector:
                     if not isinstance(response, dict):
                         dms_warning("File is not formated as a dict.")
                         continue
-                    responses.append(response)
+                    metadata = response.get("metadata")
+                    if metadata is None:
+                        dms_warning(f"No metadata pressent, {pointer}.")
+                    responses.append(metadata)
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_file}.")
         except exceptions.HTTPError:

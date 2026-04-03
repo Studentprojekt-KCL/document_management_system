@@ -159,7 +159,7 @@ class Connector:
         try:
             return get(
                 self.url_file,
-                params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
+                params=[("file_pointer", pointer), ("include_content", False)],
                 timeout=Connector.TIMEOUT,
             ).json()
         except exceptions.ConnectionError:

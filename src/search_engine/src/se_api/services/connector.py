@@ -17,6 +17,8 @@ class Connector:
         subdata: connector file status.
     """
 
+    TIMEOUT: int = 120
+
     address: str
     subdata: str | None
 
@@ -50,9 +52,7 @@ class Connector:
         """
         response: Any | None = None
         try:
-            response = get(
-                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
-            ).json()
+            response = self._get_file_pointers()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files}.")
         except exceptions.HTTPError:
@@ -87,11 +87,7 @@ class Connector:
         """
         response: Any | None = None
         try:
-            response = get(
-                self.url_file,
-                params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
-                timeout=120,
-            ).json()
+            response = self._get_file_from_pointer(pointer)
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_file}.")
         except exceptions.HTTPError:
@@ -126,7 +122,7 @@ class Connector:
         response: Any | None = None
 
         try:
-            response = get(file_url, timeout=120).json()
+            response = self._get_files_from_url(file_url)
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {file_url}.")
         except exceptions.HTTPError:
@@ -139,6 +135,9 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
 
         if response is None:
+            return []
+        if not isinstance(response, dict):
+            dms_warning("Response is not formatted as a dict.")
             return []
 
         data = response.get("files")
@@ -158,9 +157,7 @@ class Connector:
 
         response: Any | None = None
         try:
-            response = get(
-                self.url_files_to_index, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=120
-            ).json()
+            response = self._get_file_to_index()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:
@@ -189,3 +186,25 @@ class Connector:
         self.subdata = subdata
 
         return file_url
+
+    def _get_file_pointers(self) -> Any | None:
+        return get(
+            self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
+        ).json()
+
+    def _get_file_from_pointer(self, pointer: str) -> Any | None:
+        return get(
+            self.url_file,
+            params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
+            timeout=Connector.TIMEOUT,
+        ).json()
+
+    def _get_files_from_url(self, url: str) -> Any | None:
+        return get(url, timeout=Connector.TIMEOUT).json()
+
+    def _get_file_to_index(self) -> Any | None:
+        return get(
+            self.url_files_to_index,
+            params=[("subdata", self.subdata)] if self.subdata is not None else None,
+            timeout=Connector.TIMEOUT,
+        ).json()

@@ -3,7 +3,7 @@
 from os import environ
 from typing import Any
 from dmis_logger import dms_error, dms_warning
-from requests import get
+from requests import Session, get
 from requests import exceptions
 
 
@@ -73,8 +73,8 @@ class Connector:
         pointers = response.get("file_pointers")
         return pointers if pointers is not None else []
 
-    def get_file(self, pointer: str) -> dict | None:
-        """Graps a file from the connectors.
+    def fetch_files(self, pointers: list[str]) -> list[dict]:
+        """Grab a files from the connectors.
 
         Args:
             pointer: file pointer.
@@ -85,9 +85,17 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        response: Any | None = None
+        responses: list[dict] = []
         try:
-            response = self._get_file_from_pointer(pointer)
+            with Session() as client:
+                for pointer in pointers:
+                    response: Any | None = self._get_file_from_pointer(pointer, client)
+                    if response is None:
+                        continue
+                    if not isinstance(response, dict):
+                        dms_warning("File is not formated as a dict.")
+                        continue
+                    responses.append(response)
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_file}.")
         except exceptions.HTTPError:
@@ -99,14 +107,7 @@ class Connector:
         except exceptions.RequestException:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
 
-        if response is None:
-            return None
-
-        if not isinstance(response, dict):
-            dms_warning("File is not formated as a dict.")
-            return None
-
-        return response
+        return responses
 
     def get_files(self) -> list:
         """Grab all new files pointers from connectors.
@@ -192,8 +193,8 @@ class Connector:
             self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
         ).json()
 
-    def _get_file_from_pointer(self, pointer: str) -> Any | None:
-        return get(
+    def _get_file_from_pointer(self, pointer: str, client: Session) -> Any | None:
+        return client.get(
             self.url_file,
             params=[("file_pointer", pointer), ("include_content", False)] if self.subdata is not None else None,
             timeout=Connector.TIMEOUT,

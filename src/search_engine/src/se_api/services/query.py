@@ -18,15 +18,36 @@ class Query:
 
         self.classify_url = address.rstrip("/") + "/classify"
 
-    def classify(self, pointers: list[str]) -> list:
+    def classify(self, pointers: list[str]) -> dict[str, str]:
+        """Classify the files at the pointers.
+
+        Args:
+            pointers: list of unique file pointers
+        Returns: list of file pointers with their classification.
+        """
         response: Any | None = self._get_classification(pointers)
         if not isinstance(response, list):
             dms_warning(f"Query returned unreqognized structure, url {self.classify_url}.")
-            return []
+            return {}
 
-        return response
+        classifications: dict[str, str] = {}
+        for r in response:
+            unique_pointer = r.get("unique_pointer")
+            classification = r.get("security_class")
+            if unique_pointer is None or classifications is None:
+                dms_warning(f"Returned invalid response from classifier.")
+                continue
+            classifications.update({unique_pointer: classification})
+
+        return classifications
 
     def _get_classification(self, pointers: list[str]) -> Any | None:
+        """Grab the classification from the classifier.
+
+        Args:
+            pointers: list of pointers.
+        Returns: Result or None
+        """
         try:
             response = post(
                 self.classify_url,

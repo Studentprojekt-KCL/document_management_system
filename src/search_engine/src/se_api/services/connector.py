@@ -74,7 +74,7 @@ class Connector:
         return pointers if pointers is not None else []
 
     def fetch_files(self, pointers: list[str]) -> list[dict]:
-        """Grab a files from the connectors.
+        """Grab all files from the connectors pointed at by the pointers.
 
         Args:
             pointer: file pointer.
@@ -95,9 +95,10 @@ class Connector:
                     if not isinstance(response, dict):
                         dms_warning("File is not formated as a dict.")
                         continue
-                    metadata = response.get("metadata")
+                    metadata: dict | None = response.get("metadata")
                     if metadata is None:
                         dms_warning(f"No metadata pressent, {pointer}.")
+                        continue
                     responses.append(metadata)
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_file}.")

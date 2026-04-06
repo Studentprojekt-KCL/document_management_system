@@ -31,6 +31,7 @@ class API:
     port: int
     host: str
     log_level: str
+    MAX_PORT: int = 65536
 
     def __init__(self) -> None:
         logging.basicConfig()
@@ -58,8 +59,8 @@ class API:
 
         if not port.isdigit():
             dms_error("Port is expected to be an integer.")
-        elif int(port) < 0 or int(port) >= 65536:
-            dms_error("Port should be between 0 and 65536.")
+        elif int(port) < 0 or int(port) >= self.MAX_PORT:
+            dms_error(f"Port should be between 0 and {self.MAX_PORT}.")
 
         self.port = int(port)
         self.host = host
@@ -87,10 +88,8 @@ class API:
         else:
             errors = {"detail": str(exc)}
         content: str | dict[str, str]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
     async def query(self, q: str, k: int = 10, p: int = 1) -> list:

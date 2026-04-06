@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 import requests
 import uvicorn
@@ -37,11 +38,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict[str, Any]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
 
@@ -55,7 +52,7 @@ class API:
             return JSONResponse(status_code=500, content="D")
 
         try:
-            response = requests.get(
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{search_api_url.rstrip('/')}/search",
                 params={"q": query},
                 timeout=120,

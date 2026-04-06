@@ -55,7 +55,7 @@ def create_router(config: APIConfiguration) -> APIRouter:
         scores = await rank_documents(query, texts, config.services.tei_url)
 
         scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers)],
+            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
             key=lambda x: x.score,
             reverse=True,
         )

@@ -40,6 +40,7 @@ class APIConfiguration:
     log_level: str
     device: str
     services: ServiceConfig
+    MAX_PORT: int = 65536
 
     def __init__(self) -> None:
         self._load_log_level()
@@ -70,6 +71,7 @@ class APIConfiguration:
 
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
+        # Note: This will be migrated to a shared solution
         port: str | None = environ.get("PORT")
 
         if port is None:
@@ -80,8 +82,8 @@ class APIConfiguration:
             dms_error("PORT is expected to be an integer.")
             return
 
-        if int(port) < 0 or int(port) >= 65536:
-            dms_error("PORT should be between 0 and 65536.")
+        if int(port) < 0 or int(port) >= self.MAX_PORT:
+            dms_error(f"PORT should be between 0 and {self.MAX_PORT}.")
             return
 
         self.port = int(port)

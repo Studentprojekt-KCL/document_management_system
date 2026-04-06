@@ -108,14 +108,10 @@ class Connector:
             return []
 
         data = response.get("files")
-        subdata = response.get("subdata")
 
         if data is None:
             dms_warning("No files in collector response.")
             return []
-        if subdata is None:
-            dms_warning("No subdata delievered by collector.")
-        self.subdata = subdata
 
         return data
 
@@ -145,7 +141,9 @@ class Connector:
         """Get file pointers"""
         try:
             return get(
-                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
+                self.url_files,
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+                timeout=Connector.TIMEOUT
             ).json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
@@ -197,6 +195,7 @@ class Connector:
 
     def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
+        print([("subdata", self.subdata)] if self.subdata is not None else None)
         try:
             return get(
                 self.url_files_to_index,

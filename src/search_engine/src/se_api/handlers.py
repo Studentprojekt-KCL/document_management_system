@@ -47,13 +47,15 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        new_files: list = self.connector.get_files()
-        if new_files:
-            dms_info(f"New files in connector reindexing, number of files: {len(new_files)}.")
-            if self.search_engine.have_new_category(new_files[0]):
-                self.search_engine.rebuild()
-                self.connector.reset()
-                new_files = self.connector.get_files()
+        new_pointers: list = self.connector.get_file_pointers()
+        if new_pointers:
+            dms_info(f"New files in connector reindexing, number of files: {len(new_pointers)}.")
+            new_files: list[dict] = self.connector.get_files()
+            if new_files:
+                if self.search_engine.have_new_category(new_files[0]):
+                    self.search_engine.rebuild()
+                    self.connector.reset()
+                    new_files = self.connector.get_files()
             self.search_engine.add_files(new_files)
 
         matches: list = self.search_engine.query_files(request, offset + count)[offset:count + offset]

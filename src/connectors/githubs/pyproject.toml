@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github_service"
+description = ""
+version = "0.1.0"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+py-modules = [
+    "github_collector_api",
+    "interfacer_github",
+]
+
+[project.scripts]
+github_connector = "github_collector_api:run"

@@ -1,0 +1,10 @@
+The following needs to be exported in local environment:
+
+    GITHUB_CONNECTOR_PORT=<CONNECTOR_PORT>
+
+Optional:
+
+    GITHUB_TOKEN or GITHUB_ACCESS_TOKEN
+    GITHUB_ORG=<ORG_LOGIN>
+    GITHUB_AUTH_MODE=legacy|app|auto
+    GITHUB_APP_INSTALLATION_TOKEN=<TOKEN_WHEN_USING_APP_MODE>

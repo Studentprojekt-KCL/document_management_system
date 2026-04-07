@@ -12,7 +12,7 @@ LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
 LABEL_TRIGGERS = [
     # Public
-    "This is general information intended for the public, such as manuals, public announcements, or open event invitations.",
+    "This is general information intended for the public, such as manuals, public announcements, " "or open event invitations.",
     # Internal
     "This is internal company information meant only for employees, such as sales targets, project plans, "
     "team updates, system migrations, or internal process changes.",
@@ -39,18 +39,24 @@ def _build_inputs(items: list[InputItem], max_chars: int) -> list[list[str]]:
     return inputs
 
 
-def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: float) -> int:
-    """Bump classification up if a higher-ranked label is within threshold."""
+def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: float = 0.02) -> int:
+    """Bump classification up if a higher-ranked label is within threshold.
+
+    Threshold halves after each escalation step (For example: 0.02 → 0.01 → 0.005)
+    """
     label_rank = {"Public": 0, "Internal": 1, "Sensitive": 2, "Confidential": 3}
     best_score = doc_scores[best_index]
+    step = 0
 
     for i, score in enumerate(doc_scores):
         is_higher_rank = label_rank[LABELS[i]] > label_rank[LABELS[best_index]]
-        is_within_threshold = (best_score - score) < escalation_threshold
+        current_threshold = escalation_threshold / (2**step)
+        is_within_threshold = (best_score - score) < current_threshold
 
         if is_higher_rank and is_within_threshold:
             best_index = i
             best_score = score
+            step += 1
 
     return best_index
 
@@ -58,7 +64,7 @@ def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: fl
 def _resolve_labels(
     items: list[InputItem],
     all_scores: list[float],
-    escalation_threshold: float | None = None,
+    escalation_threshold: float = 0.02,
 ) -> list[ClassificationResult]:
     """Map entailment scores back to classification labels per document."""
     results = []
@@ -79,7 +85,7 @@ def _resolve_labels(
 
 
 async def classify_documents(
-    items: list[InputItem], classifier_url: str, escalation_threshold: float
+    items: list[InputItem], classifier_url: str, escalation_threshold: float = 0.02
 ) -> list[ClassificationResult]:
     """Classify a batch of documents using parallel NLI inference against a TEI container."""
     inputs = _build_inputs(items, max_chars=800)

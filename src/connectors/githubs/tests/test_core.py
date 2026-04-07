@@ -80,7 +80,3 @@ class TestGitHubHelpers(unittest.TestCase):
         ):
             github = GitHub()
         self.assertEqual(github.session.headers.get("Authorization"), "Bearer app-token")
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -29,6 +29,7 @@ class MetadataTemplate(BaseModel):
     """Metadata fields attached to each document input."""
 
     name: StrictStr | None = None
+    unique_pointer: StrictStr | None = None
     author: StrictStr | None = None
 
     model_config = {"extra": "ignore"}
@@ -46,7 +47,7 @@ class InputItem(BaseModel):
 class ClassificationResult(BaseModel):
     """Output schema for a classified document."""
 
-    name: StrictStr | None = None
+    unique_pointer: StrictStr | None = None
     security_class: Literal["Public", "Internal", "Sensitive", "Confidential"] = Field(..., alias="Security-class")
 
     model_config = {"populate_by_name": True}

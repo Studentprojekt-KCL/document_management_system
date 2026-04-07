@@ -74,9 +74,9 @@ Any attempt to bypass the path by adding /search would result in being redirecte
 ________________________________________
 
 # Keycloak
-To access keycloak you can go to: ```https://ad.dms-lookup.com:8443/```
-## Create a user
-Use the admin credentials to log in (*admin, pass*).
+To access keycloak you can go to: ```https://Keycloak```
+
+Log in as admin
 
 Choose User from the left side bar.
 
@@ -96,21 +96,15 @@ Choose User from the left side bar.
 5. **Save password**
 ________________________________________
 
-### Test account
-**username:** frontend_tester
-**password:** password
-
-________________________________________
-
 # Environment Setup
 Before running the service, you must create a `.env` file in the /front_end/ directory.
 
 Create `.env` file following this structure:
 
 ```
-KEYCLOAK_BASE_URL=https://ad.dms-lookup.com:8443
+KEYCLOAK_BASE_URL= Keycloak Base URL
 KEYCLOAK_REALM=master
-KEYCLOAK_CLIENT_ID=dms-frontend
-API_BASE_URL=/api
-API_HOST=http://dmis-api.dev.dms-lookup.com:8000/
+KEYCLOAK_CLIENT_ID=Keyloak Client ID
+API_BASE_URL=/api/
+API_HOST= The develop API URL for frontend
 ```

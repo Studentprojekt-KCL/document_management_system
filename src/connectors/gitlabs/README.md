@@ -9,7 +9,7 @@ The following needs to be exported in local environment:
 ## Endpoing: file
 
     {
-  "metadata": {
+    "metadata": {
     "unique_pointer": <POINTER TO OBJ>,
     "name": "<FILE NAME>",
     "size": 6042,

@@ -156,7 +156,7 @@ class GitLabs:
                 "size": file.get("size"),
                 "last_edit_date": unpack_values(blame, (0, "commit", "committed_date")),
                 "type": SOURCE_FILE,
-                "source_system": self.SOURCE_SYSTEM
+                "source_system": self.SOURCE_SYSTEM,
             }
         }
         file_path = file.get("file_path")

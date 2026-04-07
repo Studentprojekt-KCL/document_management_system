@@ -3,6 +3,7 @@
 import os
 import io
 import json
+from contextlib import suppress
 
 import boto3
 from botocore.exceptions import ClientError
@@ -27,10 +28,9 @@ def upload_file(content: dict | list, file_name: str, bucket: str = "slask") -> 
         )
     except ClientError as err:
         dms_error(f"Could not connect to MinIO (might be missing credentials). {err}")
-    try:
+
+    with suppress(ClientError):
         client.create_bucket(Bucket=bucket)
-    except ClientError:
-        pass
 
     data = io.BytesIO(json.dumps(content).encode("utf-8"))
     client.upload_fileobj(data, bucket, file_name)

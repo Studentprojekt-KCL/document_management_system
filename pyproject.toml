@@ -11,7 +11,7 @@ max-line-length = 132
 exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv", "test"]
 
 [tool.ruff.lint]
-select = ["T20", "PYI056"]
+select = ["T20", "PYI056", "ASYNC", "B", "SIM", "PL", "UP"]
 
 [tool.mypy]
 disallow_untyped_defs = true

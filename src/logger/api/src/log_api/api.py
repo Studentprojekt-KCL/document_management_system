@@ -2,7 +2,8 @@
 
 import argparse
 from os import environ
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 import uvicorn
@@ -41,7 +42,7 @@ class API:
         if not port.isdigit():
             dms_error("Expected LOGGER_PORT to be an integer.")
             return
-        if int(port) <= 0 or int(port) >= 65535:
+        if int(port) <= 0 or int(port) >= 65535:  # noqa: PLR2004 #This will be migrated to shared solution
             dms_error("Expected LOGGER_PORT to be between 0 and 65545.")
             return
 
@@ -76,11 +77,9 @@ class API:
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
             errors = {"detail": str(exc)}
-        content: str | dict[str, str]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+
+        content: str | dict[str, str] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
     async def get_logs(self, start: datetime | None = None, end: datetime | None = None) -> list[Log] | None:

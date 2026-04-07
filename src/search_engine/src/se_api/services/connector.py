@@ -3,7 +3,7 @@
 from os import environ
 from typing import Any
 from dmis_logger import dms_error, dms_warning
-from requests import get
+from requests import Session, get
 from requests import exceptions
 
 
@@ -61,8 +61,8 @@ class Connector:
         pointers = response.get("file_pointers")
         return pointers if pointers is not None else []
 
-    def get_file(self, pointer: str) -> dict | None:
-        """Graps a file from the connectors.
+    def fetch_files(self, pointers: list[str]) -> list[dict]:
+        """Grab all files from the connectors pointed at by the pointers.
 
         Args:
             pointer: file pointer.
@@ -73,16 +73,20 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        response: Any | None = self._get_file_from_pointer(pointer)
+        client: Session = Session()
+        responses: list[dict] = []
+        for pointer in pointers:
+            response: Any | None = self._get_file_from_pointer(pointer, client)
+            if not isinstance(response, dict):
+                continue
+            metadata: dict | None = response.get("metadata")
+            if metadata is None:
+                continue
+            responses.append(metadata)
 
-        if response is None:
-            return None
+        client.close()
 
-        if not isinstance(response, dict):
-            dms_warning("File is not formated as a dict.")
-            return None
-
-        return response
+        return responses
 
     def get_files(self) -> list:
         """Grab all new files pointers from connectors.
@@ -109,9 +113,9 @@ class Connector:
             dms_warning("No files in collector response.")
             return []
         if subdata is None:
-            dms_warning("No subdata delievered by collector.")
-        self.subdata = subdata
+            dms_warning("Connector returned empty subdata.")
 
+        self.subdata = subdata
         return data
 
     def _files_to_index(self) -> str | None:
@@ -154,10 +158,10 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
 
-    def _get_file_from_pointer(self, pointer: str) -> Any | None:
+    def _get_file_from_pointer(self, pointer: str, client: Session) -> Any | None:
         """Get file from pointer"""
         try:
-            return get(
+            return client.get(
                 self.url_file,
                 params=[("file_pointer", pointer), ("include_content", False)],
                 timeout=Connector.TIMEOUT,

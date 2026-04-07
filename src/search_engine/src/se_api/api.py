@@ -15,7 +15,6 @@ from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
 
-
 class API:
     """API object, holds all endpoints and configuration.
 

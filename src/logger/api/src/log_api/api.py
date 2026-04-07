@@ -14,7 +14,7 @@ from fastapi.encoders import jsonable_encoder
 
 from log_api.database import Database
 from log_api.models import Log
-from dmis_logger import dms_error
+from initialisation_tools import read_port, read_env_variable
 
 
 class API:
@@ -29,22 +29,8 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        port = environ.get("LOGGER_PORT")
-        bind = environ.get("LOGGER_BIND_ADDRESS")
-
-        if port is None:
-            dms_error("LOGGER_PORT is not defined.")
-            return
-        if bind is None:
-            dms_error("LOGGER_BIND_ADDRESS is not defined.")
-            return
-
-        if not port.isdigit():
-            dms_error("Expected LOGGER_PORT to be an integer.")
-            return
-        if int(port) <= 0 or int(port) >= 65535:  # noqa: PLR2004 #This will be migrated to shared solution
-            dms_error("Expected LOGGER_PORT to be between 0 and 65545.")
-            return
+        self.port = read_port("LOGGER_PORT")
+        self.bind = read_env_variable("LOGGER_BIND_ADDRESS")
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--dev", action="store_true")
@@ -52,9 +38,6 @@ class API:
 
         if args.dev:
             self.log_level = "debug"
-
-        self.bind = bind
-        self.port = int(port)
 
         self.app = FastAPI()
 

@@ -9,6 +9,7 @@ from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
+from initialisation_tools import read_env_variable
 
 class Database:
     """Service class for the database."""
@@ -19,28 +20,10 @@ class Database:
     database: str
 
     def __init__(self) -> None:
-        host = os.environ.get("LOGGER_DB_HOST")
-        user = os.environ.get("LOGGER_DB_USER")
-        password = os.environ.get("LOGGER_DB_PASS")
-        database = os.environ.get("LOGGER_DB_DATABASE")
-
-        if host is None:
-            dms_error("LOGGER_DB_HOST is undefined.")
-            return
-        if user is None:
-            dms_error("LOGGER_DB_USER is undefined.")
-            return
-        if password is None:
-            dms_error("LOGGER_DB_PASS is undefined.")
-            return
-        if database is None:
-            dms_error("LOGGER_DB_DATABASE is undefined.")
-            return
-
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
+        self.host = read_env_variable("LOGGER_DB_HOST")
+        self.user = read_env_variable("LOGGER_DB_USER")
+        self.password = read_env_variable("LOGGER_DB_PASS")
+        self.database = read_env_variable("LOGGER_DB_DATABASE")
 
     def connect(self) -> PooledMySQLConnection | MySQLConnectionAbstract:
         """Return database connection."""

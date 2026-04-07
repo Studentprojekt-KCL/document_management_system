@@ -15,7 +15,7 @@ The following needs to be exported in local environment:
     "size": 6042,
     "last_edit_date": <EDIT DATE>,
     "type": <TYPE OF OBJECT>,
-    "source_system": "gitlabs",
+    "source_system": "gitlab",
     "clickable_url": <CLICKABLE URL TO OBJ>
     },
     "content": <FILE CONTENT>

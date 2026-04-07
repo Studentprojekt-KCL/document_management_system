@@ -67,7 +67,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.get( # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.search_api_url}/search",
                 params={"q": query},
                 timeout=120,
@@ -102,7 +102,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.post(
+            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.query_api_url}/summarize",
                 json={"pointers": [file_pointer]},
                 timeout=100,
@@ -141,7 +141,7 @@ def run() -> None:
     except ValueError:
         dms_error("API_PORT expected int.")
         return
-    if port <= 0 or port >= 65535:
+    if port <= 0 or port >= 65535:  # noqa: PLR2004 #Migration to shared env var parser in separate commit.
         dms_error("API_PORT should be between 0 and 65535.")
         return
     if not search_api_url:

@@ -5,7 +5,7 @@ on:
     branches: ["develop"]
 
 env:
-  DEPLOY_DIR: "/opt/dev/"
+  DEPLOY_DIR: "/opt/dev-dms-lookup/"
   COMPOSE_FILE: "docker-compose-build-all.yaml"
   REGISTRY: "registry.dms-lookup.com"
 

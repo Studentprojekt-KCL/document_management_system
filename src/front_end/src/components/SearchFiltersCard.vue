@@ -2,44 +2,64 @@
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 
+// Will eventually fetch these filter options from the backend or something??
 const sourceFilters = ['GitHub', 'GitLab', 'Network File System'] // Add more sources needed if possible
 const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
 const securityFilters = ['Public', 'Internal', 'Sensitive', 'Confidential']
 
-const selectedFilters = ref({
-  source: [],
-  type: [],
-  security: []
+const props = defineProps({
+  selectedFilters: Object
 })
+const emit = defineEmits(['update:filters'])
 
-const hasActiveFilters = computed(() => {
-  return (
-    selectedFilters.value.source.length > 0 || selectedFilters.value.type.length > 0 || selectedFilters.value.security.length > 0
-  )
-})
+/* Local refs for filter selection */
+const localSource = ref([...props.selectedFilters.source])
+const localType = ref([...props.selectedFilters.type])
+const localSecurity = ref([...props.selectedFilters.security])
 
+/* Computed to check if any filters are active */
+const hasActiveFilters = computed(
+  () => localSource.value.length > 0 || localType.value.length > 0 || localSecurity.value.length > 0
+)
+
+/* Check if a filter is selected */
 const isSelected = (filterType, value) => {
-  return selectedFilters.value[filterType].includes(value)
+  if (filterType === 'source') return localSource.value.includes(value)
+  if (filterType === 'type') return localType.value.includes(value)
+  if (filterType === 'security') return localSecurity.value.includes(value)
+  return false
 }
 
-// Placeholder for handling filter changes.
-// In a later implementation, this will probably update the search query or trigger a new search with the applied filters.
-const handleFilterChange = (filterType, value) => {
-  if (isSelected(filterType, value)) {
-    selectedFilters.value[filterType] = selectedFilters.value[filterType].filter((item) => item !== value)
+/* Toggle filter selection */
+const toggleFilter = (filterType, value) => {
+  let refArray
+  if (filterType === 'source') refArray = localSource
+  else if (filterType === 'type') refArray = localType
+  else if (filterType === 'security') refArray = localSecurity
+  else return
+
+  if (refArray.value.includes(value)) {
+    refArray.value = refArray.value.filter((f) => f !== value)
   } else {
-    selectedFilters.value[filterType] = [...selectedFilters.value[filterType], value]
+    refArray.value = [...refArray.value, value]
   }
-
-  console.log(`Selected ${filterType} filters:`, selectedFilters.value[filterType])
+  emit('update:filters', {
+    source: localSource.value,
+    type: localType.value,
+    security: localSecurity.value
+  })
 }
 
+/* Clear all filters */
 const clearAllFilters = () => {
-  selectedFilters.value = {
+  localSource.value = []
+  localType.value = []
+  localSecurity.value = []
+  emit('update:filters', {
     source: [],
     type: [],
     security: []
-  }
+  })
 }
 </script>
 
@@ -50,6 +70,7 @@ their search queries.
 <template>
   <div class="filters-card">
     <div class="filters-row">
+      <!-- Source Filters -->
       <div class="filter-group">
         <span class="group-label">
           <Grid2X2 :size="14" />
@@ -59,9 +80,7 @@ their search queries.
           v-for="item in sourceFilters"
           :key="item"
           :class="['chip', { active: isSelected('source', item) }]"
-          type="button"
-          :aria-pressed="isSelected('source', item)"
-          @click="handleFilterChange('source', item)"
+          @click="toggleFilter('source', item)"
         >
           {{ item }}
         </button>
@@ -69,6 +88,7 @@ their search queries.
 
       <span class="group-divider" aria-hidden="true"></span>
 
+      <!-- Type Filters -->
       <div class="filter-group">
         <span class="group-label">
           <FileText :size="14" />
@@ -78,9 +98,7 @@ their search queries.
           v-for="item in typeFilters"
           :key="item"
           :class="['chip', { active: isSelected('type', item) }]"
-          type="button"
-          :aria-pressed="isSelected('type', item)"
-          @click="handleFilterChange('type', item)"
+          @click="toggleFilter('type', item)"
         >
           {{ item }}
         </button>
@@ -88,6 +106,7 @@ their search queries.
 
       <span class="group-divider" aria-hidden="true"></span>
 
+      <!-- Security Filters -->
       <div class="filter-group">
         <span class="group-label">
           <Shield :size="14" />
@@ -97,15 +116,13 @@ their search queries.
           v-for="item in securityFilters"
           :key="item"
           :class="['chip', { active: isSelected('security', item) }]"
-          type="button"
-          :aria-pressed="isSelected('security', item)"
-          @click="handleFilterChange('security', item)"
+          @click="toggleFilter('security', item)"
         >
           {{ item }}
         </button>
       </div>
       <div class="filters-header">
-        <button v-if="hasActiveFilters" class="clear-button" type="button" @click="clearAllFilters">Clear all</button>
+        <button v-if="hasActiveFilters" class="clear-button" @click="clearAllFilters">Clear all</button>
       </div>
     </div>
   </div>
@@ -127,22 +144,14 @@ their search queries.
   margin-left: auto;
 }
 
-.filters-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #99a4b8;
-  text-transform: uppercase;
-}
-
 .clear-button {
   border: none;
   background: transparent;
   color: #7c3aed;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0.1rem 0.2rem;
+  padding: 0.1rem 0.6rem;
 }
 
 .clear-button:hover {

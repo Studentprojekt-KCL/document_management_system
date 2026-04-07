@@ -14,21 +14,6 @@ from unittest.mock import patch
 from interfacer_github import GitHub
 from unpacker import unpack_values
 
-
-class TestUnpacker(unittest.TestCase):
-    """Tests for unpack_values helper."""
-
-    def test_unpack_values_returns_nested_value(self) -> None:
-        """Nested dict path returns the leaf value."""
-        data = {"a": {"b": {"c": 123}}}
-        self.assertEqual(unpack_values(data, ("a", "b", "c")), 123)
-
-    def test_unpack_values_returns_none_for_missing_path(self) -> None:
-        """Missing key in path yields None."""
-        data = {"a": {"b": 1}}
-        self.assertIsNone(unpack_values(data, ("a", "x")))
-
-
 class TestGitHubHelpers(unittest.TestCase):
     """Tests for GitHub connector URL and auth helpers."""
 

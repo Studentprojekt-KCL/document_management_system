@@ -28,38 +28,20 @@ class API:
     search_api_url: str
     query_api_url: str
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        bind_address: str,
+        port: int,
+        search_api_url: str,
+        query_api_url: str,
+        log_level: str | None = None,
+    ) -> None:
         """Constructor."""
-        bind_address = os.environ.get("API_BIND_ADDRESS")
-        port = os.environ.get("API_PORT")
-        allowed_origins = os.environ.get("API_ALLOW_ORIGIN")
-        search_api_url = os.getenv("DMIS_SEARCH_API_URL")
-        query_api_url = os.getenv("DMIS_QUERY_API_URL")
+        self.app = FastAPI()
 
-        if bind_address is None:
-            dms_error("API_BIND_ADDRESS is not defined.")
-            return
-        if port is None:
-            dms_error("API_PORT is not defined.")
-            return
-        if not port.isdigit():
-            dms_error("API_PORT expected integer.")
-            return
-        if int(port) <= 0 or int(port) >= 65535:
-            dms_error("API_PORT should be between 0 and 65535.")
-            return
-        if not search_api_url: dms_error("DMIS_SEARCH_API_URL is not set.")
-        if not query_api_url: dms_error("DMIS_QUERY_API_URL is not set.")
-        
-        parser = argparse.ArgumentParser()
-        _ = parser.add_argument("--dev", action="store_true")
-        args = parser.parse_args()
-
-        if args.dev:
-            self.log_level = "debug"
-
+        self.log_level = log_level
         self.bind_address = bind_address
-        self.port = port
+        self.port = int(port)
         self.search_api_url = search_api_url.rstrip("/")
         self.query_api_url = query_api_url.rstrip("/")
 
@@ -68,23 +50,17 @@ class API:
             self.validation_exception_handler,
         )
 
-        if allowed_origins is not None:
-            origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
-            dms_info(f"Allowing origins: {origins}")
-            self.app.add_middleware(
-                CORSMiddleware,
-                allow_origins=origins,
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
-
         self.app.add_api_route("/search", self.search, methods=["GET"])
         self.app.add_api_route("/summary", self.summary, methods=["POST"])
 
     def start(self) -> None:
         """Start API"""
-        uvicorn.run(self.app, host=self.bind_address, port=self.port, log_level=self.log_level)
+        uvicorn.run(
+            self.app,
+            host=self.bind_address,
+            port=self.port,
+            log_level=self.log_level,
+        )
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -102,8 +78,13 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    def fetch_search_results(self, query: str) -> list[Any]:
-        """Fetch search results from upstream search API."""
+    async def search(self, query: str = Query(..., min_length=1, max_length=200)) -> JSONResponse:
+        """Forward search request to upstream search API, enrich results with classification, and return results."""
+        query = query.strip()
+        if not query:
+            dms_warning("Search request received empty query.")
+            raise HTTPException(status_code=422)
+
         try:
             response = requests.get(
                 f"{self.search_api_url}/search",
@@ -118,137 +99,15 @@ class API:
         except requests.JSONDecodeError as exc:
             dms_warning(f"Upstream search API returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        
+
         if not isinstance(search_data, list):
             dms_warning("Search API returned unexpected JSON shape.")
             raise HTTPException(status_code=502)
-        
-        return search_data
-
-    def fetch_classification_maps(self, pointers: list[str]) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Fetch classification data and build lookup maps."""
-        try:
-            response = requests.post(
-                f"{self.query_api_url}/classify",
-                json={"pointers": pointers},
-                timeout=30,
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            response_text = exc.response.text if exc.response is not None else ""
-            dms_warning(f"Classification request failed: {exc}. " f"Response body: {response_text}")
-            raise HTTPException(status_code=502) from exc
-
-        try:
-            classification_data = response.json()
-        except requests.JSONDecodeError as exc:
-            dms_warning(f"Classification service returned invalid JSON: {exc}")
-            raise HTTPException(status_code=502) from exc
-
-        if isinstance(classification_data, list):
-            classification_items = [item for item in classification_data if isinstance(item, dict)]
-        elif isinstance(classification_data, dict):
-            classification_items = [classification_data]
-        else:
-            dms_warning("Classification service returned unexpected JSON shape.")
-            raise HTTPException(status_code=502)
-
-        classification_map_by_pointer: dict[str, Any] = {}
-        classification_map_by_name: dict[str, Any] = {}
-
-        for item in classification_items:
-            pointer = item.get("pointer")
-            if isinstance(pointer, str) and pointer.strip():
-                classification_map_by_pointer[pointer.strip()] = item
-
-            name = item.get("name")
-            if isinstance(name, str) and name.strip():
-                classification_map_by_name[name.strip()] = item
-
-        return classification_map_by_pointer, classification_map_by_name
-
-    @staticmethod
-    def apply_security_classes(
-        results: list[Any],
-        classification_map_by_pointer: dict[str, Any],
-        classification_map_by_name: dict[str, Any],
-    ) -> None:
-        """Enrich search results with security classification."""
-        for entry in results:
-            if not isinstance(entry, dict):
-                continue
-
-            file_pointer = entry.get("unique_pointer")
-            if not isinstance(file_pointer, str):
-                continue
-
-            file_pointer = file_pointer.strip()
-            if not file_pointer:
-                continue
-
-            classification_value = classification_map_by_pointer.get(file_pointer)
-            if classification_value is None:
-                entry_name = entry.get("name")
-                if isinstance(entry_name, str):
-                    entry_name = entry_name.strip()
-                    if entry_name:
-                        classification_value = classification_map_by_name.get(entry_name)
-
-            if isinstance(classification_value, dict):
-                security_class = classification_value.get("Security-class")
-                if isinstance(security_class, str) and security_class.strip():
-                    entry["security_class"] = security_class.strip()
-                else:
-                    entry["security_class"] = None
-            else:
-                entry["security_class"] = None
-
-    async def search(self, query: str = Query(..., min_length=1, max_length=200)) -> JSONResponse:
-        """Forward search request to upstream search API, enrich results with classification, and return results."""
-        query = query.strip()
-        if not query:
-            dms_warning("Search request received empty query.")
-            raise HTTPException(status_code=422)
-
-        results = self.fetch_search_results(query)
-
-        unique_pointers: list[str] = []
-        seen_pointers: set[str] = set()
-
-        for entry in results:
-            if not isinstance(entry, dict):
-                continue
-
-            unique_pointer = entry.get("unique_pointer")
-            if not isinstance(unique_pointer, str):
-                continue
-
-            pointer = unique_pointer.strip()
-            if pointer and pointer not in seen_pointers:
-                unique_pointers.append(pointer)
-                seen_pointers.add(pointer)
-
-        if not unique_pointers:
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "results": [],
-                    "query": query,
-                    "detail": "",
-                },
-            )
-
-        classification_map_by_pointer, classification_map_by_name = self.fetch_classification_maps(unique_pointers)
-        self.apply_security_classes(
-            results,
-            classification_map_by_pointer,
-            classification_map_by_name,
-        )
 
         return JSONResponse(
             status_code=200,
             content={
-                "results": results,
+                "results": search_data,
                 "query": query,
             },
         )
@@ -299,5 +158,40 @@ class API:
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
-    api = API()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dev", action="store_true")
+    args = parser.parge_args()
+
+    bind_address = os.environ.get("API_BIND_ADDRESS")
+    port = os.environ.get("API_PORT")
+    search_api_url = os.getenv("DMIS_SEARCH_API_URL")
+    query_api_url = os.getenv("DMIS_QUERY_API_URL")
+
+    if bind_address is None:
+        dms_error("API_BIND_ADDRESS is not defined.")
+        return
+    if port is None:
+        dms_error("API_PORT is not defined.")
+        return
+    if not port.isdigit():
+        dms_error("API_PORT expected integer.")
+        return
+    if int(port) <= 0 or int(port) >= 65535:
+        dms_error("API_PORT should be between 0 and 65535.")
+        return
+    if not search_api_url:
+        dms_error("DMIS_SEARCH_API_URL is not set.")
+    if not query_api_url:
+        dms_error("DMIS_QUERY_API_URL is not set.")
+
+    log_level = "debug" if args.dev else None
+
+    api = API(
+        bind_address=bind_address,
+        port=port,
+        search_api_url=search_api_url,
+        query_api_url=query_api_url,
+        log_level=log_level,
+    )
+
     api.start()

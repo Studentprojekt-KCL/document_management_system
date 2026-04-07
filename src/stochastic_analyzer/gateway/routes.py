@@ -71,7 +71,7 @@ def create_router(config: APIConfiguration) -> APIRouter:
             dms_warning("No documents could be retrieved from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
 
-        results = await classify_documents(payload, config.services.classifier_url, config.services.escalation_threshold)
+        results = await classify_documents(items, config.services.classifier_url, config.services.escalation_threshold)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)

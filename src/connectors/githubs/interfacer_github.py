@@ -33,8 +33,11 @@ class GitHub:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.Session()
-        raw = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-        self.api_base = raw if raw.endswith("/") else raw + "/"
+        raw = os.environ.get("GITHUB_API_URL")
+        if not raw:
+            dms_error("GitHub API URL not set in local environment, please export GITHUB_API_URL.")
+            raise ValueError("Missing GITHUB_API_URL")
+        sself.api_base = raw.rstrip("/") + "/"
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()

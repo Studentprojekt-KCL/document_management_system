@@ -104,7 +104,7 @@ Create `.env` file following this structure:
 ```
 KEYCLOAK_BASE_URL= Keycloak Base URL
 KEYCLOAK_REALM=master
-KEYCLOAK_CLIENT_ID=Keyloak Client ID
+KEYCLOAK_CLIENT_ID= Keyloak Client ID
 API_BASE_URL=/api/
 API_HOST= The develop API URL for frontend
 ```

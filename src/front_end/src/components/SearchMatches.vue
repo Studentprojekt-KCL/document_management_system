@@ -112,10 +112,10 @@ const resultsLabel = computed(() => {
 }
 
 .result-main {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.8rem;
-  align-items: start;
 }
 
 .result-content {

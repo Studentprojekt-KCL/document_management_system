@@ -107,11 +107,15 @@ class Connector:
             return []
 
         data = response.get("files")
+        subdata = response.get("subdata")
 
         if data is None:
             dms_warning("No files in collector response.")
             return []
+        if subdata is None:
+            dms_warning("Connector returned empty subdata.")
 
+        self.subdata = subdata
         return data
 
     def _files_to_index(self) -> str | None:

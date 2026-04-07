@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 import requests
 import uvicorn
@@ -54,11 +55,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict[str, Any]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
 
@@ -70,7 +67,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.get(
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.search_api_url}/search",
                 params={"q": query},
                 timeout=120,
@@ -105,7 +102,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.post(
+            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.query_api_url}/summarize",
                 json={"pointers": [file_pointer]},
                 timeout=100,
@@ -144,7 +141,7 @@ def run() -> None:
     except ValueError:
         dms_error("API_PORT expected int.")
         return
-    if port <= 0 or port >= 65535:
+    if port <= 0 or port >= 65535:  # noqa: PLR2004 #Migration to shared env var parser in separate commit.
         dms_error("API_PORT should be between 0 and 65535.")
         return
     if not search_api_url:

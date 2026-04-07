@@ -100,7 +100,7 @@ class GitLabs:
         """Unsafe parse of API URL to retrieve projectID"""
         pattern = r"https:\/\/([^\/]+)\/api\/v4\/projects\/(\d+)\/repository\/files\/(.+)"
         match = re.match(pattern, url)
-        if not match or len(match.groups()) < 3:
+        if not match or len(match.groups()) < 3:  # noqa: PLR2004
             return None
         return match.group(2)
 
@@ -298,6 +298,6 @@ class GitLabs:
             return {}
         except requests.exceptions.MissingSchema as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
-        if response.status_code != 200:
+        if response.status_code != 200:  # noqa: PLR2004
             dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
         return content

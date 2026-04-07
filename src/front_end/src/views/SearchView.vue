@@ -107,7 +107,7 @@ const handleFilterChange = (filters) => {
   }
   matches.value = allMatches.value.filter((match) => {
     const filename = (match.filename || match.name || '').toLowerCase()
-    const securityClass = resolveSecurityClass(match).toLowerCase()
+    // const securityClass = resolveSecurityClass(match).toLowerCase()
     // const source = (match.source || '').toLowerCase()
 
     // TYPE FILTER
@@ -129,12 +129,12 @@ const handleFilterChange = (filters) => {
     // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
-    const securityMatch =
-      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+    // const securityMatch =
+    //  filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
     // add sourceMatch and secuirtyMatch later
     // return typeMatch && sourceMatch && secuirtyMatch
-    return typeMatch && securityMatch
+    return typeMatch //&& securityMatch
   })
 }
 </script>

@@ -11,7 +11,7 @@ env:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: development
     permissions:
       contents: read
 

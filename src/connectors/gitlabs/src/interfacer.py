@@ -26,7 +26,7 @@ class GitLabs:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
-    source_system: str
+    source_system: str | None
 
     def __init__(self) -> None:
         """Constructor."""

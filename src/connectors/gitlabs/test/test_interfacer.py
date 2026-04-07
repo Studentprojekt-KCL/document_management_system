@@ -84,7 +84,7 @@ class TestGitLabs(TestCase):
                 "size": 0,
                 "last_edit_date": "1970-01-01T00:00:00.000Z",
                 "type": "source_file",
-                "source_system": "gitlab",
+                "source_system": None,
             },
             "content": "unittest",
         }

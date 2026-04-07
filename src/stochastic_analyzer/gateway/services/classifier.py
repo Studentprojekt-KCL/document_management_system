@@ -12,16 +12,16 @@ LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
 LABEL_TRIGGERS = [
     # Public
-    "This is general information intended for the public, such as manuals, public announcements, " "or open event invitations.",
+    "This is general information intended for the public, such as manuals, public announcements, or open event invitations.",
     # Internal
-    "This is internal company information meant only for employees, such as sales targets, project plans, "
-    "team updates, system migrations, or internal process changes.",
+    "This is internal company information meant only for employees, such as sales targets, project plans,team updates, "
+    "system migrations, or internal process changes.",
     # Sensitive
-    "This document contains sensitive employee or operational data such as performance reviews, "
-    "salary information, disciplinary records, access credentials, or HR matters.",
+    "This document contains sensitive employee or operational data such as performance reviews, salary information, "
+    "disciplinary records, access credentials, or HR matters.",
     # Confidential
-    "This is strictly confidential information such as executive strategy, mergers and acquisitions, "
-    "financial projections, medical records, patient data, or personal identification numbers.",
+    "This is strictly confidential information such as executive strategy, mergers and acquisitions, financial projections, "
+    "medical records, patient data, or personal identification numbers.",
 ]
 
 

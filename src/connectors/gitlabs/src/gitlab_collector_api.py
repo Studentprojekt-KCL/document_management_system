@@ -38,11 +38,9 @@ class API:
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
             errors = {"detail": str(exc)}
-        content: str | dict
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+
+        content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
     async def files(self, subdata: str | None = None) -> Any:

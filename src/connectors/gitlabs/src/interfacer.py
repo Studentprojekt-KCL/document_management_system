@@ -26,11 +26,13 @@ class GitLabs:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
+    source_system: str | None
 
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
         address = os.environ.get("GITLAB_ADDRESS")
+        self.source_system = os.environ.get("GITLAB_SYSTEM_NAME")
         if address is None:
             dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
             return
@@ -155,6 +157,7 @@ class GitLabs:
                 "size": file.get("size"),
                 "last_edit_date": unpack_values(blame, (0, "commit", "committed_date")),
                 "type": SOURCE_FILE,
+                "source_system": self.source_system,
             }
         }
         file_path = file.get("file_path")

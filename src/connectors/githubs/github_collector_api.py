@@ -84,7 +84,3 @@ def run() -> None:
         )
         return
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))
-
-
-if __name__ == "__main__":
-    run()

@@ -73,7 +73,6 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        response: Any | None = self._get_file_from_pointer(pointer)
         client: Session = Session()
         responses: list[dict] = []
         for pointer in pointers:

@@ -58,9 +58,9 @@ class Handler:
                     new_files = self.connector.get_files()
             self.search_engine.add_files(new_files)
 
-        matches: list = self.search_engine.query_files(request, offset + count)[offset:count + offset]
+        matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = self.connector.fetch_files(matches)
-        classifications: dict = self.query.classify(matches) # Maybe should base this of the returned pointers from the connectors.
+        classifications: dict = self.query.classify(matches)  # Maybe should base this of the returned pointers from the connectors.
         for file in files:
             unique_pointer: str = file.get("unique_pointer", "")
             classification: str = classifications.get(unique_pointer, "")

@@ -1,12 +1,15 @@
-import json
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
+
 from os import environ
 from typing import Any
 
 from dmis_logger import dms_error, dms_warning
-from requests import exceptions, get, post
+from requests import exceptions, post
 
 
 class Query:
+    """Class handling query connections."""
+
     classify_url: str
 
     def __init__(self) -> None:
@@ -35,7 +38,7 @@ class Query:
             unique_pointer = r.get("unique_pointer")
             classification = r.get("Security-class")
             if unique_pointer is None or classifications is None:
-                dms_warning(f"Returned invalid response from classifier.")
+                dms_warning("Returned invalid response from classifier.")
                 continue
             classifications.update({unique_pointer: classification})
 
@@ -49,11 +52,7 @@ class Query:
         Returns: Result or None
         """
         try:
-            response = post(
-                self.classify_url,
-                json={"pointers": pointers},
-                timeout=120
-            ).json()
+            response = post(self.classify_url, json={"pointers": pointers}, timeout=120).json()
             return response
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.classify_url}.")
@@ -66,4 +65,3 @@ class Query:
         except exceptions.RequestException:
             dms_warning(f"Something went wrong, url: {self.classify_url}.")
         return None
-

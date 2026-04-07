@@ -234,7 +234,7 @@ class GitHub:
         return files
 
     def _get_clickable_url(self, full_name: str, file_path: str, ref: str) -> str:
-        owner, _, repo = full_name.partition("/")
+        _, _, repo = full_name.partition("/")
         if not repo:
             return ""
         return f"https://github.com/{full_name}/blob/{ref}/{file_path}"
@@ -331,6 +331,18 @@ class GitHub:
                 )
         return files_data
 
+    def _files_from_repo_zip(self, full_name: str, branch: str) -> list:
+        """Download archive for a repo branch; return file entries or [ ] on failure."""
+        owner, _, name = full_name.partition("/")
+        zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
+        resp = requests.get(zip_url, timeout=120)
+        if resp.status_code != 200:
+            dms_info(
+                f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}."
+            )
+            return []
+        return self._unpack_zip(resp.content, full_name, branch)
+
     def files_to_index(self, subdata: str | None = None) -> dict:
         """Same contract as GitLabs.files_to_index: {"files", "subdata"}."""
         provided_date = self._provided_date(subdata)
@@ -353,15 +365,7 @@ class GitHub:
             branch = repo.get("default_branch")
             if not isinstance(branch, str):
                 branch = self._default_branch_for_repo(fn)
-            owner, _, name = fn.partition("/")
-            zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
-            resp = requests.get(zip_url, timeout=120)
-            if resp.status_code != 200:
-                dms_info(
-                    f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {fn}."
-                )
-                continue
-            files_data.extend(self._unpack_zip(resp.content, fn, branch))
+            files_data.extend(self._files_from_repo_zip(fn, branch))
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
         return {"files": files_data, "subdata": generated_subdata}
@@ -421,4 +425,3 @@ class GitHub:
         if response.status_code != 200:
             dms_info(f"Request to {url} returned {response.status_code}.")
         return content
-

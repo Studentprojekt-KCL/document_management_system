@@ -77,6 +77,7 @@ class TestGitLabs(TestCase):
 
     def test_get_file(self):
         """Test get_file method."""
+        self.instance.source_system = "system"
         assert self.instance.get_file("test_url", True) == {
             "metadata": {
                 "unique_pointer": "test_url",
@@ -84,7 +85,7 @@ class TestGitLabs(TestCase):
                 "size": 0,
                 "last_edit_date": "1970-01-01T00:00:00.000Z",
                 "type": "source_file",
-                "source_system": None,
+                "source_system": "system",
             },
             "content": "unittest",
         }

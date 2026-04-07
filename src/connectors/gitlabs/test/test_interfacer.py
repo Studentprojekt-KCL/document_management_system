@@ -77,7 +77,6 @@ class TestGitLabs(TestCase):
 
     def test_get_file(self):
         """Test get_file method."""
-        print(self.instance.get_file("test_url", True))
         assert self.instance.get_file("test_url", True) == {
             "metadata": {
                 "unique_pointer": "test_url",

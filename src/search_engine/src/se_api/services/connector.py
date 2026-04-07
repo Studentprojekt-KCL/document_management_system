@@ -73,7 +73,7 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-
+        response: Any | None = self._get_file_from_pointer(pointer)
         client: Session = Session()
         responses: list[dict] = []
         for pointer in pointers:
@@ -141,9 +141,7 @@ class Connector:
         """Get file pointers"""
         try:
             return get(
-                self.url_files,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                timeout=Connector.TIMEOUT
+                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
             ).json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
@@ -195,7 +193,6 @@ class Connector:
 
     def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
-        print([("subdata", self.subdata)] if self.subdata is not None else None)
         try:
             return get(
                 self.url_files_to_index,

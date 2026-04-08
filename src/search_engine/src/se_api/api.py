@@ -2,11 +2,9 @@
 
 import argparse
 import logging
-from os import environ
 from typing import Any
 from collections.abc import Sequence
 
-from dmis_logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -47,23 +46,8 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
             self.log_level = "info"
 
-        port: str | None = environ.get("SE_API_PORT")
-        host: str | None = environ.get("SE_API_HOST")
-
-        if port is None:
-            dms_error("SE_API_PORT is not defined.")
-            return
-        if host is None:
-            dms_error("SE_API_HOST is not defined.")
-            return
-
-        if not port.isdigit():
-            dms_error("Port is expected to be an integer.")
-        elif int(port) < 0 or int(port) >= self.MAX_PORT:
-            dms_error(f"Port should be between 0 and {self.MAX_PORT}.")
-
-        self.port = int(port)
-        self.host = host
+        self.port: int = read_port("SE_API_PORT")
+        self.host: str = read_env_variable("SE_API_HOST")
 
         self.handler = Handler()
 

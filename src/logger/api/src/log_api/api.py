@@ -1,7 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import argparse
-from os import environ
 from typing import Any
 from collections.abc import Sequence
 from datetime import datetime, timedelta

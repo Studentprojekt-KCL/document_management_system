@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-from os import environ
 from typing import Any
 from collections.abc import Sequence
 
@@ -14,6 +13,7 @@ from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
 from initialisation_tools import read_env_variable, read_port
+
 
 class API:
     """API object, holds all endpoints and configuration.

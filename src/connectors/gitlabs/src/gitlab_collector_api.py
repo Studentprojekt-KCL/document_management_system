@@ -68,5 +68,8 @@ def run() -> None:
         api.log_level = "debug"
 
     uvicorn.run(
-        api.app, host=read_env_variable("GITLAB_CONNECTOR_BIND_ADDR"), log_level=api.log_level, port=read_port("GITLAB_CONNECTOR_PORT")
+        api.app,
+        host=read_env_variable("GITLAB_CONNECTOR_BIND_ADDR"),
+        log_level=api.log_level,
+        port=read_port("GITLAB_CONNECTOR_PORT"),
     )

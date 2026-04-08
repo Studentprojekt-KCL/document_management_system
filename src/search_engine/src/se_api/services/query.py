@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from os import environ
 from typing import Any
 
 from dmis_logger import dms_error, dms_warning

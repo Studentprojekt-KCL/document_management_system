@@ -1,8 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import os
 from datetime import datetime
-from dmis_logger import dms_error
 import mysql.connector
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from mysql.connector.pooling import PooledMySQLConnection
@@ -10,6 +8,7 @@ from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
 from initialisation_tools import read_env_variable
+
 
 class Database:
     """Service class for the database."""

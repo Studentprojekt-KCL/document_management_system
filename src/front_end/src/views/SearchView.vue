@@ -28,7 +28,7 @@ const lastQuery = ref('')
 const isPreviewOpen = ref(false)
 
 /* Base URL for API requests, configurable via environment variable */
-const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {

@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import os
 import re
 from urllib.parse import urljoin
 import base64
@@ -17,6 +16,7 @@ from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
+from initialisation_tools import read_env_variable
 
 
 class GitLabs:
@@ -26,16 +26,13 @@ class GitLabs:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
-    source_system: str | None
+    source_system: str
 
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        address = os.environ.get("GITLAB_ADDRESS")
-        self.source_system = os.environ.get("GITLAB_SYSTEM_NAME")
-        if address is None:
-            dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
-            return
+        address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
         if not address.endswith("/"):
             address += "/"
         self.base = urljoin(str(address), self.API_URL)

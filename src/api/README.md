@@ -17,8 +17,9 @@ nano .env
 DMIS_SEARCH_API_URL=http://<ip-address>
 DMIS_QUERY_API_URL=http://<ip-adress>
 API_PORT=XXXX
-API_BIND_ADDRESS=0.0.0.0
-API_ALLOW_ORIGIN=http://localhost:8000
+KEYCLOAK_ISSUER=https://KEYCLOAK_IP/realms/master
+KEYCLOAK_AUDIENCE=FRONTEND_IP
+KEYCLOAK_JWKS_URL=https://KEYCLOAK_IP/realms/master/protocol/openid-connect/certs
 
 ### 1. Build the image from the project root:
 

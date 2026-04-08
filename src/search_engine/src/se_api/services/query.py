@@ -1,10 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from os import environ
 from typing import Any
 
 from dmis_logger import dms_error, dms_warning
 from requests import exceptions, post
-from initialisation_tools import read_env_variable
 
 
 class Query:
@@ -13,7 +13,7 @@ class Query:
     classify_url: str
 
     def __init__(self) -> None:
-        address: str = read_env_variable("SE_API_QUERY_ADDRESS")
+        address: str | None = environ.get("SE_API_QUERY_ADDRESS")
 
         if address is None:
             dms_error("SE_API_QUERY_ADDRESS is not defined.")

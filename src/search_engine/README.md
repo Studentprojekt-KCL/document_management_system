@@ -10,7 +10,7 @@ Performs a search and returns the metadata for the result.
 
 - `query`: search query, required.
 - `count`: page size, default 10.
-- `offset`: page index, default 1.
+- `offset`: page index, default 0.
 
 ```url
 http://<host>:<port>/search?q=<search query>&k=<page size>&p=<page index>

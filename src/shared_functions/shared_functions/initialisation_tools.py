@@ -20,12 +20,12 @@ def read_port(env_variable: str, allowed_ports: tuple[int, ...] = tuple(range(0,
 
 
 def read_env_variable(env_variable: str) -> str:
-    """Read host from local environement variable.
+    """Read env_variable from local environement.
 
     Args:
         env_varaible: Name of env variable.
     """
-    host = environ.get(env_variable)
-    if not host or not isinstance(host, str):
+    variable = environ.get(env_variable)
+    if not variable or not isinstance(variable, str):
         dms_error(f"{env_variable} must be set in local environement.")
-    return host  # type: ignore
+    return variable  # type: ignore

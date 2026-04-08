@@ -69,7 +69,7 @@ class API:
         try:
             response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.search_api_url}/search",
-                params={"q": query},
+                params={"query": query},
                 timeout=120,
             )
             response.raise_for_status()

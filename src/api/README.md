@@ -13,12 +13,10 @@ Expected "200 ok" code
 
 Create .env in src/api/src
 
-nano .env
-DMIS_SEARCH_API_URL=http://<ip-address>
-DMIS_QUERY_API_URL=http://<ip-adress>
-API_PORT=XXXX
-API_BIND_ADDRESS=0.0.0.0
-API_ALLOW_ORIGIN=http://localhost:8000
+  DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+  DMIS_QUERY_API_URL=<DMIS_QUERY_API>
+  API_PORT=XXXX
+  API_BIND_ADDRESS=<BIND_ADDR>
 
 ### 1. Build the image from the project root:
 

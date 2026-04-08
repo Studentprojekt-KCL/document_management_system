@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import os
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 import requests
 import uvicorn
@@ -13,14 +13,15 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from dmis_logger import dms_warning, dms_error, dms_info
+from dmis_logger import dms_warning, dms_info
 from .auth import TokenVerifier
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
     """Management class for main API."""
 
-    app: FastAPI = FastAPI()
+    #app: FastAPI = FastAPI()
 
     log_level: str | None = None
     search_api_url: str
@@ -33,7 +34,6 @@ class API:
         query_api_url: str,
         keycloak_issuer: str,
         keycloak_jwks_url: str,
-        keycloak_audience: str | None = None,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -45,7 +45,6 @@ class API:
         self.token_verifier = TokenVerifier(
             issuer=keycloak_issuer,
             jwks_url=keycloak_jwks_url,
-            audience=keycloak_audience,
         )
 
         self.app.add_exception_handler(
@@ -64,11 +63,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict[str, Any]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
 
@@ -92,7 +87,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.get(
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.search_api_url}/search",
                 params={"query": query},
                 timeout=120,
@@ -126,7 +121,7 @@ class API:
         """Forward summary request to upstream summary API and return response."""
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
-            f"Authorized search request: "
+            f"Authorized summary request: "
             f"sub={claims.get('sub')} "
             f"user={claims.get('preferred_username')} "
             f"azp={claims.get('azp')}"
@@ -138,7 +133,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.post(
+            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.query_api_url}/summarize",
                 json={"pointers": [file_pointer]},
                 timeout=100,
@@ -160,41 +155,12 @@ def run() -> None:
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    bind_address = os.environ.get("API_BIND_ADDRESS")
-    port_str = os.environ.get("API_PORT")
-    search_api_url = os.getenv("DMIS_SEARCH_API_URL")
-    query_api_url = os.getenv("DMIS_QUERY_API_URL")
-    keycloak_issuer = os.getenv("KEYCLOAK_ISSUER")
-    keycloak_jwks_url = os.getenv("KEYCLOAK_JWKS_URL")
-    keycloak_audience = os.getenv("KEYCLOAK_AUDIENCE")
-
-    if bind_address is None:
-        dms_error("API_BIND_ADDRESS is not defined.")
-        return
-    if port_str is None:
-        dms_error("API_PORT is not defined.")
-        return
-
-    try:
-        port = int(port_str)
-    except ValueError:
-        dms_error("API_PORT expected int.")
-        return
-    if port <= 0 or port >= 65535:
-        dms_error("API_PORT should be between 0 and 65535.")
-        return
-    if not search_api_url:
-        dms_error("DMIS_SEARCH_API_URL is not set.")
-        return
-    if not query_api_url:
-        dms_error("DMIS_QUERY_API_URL is not set.")
-        return
-    if not keycloak_issuer:
-        dms_error("KEYCLOAK_ISSUER is not set.")
-        return
-    if not keycloak_jwks_url:
-        dms_error("KEYCLOAK_JWKS_URL is not set.")
-        return
+    bind_address = read_env_variable("API_BIND_ADDRESS")
+    port = read_port("API_PORT")
+    search_api_url = read_env_variable("DMIS_SEARCH_API_URL")
+    query_api_url = read_env_variable("DMIS_QUERY_API_URL")
+    keycloak_issuer = read_env_variable("KEYCLOAK_ISSUER")
+    keycloak_jwks_url = read_env_variable("KEYCLOAK_JWKS_URL")
 
     log_level = "debug" if args.dev else None
 
@@ -203,7 +169,6 @@ def run() -> None:
         query_api_url=query_api_url,
         keycloak_issuer=keycloak_issuer,
         keycloak_jwks_url=keycloak_jwks_url,
-        keycloak_audience=keycloak_audience,
         log_level=log_level,
     )
 

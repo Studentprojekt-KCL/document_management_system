@@ -43,31 +43,31 @@ class TestConnector(TestCase):
         result = self.instance.get_file_pointers()
         assert result == ["pointer-1", "pointer-2", "pointer-3"]
 
-    # ==== GET_FILE_FROM_POINTER ====
+    # ==== FETCH_FILES_FROM_POINTERS ====
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointer")
-    def test_get_file_dict(self, mock_get_file_from_pointer):
+    def test_fetch_files_dict(self, mock_get_file_from_pointer):
         mock_get_file_from_pointer.return_value = {}
-        result = self.instance.get_file("")
-        assert result == {}
+        result = self.instance.fetch_files(["pointer"])
+        assert result == []
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointer")
-    def test_get_file_list(self, mock_get_file_from_pointer):
+    def test_fetch_files_list(self, mock_get_file_from_pointer):
         mock_get_file_from_pointer.return_value = []
-        result = self.instance.get_file("")
-        assert result is None
+        result = self.instance.fetch_files(["pointer"])
+        assert result == []
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointer")
-    def test_get_file_empty(self, mock_get_file_from_pointer):
+    def test_fetch_files_empty(self, mock_get_file_from_pointer):
         mock_get_file_from_pointer.return_value = None
-        result = self.instance.get_file("")
-        assert result is None
+        result = self.instance.fetch_files(["pointer"])
+        assert result == []
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointer")
-    def test_get_file_full(self, mock_get_file_from_pointer):
-        mock_get_file_from_pointer.return_value = {"content": "content", "metadata": {"item1": "item", "item2": "item"}}
-        result = self.instance.get_file("")
-        assert result == {"content": "content", "metadata": {"item1": "item", "item2": "item"}}
+    def test_fetch_files_full(self, mock_get_file_from_pointer):
+        mock_get_file_from_pointer.return_value = {"metadata": {"item1": "item", "item2": "item"}}
+        result = self.instance.fetch_files(["pointer"])
+        assert result == [{"item1": "item", "item2": "item"}]
 
     # ==== GET_FILE ====
 

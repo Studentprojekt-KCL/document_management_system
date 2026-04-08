@@ -66,15 +66,12 @@ The only way to access the DMS now is through logging in.
 Any attempt to bypass the path by adding /search would result in being redirected to the / path.
 1. ```http://localhost:8080``` / ```http://localhost:5173```
 2. Rress login
-3. Enter credentials
-   > frontend_tester
-
-   > password
+3. Enter credentials for an ordinary user or admin
 5. Access to DMS
 ________________________________________
 
 # Keycloak
-To access keycloak you can go to: ```https://Keycloak```
+To access keycloak you can go to the keycloak site. 
 
 Log in as admin
 

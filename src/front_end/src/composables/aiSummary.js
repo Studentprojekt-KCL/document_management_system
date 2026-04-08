@@ -37,7 +37,7 @@ export function useAISummary(props) {
     try {
       const response = await globalThis.fetch(`${API_BASE_URL}/summary`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${access_token}`
         },

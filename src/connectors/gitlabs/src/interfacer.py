@@ -216,7 +216,11 @@ class GitLabs:
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
 
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+        if subdata is None:
+            latest_update = datetime.min.replace(tzinfo=timezone.utc)
+        else:
+            latest_update = provided_date
+
         for project in projects:
             project_id = project.get("id")
             new_timestamp = current_subdata.get(project_id)

@@ -32,11 +32,15 @@ export function useAISummary(props) {
     aiSummary.value = ''
     aiSummaryHtmlRaw.value = ''
     summaryPointer.value = ''
+    const access_token = sessionStorage.getItem('access_token')
 
     try {
       const response = await globalThis.fetch(`${API_BASE_URL}/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${access_token}`
+        },
         body: JSON.stringify({ file_pointer: uniquePointer.value })
       })
 

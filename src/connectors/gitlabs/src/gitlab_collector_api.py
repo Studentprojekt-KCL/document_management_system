@@ -13,7 +13,6 @@ from fastapi.encoders import jsonable_encoder
 from interfacer import GitLabs
 from boto_tools import upload_file
 
-from dmis_logger import dms_error
 from initialisation_tools import read_port, read_env_variable
 
 

@@ -56,10 +56,10 @@ const handleSearch = async (query) => {
   isSearching.value = true
   try {
     const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`, {
-      headers:{
-        "Authorization": `Bearer ${access_token}`,
-    },
-  })
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    })
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`

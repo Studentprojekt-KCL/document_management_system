@@ -1,7 +1,8 @@
 The following needs to be exported in local environment:
 
     GITLAB_CONNECTOR_PORT=<CONNECTOR_PORT>
-    GITLAB_ADDRESS=<GITLABB_ADDRESS>
+    GITLAB_ADDRESS=<GITLAB_ADDRESS>
+    GITLAB_CONNECTOR_BIND_ADDR=<GITLAB_CONNECTOR_BIND_ADDR>
     GITLAB_SYSTEM_NAME=<Name to display in frontend for this Gitlab instance (e.g. 'gitlab').>
 
 

@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+<<<<<<< HEAD
 from os import environ
 from typing import Any
 
@@ -7,20 +8,22 @@ from dmis_logger import dms_error, dms_info, dms_warning
 from requests import exceptions, post
 
 from se_api.services.classifier_cache import ClassifierCache
+=======
+from typing import Any
+
+from dmis_logger import dms_error, dms_warning
+from requests import exceptions, post
+from initialisation_tools import read_env_variable
+>>>>>>> develop
 
 
 class Query:
     """Class handling query connections."""
 
     classify_url: str
-    cache: ClassifierCache
 
     def __init__(self) -> None:
-        address: str | None = environ.get("SE_API_QUERY_ADDRESS")
-
-        if address is None:
-            dms_error("SE_API_QUERY_ADDRESS is not defined.")
-            return
+        address: str = read_env_variable("SE_API_QUERY_ADDRESS")
 
         self.classify_url = address.rstrip("/") + "/classify"
         self.cache = ClassifierCache()
@@ -47,7 +50,6 @@ class Query:
         if not isinstance(response, list):
             dms_warning(f"Query returned unreqognized structure, url {self.classify_url}.")
             return {}
-
 
         for r in response:
             if not isinstance(r, dict):

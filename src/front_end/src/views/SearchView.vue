@@ -27,7 +27,7 @@ const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
-
+const access_token = sessionStorage.getItem('access_token')
 /* Base URL for API requests, configurable via environment variable */
 const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
 
@@ -55,7 +55,11 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
+    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    })
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`

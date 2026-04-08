@@ -3,14 +3,17 @@
 from os import environ
 from typing import Any
 
-from dmis_logger import dms_error, dms_warning
+from dmis_logger import dms_error, dms_info, dms_warning
 from requests import exceptions, post
+
+from se_api.services.classifier_cache import ClassifierCache
 
 
 class Query:
     """Class handling query connections."""
 
     classify_url: str
+    cache: ClassifierCache
 
     def __init__(self) -> None:
         address: str | None = environ.get("SE_API_QUERY_ADDRESS")
@@ -20,6 +23,7 @@ class Query:
             return
 
         self.classify_url = address.rstrip("/") + "/classify"
+        self.cache = ClassifierCache()
 
     def classify(self, pointers: list[str]) -> dict[str, str]:
         """Classify the files at the pointers.
@@ -28,19 +32,34 @@ class Query:
             pointers: list of unique file pointers
         Returns: list of file pointers with their classification.
         """
+        classifications: dict[str, str] = {}
+
+        for pointer in pointers:
+            dms_info(f"Checking {pointer}")
+            classification: str | None = self.cache.fetch_classification(pointer)
+            if classification is not None:
+                classifications.update({pointer: classification})
+                pointers.remove(pointer)
+            else:
+                dms_info(f"Cache not found {pointer}")
+
         response: Any | None = self._get_classification(pointers)
         if not isinstance(response, list):
             dms_warning(f"Query returned unreqognized structure, url {self.classify_url}.")
             return {}
 
-        classifications: dict[str, str] = {}
+
         for r in response:
-            unique_pointer = r.get("unique_pointer")
-            classification = r.get("Security-class")
-            if unique_pointer is None or classifications is None:
-                dms_warning("Returned invalid response from classifier.")
+            if not isinstance(r, dict):
+                dms_warning("Returned invalid response from classifier, expected list of dicts.")
+                continue
+            unique_pointer: str | None = r.get("unique_pointer")
+            classification: str | None = r.get("Security-class")
+            if unique_pointer is None or classification is None:
+                dms_warning("Returned invalid response from classifier, neither unique_pointer or Security-class does not exist.")
                 continue
             classifications.update({unique_pointer: classification})
+            self.cache.add_classification(unique_pointer, classification)
 
         return classifications
 

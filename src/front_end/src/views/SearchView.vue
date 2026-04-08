@@ -16,10 +16,11 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveFilename } from '@/composables/useSearchMetadata'
+import { resolveFilename, TYPE_FILTERS } from '@/composables/useSearchMetadata'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
+const allMatches = ref([])
 const selectedFile = ref('')
 const selectedMatch = ref(null)
 const error = ref('')
@@ -29,6 +30,13 @@ const isPreviewOpen = ref(false)
 
 /* Base URL for API requests, configurable via environment variable */
 const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
+
+/* Filters so it can access matches */
+const selectedFilters = ref({
+  source: [],
+  type: [],
+  security: []
+})
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {
@@ -56,7 +64,10 @@ const handleSearch = async (query) => {
 
     const data = await res.json()
     console.log('Search response:', data)
-    matches.value = Array.isArray(data) ? data : data.results || data.matches || []
+    const resultArray = Array.isArray(data) ? data : data.results || data.matches || []
+
+    allMatches.value = resultArray
+    matches.value = resultArray
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
@@ -84,9 +95,47 @@ const closePreview = () => {
   isPreviewOpen.value = false
 }
 
-/* Handle changes to search filters (currently just logs the change) */
-const handleFilterChange = (filter) => {
-  console.log('Filter changed:', filter)
+/* Handle changes to search filters  */
+// TODO: add source & security filtering.
+const handleFilterChange = (filters) => {
+  selectedFilters.value = filters
+  console.log('Filter changed:', filters)
+  // If no filters → show everything
+  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
+    matches.value = allMatches.value
+    return
+  }
+  matches.value = allMatches.value.filter((match) => {
+    const filename = (match.filename || match.name || '').toLowerCase()
+    // const securityClass = resolveSecurityClass(match).toLowerCase()
+    // const source = (match.source || '').toLowerCase()
+
+    // TYPE FILTER
+    const typeMatch =
+      filters.type.length === 0 ||
+      filters.type.some((filterLabel) => {
+        // Find the TYPE_KEYWORDS entry that matches the selected filter
+        const keywordsEntry = Object.entries(TYPE_FILTERS).find(([docType]) => docType === filterLabel)
+
+        if (!keywordsEntry) return false
+
+        const [, keywords] = keywordsEntry
+
+        // Only match filename against the keywords for this filter
+        return keywords.some((kw) => filename.endsWith(kw))
+      })
+
+    // SOURCE FILTER
+    // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
+
+    // SECURITY FILTER
+    // const securityMatch =
+    //  filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+
+    // add sourceMatch and secuirtyMatch later
+    // return typeMatch && sourceMatch && secuirtyMatch
+    return typeMatch //&& securityMatch
+  })
 }
 </script>
 
@@ -97,7 +146,7 @@ const handleFilterChange = (filter) => {
     <SearchBar :loading="isSearching" @search="handleSearch" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard @filter-change="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

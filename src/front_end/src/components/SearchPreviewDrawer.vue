@@ -10,6 +10,7 @@
 
 import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { useAISummary } from '@/composables/aiSummary'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -24,6 +25,9 @@ const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
 const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } = useSearchMetadata(props)
+
+/* AI summary composable */
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 </script>
 
 <template>
@@ -47,15 +51,6 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
         <span class="tag">{{ previewType }}</span>
       </div>
 
-      <!-- AI Summary section -->
-      <section class="panel-section">
-        <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
-        <p class="section-title">AI SUMMARY</p>
-        <div class="generate-summary">
-          <p class="summary-card"><StarsIcon :size="13" />Generate AI summary</p>
-        </div>
-      </section>
-
       <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
@@ -73,6 +68,27 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
             <p><FileType2 :size="13" /> {{ previewType }}</p>
           </div>
         </div>
+      </section>
+
+      <!-- AI Summary section -->
+      <section class="panel-section">
+        <p class="section-title">AI SUMMARY</p>
+        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
+          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isGeneratingSummary"
+          @click="generateAISummary"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
+          </p>
+          <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
+        </button>
       </section>
     </div>
 
@@ -102,7 +118,7 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
   top: 0;
   right: 0;
   height: 100vh;
-  width: min(520px, 92vw);
+  width: min(700px, 100vw);
   background: #ffffff;
   transform: translateX(100%);
   transition: transform 0.25s ease;
@@ -180,21 +196,6 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
   align-items: center;
 }
 
-/* QUICK FIX: This should be a button, but we can iterate later */
-.summary-card {
-  border: 1px solid #e2e8f0;
-  background: #f8faff;
-  border-radius: 12px;
-  padding: 0.75rem;
-  color: #334155;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -222,6 +223,33 @@ const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink } 
   gap: 0.32rem;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.meta-cell-summary {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.summary-markdown {
+  padding: 1rem 1.5rem;
+}
+
+.summary-cell-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+
+.summary-cell-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-cell-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
 }
 
 .preview-footer {

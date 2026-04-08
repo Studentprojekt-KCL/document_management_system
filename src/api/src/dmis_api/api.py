@@ -21,8 +21,6 @@ from initialisation_tools import read_env_variable, read_port
 class API:
     """Management class for main API."""
 
-    #app: FastAPI = FastAPI()
-
     log_level: str | None = None
     search_api_url: str
     query_api_url: str
@@ -34,6 +32,7 @@ class API:
         query_api_url: str,
         keycloak_issuer: str,
         keycloak_jwks_url: str,
+        keycloak_expected_azp: str,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -45,6 +44,7 @@ class API:
         self.token_verifier = TokenVerifier(
             issuer=keycloak_issuer,
             jwks_url=keycloak_jwks_url,
+            expected_azp=keycloak_expected_azp,
         )
 
         self.app.add_exception_handler(
@@ -161,6 +161,7 @@ def run() -> None:
     query_api_url = read_env_variable("DMIS_QUERY_API_URL")
     keycloak_issuer = read_env_variable("KEYCLOAK_ISSUER")
     keycloak_jwks_url = read_env_variable("KEYCLOAK_JWKS_URL")
+    keycloak_expected_azp = read_env_variable("KEYCLOAK_EXPECTED_AZP")
 
     log_level = "debug" if args.dev else None
 
@@ -169,6 +170,7 @@ def run() -> None:
         query_api_url=query_api_url,
         keycloak_issuer=keycloak_issuer,
         keycloak_jwks_url=keycloak_jwks_url,
+        keycloak_expected_azp=keycloak_expected_azp,
         log_level=log_level,
     )
 

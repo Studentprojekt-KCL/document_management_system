@@ -14,11 +14,12 @@ Expected "200 ok" code
 Create .env in src/api/src
 
 nano .env
-DMIS_SEARCH_API_URL=http://<ip-address>
-DMIS_QUERY_API_URL=http://<ip-adress>
+DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+DMIS_QUERY_API_URL=<DMIS_QUERY_API>
 API_PORT=XXXX
-KEYCLOAK_ISSUER=https://KEYCLOAK_IP/realms/master
-KEYCLOAK_JWKS_URL=https://KEYCLOAK_IP/realms/master/protocol/openid-connect/certs
+KEYCLOAK_ISSUER=https://<KEYCLOAK_IP>/realms/master
+KEYCLOAK_JWKS_URL=https://<KEYCLOAK_IP>/realms/master/protocol/openid-connect/certs
+KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
 
 ### 1. Build the image from the project root:
 

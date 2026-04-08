@@ -1,0 +1,133 @@
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: caddy-edge
+    restart: always
+    volumes:
+      - caddy-config:/config
+      - caddy-data:/data
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      edge:
+    environment:
+      - CLOUDFLARE_EMAIL=${CF_EMAIL}
+      - CLOUDFLARE_API_TOKEN=${CF_API_TOKEN}
+      - ACME_AGREE=true
+      
+  log-api:
+    image: registry.dms-lookup.com/log-api:prod
+    container_name: log-api
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_LOG_API}
+    environment:
+      LOGGER_BIND_ADDRESS: ${LOGGER_BIND_ADDRESS}
+      LOGGER_PORT: ${LOGGER_PORT}
+      LOGGER_DB_HOST: ${LOGGER_DB_HOST}
+      LOGGER_DB_USER: ${LOGGER_DB_USER}
+      LOGGER_DB_PASS: ${LOGGER_DB_PASS}
+      LOGGER_DB_DATABASE: ${LOGGER_DB_DATABASE}
+
+  log-database:
+    image: registry.dms-lookup.com/log-database:prod
+    container_name: log-database
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_LOG_DB}
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: ${MYSQL_RANDOM_ROOT_PASSWORD}
+
+  search-engine:
+    image: registry.dms-lookup.com/search-engine:prod
+    container_name: search-engine
+    restart: always
+    networks:
+      dmis-api_search-engine
+    environment:
+      SE_API_PORT: ${SE_API_PORT}
+      SE_API_CONNECTOR_ADDRESS: ${SE_API_CONNECTOR_ADDRESS}
+      SE_API_HOST: ${SE_API_HOST}
+
+  dmis-api:
+    image: registry.dms-lookup.com/dmis-api:prod
+    container_name: dmis-api
+    restart: always
+    networks:
+      dmis-api_search-engine
+      front-end_dmis-api
+    environment:
+      DMIS_SEARCH_API_URL: ${DMIS_SEARCH_API_URL}
+
+  front-end:
+    image: registry.dms-lookup.com/front-end:prod
+    container_name: front-end
+    restart: always
+    networks:
+      edge:
+      front-end_dmis-api:
+    environment:
+      API_HOST: ${API_HOST}
+
+  connector-gitlabs:
+    image: registry.dms-lookup.com/connector-gitlabs:prod
+    container_name: connector-gitlabs
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONNECTOR_GITLABS}
+    environment:
+      GITLAB_CONNECTOR_PORT: ${GITLAB_CONNECTOR_PORT}
+      GITLAB_ADDRESS: ${GITLAB_ADDRESS}
+      MINIO_ACCESS_ADDRESS: ${MINIO_ACCESS_ADDRESS}
+      MINIO_USERNAME: ${MINIO_USERNAME}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+
+  connector-minio:
+    image: registry.dms-lookup.com/connector-minio:prod
+    container_name: connector-minio
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONNECTOR_MINIO}
+    environment:
+      MINIO_ACCESS_ADDRESS: ${MINIO_ACCESS_ADDRESS_LOCAL}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_USERNAME: ${MINIO_USERNAME}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+
+  stochastic-analyzer:
+    image: registry.dms-lookup.com/stochastic-analyzer:prod
+    container_name: stochastic-analyzer
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_STOCHASTIC_ANALYZER}
+    environment:
+      BIND: ${BIND}
+      PORT: ${PORT}
+      TEI_URL: ${TEI_URL}
+      CLASSIFIER_URL: ${CLASSIFIER_URL}
+      MINISTRAL_URL: ${MINISTRAL_URL}
+      MINISTRAL_MODEL: ${MINISTRAL_MODEL}
+      CONNECTOR_ADDRESS: ${CONNECTOR_ADDRESS}
+
+volumes:
+  caddy-config:
+  caddy-data:
+
+networks:
+  edge:
+  front-end_dmis-api:
+  connector-gitlabs_connector-minio:
+  dmis-api_search-engine: 

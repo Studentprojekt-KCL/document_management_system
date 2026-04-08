@@ -26,12 +26,13 @@ class GitLabs:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
-    source_system: str | None
+    source_system: str
 
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
         address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
         if not address.endswith("/"):
             address += "/"
         self.base = urljoin(str(address), self.API_URL)

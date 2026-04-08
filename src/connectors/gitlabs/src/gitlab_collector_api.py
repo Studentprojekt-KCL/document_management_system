@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import os
 from typing import Any
 import argparse
 
@@ -13,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from interfacer import GitLabs
 from boto_tools import upload_file
 
-from dmis_logger import dms_error
+from initialisation_tools import read_port, read_env_variable
 
 
 class API:
@@ -68,8 +67,9 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = os.environ.get("GITLAB_CONNECTOR_PORT")
-    if port is None or not port.isdigit():
-        dms_error("Port for Gitlab connector not set in local environment, please export GITLAB_CONNECTOR_PORT.")
-        return
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))
+    uvicorn.run(
+        api.app,
+        host=read_env_variable("GITLAB_CONNECTOR_BIND_ADDR"),
+        log_level=api.log_level,
+        port=read_port("GITLAB_CONNECTOR_PORT"),
+    )

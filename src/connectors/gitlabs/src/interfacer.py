@@ -32,15 +32,7 @@ class GitLabs:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-<<<<<<< HEAD
-        address = os.environ.get("GITLAB_ADDRESS")
-        self.source_system = os.environ.get("GITLAB_SYSTEM_NAME")
-        if address is None:
-            dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
-            return
-=======
         address = read_env_variable("GITLAB_ADDRESS")
->>>>>>> 9c7322c (Connector migrated to shared env parser)
         if not address.endswith("/"):
             address += "/"
         self.base = urljoin(str(address), self.API_URL)

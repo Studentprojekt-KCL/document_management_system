@@ -16,7 +16,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveFilename, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { resolveFilename, resolveSecurityClass, TYPE_FILTERS } from '@/composables/useSearchMetadata'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
@@ -27,7 +27,7 @@ const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
-
+const access_token = sessionStorage.getItem('access_token')
 /* Base URL for API requests, configurable via environment variable */
 const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
 
@@ -55,7 +55,11 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
+    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    })
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
@@ -107,7 +111,7 @@ const handleFilterChange = (filters) => {
   }
   matches.value = allMatches.value.filter((match) => {
     const filename = (match.filename || match.name || '').toLowerCase()
-    // const securityClass = resolveSecurityClass(match).toLowerCase()
+    const securityClass = resolveSecurityClass(match).toLowerCase()
     // const source = (match.source || '').toLowerCase()
 
     // TYPE FILTER
@@ -129,12 +133,12 @@ const handleFilterChange = (filters) => {
     // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
-    // const securityMatch =
-    //  filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+    const securityMatch =
+      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
     // add sourceMatch and secuirtyMatch later
     // return typeMatch && sourceMatch && secuirtyMatch
-    return typeMatch //&& securityMatch
+    return typeMatch && securityMatch
   })
 }
 </script>

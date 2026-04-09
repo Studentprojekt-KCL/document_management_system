@@ -22,7 +22,7 @@ class Connector:
     address: str
     subdata: str | None
 
-    url_files: str
+    index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
 

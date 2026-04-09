@@ -157,25 +157,23 @@ class GitLabs:
             file = {}
 
         base_structure: dict[Any, Any] = {
-            "metadata": {
-                "unique_pointer": url,
-                "name": file.get("file_name"),
-                "size": file.get("size"),
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
-            }
+            "unique_pointer": url,
+            "name": file.get("file_name"),
+            "size": file.get("size"),
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
         }
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
                 self.blame_cache[url] = self._execute_request(url)
-            base_structure["metadata"] |= {
+            base_structure |= {
                 "last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))
             }
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):
-            base_structure["metadata"] |= {"clickable_url": self._get_clickable_url(url, file_path)}
+            base_structure |= {"clickable_url": self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}

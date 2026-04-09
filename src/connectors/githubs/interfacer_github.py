@@ -336,7 +336,7 @@ class GitHub:
         owner, _, name = full_name.partition("/")
         zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
         resp = requests.get(zip_url, timeout=120)
-        if resp.status_code != 200:
+        if resp.status_code != requests.codes.ok:
             dms_info(
                 f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}."
             )
@@ -422,6 +422,6 @@ class GitHub:
         except requests.exceptions.MissingSchema as err:
             dms_error(f"GitHub API URL incorrectly formatted. (From error: {err})")
             return {}
-        if response.status_code != 200:
+        if response.status_code != requests.codes.ok:
             dms_info(f"Request to {url} returned {response.status_code}.")
         return content

@@ -14,6 +14,9 @@ SWEDISH_STOPWORDS = {"och", "är", "det", "på", "i", "av", "för", "med", "som"
 MIN_DOC_LENGTH = 50
 SAMPLE_SIZE = 5000  # Only scan first 5K chars for language detection
 
+SWEDISH_CHAR_THRESHOLD = 2
+SWEDISH_STOPWORD_THRESHOLD = 3
+
 def detect_language(text: str) -> str:
     """Detect Swedish via early-exit heuristic on sampled prefix. Fast & injection-resistant."""
     if len(text) < MIN_DOC_LENGTH:
@@ -27,13 +30,13 @@ def detect_language(text: str) -> str:
     for char in sample:
         if char in SWEDISH_CHARS:
             swedish_char_count += 1
-            if swedish_char_count >= 2:
+            if swedish_char_count >= SWEDISH_CHAR_THRESHOLD:
                 return "swedish"
 
     # Fallback: check for common Swedish stopwords (≥3 matches = likely Swedish)
     words = sample.split()
     swedish_word_hits = sum(1 for word in words if word in SWEDISH_STOPWORDS)
-    return "swedish" if swedish_word_hits >= 3 else "english"
+    return "swedish" if swedish_word_hits >= SWEDISH_STOPWORD_THRESHOLD else "english"
 
 async def summarize_documents(items: list[InputItem], ministral_url: str, ministral_model: str) -> SummaryResult | None:
     """Synthesize multiple documents into a single summary via the Ministral LLM."""

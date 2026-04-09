@@ -9,7 +9,6 @@ Same format as GitLab.
 """
 
 import argparse
-import os
 from typing import Any
 
 import uvicorn
@@ -19,8 +18,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from boto_tools import upload_file
-from dmis_logger import dms_error
 from interfacer_github import GitHub
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -75,14 +74,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = os.environ.get("GITHUB_CONNECTOR_PORT")
-    if port is None or not port.isdigit():
-        dms_error("Port for GitHub connector not set in local environment, please export GITHUB_CONNECTOR_PORT.")
-        return
+    port = read_port("GITHUB_CONNECTOR_PORT")
+    host = read_env_variable("GITHUB_CONNECTOR_HOST")
 
-    host = os.environ.get("GITHUB_CONNECTOR_HOST")
-    if not host:
-        dms_error("Host for GitHub connector not set in local environment, please export GITHUB_CONNECTOR_HOST.")
-        return
-
-    uvicorn.run(api.app, host=host, log_level=api.log_level, port=int(port))
+    uvicorn.run(api.app, host=host, log_level=api.log_level, port=port)

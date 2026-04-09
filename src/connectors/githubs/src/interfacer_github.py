@@ -41,22 +41,24 @@ class GitHub:
             raise ValueError("Missing GITHUB_API_URL")
         self.source_system = read_env_variable("GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
+        self.org = os.environ.get("GITHUB_ORG")
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()
         self._configure_auth()
 
     def _set_default_headers(self) -> None:
+        api_version = read_env_variable("GITHUB_API_VERSION")
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
+                "X-GitHub-Api-Version": api_version,
             }
         )
 
     @staticmethod
     def _auth_mode() -> str:
-        raw_mode = os.environ.get("GITHUB_AUTH_MODE", "auto").strip().lower()
+        raw_mode = read_env_variable("GITHUB_AUTH_MODE").strip().lower()
         if raw_mode in {"legacy", "app", "auto"}:
             return raw_mode
         dms_warning("Unknown GITHUB_AUTH_MODE '%s', using 'auto'.", raw_mode)
@@ -95,8 +97,7 @@ class GitHub:
 
     def _get_repos(self) -> list:
         """Retrieve all repositories the token can access (user or org)."""
-        org = os.environ.get("GITHUB_ORG")
-        path = f"orgs/{org}/repos" if org else "user/repos"
+        path = f"orgs/{self.org}/repos" if self.org else "user/repos"
         out: list = []
         page = 1
         per_page = 100

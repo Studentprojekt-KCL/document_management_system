@@ -20,6 +20,7 @@ import requests
 from variables import PROJECT, SOURCE_FILE
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
+from initialisation_tools import read_env_variable
 
 
 class GitHub:
@@ -33,11 +34,11 @@ class GitHub:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.Session()
-        raw = os.environ.get("GITHUB_API_URL")
+        raw = read_env_variable("GITHUB_API_URL")
         if not raw:
-            dms_error("GitHub API URL not set in local environment, please export GITHUB_API_URL.")
             raise ValueError("Missing GITHUB_API_URL")
-        sself.api_base = raw.rstrip("/") + "/"
+        self.source_system = read_env_variable("GITHUB_SYSTEM_NAME")
+        self.api_base = raw.rstrip("/") + "/"
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()
@@ -281,6 +282,7 @@ class GitHub:
                 "size": size,
                 "last_edit_date": last_edit,
                 "type": SOURCE_FILE,
+                "source_system": self.source_system,
             }
         }
         if isinstance(path, str):
@@ -329,6 +331,7 @@ class GitHub:
                             "name": Path(intermediate_path).name,
                             "unique_pointer": unique_pointer,
                             "size": info.file_size,
+                            "source_system": self.source_system,
                         },
                     }
                 )

@@ -5,7 +5,7 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 
-const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
+const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {

@@ -29,7 +29,7 @@ const lastQuery = ref('')
 const isPreviewOpen = ref(false)
 const access_token = sessionStorage.getItem('access_token')
 /* Base URL for API requests, configurable via environment variable */
-const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
 /* Filters so it can access matches */
 const selectedFilters = ref({

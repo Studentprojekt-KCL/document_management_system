@@ -47,7 +47,7 @@ class SearchEngine:
         """
 
         new: bool = False
-        for key in categories.keys():
+        for key in categories:
             category = categories.get(key)
             if isinstance(category, dict):
                 new = new or self.have_new_category(category)

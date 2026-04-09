@@ -15,6 +15,7 @@ class ServiceConfig:
         ministral_url: URL for the Ministral LLM container.
         ministral_model: model identifier for Ministral.
         connector_url: connector url
+        escalation_threshold: score gap threshold for security-first classification escalation.
     """
 
     tei_url: str
@@ -22,6 +23,7 @@ class ServiceConfig:
     ministral_url: str
     ministral_model: str
     connector_url: str
+    escalation_threshold: float
 
 
 class APIConfiguration:
@@ -40,6 +42,7 @@ class APIConfiguration:
     log_level: str
     device: str
     services: ServiceConfig
+    MAX_PORT: int = 65536
 
     def __init__(self) -> None:
         self._load_log_level()
@@ -70,6 +73,7 @@ class APIConfiguration:
 
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
+        # Note: This will be migrated to a shared solution
         port: str | None = environ.get("PORT")
 
         if port is None:
@@ -80,8 +84,8 @@ class APIConfiguration:
             dms_error("PORT is expected to be an integer.")
             return
 
-        if int(port) < 0 or int(port) >= 65536:
-            dms_error("PORT should be between 0 and 65536.")
+        if int(port) < 0 or int(port) >= self.MAX_PORT:
+            dms_error(f"PORT should be between 0 and {self.MAX_PORT}.")
             return
 
         self.port = int(port)
@@ -96,6 +100,7 @@ class APIConfiguration:
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
         address: str | None = environ.get("CONNECTOR_ADDRESS")
+        escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
@@ -117,8 +122,13 @@ class APIConfiguration:
             dms_error("CONNECTOR_ADDRESS is not defined.")
             return
 
+        if escalation_threshold is None:
+            dms_error("ESCALATION_THRESHOLD is not defined.")
+            return
+
         self.services.tei_url = tei_url
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
         self.services.connector_url = address
+        self.services.escalation_threshold = float(escalation_threshold)

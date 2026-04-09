@@ -1,6 +1,7 @@
 
 import os
 import argparse
+import logging
 from typing import Any, Optional, List
 from datetime import datetime
 
@@ -17,8 +18,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pydantic import BaseModel
 
 
-MAX_BATCH_SIZE = 50
-MAX_WORKERS = 8
+def _env_int(name: str, default: int) -> int:
+    """Read an integer environment variable with fallback."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+MAX_BATCH_SIZE = _env_int("SMB_MAX_BATCH_SIZE", 50)
+MAX_WORKERS = _env_int("SMB_API_MAX_WORKERS", 8)
+SMB_HOST = os.environ.get("SMB_CONNECTOR_HOST", "0.0.0.0")
 
 
 class BatchFileRequest(BaseModel):
@@ -32,6 +45,7 @@ class API:
     log_level: str | None = None
 
     def __init__(self) -> None:
+        """Create API app, collector and route bindings."""
         self.collector = SMBCollector()
 
         self.app.add_exception_handler(
@@ -39,7 +53,7 @@ class API:
             self.validation_exception_handler
         )
 
-
+        # ✅ SAME endpoints as GitLab
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
@@ -51,6 +65,7 @@ class API:
     # =========================
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+        """Return normalized 422 response for validation errors."""
         if isinstance(exc, RequestValidationError):
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
@@ -72,7 +87,7 @@ class API:
 
         metadata = file_data.get("metadata", {})
 
-
+        # 🔥 Normalize fields
         normalized = {
             "metadata": {
                 "unique_pointer": metadata.get("unique_pointer"),
@@ -128,7 +143,7 @@ class API:
     async def files_to_index(self, subdata: Optional[str] = None) -> dict:
         """
         SAME as GitLab:
-        returns files + subdata (NO deleted)
+        returns files + deleted + subdata
         """
 
         result = self.collector.files_to_index(subdata)
@@ -140,21 +155,23 @@ class API:
 
         return {
             "files": normalized_files,
+            "deleted": result.get("deleted", []),
             "subdata": result.get("subdata")
         }
 
     async def files_batch(self, req: BatchFileRequest):
+        """Fetch multiple files concurrently in one request."""
 
         if not req.paths:
             return {"files": [], "errors": []}
 
-        if len(req.paths) > 50:
+        if len(req.paths) > MAX_BATCH_SIZE:
             raise HTTPException(status_code=400, detail="Too many files")
 
         results = []
         errors = []
 
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {
                 executor.submit(
                     self.collector.get_file,
@@ -188,6 +205,7 @@ class API:
 # =========================
 
 def run() -> None:
+    """Start SMB FastAPI service using environment configuration."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
@@ -200,12 +218,12 @@ def run() -> None:
     port = os.environ.get("SMB_CONNECTOR_PORT")
 
     if port is None or not port.isdigit():
-        print("ERROR: SMB_CONNECTOR_PORT not set")
+        logging.error("SMB_CONNECTOR_PORT not set")
         return
 
     uvicorn.run(
         api.app,
-        host="0.0.0.0",
+        host=SMB_HOST,
         port=int(port),
         log_level=api.log_level or "info"
     )

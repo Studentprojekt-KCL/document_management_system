@@ -51,7 +51,12 @@ class GitLabs:
             Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
         """
         ids: dict[int, str] = {}
-        for project in self._get_projects():
+        projects = self._get_projects()
+        if not isinstance(projects, list):
+            return ids
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
             last_activity = project.get("last_activity_at")
             if not last_activity:
                 continue  # Entails there was no activity for this project
@@ -62,9 +67,13 @@ class GitLabs:
     def get_projects_as_units(self) -> dict:
         """Retrieve information about available projects."""
         content = self._get_projects()
+        if not isinstance(content, list):
+            return {}
 
         projects: dict = {}
         for project in content:
+            if not isinstance(project, dict):
+                continue
             projects[project.get("web_url")] = {
                 "name": unpack_values(project, ("name",)),
                 "creator": unpack_values(project, ("namespace", "name")),
@@ -85,9 +94,13 @@ class GitLabs:
         tree_args: str = f"projects/{project_id}/repository/tree?recursive=true&per_page=1000&pagination=none"
         url = urljoin(self.base, tree_args)
         content = self._execute_request(url)
+        if not isinstance(content, list):
+            return []
         base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
         files: list = []
         for file in content:
+            if not isinstance(file, dict):
+                continue
             if file.get("type") == "tree":
                 continue
             files.append(
@@ -216,9 +229,13 @@ class GitLabs:
 
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
+        if not isinstance(projects, list):
+            return {"files": files_data, "subdata": base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()}
 
         latest_update = datetime.min.replace(tzinfo=timezone.utc)
         for project in projects:
+            if not isinstance(project, dict):
+                continue
             project_id = project.get("id")
             new_timestamp = current_subdata.get(project_id)
             if not isinstance(new_timestamp, str):
@@ -229,9 +246,18 @@ class GitLabs:
             latest_update = max(latest_update, new_timestamp_object)
 
             branch = project.get("default_branch")
+            if not isinstance(branch, str) or not branch:
+                continue
+            if not isinstance(project.get("web_url"), str) or not isinstance(project.get("path"), str):
+                continue
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
-            content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content, project_id))
+            try:
+                response = requests.get(url, timeout=120)
+                response.raise_for_status()
+                files_data.extend(self._unpack_zip(response.content, project_id))
+            except (requests.RequestException, zipfile.BadZipFile, ValueError) as err:
+                dms_warning(f"Skipping project {project_id}, could not fetch archive: {err}")
+                continue
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
@@ -291,6 +317,9 @@ class GitLabs:
         try:
             response = self.session.get(url, timeout=120)
             content = response.json()
+        except requests.RequestException as err:
+            dms_warning(f"Gitlab request to {url} failed: {err}")
+            return {}
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}

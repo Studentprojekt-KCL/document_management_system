@@ -18,6 +18,10 @@ class BatchRequest(BaseModel):
     include_content: bool = True
 
 
+class SubdataRequest(BaseModel):
+    subdata: Optional[str] = None
+
+
 # =========================
 # HEALTH
 # =========================
@@ -64,12 +68,21 @@ def batch(req: BatchRequest):
 
 
 # =========================
-# FILES TO INDEX
+# FILES TO INDEX (FIXED)
 # =========================
 
-@app.get("/files_to_index")
-def files_to_index():
+@app.post("/files_to_index")
+def files_to_index(req: SubdataRequest):
     try:
-        return router.files_to_index()
+        return router.files_to_index(req.subdata)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# OPTIONAL: keep GET for quick manual testing
+@app.get("/files_to_index")
+def files_to_index_get():
+    try:
+        return router.files_to_index(None)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

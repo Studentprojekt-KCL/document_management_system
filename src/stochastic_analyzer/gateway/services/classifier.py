@@ -10,12 +10,12 @@ from gateway.schemas import InputItem, ClassificationResult
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
-#These label triggers have been tweaked for hours, only touch if absolutley certain
+# These label triggers have been tweaked for hours, only touch if absolutley certain
 LABEL_TRIGGERS = [
-    "publicly available source code, documentation, or open material", 
-    "internal company policy and employee guidelines", 
-    "sensitive personal, employee, or security data", 
-    "strictly confidential executive leadership strategy" 
+    "publicly available source code, documentation, or open material",
+    "internal company policy and employee guidelines",
+    "sensitive personal, employee, or security data",
+    "strictly confidential executive leadership strategy",
 ]
 
 
@@ -57,7 +57,6 @@ def _resolve_labels(
     for doc_idx, item in enumerate(items):
         offset = doc_idx * num_labels
         doc_scores = all_scores[offset : offset + num_labels]
-        print(f"Scores for {item.metadata.unique_pointer}: Public={doc_scores[0]:.4f} Internal={doc_scores[1]:.4f} Sensitive={doc_scores[2]:.4f} Confidential={doc_scores[3]:.4f}") #TEMP THINGY DONT LEAVE FOR PUSH
         best_index = doc_scores.index(max(doc_scores))
         if escalation_threshold is not None:
             best_index = _escalate(doc_scores, best_index, escalation_threshold)

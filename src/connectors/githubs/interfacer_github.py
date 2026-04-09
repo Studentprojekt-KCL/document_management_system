@@ -99,10 +99,7 @@ class GitHub:
     def _get_repos(self) -> list:
         """Retrieve all repositories the token can access (user or org)."""
         org = os.environ.get("GITHUB_ORG")
-        if org:
-            path = f"orgs/{org}/repos"
-        else:
-            path = "user/repos"
+        path = f"orgs/{org}/repos" if org else "user/repos"
         out: list = []
         page = 1
         per_page = 100
@@ -300,12 +297,9 @@ class GitHub:
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
             for name in zip_file.namelist():
-                if name.endswith("/"):
+                if "/" not in name:
                     continue
-                parts = name.split("/", 1)
-                if len(parts) < 2:
-                    continue
-                intermediate_path = parts[1]
+                _, intermediate_path = name.split("/", 1)
                 if self._is_excluded_path(intermediate_path):
                     continue
                 info = zip_file.getinfo(name)

@@ -6,30 +6,34 @@ import httpx
 
 from dmis_logger import dms_warning
 from gateway.schemas import InputItem, SummaryResult
-from gateway.preprompts import SUMMARIZER_PROMPT, SUMMARIZER_SYSTEM_PROMPT
+from gateway.preprompts import SUMMARIZER_PROMPT, SUMMARIZER_SYSTEM_PROMPT, HEADERS
 
-SWEDISH_WORDS = {
-    "och", "att", "för", "med", "som", "är", "av", "på",
-    "det", "en", "till", "inom", "mot", "men", "har", "vid",
-    "sin", "sig", "den", "de", "om", "ett", "kan", "ska"
-}
-
-HEADERS = {
-    "swedish": {
-        "highlights": "**Viktiga Höjdpunkter:**",
-        "summary":    "**Sammanfattning:**",
-    },
-    "english": {
-        "highlights": "**Key Highlights:**",
-        "summary":    "**Executive Summary:**",
-    },
-}
+# Language detection constants
+SWEDISH_CHARS = set("åäöÅÄÖ")
+SWEDISH_STOPWORDS = {"och", "är", "det", "på", "i", "av", "för", "med", "som", "att", "en", "ett", "den", "der"}
+MIN_DOC_LENGTH = 50
+SAMPLE_SIZE = 5000  # Only scan first 5K chars for language detection
 
 def detect_language(text: str) -> str:
-    """Detect language from Swedish function words. Defaults to English."""
-    words = set(text.lower().split())
-    sw_hits = len(words & SWEDISH_WORDS)
-    return "swedish" if sw_hits >= 3 else "english"
+    """Detect Swedish via early-exit heuristic on sampled prefix. Fast & injection-resistant."""
+    if len(text) < MIN_DOC_LENGTH:
+        return "english"
+
+    # Sample only the beginning (where language signals usually appear)
+    sample = text[:SAMPLE_SIZE].lower()
+
+    # Early-exit character check
+    swedish_char_count = 0
+    for char in sample:
+        if char in SWEDISH_CHARS:
+            swedish_char_count += 1
+            if swedish_char_count >= 2:
+                return "swedish"
+
+    # Fallback: check for common Swedish stopwords (≥3 matches = likely Swedish)
+    words = sample.split()
+    swedish_word_hits = sum(1 for word in words if word in SWEDISH_STOPWORDS)
+    return "swedish" if swedish_word_hits >= 3 else "english"
 
 async def summarize_documents(items: list[InputItem], ministral_url: str, ministral_model: str) -> SummaryResult | None:
     """Synthesize multiple documents into a single summary via the Ministral LLM."""
@@ -53,6 +57,8 @@ async def summarize_documents(items: list[InputItem], ministral_url: str, minist
         "system": SUMMARIZER_SYSTEM_PROMPT,
         "prompt": prompt,
         "stream": False,
+        "max_tokens": 400,  # 150 for summary + 250 for bullets
+        "temperature": 0.3,
     }
 
     try:

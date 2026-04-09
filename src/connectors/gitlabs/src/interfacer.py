@@ -43,7 +43,7 @@ class GitLabs:
         projects = self._execute_request(url)
         self.project_information = {
             str(project.get("id")): {
-                "web_url": project.get("https://gitlab.dms-lookup.com/jaen22/company_files"),
+                "web_url": project.get("web_url"),
                 "default_branch": project.get("default_branch"),
             }
             for project in projects
@@ -138,7 +138,7 @@ class GitLabs:
 
         Args:
         ----
-            URuL: The URL should be given formatted like:
+            url: The URL should be given formatted like:
               https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
 

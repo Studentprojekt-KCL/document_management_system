@@ -100,7 +100,7 @@ class APIConfiguration:
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
         address: str | None = environ.get("CONNECTOR_ADDRESS")
-        escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
+        escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.05")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")

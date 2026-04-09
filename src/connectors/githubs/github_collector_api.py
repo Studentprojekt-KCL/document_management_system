@@ -90,5 +90,5 @@ def run() -> None:
             "Host for GitHub connector not set in local environment, please export GITHUB_CONNECTOR_HOST."
         )
         return
-    
+
     uvicorn.run(api.app, host=host, log_level=api.log_level, port=int(port))

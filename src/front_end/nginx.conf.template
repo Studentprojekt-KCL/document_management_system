@@ -15,13 +15,6 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Health check endpoint
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-
     # Proxy API calls to backend (avoids CORS — same-origin from browser's view)
     location /api/ {
         proxy_pass ${API_HOST};
@@ -48,10 +41,7 @@ server {
     }
 
     # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 }

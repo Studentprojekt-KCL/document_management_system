@@ -24,6 +24,7 @@ from initialisation_tools import read_env_variable
 
 HTTP_OK = 200
 
+
 class GitHub:
     """GitHub connector methods (parity with GitLabs)."""
 
@@ -82,17 +83,12 @@ class GitHub:
         elif mode == "app":
             token = self._app_installation_token()
             if not token:
-                dms_warning(
-                    "GITHUB_AUTH_MODE=app is set but GITHUB_APP_INSTALLATION_TOKEN is missing."
-                )
+                dms_warning("GITHUB_AUTH_MODE=app is set but GITHUB_APP_INSTALLATION_TOKEN is missing.")
         else:
             token = self._app_installation_token() or self._incoming_or_legacy_token()
 
         if not token:
-            dms_info(
-                "No GitHub auth token configured; connector runs in public (unauthenticated) mode "
-                "(rate limits are lower)."
-            )
+            dms_info("No GitHub auth token configured; connector runs in public (unauthenticated) mode. (rate limits are lower).")
             return
 
         self.session.headers.update({"Authorization": f"Bearer {token}"})
@@ -194,18 +190,14 @@ class GitHub:
         return "main"
 
     def _tree_sha_for_branch(self, full_name: str, branch: str) -> str | None:
-        ref = self._execute_request(
-            urljoin(self.api_base, f"repos/{full_name}/git/ref/heads/{branch}")
-        )
+        ref = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/ref/heads/{branch}"))
         if not isinstance(ref, dict):
             return None
         obj = ref.get("object") or {}
         commit_sha = obj.get("sha")
         if not isinstance(commit_sha, str):
             return None
-        commit = self._execute_request(
-            urljoin(self.api_base, f"repos/{full_name}/git/commits/{commit_sha}")
-        )
+        commit = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/commits/{commit_sha}"))
         if not isinstance(commit, dict):
             return None
         tree = commit.get("tree") or {}
@@ -218,9 +210,7 @@ class GitHub:
         tree_sha = self._tree_sha_for_branch(full_name, branch)
         if not tree_sha:
             return []
-        tree = self._execute_request(
-            urljoin(self.api_base, f"repos/{full_name}/git/trees/{tree_sha}?recursive=1")
-        )
+        tree = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/trees/{tree_sha}?recursive=1"))
         if not isinstance(tree, dict):
             return []
         files: list = []
@@ -284,9 +274,7 @@ class GitHub:
             }
         }
         if isinstance(path, str):
-            base_structure["metadata"]["clickable_url"] = self._get_clickable_url(
-                full_name, path, ref
-            )
+            base_structure["metadata"]["clickable_url"] = self._get_clickable_url(full_name, path, ref)
         if include_content and isinstance(file.get("content"), str):
             base_structure["content"] = file["content"].replace("\n", "")
 
@@ -314,9 +302,7 @@ class GitHub:
                         dms_info(f"Skipping binary/non-UTF8 file content: {name}. {err}")
                         self._binary_skip_logs += 1
                         if self._binary_skip_logs == self._binary_skip_log_limit:
-                            dms_info(
-                                "Further binary/non-UTF8 file skip logs are suppressed for this run."
-                            )
+                            dms_info("Further binary/non-UTF8 file skip logs are suppressed for this run.")
                 enc = self._encode_content_path(intermediate_path)
                 unique_pointer = f"{base_pointer_prefix}{enc}?ref={quote(branch, safe='')}"
                 files_data.append(
@@ -338,9 +324,7 @@ class GitHub:
         zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
         resp = requests.get(zip_url, timeout=120)
         if resp.status_code != HTTP_OK:
-            dms_info(
-                f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}."
-            )
+            dms_info(f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}.")
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
@@ -416,9 +400,7 @@ class GitHub:
             response = self.session.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
-            dms_warning(
-                f"GitHub request to {url} could not be decoded.\nExpected JSON\nGot {response.text[:500]}"
-            )
+            dms_warning(f"GitHub request to {url} could not be decoded.\nExpected JSON\nGot {response.text[:500]}")
             return {}
         except requests.exceptions.MissingSchema as err:
             dms_error(f"GitHub API URL incorrectly formatted. (From error: {err})")

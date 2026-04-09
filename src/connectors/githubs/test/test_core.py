@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from interfacer_github import GitHub
 
+
 class TestGitHubHelpers(unittest.TestCase):
     """Tests for GitHub connector URL and auth helpers."""
 

@@ -9,10 +9,7 @@ version = "0.1.0"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
-py-modules = [
-    "github_collector_api",
-    "interfacer_github",
-]
+package-dir = {"" = "src"}
 
 [project.scripts]
 github_connector = "github_collector_api:run"

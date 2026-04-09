@@ -17,6 +17,7 @@ select = ["T20", "PYI056", "ASYNC", "B", "SIM", "PL", "UP"]
 disallow_untyped_defs = true
 exclude = '(\.env|venv|__pycache__|\.tox|build/|setup\.py|test/)'
 ignore_missing_imports = true
+explicit_package_bases = true
 
 
 [tool.black]

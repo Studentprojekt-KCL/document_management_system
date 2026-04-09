@@ -77,8 +77,8 @@ def _resolve_labels(
             best_index = _escalate(doc_scores, best_index, escalation_threshold)
         results.append(
             ClassificationResult(
-                name=item.metadata.name or "Unknown Document",
-                **{"Security-class": LABELS[best_index]},
+                unique_pointer=item.metadata.unique_pointer or "Unknown Document",
+                **{"security_class": LABELS[best_index]},
             )
         )
     return results

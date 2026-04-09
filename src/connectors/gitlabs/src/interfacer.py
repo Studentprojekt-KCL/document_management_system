@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import os
 import re
 from urllib.parse import urljoin
 import base64
@@ -17,6 +16,7 @@ from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
+from initialisation_tools import read_env_variable
 
 
 class GitLabs:
@@ -26,16 +26,13 @@ class GitLabs:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
-    source_system: str | None
+    source_system: str
 
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        address = os.environ.get("GITLAB_ADDRESS")
-        self.source_system = os.environ.get("GITLAB_SYSTEM_NAME")
-        if address is None:
-            dms_error("Gitlab URL not exported in local environment please export 'GITLAB_ADDRESS'.")
-            return
+        address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
         if not address.endswith("/"):
             address += "/"
         self.base = urljoin(str(address), self.API_URL)
@@ -100,7 +97,7 @@ class GitLabs:
         """Unsafe parse of API URL to retrieve projectID"""
         pattern = r"https:\/\/([^\/]+)\/api\/v4\/projects\/(\d+)\/repository\/files\/(.+)"
         match = re.match(pattern, url)
-        if not match or len(match.groups()) < 3:
+        if not match or len(match.groups()) < 3:  # noqa: PLR2004
             return None
         return match.group(2)
 
@@ -219,7 +216,11 @@ class GitLabs:
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
 
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+        if subdata is None:
+            latest_update = datetime.min.replace(tzinfo=timezone.utc)
+        else:
+            latest_update = provided_date
+
         for project in projects:
             project_id = project.get("id")
             new_timestamp = current_subdata.get(project_id)
@@ -298,6 +299,6 @@ class GitLabs:
             return {}
         except requests.exceptions.MissingSchema as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
-        if response.status_code != 200:
+        if response.status_code != 200:  # noqa: PLR2004
             dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
         return content

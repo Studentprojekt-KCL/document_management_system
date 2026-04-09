@@ -12,7 +12,6 @@ import unittest
 from unittest.mock import patch
 
 from interfacer_github import GitHub
-from unpacker import unpack_values
 
 class TestGitHubHelpers(unittest.TestCase):
     """Tests for GitHub connector URL and auth helpers."""

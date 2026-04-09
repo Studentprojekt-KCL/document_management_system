@@ -107,11 +107,19 @@ class SearchEngine:
             content = content_bytes.decode("utf-8")
             flat_file["content"] = content
 
-            _ = writer.add_json(json.dumps(flat_file))
+            writer.add_json(json.dumps(flat_file))
 
-        _ = writer.commit()
+        writer.commit()
         writer.wait_merging_threads()
 
+        self.index.reload()
+
+    def remove_file(self, pointer: str) -> None:
+        writer: IndexWriter = self.index.writer()
+        writer.delete_documents("unique_pointer", pointer)
+        writer.commit()
+        writer.wait_merging_threads()
+        dms_info(f"Removed {pointer} from index.")
         self.index.reload()
 
     def _flatten_dict(self, d: dict) -> dict:

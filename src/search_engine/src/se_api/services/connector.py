@@ -76,6 +76,8 @@ class Connector:
         client: Session = Session()
         responses: list[dict] = []
         for pointer in pointers:
+            if pointer == "https://gitlab.dms-lookup.com/api/v4/projects/2/repository/files/tensorflow%2Fpython%2Ftpu%2Ftpu_test_wrapper_test.py":
+                continue
             response: Any | None = self._get_file_from_pointer(pointer, client)
             if not isinstance(response, dict):
                 continue
@@ -143,9 +145,11 @@ class Connector:
     def _get_file_pointers(self) -> Any | None:
         """Get file pointers"""
         try:
-            return get(
+            resp = get(
                 self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
-            ).json()
+            )
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:
@@ -161,11 +165,13 @@ class Connector:
     def _get_file_from_pointer(self, pointer: str, client: Session) -> Any | None:
         """Get file from pointer"""
         try:
-            return client.get(
+            resp = client.get(
                 self.url_file,
                 params=[("file_pointer", pointer), ("include_content", False)],
                 timeout=Connector.TIMEOUT,
-            ).json()
+            )
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:
@@ -181,7 +187,9 @@ class Connector:
     def _get_files_from_url(self, url: str) -> Any | None:
         """Get files from url"""
         try:
-            return get(url, timeout=Connector.TIMEOUT).json()
+            resp = get(url, timeout=Connector.TIMEOUT)
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:
@@ -197,11 +205,13 @@ class Connector:
     def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
         try:
-            return get(
+            resp = get(
                 self.url_files_to_index,
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
                 timeout=Connector.TIMEOUT,
-            ).json()
+            )
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:

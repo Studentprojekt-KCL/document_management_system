@@ -20,11 +20,13 @@ class TokenVerifier:
         jwks_url: str,
         expected_azp: str,
     ) -> None:
+        """Initialize token verifier with Keycloak settings."""
         self.issuer = issuer.rstrip("/")
         self.jwks_client = PyJWKClient(jwks_url)
         self.expected_azp = expected_azp
 
     def verify_access_token(self, authorization: str | None) -> dict[str, Any]:
+        """Validate bearer token and return token claims."""
         if authorization is None:
             dms_info("Missing Authorization header.")
             raise HTTPException(status_code=401)
@@ -55,9 +57,7 @@ class TokenVerifier:
             raise HTTPException(status_code=403)
 
         realm_roles = set(claims.get("realm_access", {}).get("roles", []))
-        client_roles = set(
-            claims.get("resource_access", {}).get("dms-frontend-dev", {}).get("roles", [])
-        )
+        client_roles = set(claims.get("resource_access", {}).get(self.expected_azp, {}).get("roles", []))
         all_roles = realm_roles | client_roles
 
         if "user" not in all_roles and "admin" not in all_roles:

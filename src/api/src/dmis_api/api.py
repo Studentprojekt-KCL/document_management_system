@@ -14,8 +14,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from dmis_logger import dms_warning, dms_info
-from .auth import TokenVerifier
 from initialisation_tools import read_env_variable, read_port
+
+from .auth import TokenVerifier
 
 
 class API:
@@ -30,9 +31,7 @@ class API:
         self,
         search_api_url: str,
         query_api_url: str,
-        keycloak_issuer: str,
-        keycloak_jwks_url: str,
-        keycloak_expected_azp: str,
+        token_verifier: TokenVerifier,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -41,11 +40,7 @@ class API:
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
         self.query_api_url = query_api_url.rstrip("/")
-        self.token_verifier = TokenVerifier(
-            issuer=keycloak_issuer,
-            jwks_url=keycloak_jwks_url,
-            expected_azp=keycloak_expected_azp,
-        )
+        self.token_verifier = token_verifier
 
         self.app.add_exception_handler(
             RequestValidationError,
@@ -165,12 +160,16 @@ def run() -> None:
 
     log_level = "debug" if args.dev else None
 
+    token_verifier = TokenVerifier(
+        issuer=keycloak_issuer,
+        jwks_url=keycloak_jwks_url,
+        expected_azp=keycloak_expected_azp,
+    )
+
     api = API(
         search_api_url=search_api_url,
         query_api_url=query_api_url,
-        keycloak_issuer=keycloak_issuer,
-        keycloak_jwks_url=keycloak_jwks_url,
-        keycloak_expected_azp=keycloak_expected_azp,
+        token_verifier=token_verifier,
         log_level=log_level,
     )
 

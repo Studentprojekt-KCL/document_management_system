@@ -17,7 +17,7 @@ from urllib.parse import quote, unquote, urljoin
 
 import requests
 
-from variables import PROJECT, SOURCE_FILE
+from variables import SOURCE_FILE
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
 from initialisation_tools import read_env_variable
@@ -45,7 +45,6 @@ class GitHub:
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()
-        self._configure_auth()
 
     def _set_default_headers(self) -> None:
         api_version = read_env_variable("GITHUB_API_VERSION")
@@ -56,46 +55,7 @@ class GitHub:
             }
         )
 
-    @staticmethod
-    def _auth_mode() -> str:
-        raw_mode = read_env_variable("GITHUB_AUTH_MODE").strip().lower()
-        if raw_mode in {"legacy", "app", "auto"}:
-            return raw_mode
-        dms_warning("Unknown GITHUB_AUTH_MODE '%s', using 'auto'.", raw_mode)
-        return "auto"
-
-    @staticmethod
-    def _incoming_or_legacy_token() -> str | None:
-        incoming = os.environ.get("GITHUB_ACCESS_TOKEN")
-        if incoming:
-            return incoming
-        return os.environ.get("GITHUB_TOKEN")
-
-    @staticmethod
-    def _app_installation_token() -> str | None:
-        # Placeholder for future JWT->installation token exchange.
-        return os.environ.get("GITHUB_APP_INSTALLATION_TOKEN")
-
-    def _configure_auth(self) -> None:
-        mode = self._auth_mode()
-        token: str | None = None
-
-        if mode == "legacy":
-            token = self._incoming_or_legacy_token()
-        elif mode == "app":
-            token = self._app_installation_token()
-            if not token:
-                dms_warning("GITHUB_AUTH_MODE=app is set but GITHUB_APP_INSTALLATION_TOKEN is missing.")
-        else:
-            token = self._app_installation_token() or self._incoming_or_legacy_token()
-
-        if not token:
-            dms_info("No GitHub auth token configured; connector runs in public (unauthenticated) mode. (rate limits are lower).")
-            return
-
-        self.session.headers.update({"Authorization": f"Bearer {token}"})
-
-    def _get_repos(self) -> list:
+    def _get_repos(self, token: str | None = None) -> list:
         """Retrieve all repositories the token can access (user or org)."""
         path = f"orgs/{self.org}/repos" if self.org else "user/repos"
         out: list = []
@@ -106,7 +66,7 @@ class GitHub:
                 self.api_base,
                 f"{path}?per_page={per_page}&page={page}&sort=pushed",
             )
-            chunk = self._execute_request(url)
+            chunk = self._execute_request(url, token)
             if not isinstance(chunk, list) or not chunk:
                 break
             out.extend(chunk)
@@ -115,10 +75,10 @@ class GitHub:
             page += 1
         return out
 
-    def get_repo_ids(self) -> dict[str, str]:
+    def get_repo_ids(self, token: str | None = None) -> dict[str, str]:
         """Map repo full_name -> last push timestamp (ISO), analogous to GitLab project ids."""
         ids: dict[str, str] = {}
-        for repo in self._get_repos():
+        for repo in self._get_repos(token):
             pushed = repo.get("pushed_at")
             if not pushed:
                 continue
@@ -126,23 +86,6 @@ class GitHub:
             if isinstance(fn, str):
                 ids[fn] = pushed
         return ids
-
-    def get_repos_as_units(self) -> dict:
-        """Repository metadata keyed by html_url (mirrors get_projects_as_units)."""
-        content = self._get_repos()
-        projects: dict = {}
-        for repo in content:
-            html_url = repo.get("html_url")
-            if not html_url:
-                continue
-            projects[html_url] = {
-                "name": unpack_values(repo, ("name",)),
-                "creator": unpack_values(repo, ("owner", "login")),
-                "created_date": unpack_values(repo, ("created_at",)),
-                "last_edit_date": unpack_values(repo, ("pushed_at",)),
-                "type": PROJECT,
-            }
-        return projects
 
     @staticmethod
     def _encode_content_path(path: str) -> str:
@@ -182,36 +125,36 @@ class GitHub:
         except ValueError:
             return None
 
-    def _default_branch_for_repo(self, full_name: str) -> str:
-        r = self._execute_request(urljoin(self.api_base, f"repos/{full_name}"))
+    def _default_branch_for_repo(self, full_name: str, token: str | None = None) -> str:
+        r = self._execute_request(urljoin(self.api_base, f"repos/{full_name}"), token)
         if isinstance(r, dict):
             b = r.get("default_branch")
             if isinstance(b, str):
                 return b
         return "main"
 
-    def _tree_sha_for_branch(self, full_name: str, branch: str) -> str | None:
-        ref = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/ref/heads/{branch}"))
+    def _tree_sha_for_branch(self, full_name: str, branch: str, token: str | None = None) -> str | None:
+        ref = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/ref/heads/{branch}"), token)
         if not isinstance(ref, dict):
             return None
         obj = ref.get("object") or {}
         commit_sha = obj.get("sha")
         if not isinstance(commit_sha, str):
             return None
-        commit = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/commits/{commit_sha}"))
+        commit = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/commits/{commit_sha}"), token)
         if not isinstance(commit, dict):
             return None
         tree = commit.get("tree") or {}
         sha = tree.get("sha")
         return sha if isinstance(sha, str) else None
 
-    def get_files_in_repo(self, full_name: str, default_branch: str | None = None) -> list:
+    def get_files_in_repo(self, full_name: str, default_branch: str | None = None, token: str | None = None) -> list:
         """List content API URLs (pointers) for every blob in the repo tree."""
-        branch = default_branch or self._default_branch_for_repo(full_name)
-        tree_sha = self._tree_sha_for_branch(full_name, branch)
+        branch = default_branch or self._default_branch_for_repo(full_name, token)
+        tree_sha = self._tree_sha_for_branch(full_name, branch, token)
         if not tree_sha:
             return []
-        tree = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/trees/{tree_sha}?recursive=1"))
+        tree = self._execute_request(urljoin(self.api_base, f"repos/{full_name}/git/trees/{tree_sha}?recursive=1"), token)
         if not isinstance(tree, dict):
             return []
         files: list = []
@@ -232,18 +175,18 @@ class GitHub:
             return ""
         return f"https://github.com/{full_name}/blob/{ref}/{file_path}"
 
-    def _last_commit_date_for_path(self, full_name: str, path: str, ref: str) -> str | None:
+    def _last_commit_date_for_path(self, full_name: str, path: str, ref: str, token: str | None = None) -> str | None:
         q = quote(path, safe="")
         url = urljoin(
             self.api_base,
             f"repos/{full_name}/commits?path={q}&sha={quote(ref, safe='')}&per_page=1",
         )
-        data = self._execute_request(url)
+        data = self._execute_request(url, token)
         if isinstance(data, list) and data:
             return unpack_values(data[0], ("commit", "committer", "date"))
         return None
 
-    def get_file(self, pointer: str, include_content: bool = True) -> dict:
+    def get_file(self, pointer: str, include_content: bool = True, token: str | None = None) -> dict:
         """Fetch one file by pointer URL (GitHub contents API shape normalized to GitLab output)."""
         parsed = self._parse_file_pointer(pointer)
         if not parsed:
@@ -253,7 +196,7 @@ class GitHub:
         full_name, path, ref = parsed
         req_url = self._make_file_pointer(full_name, path, ref)
         file: dict | list = {}
-        file = self._execute_request(req_url)
+        file = self._execute_request(req_url, token)
         if isinstance(file, dict) and not include_content:
             file = {k: v for k, v in file.items() if k != "content"}
 
@@ -262,7 +205,7 @@ class GitHub:
 
         name = file.get("name")
         size = file.get("size")
-        last_edit = self._last_commit_date_for_path(full_name, path, ref)
+        last_edit = self._last_commit_date_for_path(full_name, path, ref, token)
 
         base_structure: dict[Any, Any] = {
             "metadata": {
@@ -319,22 +262,23 @@ class GitHub:
                 )
         return files_data
 
-    def _files_from_repo_zip(self, full_name: str, branch: str) -> list:
+    def _files_from_repo_zip(self, full_name: str, branch: str, token: str | None = None) -> list:
         """Download archive for a repo branch; return file entries or [ ] on failure."""
         owner, _, name = full_name.partition("/")
         zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
-        resp = requests.get(zip_url, timeout=120)
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        resp = requests.get(zip_url, timeout=120, headers=headers)
         if resp.status_code != HTTP_OK:
             dms_info(f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}.")
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
-    def files_to_index(self, subdata: str | None = None) -> dict:
+    def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
         """Same contract as GitLabs.files_to_index: {"files", "subdata"}."""
         provided_date = self._provided_date(subdata)
         files_data: list = []
-        current = self.get_repo_ids()
-        repos = self._get_repos()
+        current = self.get_repo_ids(token)
+        repos = self._get_repos(token)
         latest_update = datetime.min.replace(tzinfo=timezone.utc)
 
         for repo in repos:
@@ -350,19 +294,19 @@ class GitHub:
             latest_update = max(latest_update, ts_obj)
             branch = repo.get("default_branch")
             if not isinstance(branch, str):
-                branch = self._default_branch_for_repo(fn)
-            files_data.extend(self._files_from_repo_zip(fn, branch))
+                branch = self._default_branch_for_repo(fn, token)
+            files_data.extend(self._files_from_repo_zip(fn, branch, token))
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
         return {"files": files_data, "subdata": generated_subdata}
 
-    def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
+    def pointers_to_all_files_to_index(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
         """Same contract as GitLabs.pointers_to_all_files_to_index: {"subdata", "file_pointers"}."""
         provided_date = self._provided_date(subdata)
         file_pointers: list = []
-        repo_ids = self.get_repo_ids()
+        repo_ids = self.get_repo_ids(token)
         latest_update = datetime.min.replace(tzinfo=timezone.utc)
-        repos = {r.get("full_name"): r for r in self._get_repos() if r.get("full_name")}
+        repos = {r.get("full_name"): r for r in self._get_repos(token) if r.get("full_name")}
 
         for full_name, change_time in repo_ids.items():
             if not isinstance(change_time, str):
@@ -374,8 +318,8 @@ class GitHub:
             r = repos.get(full_name) or {}
             branch = r.get("default_branch") if isinstance(r, dict) else None
             if not isinstance(branch, str):
-                branch = self._default_branch_for_repo(full_name)
-            file_pointers.extend(self.get_files_in_repo(full_name, branch))
+                branch = self._default_branch_for_repo(full_name, token)
+            file_pointers.extend(self.get_files_in_repo(full_name, branch, token))
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
         return {"subdata": generated_subdata, "file_pointers": file_pointers}
@@ -396,9 +340,10 @@ class GitHub:
             dms_error("GitHub connector could not interpret subdata: %s", subdata)
             return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(self, url: str) -> dict | list:
+    def _execute_request(self, url: str, token: str | None = None) -> dict | list:
+        headers = {"Authorization": f"Bearer {token}"} if token else None
         try:
-            response = self.session.get(url, timeout=120)
+            response = self.session.get(url, timeout=120, headers=headers)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"GitHub request to {url} could not be decoded.\nExpected JSON\nGot {response.text[:500]}")

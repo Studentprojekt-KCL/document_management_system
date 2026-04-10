@@ -12,7 +12,7 @@ import argparse
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -49,17 +49,39 @@ class API:
         content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self, subdata: str | None = None) -> Any:
+    async def files(
+        self,
+        subdata: str | None = None,
+        x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
+    ) -> Any:
         """List file pointers plus subdata (same as GitLab /files)."""
-        return self.github_instance.pointers_to_all_files_to_index(subdata)
+        if x_github_token is None:
+            return {"subdata": subdata, "file_pointers": []}
+        token = x_github_token.removeprefix("Bearer ").strip()
+        return self.github_instance.pointers_to_all_files_to_index(subdata, token)
 
-    async def file(self, file_pointer: str, include_content: bool = True) -> Any:
+    async def file(
+        self,
+        file_pointer: str,
+        include_content: bool = True,
+        x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
+    ) -> Any:
         """Single file by pointer (same metadata/content shape as GitLab /file)."""
-        return self.github_instance.get_file(file_pointer, include_content)
+        if x_github_token is None:
+            return {}
+        token = x_github_token.removeprefix("Bearer ").strip()
+        return self.github_instance.get_file(file_pointer, include_content, token)
 
-    async def files_to_index(self, subdata: str | None = None) -> dict:
+    async def files_to_index(
+        self,
+        subdata: str | None = None,
+        x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
+    ) -> dict:
         """Bulk payload uploaded like GitLab; response includes subdata and file_url."""
-        content = self.github_instance.files_to_index(subdata)
+        if x_github_token is None:
+            return {"subdata": subdata, "file_url": None}
+        token = x_github_token.removeprefix("Bearer ").strip()
+        content = self.github_instance.files_to_index(subdata, token)
         url = upload_file(content, "github_content.json")
         return {"subdata": content.get("subdata"), "file_url": url}
 

@@ -1,6 +1,5 @@
 """File content retrieval from the connector microservice."""
 
-import asyncio
 import binascii
 from base64 import b64decode
 
@@ -22,8 +21,12 @@ async def _get_content(url: str, pointers: list, client: httpx.AsyncClient) -> l
         InputItem on success, None on failure.
     """
     try:
-        response = await client.post(f"{url.rstrip("/")}/get_files", params=[("include_content", True), ("include_last_edit_date", False)],
-                                json={"file_pointers": pointers}, timeout=120)
+        response = await client.post(
+            f"{url.rstrip("/")}/get_files",
+            params=[("include_content", True), ("include_last_edit_date", False)],
+            json={"file_pointers": pointers},
+            timeout=120,
+        )
         response.raise_for_status()
         data = response.json()
     except (httpx.HTTPStatusError, httpx.TimeoutException, ValueError) as err:

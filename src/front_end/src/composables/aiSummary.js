@@ -5,7 +5,7 @@ export function useAISummary(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
-  const API_BASE_URL = import.meta.env.API_BASE_URL.replace(/\/$/, '')
+  const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
   /* Summary state */
   const aiSummary = ref('')

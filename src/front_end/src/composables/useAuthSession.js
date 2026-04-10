@@ -8,8 +8,8 @@ export function useAuthSession(){
     let intervalID = null
 
     // configuration
-    const TIME_LIMIT = 2*60*1000 //30 minutes
-    const REFRESH_TIME = 1*60*1000 // 25 minutes
+    const TIME_LIMIT = 25*60*1000 //25 minutes idle logout
+    const REFRESH_TIME = 20*60*1000 // 20 minutes refresh early (safe buffer)
 
     // update functions for lastActivity
     const updateActivity = ()=>{
@@ -19,7 +19,6 @@ export function useAuthSession(){
     const triggerLogout = () => {
         console.log("rigger loggout() called - logging out user")
         logout()
-        router.push('/')
     }
     // Synchronize logout across multiple tabs for storage events.
     const syncLogout = (event) => {
@@ -35,10 +34,7 @@ export function useAuthSession(){
             console.log("checking session...") // remove after testing
             const now = Date.now()
             const isActive = (now - lastActivity) < TIME_LIMIT
-            console.log({
-                isActive,
-                timeSinceActivity: now -lastActivity
-            })
+            
             if (!isActive){
                 console.log("inactive -> logging out")
                 triggerLogout()
@@ -71,7 +67,7 @@ export function useAuthSession(){
                 console.error("refresh failed:", err)
             }
             
-        } , 60 * 1000)
+        } , 2*60*1000) // 2 minutes check
     }
     // life cycle
     onMounted(()=> {

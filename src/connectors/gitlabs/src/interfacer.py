@@ -12,7 +12,7 @@ import binascii
 
 import requests
 
-from variables import PROJECT, SOURCE_FILE
+from variables import SOURCE_FILE
 
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
@@ -57,22 +57,6 @@ class GitLabs:
             ids[project.get("id")] = last_activity
 
         return ids
-
-    def get_projects_as_units(self) -> dict:
-        """Retrieve information about available projects."""
-        content = self._get_projects()
-
-        projects: dict = {}
-        for project in content:
-            projects[project.get("web_url")] = {
-                "name": unpack_values(project, ("name",)),
-                "creator": unpack_values(project, ("namespace", "name")),
-                "created_date": unpack_values(project, ("created_at",)),
-                "last_edit_date": unpack_values(project, ("last_activity_at",)),
-                "type": PROJECT,
-            }
-
-        return projects
 
     def get_files_in_project(self, project_id: int, token: str | None = None) -> list:
         """Retrieve URLs for all available files in a project.

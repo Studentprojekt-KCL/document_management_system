@@ -167,9 +167,7 @@ class GitLabs:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
                 self.blame_cache[url] = self._execute_request(url)
-            base_structure |= {
-                "last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))
-            }
+            base_structure |= {"last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))}
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):

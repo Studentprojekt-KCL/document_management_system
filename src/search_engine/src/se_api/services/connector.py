@@ -54,15 +54,15 @@ class Connector:
 
             return not response.get("index_needed") is False
         except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to connect, url: {self.index_needed_bool}.")
         except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+            dms_warning(f"Invalid HTTP response, url: {self.index_needed_bool}.")
         except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+            dms_warning(f"Request timed out, url: {self.index_needed_bool}")
         except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to parse JSON, url: {self.index_needed_bool}.")
         except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+            dms_warning(f"Something went wrong, url: {self.index_needed_bool}.")
         return True
 
     def fetch_files(self, pointers: list[str]) -> list[dict]:
@@ -149,15 +149,15 @@ class Connector:
                 timeout=Connector.TIMEOUT,
             ).json()
         except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to connect, url: {self.url_get_files}.")
         except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+            dms_warning(f"Invalid HTTP response, url: {self.url_get_files}.")
         except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+            dms_warning(f"Request timed out, url: {self.url_get_files}")
         except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to parse JSON, url: {self.url_get_files}.")
         except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+            dms_warning(f"Something went wrong, url: {self.url_get_files}.")
         return None
 
     def _get_files_from_url(self, url: str) -> Any | None:
@@ -165,15 +165,15 @@ class Connector:
         try:
             return get(url, timeout=Connector.TIMEOUT).json()
         except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to connect, url: {url}.")
         except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
+            dms_warning(f"Invalid HTTP response, url: {url}.")
         except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
+            dms_warning(f"Request timed out, url: {url}")
         except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
+            dms_warning(f"Failed to parse JSON, url: {url}.")
         except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+            dms_warning(f"Something went wrong, url: {url}.")
         return None
 
     def _get_file_to_index(self) -> Any | None:
@@ -193,5 +193,5 @@ class Connector:
         except exceptions.JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
         except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
+            dms_warning(f"Something went wrong, url: {self.url_files_to_index}.")
         return None

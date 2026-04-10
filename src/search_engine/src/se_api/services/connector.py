@@ -77,27 +77,10 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        client: Session = Session()
-<<<<<<< HEAD
-        responses: list[dict] = []
-        for pointer in pointers:
-            if pointer == "https://gitlab.dms-lookup.com/api/v4/projects/2/repository/files/tensorflow%2Fpython%2Ftpu%2Ftpu_test_wrapper_test.py":
-                continue
-            response: Any | None = self._get_file_from_pointer(pointer, client)
-            if not isinstance(response, dict):
-                continue
-            metadata: dict | None = response.get("metadata")
-            if metadata is None:
-                continue
-            responses.append(metadata)
-=======
-        response: Any | None = self._get_file_from_pointer(pointers, client)
-
+        with Session() as client:
+            response: Any | None = self._get_file_from_pointer(pointers, client)
         if not isinstance(response, list):
             return []
->>>>>>> develop
-
-        client.close()
 
         return response
 
@@ -137,9 +120,6 @@ class Connector:
         response: Any | None = self._get_file_to_index()
         if response is None or not isinstance(response, dict) or response.get("index_needed") is False:
             return None
-        if not isinstance(response, dict):
-            dms_warning(f"Response is not formated as a dict, url: {self.url_files_to_index}.")
-            return None
 
         subdata = response.get("subdata")
         file_url = response.get("file_url")
@@ -153,42 +133,13 @@ class Connector:
 
         return file_url
 
-<<<<<<< HEAD
-    def _get_file_pointers(self) -> Any | None:
-        """Get file pointers"""
-        try:
-            resp = get(
-                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files}.")
-        return None
-
-    def _get_file_from_pointer(self, pointer: str, client: Session) -> Any | None:
-        """Get file from pointer"""
-        try:
-            resp = client.get(
-                self.url_file,
-                params=[("file_pointer", pointer), ("include_content", False)],
-=======
     def _get_file_from_pointer(self, pointers: list[str], client: Session) -> Any | None:
         """Get file from pointer"""
         try:
-            return client.post(
+            resp = client.post(
                 self.url_get_files,
                 params=[("include_content", False), ("include_last_edit_date", True)],
                 json={"file_pointers": pointers},
->>>>>>> develop
                 timeout=Connector.TIMEOUT,
             )
             resp.raise_for_status()

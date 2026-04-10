@@ -22,7 +22,7 @@ class Query:
     def reset(self) -> None:
         self.cache.reset()
 
-    def classify(self, pointers: list[str]) -> dict[str, str]:
+    def classify(self, files: list[dict]) -> dict[str, str]:
         """Classify the files at the pointers.
 
         Args:
@@ -31,6 +31,13 @@ class Query:
         """
         classifications: dict[str, str] = {}
         none_cached: list[str] = []
+        pointers: list[str] = []
+
+        for file in files:
+            pointer: str | None = file.get("unique_pointer")
+            if pointer is None:
+                continue
+            pointers.append(pointer)
 
         for pointer in pointers:
             classification: str | None = self.cache.fetch_classification(pointer)

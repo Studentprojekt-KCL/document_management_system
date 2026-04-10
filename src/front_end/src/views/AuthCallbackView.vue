@@ -75,6 +75,7 @@ onMounted(async () => {
 
     /* Store token(s) and data in sessionStorage */
     if (data.access_token) sessionStorage.setItem('access_token', data.access_token)
+    if (data.refresh_token) sessionStorage.setItem('refresh_token', data.refresh_token)
     if (data.id_token) sessionStorage.setItem('id_token', data.id_token)
 
     /* Cleanup old items */

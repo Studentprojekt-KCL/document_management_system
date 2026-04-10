@@ -7,9 +7,9 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 /* Keycloak attributes */
-const KEYCLOAK_BASE = import.meta.env.KEYCLOAK_BASE_URL
-const REALM = import.meta.env.KEYCLOAK_REALM
-const CLIENT_ID = import.meta.env.KEYCLOAK_CLIENT_ID
+const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
+const REALM = window.__ENV__.KEYCLOAK_REALM
+const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
 
 const route = useRoute()
 const router = useRouter()

@@ -55,9 +55,7 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        new_pointers: list = self.connector.get_file_pointers()
-        if new_pointers:
-            dms_info(f"New files in connector reindexing, number of files: {len(new_pointers)}.")
+        if self.connector.reindex_needed():  # This endpoint is approx 3x faster
             new_files: list[dict] = self.connector.get_files()
             if new_files:
                 if self.search_engine.have_new_category(new_files[0]):
@@ -67,7 +65,11 @@ class Handler:
                 self.search_engine.add_files(new_files)
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = self.connector.fetch_files(matches)
+<<<<<<< HEAD
         self.clean_misses(matches, files)
+=======
+
+>>>>>>> develop
         classifications: dict = self.query.classify(matches)  # Maybe should base this of the returned pointers from the connectors.
         for file in files:
             unique_pointer: str = file.get("unique_pointer", "")

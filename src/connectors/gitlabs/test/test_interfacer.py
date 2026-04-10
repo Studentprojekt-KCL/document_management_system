@@ -69,23 +69,31 @@ class TestGitLabs(TestCase):
         """Test _execute_request method."""
         assert self.instance._execute_request(url="") == self.CORRECT_DATA
 
-    def test_pointers_to_all_files_index(self):
-        """Test pointers_to_all_files_index method."""
-        pointers = self.instance.pointers_to_all_files_to_index(None)
-        assert pointers.get("file_pointers") == ["projects/1/repository/files/namespace"]
-        assert "subdata" in pointers.keys()
+    def test_check_index_needed_no_sudata(self):
+        """Test check_index_needed method without current subdata."""
+        pointers = self.instance.check_index_needed(None)
+        assert "index_needed" in pointers.keys()
+        assert pointers.get("index_needed") == True
+
+    def test_check_index_needed_false(self):
+        """Test check_index_needed method with current subdata."""
+        pointers = self.instance.check_index_needed("MTk3MC0wMS0wMVQwMDowMDowMC4wMDBa")
+        assert pointers.get("index_needed") == False
+
+    def test_check_index_needed_old_subdata(self):
+        """Test check_index_needed method with old subdata."""
+        pointers = self.instance.check_index_needed("MTk2OC0wMS0wMVQwMDowMDowMC4wMDBa")
+        assert pointers.get("index_needed") == True
 
     def test_get_file(self):
         """Test get_file method."""
         self.instance.source_system = "system"
         assert self.instance.get_file("test_url", True) == {
-            "metadata": {
-                "unique_pointer": "test_url",
-                "name": "test_file",
-                "size": 0,
-                "last_edit_date": "1970-01-01T00:00:00.000Z",
-                "type": "source_file",
-                "source_system": "system",
-            },
+            "unique_pointer": "test_url",
+            "name": "test_file",
+            "size": 0,
+            "last_edit_date": "1970-01-01T00:00:00.000Z",
+            "type": "source_file",
+            "source_system": "system",
             "content": "unittest",
         }

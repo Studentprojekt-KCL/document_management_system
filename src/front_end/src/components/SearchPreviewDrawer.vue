@@ -8,8 +8,9 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2 } from 'lucide-vue-next'
+import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { useAISummary } from '@/composables/aiSummary'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -23,7 +24,10 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMetadata(props)
+const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, previewSecurityClass } = useSearchMetadata(props)
+
+/* AI summary composable */
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 </script>
 
 <template>
@@ -47,15 +51,6 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
         <span class="tag">{{ previewType }}</span>
       </div>
 
-      <!-- AI Summary section -->
-      <section class="panel-section">
-        <!-- QUICK FIX: This should be a button, where we ask for the ai summary for chosen file -->
-        <p class="section-title">AI SUMMARY</p>
-        <div class="generate-summary">
-          <p class="summary-card"><StarsIcon :size="13" />Generate AI summary</p>
-        </div>
-      </section>
-
       <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
@@ -72,8 +67,44 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
             <span>Format</span>
             <p><FileType2 :size="13" /> {{ previewType }}</p>
           </div>
+          <div class="meta-cell">
+            <span>Security Class</span>
+            <p>{{ previewSecurityClass || 'Unknown' }}</p>
+          </div>
         </div>
       </section>
+
+      <!-- AI Summary section -->
+      <section class="panel-section">
+        <p class="section-title">AI SUMMARY</p>
+        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
+          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isGeneratingSummary"
+          @click="generateAISummary"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
+          </p>
+          <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
+        </button>
+      </section>
+    </div>
+
+    <div class="preview-footer">
+      <a v-if="previewLink" class="open-file-btn" :href="previewLink" target="_blank" rel="noopener noreferrer">
+        <ExternalLink :size="14" />
+        Open file
+      </a>
+      <button v-else class="open-file-btn" type="button" disabled>
+        <ExternalLink :size="14" />
+        No file link available
+      </button>
     </div>
   </aside>
 </template>
@@ -91,11 +122,13 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
   top: 0;
   right: 0;
   height: 100vh;
-  width: min(520px, 92vw);
+  width: min(700px, 100vw);
   background: #ffffff;
   transform: translateX(100%);
   transition: transform 0.25s ease;
   z-index: 50;
+  display: flex;
+  flex-direction: column;
 }
 
 .preview-drawer.open {
@@ -167,21 +200,6 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
   align-items: center;
 }
 
-/* QUICK FIX: This should be a button, but we can iterate later */
-.summary-card {
-  border: 1px solid #e2e8f0;
-  background: #f8faff;
-  border-radius: 12px;
-  padding: 0.75rem;
-  color: #334155;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -209,5 +227,62 @@ const { previewTitle, previewType, previewCreatedAt, previewSize } = useSearchMe
   gap: 0.32rem;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.meta-cell-summary {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.summary-markdown {
+  padding: 1rem 1.5rem;
+}
+
+.summary-cell-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+
+.summary-cell-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-cell-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+.preview-footer {
+  border-top: 1px solid #eef2f7;
+  padding: 0.85rem 1rem 1rem;
+}
+
+.open-file-btn {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.open-file-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.open-file-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 </style>

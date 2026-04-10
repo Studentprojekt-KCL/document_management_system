@@ -2,6 +2,7 @@
 
 from dmis_logger import dms_info, dms_warning
 from se_api.services.connector import Connector
+from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
 
 
@@ -14,19 +15,22 @@ class Handler:
     """
 
     connector: Connector
+    query: Query
     search_engine: SearchEngine
 
     def __init__(self) -> None:
         self.connector = Connector()
         self.search_engine = SearchEngine()
+        self.query = Query()
 
     def reset(self) -> None:
         """Reset the connector."""
         self.search_engine = SearchEngine()
         self.connector = Connector()
+        self.query = Query()
         dms_info("Search engine was reset.")
 
-    def preform_search(self, request: str, k: int, p: int) -> list[str]:
+    def preform_search(self, request: str, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
@@ -36,34 +40,30 @@ class Handler:
             Returns matching files or None.
         """
 
-        if k <= 0 or p < 1:
-            dms_warning(f"Either page size or page index is invalid. (p: {p}, k: {k}).")
+        if count <= 0:
+            dms_warning(f"Count result count is invalid. (count: {count}).")
+            return []
+        if offset < 0:
+            dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        files: list = self.connector.get_files()
-        if files:
-            dms_info(f"New files in connector reindexing, number of files: {len(files)}.")
-            if files:
-                if self.search_engine.have_new_category(files[0]):
+        new_pointers: list = self.connector.get_file_pointers()
+        if new_pointers:
+            dms_info(f"New files in connector reindexing, number of files: {len(new_pointers)}.")
+            new_files: list[dict] = self.connector.get_files()
+            if new_files:
+                if self.search_engine.have_new_category(new_files[0]):
                     self.search_engine.rebuild()
                     self.connector.reset()
-                    files = self.connector.get_files()
-                self.search_engine.add_files(files)
+                    new_files = self.connector.get_files()
+                self.search_engine.add_files(new_files)
 
-        matches: list = self.search_engine.query_files(request, k * p)
+        matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
+        files: list[dict] = self.connector.fetch_files(matches)
+        classifications: dict = self.query.classify(matches)  # Maybe should base this of the returned pointers from the connectors.
+        for file in files:
+            unique_pointer: str = file.get("unique_pointer", "")
+            classification: str = classifications.get(unique_pointer, "")
+            file.update({"security_class": classification})
 
-        matching_files: list = []
-
-        for i in range(k * (p - 1), len(matches)):
-            file: dict | None = self.connector.get_file(matches[i])
-
-            if file is None:
-                continue
-
-            metadata: dict | None = file.get("metadata")
-            if metadata is None:
-                continue
-
-            matching_files.append(metadata)
-
-        return matching_files
+        return files

@@ -1,38 +1,75 @@
-# Embedded Ranker Service
+# Unified Document Analysis Gateway
 
 ## Description
-This microservice provides semantic document ranking using Cross-Encoder models. It is used to evaluate the relevance of document content against a specific query to refine search accuracy.
 
-## Environment Setup
-Before running the service, you must create a `.env` file in the root directory. The application will not start without these variables. 
+This microservice provides semantic document ranking using Cross-Encoder models, alongside document security classification and batch summarization powered by generative LLMs. It evaluates the relevance of document content against a specific query, determines corporate security levels, synthesizes unified summaries from multiple sources, and converts markdown summaries to PDF.
 
-Create a `.env` file based on this structure:
+## Developer Instructions
 
-```env
-# Infrastructure setup
-HOST=0.0.0.0
-PORT=8000
+Run the gateway locally in developer mode, inside a virtual python environment do the following:
 
-# Model configuration
-MODEL_NAME=BAAI/bge-reranker-v2-m3
+```bash
+$ pip install -e .
+$ gateway --dev
 ```
 
-## Running the Service locally
+## Configuration
+
+Configuration is done through environment variables.
+
+- `BIND` — Address to bind to.
+- `PORT` — Port to host on.
+- `TEI_URL` — URL for the TEI reranker container.
+- `CLASSIFIER_URL` — URL for the TEI classifier container.
+- `MINISTRAL_URL` — URL for the Ministral LLM container.
+- `MINISTRAL_MODEL` — Model identifier for Ministral.
+- `DEVICE` — Compute device identifier (optional, defaults to `external`).
+
+Optional flags:
+
+- `--dev`, developer mode (enables debug logging and detailed error responses).
+
+## Running the Service
+
 To build and run the service via Docker:
 
 1. **Build the image:**
    ```bash
-   sudo docker build -t stochastic-analyzer .
+   sudo docker build -t stochastic-analyzer -f src/stochastic_analyzer/Dockerfile .
    ```
-2. **Run the container (injecting the .env file):**
+
+2. **Run the container (using host networking):**
    ```bash
-   sudo docker run --env-file .env -p 8000:8000 stochastic-analyzer
+   sudo docker run -d \
+     --name analyzer \
+     --network host \
+     --env-file src/stochastic_analyzer/.env \
+     stochastic-analyzer
    ```
+
+## Test request to API
+
+To test that the API is working correctly, test the following CURL command:
+
+```bash
+curl -v http://127.0.0.1:8000/health
+```
+
+Which should result in a `200` and:
+
+```json
+{
+  "status": "active",
+  "model_loaded": true,
+  "device": "external"
+}
+```
 
 ## API Endpoints
 
 ### 1. Health Check
-Checks if the API is active, if the model has successfully loaded into memory, and identifies the compute device.
+
+Checks if the API is active and identifies the compute device.
 
 * **URL:** `/health`
 * **Method:** `GET`
@@ -43,11 +80,12 @@ Checks if the API is active, if the model has successfully loaded into memory, a
 {
   "status": "active",
   "model_loaded": true,
-  "device": "GPU"
+  "device": "external"
 }
 ```
 
 ### 2. Document Re-Ranker
+
 Scores and sorts a list of documents based on their semantic relevance to a provided query.
 
 * **URL:** `/rerank`
@@ -102,3 +140,102 @@ Scores and sorts a list of documents based on their semantic relevance to a prov
   ]
 }
 ```
+
+### 3. Document Classifier
+
+Classifies documents into security levels (Public, Internal, Sensitive, Confidential) using zero-shot NLI inference via the RoBERTa TEI container.
+
+* **URL:** `/classify`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
+
+**Request Body Example:**
+```json
+[
+  {
+    "content": "Quarterly financial projections and unreleased earnings targets.",
+    "metadata": {
+      "name": "Q3_Projections",
+      "author": "Finance Team"
+    }
+  }
+]
+```
+
+**Success Response:** `200 OK`
+
+**Response Example:**
+```json
+[
+  {
+    "name": "Q3_Projections",
+    "Security-class": "Confidential"
+  }
+]
+```
+
+### 4. Batch Summarizer
+
+Synthesizes the content of multiple documents into a single, unified summary using the Ministral model.
+
+* **URL:** `/summarize`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
+
+**Request Body Example:**
+```json
+[
+  {
+    "content": "Quarterly financial projections and unreleased earnings targets.",
+    "metadata": {
+      "name": "Q3_Projections",
+      "author": "Finance Team"
+    }
+  },
+  {
+    "content": "Marketing expenditure was reduced by 15% across European regions.",
+    "metadata": {
+      "name": "EU_Marketing_Q3",
+      "author": "Marketing Team"
+    }
+  }
+]
+```
+
+**Success Response:** `200 OK`
+
+**Response Example:**
+```json
+{
+  "summary": "In Q3, the organization focused on strict financial projections and unreleased earnings targets, alongside a 15% reduction in European marketing expenditure."
+}
+```
+
+### 5. Markdown to PDF
+
+Converts a markdown summary into a downloadable PDF file.
+
+* **URL:** `/md-to-pdf`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
+
+**Request Body Example:**
+```json
+{
+  "summary": "# Incident Summary\n\nThe servers experienced downtime at 2 AM due to a power outage. No data loss was reported."
+}
+```
+
+**Success Response:** `200 OK` with `application/pdf` body.
+
+**CURL Example:**
+```bash
+curl -X POST http://localhost:8000/md-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"summary": "# Report\n\nThis is the summary content."}' \
+  --output summary.pdf
+```
+
+## Further API documentation
+
+An automated API documentation is constructed when the API service is started, and can be found at http://127.0.0.1:8000/docs

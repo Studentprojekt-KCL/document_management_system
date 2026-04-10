@@ -11,15 +11,15 @@ Expected "200 ok" code
 
 ## Run with Docker
 
-Create .env in src/api/src
+Create .env file and put the vars
 
-nano .env
-DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
-DMIS_QUERY_API_URL=<DMIS_QUERY_API>
-API_PORT=XXXX
-KEYCLOAK_ISSUER=https://<KEYCLOAK_IP>/realms/master
-KEYCLOAK_JWKS_URL=https://<KEYCLOAK_IP>/realms/master/protocol/openid-connect/certs
-KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
+- DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+- DMIS_QUERY_API_URL=<DMIS_QUERY_API>
+- API_PORT=XXXX
+- KEYCLOAK_ISSUER=https://<KEYCLOAK_IP>/realms/master
+- KEYCLOAK_JWKS_URL=https://<KEYCLOAK_IP>/realms/master/protocol/openid-connect/certs
+- KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
+- API_BIND_ADDRESS=<BIND_ADRESS>
 
 ### 1. Build the image from the project root:
 
@@ -27,7 +27,7 @@ sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 ### 2. Run the container
 
-sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
+sudo docker run --rm -p 8001:8001 --env-file PATH_TO_.ENV/.env dmis_api
 
 ### 3. Test the API's
 

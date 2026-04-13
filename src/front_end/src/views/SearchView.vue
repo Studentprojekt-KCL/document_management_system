@@ -27,7 +27,6 @@ const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
-const access_token = sessionStorage.getItem('access_token')
 /* Base URL for API requests, configurable via environment variable */
 const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
@@ -57,7 +56,7 @@ const handleSearch = async (query) => {
   try {
     const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`, {
       headers: {
-        Authorization: `Bearer ${access_token}`
+        Authorization: `Bearer ${sessionStorage.getItem('access_token')}`
       }
     })
 
@@ -124,7 +123,7 @@ const handleFilterChange = (filters) => {
         if (!keywordsEntry) return false
 
         const [, keywords] = keywordsEntry
-
+access_token
         // Only match filename against the keywords for this filter
         return keywords.some((kw) => filename.endsWith(kw))
       })

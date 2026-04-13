@@ -1,39 +1,39 @@
 services:
   log-api:
-    image: log-api
+    image: log-api:pr
     build:
       dockerfile: src/logger/api/Dockerfile
 
   log-database:
-    image: log-database
+    image: log-database:pr
     build: 
       dockerfile: src/logger/database/Dockerfile
 
   search-engine:
-    image: search-engine
+    image: search-engine:pr
     build:
       dockerfile: src/search_engine/Dockerfile
 
   dmis-api:
-    image: dmis-api
+    image: dmis-api:pr
     build:
       dockerfile: src/api/Dockerfile
 
   front-end:
-    image: front-end
+    image: front-end:pr
     build: ./src/front_end
 
   connector-gitlabs:
-    image: connector-gitlabs
+    image: connector-gitlabs:pr
     build:
       dockerfile: src/connectors/gitlabs/Dockerfile
 
   connector-minio:
-    image: connector-minio
+    image: connector-minio:pr
     build:
       dockerfile: src/connectors/storage-infra/Dockerfile
 
   stochastic-analyzer:
-    image: stochastic-analyzer
+    image: stochastic-analyzer:pr
     build:
       dockerfile: src/stochastic_analyzer/Dockerfile

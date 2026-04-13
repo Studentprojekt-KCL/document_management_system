@@ -10,7 +10,7 @@ from gateway.schemas import InputItem, ClassificationResult
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
-# These label triggers have been tweaked for hours, only touch if absolutley certain
+# These label triggers have been tweaked for hours, only touch if absolutly certain
 LABEL_TRIGGERS = [
     "publicly available source code, documentation, or open material",
     "internal company policy and employee guidelines",
@@ -38,11 +38,9 @@ def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: fl
     label_rank = {"Public": 0, "Internal": 1, "Sensitive": 2, "Confidential": 3}
     original_score = doc_scores[best_index]
     original_rank = label_rank[LABELS[best_index]]
-
     for i, score in enumerate(doc_scores):
         if label_rank[LABELS[i]] > original_rank and (original_score - score) < escalation_threshold:
             best_index = i
-
     return best_index
 
 

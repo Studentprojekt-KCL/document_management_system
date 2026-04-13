@@ -29,7 +29,7 @@ async def _get_content(url: str, pointers: list, client: httpx.AsyncClient) -> l
         )
         response.raise_for_status()
         data = response.json()
-    except (httpx.HTTPStatusError, httpx.TimeoutException, ValueError) as err:
+    except (httpx.HTTPStatusError, httpx.TimeoutException, ValueError, httpx.ConnectError) as err:
         dms_warning(f"Connector request failed for pointer '{pointers}': {err}")
         return []
 

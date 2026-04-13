@@ -4,7 +4,7 @@ from typing import Any
 import argparse
 
 import uvicorn
-from fastapi import FastAPI, Header, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -42,39 +42,17 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def files(
-        self,
-        subdata: str | None = None,
-        x_gitlab_token: str | None = Header(default=None, alias="X-GitLab-Token"),
-    ) -> Any:
+    async def files(self, subdata: str | None = None) -> Any:
         """Endpoint returning a list of files available."""
-        if x_gitlab_token is None:
-            return {"subdata": subdata, "file_pointers": []}
-        token = x_gitlab_token.removeprefix("Bearer ").strip()
-        return self.gitlabs_instance.pointers_to_all_files_to_index(subdata, token)
+        return self.gitlabs_instance.pointers_to_all_files_to_index(subdata)
 
-    async def file(
-        self,
-        file_pointer: str,
-        include_content: bool = True,
-        x_gitlab_token: str | None = Header(default=None, alias="X-GitLab-Token"),
-    ) -> Any:
+    async def file(self, file_pointer: str, include_content: bool = True) -> Any:
         """Endpoint for retrieving specific file."""
-        if x_gitlab_token is None:
-            return {}
-        token = x_gitlab_token.removeprefix("Bearer ").strip()
-        return self.gitlabs_instance.get_file(file_pointer, include_content, token)
+        return self.gitlabs_instance.get_file(file_pointer, include_content)
 
-    async def files_to_index(
-        self,
-        subdata: str | None = None,
-        x_gitlab_token: str | None = Header(default=None, alias="X-GitLab-Token"),
-    ) -> dict:
+    async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
-        if x_gitlab_token is None:
-            return {"subdata": subdata, "file_url": None}
-        token = x_gitlab_token.removeprefix("Bearer ").strip()
-        content = self.gitlabs_instance.files_to_index(subdata, token)
+        content = self.gitlabs_instance.files_to_index(subdata)
         url = upload_file(content, "gitlabs_content.json")
         return {"subdata": content.get("subdata"), "file_url": url}
 

@@ -12,7 +12,7 @@ import binascii
 
 import requests
 
-from variables import SOURCE_FILE
+from variables import PROJECT, SOURCE_FILE
 
 from unpacker import unpack_values
 from dmis_logger import dms_error, dms_info, dms_warning
@@ -37,12 +37,12 @@ class GitLabs:
             address += "/"
         self.base = urljoin(str(address), self.API_URL)
 
-    def _get_projects(self, token: str | None = None) -> dict | list:
+    def _get_projects(self) -> dict | list:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        return self._execute_request(url, token)
+        return self._execute_request(url)
 
-    def get_project_ids(self, token: str | None = None) -> dict[int, str]:
+    def get_project_ids(self) -> dict[int, str]:
         """Retrieve a dictionary of IDs for all available projects.
 
         Returns:
@@ -50,7 +50,7 @@ class GitLabs:
             Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
         """
         ids: dict[int, str] = {}
-        for project in self._get_projects(token):
+        for project in self._get_projects():
             last_activity = project.get("last_activity_at")
             if not last_activity:
                 continue  # Entails there was no activity for this project
@@ -58,7 +58,23 @@ class GitLabs:
 
         return ids
 
-    def get_files_in_project(self, project_id: int, token: str | None = None) -> list:
+    def get_projects_as_units(self) -> dict:
+        """Retrieve information about available projects."""
+        content = self._get_projects()
+
+        projects: dict = {}
+        for project in content:
+            projects[project.get("web_url")] = {
+                "name": unpack_values(project, ("name",)),
+                "creator": unpack_values(project, ("namespace", "name")),
+                "created_date": unpack_values(project, ("created_at",)),
+                "last_edit_date": unpack_values(project, ("last_activity_at",)),
+                "type": PROJECT,
+            }
+
+        return projects
+
+    def get_files_in_project(self, project_id: int) -> list:
         """Retrieve URLs for all available files in a project.
 
         Args:
@@ -67,7 +83,7 @@ class GitLabs:
         """
         tree_args: str = f"projects/{project_id}/repository/tree?recursive=true&per_page=1000&pagination=none"
         url = urljoin(self.base, tree_args)
-        content = self._execute_request(url, token)
+        content = self._execute_request(url)
         base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
         files: list = []
         for file in content:
@@ -85,7 +101,7 @@ class GitLabs:
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str, token: str | None = None) -> str:
+    def _get_clickable_url(self, url: str, file_path: str) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -98,7 +114,7 @@ class GitLabs:
         """
         project_id = self._get_project_id(url)
         projects_endpoint = urljoin(self.base, "projects/")
-        project_information = self._execute_request(urljoin(projects_endpoint, project_id), token)
+        project_information = self._execute_request(urljoin(projects_endpoint, project_id))
         if isinstance(project_information, list):
             dms_info(f"Was not able to generate clickable link for {url}")
             return ""
@@ -106,7 +122,7 @@ class GitLabs:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, include_content: bool = True, token: str | None = None) -> dict:
+    def get_file(self, url: str, include_content: bool = True) -> dict:
         """
 
         Args:
@@ -116,12 +132,11 @@ class GitLabs:
             include_content: Determine if actual file content should be included or not.
 
         """
-        headers = {"Authorization": f"Bearer {token}"} if token else None
         file: dict | list = {}
         if include_content:
-            file = self._execute_request(urljoin(url, self.GIT_HEAD), token)
+            file = self._execute_request(urljoin(url, self.GIT_HEAD))
         else:
-            content = self.session.head(urljoin(url, self.GIT_HEAD), headers=headers).headers
+            content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
             file = {
                 "file_name": content.get("x-gitlab-file-name"),
                 "size": content.get("x-gitlab-size"),
@@ -130,7 +145,7 @@ class GitLabs:
 
         if isinstance(file, list):
             file = {}
-        blame = self._execute_request(urljoin(url.rstrip("/") + "/", self.GIT_BLAME), token)
+        blame = self._execute_request(urljoin(url.rstrip("/") + "/", self.GIT_BLAME))
 
         base_structure: dict[Any, Any] = {
             "metadata": {
@@ -144,7 +159,7 @@ class GitLabs:
         }
         file_path = file.get("file_path")
         if isinstance(file_path, str):
-            base_structure["metadata"] |= {"clickable_url": self._get_clickable_url(url, file_path, token)}
+            base_structure["metadata"] |= {"clickable_url": self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}
@@ -181,7 +196,7 @@ class GitLabs:
 
         return files_data
 
-    def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
+    def files_to_index(self, subdata: str | None = None) -> dict:
         """Retrieve a structure of files to index.
 
         Args:
@@ -198,8 +213,8 @@ class GitLabs:
         provided_date: datetime = self._provided_date(subdata)
         files_data: list = []
 
-        current_subdata = self.get_project_ids(token)
-        projects = self._get_projects(token)
+        current_subdata = self.get_project_ids()
+        projects = self._get_projects()
 
         if subdata is None:
             latest_update = datetime.min.replace(tzinfo=timezone.utc)
@@ -218,23 +233,14 @@ class GitLabs:
 
             branch = project.get("default_branch")
             url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
-            files_data.extend(
-                self._unpack_zip(
-                    requests.get(
-                        url,
-                        timeout=120,
-                        headers={"Authorization": f"Bearer {token}"} if token else None,
-                    ).content,
-                    project_id,
-                )
-            )
+            content = requests.get(url, timeout=120).content
+            files_data.extend(self._unpack_zip(content, project_id))
 
-        return {
-            "files": files_data,
-            "subdata": base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode(),
-        }
+        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
-    def pointers_to_all_files_to_index(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
+        return {"files": files_data, "subdata": generated_subdata}
+
+    def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
         """Retrieve a containing URLs pointing to all available individual files available, except those in projects
             already indexed according to subdata.
 
@@ -252,7 +258,7 @@ class GitLabs:
         provided_date = self._provided_date(subdata)
 
         file_pointers: list = []
-        project_ids = self.get_project_ids(token)
+        project_ids = self.get_project_ids()
         latest_update = datetime.min.replace(tzinfo=timezone.utc)
         for project_id, change_time in project_ids.items():
             if not isinstance(change_time, str):
@@ -262,7 +268,7 @@ class GitLabs:
                 continue
             latest_update = max(latest_update, new_timestamp_object)
 
-            file_pointers.extend(self.get_files_in_project(project_id, token))
+            file_pointers.extend(self.get_files_in_project(project_id))
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
@@ -283,11 +289,10 @@ class GitLabs:
                 dms_error("Gitlab connector could not interpret subdata: %s", subdata)
         return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(self, url: str, token: str | None = None) -> dict | list:
+    def _execute_request(self, url: str) -> dict | list:
         """Execute request to supplied URL, JSON content in response expected."""
-        headers = {"Authorization": f"Bearer {token}"} if token else None
         try:
-            response = self.session.get(url, timeout=120, headers=headers)
+            response = self.session.get(url, timeout=120)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")

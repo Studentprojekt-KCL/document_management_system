@@ -3,7 +3,6 @@
 import os
 from datetime import datetime
 from logging import error, warning, info
-from datetime import datetime
 from typing import Any
 from socket import gethostname
 

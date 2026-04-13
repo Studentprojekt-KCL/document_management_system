@@ -168,7 +168,7 @@ Classifies documents into security levels (Public, Internal, Sensitive, Confiden
 ```json
 [
   {
-    "name": "Q3_Projections",
+    "unique_pointer": "Q3_Projections",
     "Security-class": "Confidential"
   }
 ]

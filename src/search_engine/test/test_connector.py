@@ -7,9 +7,9 @@ class TestConnector(TestCase):
     def setUp(self, _):
         self.instance = Connector()
         self.instance.address = ""
-        self.instance.url_files = "/files"
-        self.instance.url_file = "/file"
+        self.instance.index_needed_bool = "/index_needed_bool"
         self.instance.url_files_to_index = "/files_to_index"
+        self.instance.url_get_files = "/get_files"
         self.instance.subdata = None
 
     def test_reset(self):
@@ -17,31 +17,26 @@ class TestConnector(TestCase):
         self.instance.reset()
         assert self.instance.subdata is None
 
+    def reindex_side_effect(self):
+        if self.instance.subdata == None:
+            return {"index_needed": True}
+        return {"index_needed": False}
+
     # ==== GET_FILE_POINTERS ====
 
-    @mock.patch("se_api.services.connector.Connector._get_file_pointers")
-    def test_get_file_pointers_dict(self, mock_get_file_pointers):
-        mock_get_file_pointers.return_value = {}
-        result = self.instance.get_file_pointers()
-        assert result == []
+    @mock.patch("se_api.services.connector.get")
+    def test_reindex_needed(self, mock_get):
+        self.instance.subdata = None
+        mock_get.return_value.json.side_effect = self.reindex_side_effect
+        result = self.instance.reindex_needed()
+        assert result == True
 
-    @mock.patch("se_api.services.connector.Connector._get_file_pointers")
-    def test_get_file_pointers_empty(self, mock_get_file_pointers):
-        mock_get_file_pointers.return_value = []
-        result = self.instance.get_file_pointers()
-        assert result == []
-
-    @mock.patch("se_api.services.connector.Connector._get_file_pointers")
-    def test_get_file_pointers_none(self, mock_get_file_pointers):
-        mock_get_file_pointers.return_value = None
-        result = self.instance.get_file_pointers()
-        assert result == []
-
-    @mock.patch("se_api.services.connector.Connector._get_file_pointers")
-    def test_get_file_pointers_valid(self, mock_get_file_pointers):
-        mock_get_file_pointers.return_value = {"file_pointers": ["pointer-1", "pointer-2", "pointer-3"]}
-        result = self.instance.get_file_pointers()
-        assert result == ["pointer-1", "pointer-2", "pointer-3"]
+    @mock.patch("se_api.services.connector.get")
+    def test_reindex_not_needed(self, mock_get):
+        self.instance.subdata = "amVzcGVy"
+        mock_get.return_value.json.side_effect = self.reindex_side_effect
+        result = self.instance.reindex_needed()
+        assert result == False
 
     # ==== FETCH_FILES_FROM_POINTERS ====
 
@@ -65,7 +60,7 @@ class TestConnector(TestCase):
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointer")
     def test_fetch_files_full(self, mock_get_file_from_pointer):
-        mock_get_file_from_pointer.return_value = {"metadata": {"item1": "item", "item2": "item"}}
+        mock_get_file_from_pointer.return_value = [{"item1": "item", "item2": "item"}]
         result = self.instance.fetch_files(["pointer"])
         assert result == [{"item1": "item", "item2": "item"}]
 

@@ -1,17 +1,10 @@
+# DMIS API
 
-### 3. Start the API
+This subdirectory contains the package for the main API of DMIS.
 
-dmis_api --dev
+## Environment Configuration
 
-### 4. Test request to API:
-
-curl "http://127.0.0.1:8001/docs"
-
-Expected "200 ok" code
-
-## Run with Docker
-
-Create .env file and put the vars
+Create a .env file with the following variables:
 
 - DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
 - DMIS_QUERY_API_URL=<DMIS_QUERY_API>
@@ -21,6 +14,37 @@ Create .env file and put the vars
 - KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
 - API_BIND_ADDRESS=<BIND_ADRESS>
 
+## Developer Setup (Local)
+
+Run the API locally in development mode using a Python virtual environment.
+
+### 1. Set Enviroment Variables
+
+- export DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+- export DMIS_QUERY_API_URL=<DMIS_QUERY_API>
+- export API_PORT=XXXX
+- export KEYCLOAK_ISSUER=https://<KEYCLOAK_IP>/realms/master
+- export KEYCLOAK_JWKS_URL=https://<KEYCLOAK_IP>/realms/master/protocol/openid-connect/certs
+- export KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
+- export API_BIND_ADDRESS=<BIND_ADRESS>
+
+### 2. Install the package
+pip install -e src/api
+
+### 3. Start the API
+
+dmis_api --dev
+
+### 4. Verify the API
+
+curl "http://127.0.0.1:8001/docs"
+
+Expected response "200 OK"
+
+## Run with Docker
+
+Create a .env file with the required variables from the section "Environment Configuration"
+
 ### 1. Build the image from the project root:
 
 sudo docker build -t dmis_api -f src/api/Dockerfile .
@@ -29,7 +53,7 @@ sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 sudo docker run --rm -p 8001:8001 --env-file PATH_TO_.ENV/.env dmis_api
 
-### 3. Test the API's
+### 4. Test the API endpoints
 
 #### Testing main API endpoint
 curl "http://127.0.0.1:8001/docs"

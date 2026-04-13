@@ -1,8 +1,8 @@
 [
-    {"description": "Text", "extension": ".md", "type": "text"},
+    {"description": "Text (.md)", "extension": ".md", "type": "text"},
     {"description": "Word (.docx)", "extension": ".docx", "type": "text"},
     {"description": "PDF (.pdf)", "extension": ".pdf", "type": "text"},
-    {"description": "text", "extension": ".txt", "type": "text"},
+    {"description": "Text (.txt)", "extension": ".txt", "type": "text"},
     {"description": "Excel (.xlsx)", "extension": ".xlsx", "type": "sheet"},
 	{"description": "missing", "extension": ".1.ada", "type": "code"},
 	{"description": "missing", "extension": ".2.ada", "type": "code"},

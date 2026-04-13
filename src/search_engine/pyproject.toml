@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "se_api"
+name = "search_engine"
 description = "Search Engine"
 dynamic = ["dependencies"]
 version = "0.0.1"
@@ -12,5 +12,5 @@ version = "0.0.1"
 package-dir = {"" = "src"}
 
 [project.scripts]
-se_api = "se_api.api:run"
+search_engine = "search_engine.main:run"
 

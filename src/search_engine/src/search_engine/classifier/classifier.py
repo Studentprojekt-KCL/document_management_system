@@ -1,29 +1,30 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import logging
+from multiprocessing import Process
+from multiprocessing.connection import Connection
 from typing import Any
 
-from dmis_logger import dms_warning
+from dmis_logger import dms_info, dms_warning
 from requests import exceptions, post
 from initialisation_tools import read_env_variable
-from se_api.services.classifier_cache import ClassifierCache
+
+from search_engine.classifier.cache import Cache
 
 
-class Query:
+class Classifier:
     """Class handling query connections."""
 
     classify_url: str
-    cache: ClassifierCache
+    cache: Cache
 
     def __init__(self) -> None:
         """Constructor."""
+        super().__init__()
         address: str = read_env_variable("SE_API_QUERY_ADDRESS")
 
         self.classify_url = address.rstrip("/") + "/classify"
-        self.cache = ClassifierCache()
-
-    def reset(self) -> None:
-        """Reset the cache."""
-        self.cache.reset()
+        self.cache = Cache()
 
     def classify(self, files: list[dict]) -> dict[str, str]:
         """Classify the files at the pointers.

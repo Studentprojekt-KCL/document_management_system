@@ -3,11 +3,13 @@
 import json
 from os import path
 
-from dmis_logger import dms_error, dms_info, dms_warning
+from dmis_logger import dms_error, dms_info
 from initialisation_tools import read_env_variable
 
+from search_engine.classifier.writer import Writer
 
-class ClassifierCache:
+
+class Cache:
     """Classifier Cache class"""
 
     CACHE_FILE: str = "classification_cache.json"
@@ -16,47 +18,44 @@ class ClassifierCache:
     cache_file: str
     cache: dict[str, str]
 
+    write_queue: list[dict[str, str]]
+    writer: Writer
+
     def __init__(self) -> None:
         """Constructor"""
         self.cache_directory: str = read_env_variable("SE_API_CACHE_DIRECTORY")
-        self.cache_file: str = f"{self.cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
+        self.cache_file: str = f"{self.cache_directory.rstrip('/')}/{Cache.CACHE_FILE}"
+        self.cache = {}
 
         if not path.isdir(self.cache_directory):
             dms_error(f"{self.cache_directory} is not a directory.")
         elif path.isfile(self.cache_file):
             try:
                 with open(self.cache_file, encoding="utf-8") as f:
-                    self.cache = json.loads(f.read())
+                    for line in f.readlines():
+                        classification: dict[str, str] = json.loads(line.strip().replace("'", '"'))
+                        self.cache.update(classification)
                 dms_info(f"Found file: {self.cache_file}.")
             except OSError:
                 dms_error(f"Failed reading file: {self.cache_file}.")
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(e.msg)
                 dms_error(f"Failed parsing file: {self.cache_file}.")
         elif path.exists(self.cache_file):
             dms_error(f"{self.cache_file} is not a file.")
         else:
             try:
                 with open(self.cache_file, "x", encoding="utf-8") as f:
-                    f.write(json.dumps({}))
-                self.cache = {}
-                dms_info(f"Created file: {self.cache_file}.")
+                    dms_info(f"Created file: {self.cache_file}.")
             except OSError:
                 dms_error(f"Failed reading file: {self.cache_file}.")
+
+        self.writer = Writer(self.cache_file)
+        self.writer.start()
 
     def reset(self) -> None:
         """Reset cache."""
         self.cache = {}
-        self._write_memory()
-
-    def _write_memory(self) -> None:
-        """Write current cache to file."""
-        try:
-            with open(self.cache_file, "w", encoding="utf=8") as f:
-                f.write(json.dumps(self.cache))
-        except OSError:
-            dms_warning(f"Failed to open (write): {self.cache_file}.")
-        except json.JSONDecodeError:
-            dms_warning("Failed to parse cache dict.")
 
     def add_classification(self, pointer: str, classification: str) -> None:
         """Add classification to cache.
@@ -66,8 +65,9 @@ class ClassifierCache:
             classification: the assigned classification.
         """
 
+        if pointer not in self.cache.keys():
+            self.writer.add({pointer: classification})
         self.cache.update({pointer: classification})
-        self._write_memory()
 
     def remove_classification(self, pointer: str) -> None:
         """Remove classification from cache.
@@ -77,7 +77,6 @@ class ClassifierCache:
         """
 
         self.cache.pop(pointer)
-        self._write_memory()
 
     def remove_classifications(self, files: list[dict[str, str]]) -> None:
         """Remove a list classifications from cache.
@@ -92,7 +91,6 @@ class ClassifierCache:
             pointer: str | None = file.get("unique_pointer")
             if pointer is not None:
                 self.cache.pop(pointer)
-        self._write_memory()
 
     def fetch_classification(self, pointer: str) -> str | None:
         """Fetch a classification.
@@ -101,3 +99,4 @@ class ClassifierCache:
             pointer: unique pointer.
         Returns: classification string or None."""
         return self.cache.get(pointer)
+

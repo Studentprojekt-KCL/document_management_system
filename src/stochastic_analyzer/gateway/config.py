@@ -4,7 +4,7 @@ from os import environ
 import argparse
 
 from dmis_logger import dms_error
-
+from initialisation_tools import read_env_variable
 
 class ServiceConfig:
     """External service connection configuration.
@@ -96,13 +96,13 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
 
-        tei_url: str | None = environ.get("TEI_URL")
-        classifier_url: str | None = environ.get("CLASSIFIER_URL")
-        ministral_url: str | None = environ.get("MINISTRAL_URL")
-        ministral_model: str | None = environ.get("MINISTRAL_MODEL")
-        ministral_timeout = environ.get("MINISTRAL_TIMEOUT", "120")
-        address: str | None = environ.get("CONNECTOR_ADDRESS")
-        escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
+        tei_url: str | None = read_env_variable("TEI_URL")
+        classifier_url: str | None = read_env_variable("CLASSIFIER_URL")
+        ministral_url: str | None = read_env_variable("MINISTRAL_URL")
+        ministral_model: str | None = read_env_variable("MINISTRAL_MODEL")
+        ministral_timeout: int | None = read_env_variable("MINISTRAL_TIMEOUT")
+        address: str | None = read_env_variable("CONNECTOR_ADDRESS")
+        escalation_threshold: int | None = read_env_variable("ESCALATION_THRESHOLD")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")

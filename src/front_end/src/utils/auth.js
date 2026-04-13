@@ -87,7 +87,7 @@ export async function refreshToken(){
   // call the save_tokens function
   saveTokens({
     access_token: data.access_token,
-    id_token: data.ide_token,
+    id_token: data.id_token,
     refresh_token: data.refresh_token
   })
   return data

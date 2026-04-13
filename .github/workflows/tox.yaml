@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-tox:
-    runs-on: self-hosted
+    runs-on: main
     permissions:
       contents: read
 

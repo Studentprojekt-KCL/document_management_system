@@ -53,17 +53,37 @@ const resolveLink = (entry) => {
   return pick(metadata?.clickable_url, entry?.clickable_url)
 }
 
-/* Function to resolve the document type from source type and name. */
-const TYPE_KEYWORDS = {
-  'PDF Document': ['pdf'],
-  'Word Document': ['word', 'doc', 'docx'],
-  'Excel Spreadsheet': ['excel', 'sheet', 'xlsx'],
-  'Text Document': ['txt'],
-  'Markdown Document': ['markdown', 'md']
+const resolveUniquePointer = (entry) => {
+  const metadata = getMetadata(entry)
+
+  return pick(metadata?.unique_pointer, entry?.unique_pointer)
+}
+
+export const resolveSecurityClass = (entry) => {
+  const metadata = getMetadata(entry)
+
+  return pick(metadata?.security_class, entry?.security_class)
 }
 
 /* Function to resolve the document type from source type and name. */
-const resolveDocumentType = ({ sourceType, sourceName }) => {
+export const TYPE_KEYWORDS = {
+  'PDF Document': ['.pdf'],
+  'Word Document': ['word', 'doc', '.docx'],
+  'Excel Spreadsheet': ['excel', 'sheet', '.xlsx'],
+  'Text Document': ['.txt'],
+  'Markdown Document': ['markdown', '.md']
+}
+
+/* Used for filtering doc types (SearchView, SearchFilterCard)*/
+export const TYPE_FILTERS = {
+  'PDF (.pdf)': ['.pdf'],
+  'Word (.docx)': ['.doc', '.docx', 'word'],
+  'Excel (.xlsx)': ['.xlsx'],
+  'Text / Markdown (.txt, .md)': ['.md', '.txt']
+}
+
+/* Function to resolve the document type from source type and name. */
+export const resolveDocumentType = ({ sourceType, sourceName }) => {
   const type = String(sourceType || '').toLowerCase()
   const name = String(sourceName || '').toLowerCase()
   const typeOrName = `${type} ${name}`
@@ -131,6 +151,10 @@ export const useSearchMetadata = (props) => {
 
   const previewLink = computed(() => resolveLink(props.selectedMatch))
 
+  const previewSecurityClass = computed(() => resolveSecurityClass(props.selectedMatch))
+
+  const uniquePointer = computed(() => resolveUniquePointer(props.selectedMatch))
+
   const normalizeMatches = (matches = []) =>
     matches.map((entry, index) => {
       const metadata = getMetadata(entry)
@@ -160,8 +184,11 @@ export const useSearchMetadata = (props) => {
     previewCreatedAt,
     previewSize,
     previewLink,
+    previewSecurityClass,
+    uniquePointer,
     normalizeMatches,
     resolveMatchDate,
-    resolveSource
+    resolveSource,
+    resolveSecurityClass
   }
 }

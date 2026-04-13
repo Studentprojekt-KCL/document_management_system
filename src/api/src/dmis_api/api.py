@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import os
-from typing import Any, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 import requests
 import uvicorn
@@ -13,7 +13,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from dmis_logger import dms_warning, dms_error, dms_info
+from dmis_logger import dms_warning, dms_info
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -54,11 +55,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict[str, Any]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
 
@@ -70,9 +67,9 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.get(
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.search_api_url}/search",
-                params={"q": query},
+                params={"query": query},
                 timeout=120,
             )
             response.raise_for_status()
@@ -105,7 +102,7 @@ class API:
             raise HTTPException(status_code=422)
 
         try:
-            response = requests.post(
+            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 f"{self.query_api_url}/summarize",
                 json={"pointers": [file_pointer]},
                 timeout=100,
@@ -127,32 +124,10 @@ def run() -> None:
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    bind_address = os.environ.get("API_BIND_ADDRESS")
-    port_str = os.environ.get("API_PORT")
-    search_api_url = os.getenv("DMIS_SEARCH_API_URL")
-    query_api_url = os.getenv("DMIS_QUERY_API_URL")
-
-    if bind_address is None:
-        dms_error("API_BIND_ADDRESS is not defined.")
-        return
-    if port_str is None:
-        dms_error("API_PORT is not defined.")
-        return
-
-    try:
-        port = int(port_str)
-    except ValueError:
-        dms_error("API_PORT expected int.")
-        return
-    if port <= 0 or port >= 65535:
-        dms_error("API_PORT should be between 0 and 65535.")
-        return
-    if not search_api_url:
-        dms_error("DMIS_SEARCH_API_URL is not set.")
-        return
-    if not query_api_url:
-        dms_error("DMIS_QUERY_API_URL is not set.")
-        return
+    bind_address = read_env_variable("API_BIND_ADDRESS")
+    port = read_port("API_PORT")
+    search_api_url = read_env_variable("DMIS_SEARCH_API_URL")
+    query_api_url = read_env_variable("DMIS_QUERY_API_URL")
 
     log_level = "debug" if args.dev else None
 

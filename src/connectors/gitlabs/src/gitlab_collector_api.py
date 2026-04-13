@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import os
 from typing import Any
 import argparse
 
@@ -13,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from interfacer import GitLabs
 from boto_tools import upload_file
 
-from dmis_logger import dms_error
+from initialisation_tools import read_port, read_env_variable
 
 
 class API:
@@ -27,8 +26,8 @@ class API:
         """Constructor."""
         self.gitlabs_instance = GitLabs()
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
-        self.app.add_api_route("/file", self.file, methods=["GET"])
+        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+        self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
@@ -38,26 +37,35 @@ class API:
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
             errors = {"detail": str(exc)}
-        content: str | dict
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+
+        content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self, subdata: str | None = None) -> Any:
-        """Endpoint returning a list of files available."""
-        return self.gitlabs_instance.pointers_to_all_files_to_index(subdata)
+    async def index_needed_bool(self, subdata: str | None = None) -> Any:
+        """Endpoint returning status if new index is needed."""
+        return self.gitlabs_instance.check_index_needed(subdata)
 
-    async def file(self, file_pointer: str, include_content: bool = True) -> Any:
-        """Endpoint for retrieving specific file."""
-        return self.gitlabs_instance.get_file(file_pointer, include_content)
+    async def get_files(
+        self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
+    ) -> Any:
+        """Endpoint for retrieving specific file.
+        Example request:
+            curl -X 'POST' \
+            '<HOST>/get_files?include_content=false&include_last_edit_date=true' \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -d '{
+            "file_pointers": ["<FILE_PTR>"]
+            }'
+        """
+        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers"), include_content, include_last_edit_date)
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         content = self.gitlabs_instance.files_to_index(subdata)
         url = upload_file(content, "gitlabs_content.json")
-        return {"subdata": content.get("subdata"), "file_url": url}
+        return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
 
 
 def run() -> None:
@@ -70,8 +78,9 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = os.environ.get("GITLAB_CONNECTOR_PORT")
-    if port is None or not port.isdigit():
-        dms_error("Port for Gitlab connector not set in local environment, please export GITLAB_CONNECTOR_PORT.")
-        return
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))
+    uvicorn.run(
+        api.app,
+        host=read_env_variable("GITLAB_CONNECTOR_BIND_ADDR"),
+        log_level=api.log_level,
+        port=read_port("GITLAB_CONNECTOR_PORT"),
+    )

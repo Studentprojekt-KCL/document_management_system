@@ -38,6 +38,8 @@ services:
       SE_API_PORT: ${SE_API_PORT}
       SE_API_CONNECTOR_ADDRESS: ${SE_API_CONNECTOR_ADDRESS}
       SE_API_HOST: ${SE_API_HOST}
+      SE_API_QUERY_ADDRESS: ${SE_API_QUERY_ADDRESS}
+
 
   dmis-api:
     image: registry.dms-lookup.com/dmis-api:latest
@@ -48,6 +50,9 @@ services:
         ipv4_address: ${IP_DMIS_API}
     environment:
       DMIS_SEARCH_API_URL: ${DMIS_SEARCH_API_URL}
+      DMIS_QUERY_API_URL: ${DMIS_QUERY_API_URL}
+      API_BIND_ADDRESS: ${DMIS_API_BIND_ADDRESS}
+      API_PORT: ${DMIS_API_PORT}
 
   front-end:
     image: registry.dms-lookup.com/front-end:latest
@@ -102,6 +107,7 @@ services:
       MINISTRAL_URL: ${MINISTRAL_URL}
       MINISTRAL_MODEL: ${MINISTRAL_MODEL}
       CONNECTOR_ADDRESS: ${CONNECTOR_ADDRESS}
+      ESCALATION_THRESHOLD: ${ESCALATION_THRESHOLD}
 
 networks:
   dev_net:

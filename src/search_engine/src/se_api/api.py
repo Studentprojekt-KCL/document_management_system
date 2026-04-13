@@ -2,11 +2,9 @@
 
 import argparse
 import logging
-from os import environ
 from typing import Any
 from collections.abc import Sequence
 
-from dmis_logger import dms_error
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -31,6 +30,7 @@ class API:
     port: int
     host: str
     log_level: str
+    MAX_PORT: int = 65536
 
     def __init__(self) -> None:
         logging.basicConfig()
@@ -46,23 +46,8 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
             self.log_level = "info"
 
-        port: str | None = environ.get("SE_API_PORT")
-        host: str | None = environ.get("SE_API_HOST")
-
-        if port is None:
-            dms_error("SE_API_PORT is not defined.")
-            return
-        if host is None:
-            dms_error("SE_API_HOST is not defined.")
-            return
-
-        if not port.isdigit():
-            dms_error("Port is expected to be an integer.")
-        elif int(port) < 0 or int(port) >= 65536:
-            dms_error("Port should be between 0 and 65536.")
-
-        self.port = int(port)
-        self.host = host
+        self.port: int = read_port("SE_API_PORT")
+        self.host: str = read_env_variable("SE_API_HOST")
 
         self.handler = Handler()
 
@@ -76,7 +61,7 @@ class API:
     def start(self) -> None:
         """Start the API."""
 
-        uvicorn.run(self.app, host=self.host, log_level=self.log_level)
+        uvicorn.run(self.app, host=self.host, log_level=self.log_level, port=self.port)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -87,13 +72,11 @@ class API:
         else:
             errors = {"detail": str(exc)}
         content: str | dict[str, str]
-        if self.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, q: str, k: int = 10, p: int = 1) -> list:
+    async def query(self, query: str, count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -103,7 +86,7 @@ class API:
             List of found files or None.
         """
 
-        return self.handler.preform_search(q, k, p)
+        return self.handler.preform_search(query, count, offset)
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""

@@ -29,7 +29,7 @@ services:
       dockerfile: src/connectors/gitlabs/Dockerfile
 
   connector-githubs:
-    image: connector-githubs
+    image: connector-githubs:pr
     build:
       dockerfile: src/connectors/githubs/Dockerfile
 

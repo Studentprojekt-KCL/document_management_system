@@ -13,13 +13,10 @@ Expected "200 ok" code
 
 Create .env in src/api/src
 
-nano .env
-DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
-DMIS_QUERY_API_URL=<DMIS_QUERY_API>
-API_PORT=XXXX
-KEYCLOAK_ISSUER=https://<KEYCLOAK_IP>/realms/master
-KEYCLOAK_JWKS_URL=https://<KEYCLOAK_IP>/realms/master/protocol/openid-connect/certs
-KEYCLOAK_EXPECTED_AZP=<CLIENT_ID>
+  DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+  DMIS_QUERY_API_URL=<DMIS_QUERY_API>
+  API_PORT=XXXX
+  API_BIND_ADDRESS=<BIND_ADDR>
 
 ### 1. Build the image from the project root:
 
@@ -35,11 +32,9 @@ sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
 curl "http://127.0.0.1:8001/docs"
 
 #### Testing search API endpoint
-curl "http://127.0.0.1:8001/search?query=test" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
+curl "http://127.0.0.1:8001/search?query=test"
 
 #### Testing summary API endpoint
 curl -X POST "http://127.0.0.1:8001/summary" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"file_pointer":"THEFILEPOINTER"}'

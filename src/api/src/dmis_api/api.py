@@ -8,7 +8,7 @@ from collections.abc import Sequence
 
 import requests
 import uvicorn
-from fastapi import FastAPI, Request, Query, HTTPException, Header
+from fastapi import FastAPI, Request, Query, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,22 +16,20 @@ from fastapi.responses import JSONResponse
 from dmis_logger import dms_warning, dms_info
 from initialisation_tools import read_env_variable, read_port
 
-from .auth import TokenVerifier
-
 
 class API:
     """Management class for main API."""
 
+    app: FastAPI = FastAPI()
+
     log_level: str | None = None
     search_api_url: str
     query_api_url: str
-    token_verifier: TokenVerifier
 
     def __init__(
         self,
         search_api_url: str,
         query_api_url: str,
-        token_verifier: TokenVerifier,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -40,7 +38,6 @@ class API:
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
         self.query_api_url = query_api_url.rstrip("/")
-        self.token_verifier = token_verifier
 
         self.app.add_exception_handler(
             RequestValidationError,
@@ -62,20 +59,8 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def search(
-        self,
-        query: str = Query(..., min_length=1, max_length=200),
-        authorization: str | None = Header(default=None),
-    ) -> JSONResponse:
+    async def search(self, query: str = Query(..., min_length=1, max_length=200)) -> JSONResponse:
         """Forward search request to upstream search API, enrich results with classification, and return results."""
-        claims = self.token_verifier.verify_access_token(authorization)
-        dms_info(
-            f"Authorized search request: "
-            f"sub={claims.get('sub')} "
-            f"user={claims.get('preferred_username')} "
-            f"azp={claims.get('azp')}"
-        )
-
         query = query.strip()
         if not query:
             dms_warning("Search request received empty query.")
@@ -108,23 +93,12 @@ class API:
             },
         )
 
-    async def summary(
-        self,
-        body: dict[str, Any],
-        authorization: str | None = Header(default=None),
-    ) -> JSONResponse:
+    async def summary(self, body: dict[str, Any]) -> JSONResponse:
         """Forward summary request to upstream summary API and return response."""
-        claims = self.token_verifier.verify_access_token(authorization)
-        dms_info(
-            f"Authorized summary request: "
-            f"sub={claims.get('sub')} "
-            f"user={claims.get('preferred_username')} "
-            f"azp={claims.get('azp')}"
-        )
 
         file_pointer = body.get("file_pointer")
         if not isinstance(file_pointer, str):
-            dms_info(f"Summary endpoint request expected 'file_pointer' to be string but got: {file_pointer!r}")
+            dms_info("Summary endpoint request expected 'file_pointer' to be string but got: {file_pointer!r}")
             raise HTTPException(status_code=422)
 
         try:
@@ -154,22 +128,12 @@ def run() -> None:
     port = read_port("API_PORT")
     search_api_url = read_env_variable("DMIS_SEARCH_API_URL")
     query_api_url = read_env_variable("DMIS_QUERY_API_URL")
-    keycloak_issuer = read_env_variable("KEYCLOAK_ISSUER")
-    keycloak_jwks_url = read_env_variable("KEYCLOAK_JWKS_URL")
-    keycloak_expected_azp = read_env_variable("KEYCLOAK_EXPECTED_AZP")
 
     log_level = "debug" if args.dev else None
-
-    token_verifier = TokenVerifier(
-        issuer=keycloak_issuer,
-        jwks_url=keycloak_jwks_url,
-        expected_azp=keycloak_expected_azp,
-    )
 
     api = API(
         search_api_url=search_api_url,
         query_api_url=query_api_url,
-        token_verifier=token_verifier,
         log_level=log_level,
     )
 

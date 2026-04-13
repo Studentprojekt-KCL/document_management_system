@@ -61,7 +61,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def execute_get_request(self, url: str, request: Request):
+    async def execute_get_request(self, url: str, request: Request) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -70,7 +70,7 @@ class API:
             return JSONResponse(status_code=400)
 
         try:
-            response = requests.get( # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 url,
                 params=params,
                 timeout=120,
@@ -92,7 +92,7 @@ class API:
             },
         )
 
-    async def execute_post_request(self, url: str, request: Request):
+    async def execute_post_request(self, url: str, request: Request) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -104,7 +104,7 @@ class API:
             return JSONResponse(status_code=400)
 
         try:
-            response = requests.post( # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
                 url,
                 params=params,
                 json=body,
@@ -142,6 +142,7 @@ class API:
     async def stochastic_analyzer_post(self, endpoint: str, request: Request) -> JSONResponse:
         """POST request to stochastic analyzer."""
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

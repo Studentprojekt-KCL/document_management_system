@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-tox:
-    runs-on: main
+    runs-on: production
     permissions:
       contents: read
 

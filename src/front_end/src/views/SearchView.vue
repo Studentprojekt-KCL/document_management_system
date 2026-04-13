@@ -102,7 +102,6 @@ const closePreview = () => {
 // TODO: add source & security filtering.
 const handleFilterChange = (filters) => {
   selectedFilters.value = filters
-  console.log('Filter changed:', filters)
   // If no filters → show everything
   if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
     matches.value = allMatches.value
@@ -121,9 +120,7 @@ const handleFilterChange = (filters) => {
         const keywordsEntry = Object.entries(TYPE_FILTERS).find(([docType]) => docType === filterLabel)
 
         if (!keywordsEntry) return false
-
         const [, keywords] = keywordsEntry
-access_token
         // Only match filename against the keywords for this filter
         return keywords.some((kw) => filename.endsWith(kw))
       })

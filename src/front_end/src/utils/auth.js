@@ -49,7 +49,7 @@ export function saveTokens({ access_token, id_token, refresh_token }) {
   if (access_token) {
     sessionStorage.setItem('access_token', access_token)
   }
-  if(id_token){
+  if (id_token) {
     sessionStorage.setItem('id_token', id_token)
   }
   if (refresh_token) {
@@ -58,15 +58,15 @@ export function saveTokens({ access_token, id_token, refresh_token }) {
 }
 
 // Token Expiery
-export function isTokenExpired(token){
-  if(!token) return true
+export function isTokenExpired(token) {
+  if (!token) return true
   const payload = decodeJwtPayload(token)
-  if(!payload?.exp) return true
+  if (!payload?.exp) return true
   return payload.exp * 1000 < Date.now()
 }
 
 // refresh Token
-export async function refreshToken(){
+export async function refreshToken() {
   const refresh_token = getRefreshToken()
   const url = `${BASE_URL}/realms/${REALM}/protocol/openid-connect/token`
 
@@ -83,7 +83,7 @@ export async function refreshToken(){
     body: params
   })
   const data = await response.json()
-  
+
   // call the save_tokens function
   saveTokens({
     access_token: data.access_token,

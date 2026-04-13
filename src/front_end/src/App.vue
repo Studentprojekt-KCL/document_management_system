@@ -15,7 +15,6 @@ const route = useRoute()
 const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
 
 useAuthSession()
-
 </script>
 
 <template>

@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
+      - name: Build images
+        run: docker compose -f docker-compose-build-all.yaml build --no-cache
 
       - name: Push images to registry
         run: |

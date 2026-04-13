@@ -19,9 +19,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build images
-        run: |
-          docker compose -f $COMPOSE_FILE build
+      - name: Build
+        run: docker compose -f $COMPOSE_FILE build
 
       - name: Push images to registry
         run: |

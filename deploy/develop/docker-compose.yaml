@@ -1,4 +1,20 @@
 services:
+  caddy:
+    build:
+      context: .
+      dockerfile: ./Caddy-front-end/Dockerfile
+    container_name: caddy-edge
+    restart: always
+    env_file:
+      - ./Caddy-front-end/.env
+    volumes:
+      - caddy-config:/config
+      - caddy-data:/data
+      - ./Caddy-front-end/Caddyfile:/etc/caddy/Caddyfile
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CADDY_EDGE}
+
   log-api:
     image: registry.dms-lookup.com/log-api:latest
     container_name: log-api
@@ -40,7 +56,6 @@ services:
       SE_API_HOST: ${SE_API_HOST}
       SE_API_QUERY_ADDRESS: ${SE_API_QUERY_ADDRESS}
 
-
   dmis-api:
     image: registry.dms-lookup.com/dmis-api:latest
     container_name: dmis-api
@@ -63,6 +78,10 @@ services:
         ipv4_address: ${IP_FRONTEND}
     environment:
       API_HOST: ${API_HOST}
+      KEYCLOAK_BASE_URL: ${KEYCLOAK_BASE_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      API_BASE_URL: ${API_BASE_URL}
 
   connector-gitlabs:
     image: registry.dms-lookup.com/connector-gitlabs:latest
@@ -77,6 +96,8 @@ services:
       MINIO_ACCESS_ADDRESS: ${MINIO_ACCESS_ADDRESS}
       MINIO_USERNAME: ${MINIO_USERNAME}
       MINIO_PASSWORD: ${MINIO_PASSWORD}
+      GITLAB_CONNECTOR_BIND_ADDR: ${GITLAB_CONNECTOR_BIND_ADDR}
+      GITLAB_SYSTEM_NAME: ${GITLAB_SYSTEM_NAME}
 
   connector-minio:
     image: registry.dms-lookup.com/connector-minio:latest
@@ -112,3 +133,7 @@ services:
 networks:
   dev_net:
     external: true
+
+volumes:
+  caddy-config:
+  caddy-data:

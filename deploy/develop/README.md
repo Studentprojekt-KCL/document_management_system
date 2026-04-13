@@ -39,7 +39,7 @@ IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
 # log-api
-LOGGER_BIND_ADDRESS=<bind address, e.g. 0.0.0.0>
+LOGGER_BIND_ADDRESS=<bind address>
 LOGGER_PORT=<port number>
 LOGGER_DB_HOST=<database host>
 LOGGER_DB_USER=<database username>
@@ -62,6 +62,10 @@ DMIS_SEARCH_API_URL=<search engine URL>
 
 # front-end
 API_HOST=<API endpoint URL>
+KEYCLOAK_BASE_URL=<keycloak base URL>
+KEYCLOAK_REALM=<keycloak realm>
+KEYCLOAK_CLIENT_ID=<keycloak id>
+API_BASE_URL=<api endpoint>
 
 # connector-gitlabs
 GITLAB_CONNECTOR_PORT=<port number>
@@ -69,6 +73,8 @@ GITLAB_ADDRESS=<GitLab instance URL>
 MINIO_ACCESS_ADDRESS=<MinIO access URL>
 MINIO_USERNAME=<username>
 MINIO_PASSWORD=<password>
+GITLAB_CONNECTOR_BIND_ADDR=<bind address>
+GITLAB_SYSTEM_NAME:<system name>
 
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>
@@ -87,12 +93,29 @@ MINISTRAL_MODEL=<model name>
 CONNECTOR_ADDRESS=<connector file endpoint URL>
  ``` 
  
- 4. Log into registry
+ 4. Create .env file for Caddy reverse proxy (HTTPS for front-end container)
+ ```bash
+ touch Caddy-front-end/.env
+ ```
+ 
+ 5. Insert env vars for Caddy container 
+ 
+ For now they are duplicates, will be fixed later
+ ```
+ # Caddy-front-end/.env
+CF_API_TOKEN=<API key>
+CF_EMAIL=<email>
+CLOUDFLARE_EMAIL=<email>
+CLOUDFLARE_API_TOKEN=<API key>
+ACME_AGREE=true
+ ```
+ 
+ 6. Log into registry
  ```bash
  docker login registry.dms-lookup.com
  ```
  
- 4. Run the stack
+ 7. Run the stack
  ```bash
  docker compose up
  ```

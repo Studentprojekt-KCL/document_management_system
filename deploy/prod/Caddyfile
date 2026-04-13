@@ -1,0 +1,24 @@
+{
+    servers {
+        protocols h1 h2
+    }
+}
+
+*.dms-lookup.com {
+
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+        propagation_delay 2m
+        resolvers 1.1.1.1
+    }
+
+    @frontend host app.dms-lookup.com
+    handle @frontend {
+        reverse_proxy front-end
+    }
+
+    # Default fallback 
+    handle {
+        respond "Not found" 404
+    }
+}

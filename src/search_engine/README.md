@@ -85,20 +85,3 @@ Configuration is done through environment variables.
 Optional flags:
 
 - `--dev`, developer mode
-
-## Connector authentication
-
-The `Connector` service forwards per-user source-system tokens to the connector as named request
-headers. Callers pass a `tokens` dict keyed by source-system name:
-
-    {"github": "<user GitHub token>", "gitlab": "<user GitLab token>"}
-
-These are mapped to headers before the outbound request:
-
-| Key       | Header forwarded    |
-|-----------|---------------------|
-| `github`  | `X-GitHub-Token`    |
-| `gitlab`  | `X-GitLab-Token`    |
-
-Tokens are optional — connectors that receive no token for their system return an empty result.
-To add a new source system, extend `_TOKEN_HEADER_MAP` in `services/connector.py`.

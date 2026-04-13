@@ -19,11 +19,6 @@ class Connector:
 
     TIMEOUT: int = 120
 
-    _TOKEN_HEADER_MAP: dict[str, str] = {
-        "github": "X-GitHub-Token",
-        "gitlab": "X-GitLab-Token",
-    }
-
     address: str
     subdata: str | None
 
@@ -46,13 +41,7 @@ class Connector:
         """Resets the subdata, getting all files."""
         self.subdata = None
 
-    def _build_auth_headers(self, tokens: dict[str, str] | None) -> dict[str, str]:
-        """Map source-system tokens to their named request headers."""
-        if not tokens:
-            return {}
-        return {self._TOKEN_HEADER_MAP[k]: v for k, v in tokens.items() if k in self._TOKEN_HEADER_MAP and v}
-
-    def get_file_pointers(self, tokens: dict[str, str] | None = None) -> list[str]:
+    def get_file_pointers(self) -> list[str]:
         """Fetch file pointers from connectors.
 
         Returns:
@@ -61,7 +50,7 @@ class Connector:
         Raises:
             SeAPIException: For potential formatting errors.
         """
-        response: Any | None = self._get_file_pointers(tokens)
+        response: Any | None = self._get_file_pointers()
 
         if response is None:
             return []
@@ -72,7 +61,7 @@ class Connector:
         pointers = response.get("file_pointers")
         return pointers if pointers is not None else []
 
-    def fetch_files(self, pointers: list[str], tokens: dict[str, str] | None = None) -> list[dict]:
+    def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.
 
         Args:
@@ -87,7 +76,7 @@ class Connector:
         client: Session = Session()
         responses: list[dict] = []
         for pointer in pointers:
-            response: Any | None = self._get_file_from_pointer(pointer, client, tokens)
+            response: Any | None = self._get_file_from_pointer(pointer, client)
             if not isinstance(response, dict):
                 continue
             metadata: dict | None = response.get("metadata")
@@ -99,14 +88,14 @@ class Connector:
 
         return responses
 
-    def get_files(self, tokens: dict[str, str] | None = None) -> list:
+    def get_files(self) -> list:
         """Grab all new files pointers from connectors.
 
         Returns:
             A list of files.
         """
 
-        file_url = self._files_to_index(tokens)
+        file_url = self._files_to_index()
         if file_url is None:
             return []
 
@@ -129,10 +118,10 @@ class Connector:
         self.subdata = subdata
         return data
 
-    def _files_to_index(self, tokens: dict[str, str] | None = None) -> str | None:
+    def _files_to_index(self) -> str | None:
         """Get the url for the file containing all new files."""
 
-        response: Any | None = self._get_file_to_index(tokens)
+        response: Any | None = self._get_file_to_index()
         if response is None:
             return None
         if not isinstance(response, dict):
@@ -151,14 +140,11 @@ class Connector:
 
         return file_url
 
-    def _get_file_pointers(self, tokens: dict[str, str] | None = None) -> Any | None:
+    def _get_file_pointers(self) -> Any | None:
         """Get file pointers"""
         try:
             return get(
-                self.url_files,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                headers=self._build_auth_headers(tokens) or None,
-                timeout=Connector.TIMEOUT,
+                self.url_files, params=[("subdata", self.subdata)] if self.subdata is not None else None, timeout=Connector.TIMEOUT
             ).json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
@@ -172,13 +158,12 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
 
-    def _get_file_from_pointer(self, pointer: str, client: Session, tokens: dict[str, str] | None = None) -> Any | None:
+    def _get_file_from_pointer(self, pointer: str, client: Session) -> Any | None:
         """Get file from pointer"""
         try:
             return client.get(
                 self.url_file,
                 params=[("file_pointer", pointer), ("include_content", False)],
-                headers=self._build_auth_headers(tokens) or None,
                 timeout=Connector.TIMEOUT,
             ).json()
         except exceptions.ConnectionError:
@@ -209,13 +194,12 @@ class Connector:
             dms_warning(f"Something went wrong, url: {self.url_files}.")
         return None
 
-    def _get_file_to_index(self, tokens: dict[str, str] | None = None) -> Any | None:
+    def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
         try:
             return get(
                 self.url_files_to_index,
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                headers=self._build_auth_headers(tokens) or None,
                 timeout=Connector.TIMEOUT,
             ).json()
         except exceptions.ConnectionError:

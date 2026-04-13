@@ -100,10 +100,10 @@ class APIConfiguration:
         tei_url: str | None = read_env_variable("TEI_URL")
         classifier_url: str | None = read_env_variable("CLASSIFIER_URL")
         ministral_url: str | None = read_env_variable("MINISTRAL_URL")
-        ministral_model: str | None = read_env_variable("MINISTRAL_MODEL")
-        ministral_timeout: int | None = read_env_variable("MINISTRAL_TIMEOUT")
+        ministral_model: str = read_env_variable("MINISTRAL_MODEL")
+        ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
         address: str | None = read_env_variable("CONNECTOR_ADDRESS")
-        escalation_threshold: int | None = read_env_variable("ESCALATION_THRESHOLD")
+        escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")

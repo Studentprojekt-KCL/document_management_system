@@ -22,6 +22,7 @@ class ServiceConfig:
     classifier_url: str
     ministral_url: str
     ministral_model: str
+    ministral_timeout: int
     connector_url: str
     escalation_threshold: float
 
@@ -99,6 +100,7 @@ class APIConfiguration:
         classifier_url: str | None = environ.get("CLASSIFIER_URL")
         ministral_url: str | None = environ.get("MINISTRAL_URL")
         ministral_model: str | None = environ.get("MINISTRAL_MODEL")
+        ministral_timeout = environ.get("MINISTRAL_TIMEOUT", "120")
         address: str | None = environ.get("CONNECTOR_ADDRESS")
         escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
 
@@ -130,5 +132,6 @@ class APIConfiguration:
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
+        self.services.ministral_timeout = int(ministral_timeout)
         self.services.connector_url = address
         self.services.escalation_threshold = float(escalation_threshold)

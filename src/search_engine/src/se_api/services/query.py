@@ -7,6 +7,7 @@ from requests import exceptions, post
 from initialisation_tools import read_env_variable
 from se_api.services.classifier_cache import ClassifierCache
 
+
 class Query:
     """Class handling query connections."""
 
@@ -14,12 +15,14 @@ class Query:
     cache: ClassifierCache
 
     def __init__(self) -> None:
+        """Constructor."""
         address: str = read_env_variable("SE_API_QUERY_ADDRESS")
 
         self.classify_url = address.rstrip("/") + "/classify"
         self.cache = ClassifierCache()
 
     def reset(self) -> None:
+        """Reset the cache."""
         self.cache.reset()
 
     def classify(self, files: list[dict]) -> dict[str, str]:
@@ -32,6 +35,7 @@ class Query:
         classifications: dict[str, str] = {}
         none_cached: list[str] = []
         pointers: list[str] = []
+        classification: str | None = None
 
         for file in files:
             pointer: str | None = file.get("unique_pointer")
@@ -40,7 +44,7 @@ class Query:
             pointers.append(pointer)
 
         for pointer in pointers:
-            classification: str | None = self.cache.fetch_classification(pointer)
+            classification = self.cache.fetch_classification(pointer)
             if classification is not None:
                 classifications.update({pointer: classification})
             else:
@@ -48,7 +52,7 @@ class Query:
 
         if not none_cached:
             return classifications
-            
+
         response: Any | None = self._get_classification(none_cached)
 
         if not isinstance(response, list):
@@ -60,7 +64,7 @@ class Query:
                 dms_warning("Returned invalid response from classifier, expected list of dicts.")
                 continue
             unique_pointer: str | None = r.get("unique_pointer")
-            classification: str | None = r.get("Security-class")
+            classification = r.get("Security-class")
             if unique_pointer is None or classification is None:
                 dms_warning("Returned invalid response from classifier, neither unique_pointer or Security-class does not exist.")
                 continue

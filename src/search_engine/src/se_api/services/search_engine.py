@@ -103,6 +103,8 @@ class SearchEngine:
                 dms_warning("File is missing unique pointer.")
                 continue
 
+            writer.delete_documents("unique_pointer", unique_pointer)
+
             content_bytes: bytes = base64.b64decode(content)
             content = content_bytes.decode("utf-8")
             flat_file["content"] = content
@@ -115,6 +117,12 @@ class SearchEngine:
         self.index.reload()
 
     def remove_file(self, pointer: str) -> None:
+        """Remove a file from the index.
+
+        Args:
+            pointer: unique pointer.
+        """
+
         writer: IndexWriter = self.index.writer()
         writer.delete_documents("unique_pointer", pointer)
         writer.commit()

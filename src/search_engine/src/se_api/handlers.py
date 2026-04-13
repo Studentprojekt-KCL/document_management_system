@@ -19,6 +19,7 @@ class Handler:
     search_engine: SearchEngine
 
     def __init__(self) -> None:
+        """Constructor"""
         self.connector = Connector()
         self.search_engine = SearchEngine()
         self.query = Query()
@@ -31,6 +32,13 @@ class Handler:
         dms_info("Search engine was reset.")
 
     def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
+        """Remove missing files from cache and index.
+
+        Args:
+            matches: list of pointers
+            grabbed: list of file dicts.
+        """
+
         grabs = [grab.get("unique_pointer") for grab in grabbed]
         for match in matches:
             if match in grabs:
@@ -63,10 +71,11 @@ class Handler:
                     self.connector.reset()
                     new_files = self.connector.get_files()
                 self.search_engine.add_files(new_files)
+                self.query.cache.remove_classifications(new_files)
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
-        classifications: dict = self.query.classify(files)        
+        classifications: dict = self.query.classify(files)
         for file in files:
             unique_pointer: str = file.get("unique_pointer", "")
             classification: str = classifications.get(unique_pointer, "")

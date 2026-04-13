@@ -76,7 +76,7 @@ class API:
                 timeout=120,
             )
             response.raise_for_status()
-            search_data = response.json()
+            response_data = response.json()
         except requests.JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -84,13 +84,7 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "results": search_data,
-                "params": params,
-            },
-        )
+        return JSONResponse(status_code=200, content=response_data)
 
     async def execute_post_request(self, url: str, request: Request) -> JSONResponse:
         """Execute POST request."""
@@ -111,7 +105,7 @@ class API:
                 timeout=120,
             )
             response.raise_for_status()
-            search_data = response.json()
+            response_data = response.json()
         except requests.JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -119,13 +113,7 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "results": search_data,
-                "params": params,
-            },
-        )
+        return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(self, endpoint: str, request: Request) -> JSONResponse:
         """GET request to search engine."""

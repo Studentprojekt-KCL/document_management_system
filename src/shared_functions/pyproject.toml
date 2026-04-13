@@ -11,5 +11,8 @@ dependencies = [
     "boto3>=1.42",
 ]
 
+[tool.setuptools.package-data]
+my_package = ["shared_functions/file_types.json"]
+
 [tool.setuptools]
 package-dir = {"" = "shared_functions"}

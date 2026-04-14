@@ -81,6 +81,7 @@ Configuration is done through environment variables.
 - `SE_API_HOST` Search engine bind address.
 - `SE_API_CONNECTOR_ADDRESS` Connector address.
 - `SE_API_QUERY_ADDRESS` Query address.
+- `SE_API_CACHE_DIRECTORY` Cache file location.
 
 Optional flags:
 

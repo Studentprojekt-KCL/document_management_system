@@ -1,10 +1,12 @@
 """Batch document summarization via external Ministral LLM."""
 
+import asyncio
 from json.decoder import JSONDecodeError
 
 import httpx
 
 from dmis_logger import dms_warning
+from gateway.preprompts import INDIVIDUAL_SUMMARY_PROMPT, SYNTHESIS_PROMPT
 from gateway.schemas import InputItem, SummaryResult
 from gateway.preprompts import SUMMARIZER_PROMPT, SUMMARIZER_SYSTEM_PROMPT, HEADERS
 from gateway.config import ServiceConfig, LanguageConfig
@@ -12,7 +14,6 @@ from gateway.config import ServiceConfig, LanguageConfig
 # Language detection constants
 SWEDISH_CHARS = set("åäöÅÄÖ")
 SWEDISH_STOPWORDS = {"och", "är", "det", "på", "i", "av", "för", "med", "som", "att", "en", "ett", "den", "der"}
-
 
 def detect_language(text: str, config: LanguageConfig) -> str:
     """Detect Swedish via early-exit heuristic on sampled prefix. Fast & injection-resistant."""
@@ -81,3 +82,61 @@ async def summarize_documents(
     except httpx.TimeoutException as err:
         dms_warning(f"Connection to {service_config.ministral.url} timed out, {err}")
     return None
+
+
+async def _synthesize(
+    per_doc_blocks: list[str],
+    ministral_url: str,
+    ministral_model: str,
+    timeout: int = 120,
+) -> SummaryResult | None:
+    """Synthesize individual summaries into a final combined summary."""
+    combined_summaries = "\n\n".join(per_doc_blocks)
+    prompt = SYNTHESIS_PROMPT.format(
+        doc_count=len(per_doc_blocks),
+        combined_summaries=combined_summaries,
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await _call_llm(client, prompt, ministral_url, ministral_model, timeout)
+
+    if result is None:
+        return None
+    return SummaryResult(summary=result)
+
+
+async def summarize_documents(
+    items: list[InputItem],
+    ministral_url: str,
+    ministral_model: str,
+    timeout: int = 120,
+) -> SummaryResult | None:
+    """Synthesize multiple documents into a single summary via a two-stage approach."""
+
+    # --- Stage 1: Summarize each document individually (in parallel) ---
+    async with httpx.AsyncClient() as client:
+        tasks = []
+        doc_names = []
+        for i, item in enumerate(items, 1):
+            name = item.metadata.name or f"Document {i}"
+            doc_names.append(name)
+            prompt = INDIVIDUAL_SUMMARY_PROMPT.format(doc_name=name, content=item.content)
+            tasks.append(_call_llm(client, prompt, ministral_url, ministral_model, timeout))
+
+        individual_summaries = await asyncio.gather(*tasks)
+
+    # Build context from successful summaries only
+    per_doc_blocks = []
+    for name, summary in zip(doc_names, individual_summaries, strict=True):
+        if summary:
+            per_doc_blocks.append(f"--- {name} ---\n{summary}")
+
+    if not per_doc_blocks:
+        return None
+
+    # Short-circuit: skip synthesis for a single document
+    if len(per_doc_blocks) == 1:
+        return SummaryResult(summary=individual_summaries[0])
+
+    # --- Stage 2: Synthesize individual summaries into a final output ---
+    return await _synthesize(per_doc_blocks, ministral_url, ministral_model, timeout)

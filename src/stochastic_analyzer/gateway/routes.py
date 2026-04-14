@@ -83,7 +83,12 @@ def create_router(config: APIConfiguration) -> APIRouter:
             dms_warning("No documents could be retrieved from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
 
-        result = await summarize_documents(items, config.services.ministral_url, config.services.ministral_model)
+        result = await summarize_documents(
+            items,
+            config.services.ministral_url,
+            config.services.ministral_model,
+            config.services.ministral_timeout,
+        )
 
         if result is None:
             dms_warning("Summarization returned no result.")

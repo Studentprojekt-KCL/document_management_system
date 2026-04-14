@@ -41,7 +41,7 @@ export function useAISummary(props) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${access_token}`
         },
-        body: JSON.stringify({ file_pointer: uniquePointer.value })
+        body: JSON.stringify({ pointers: [uniquePointer.value] })
       })
 
       if (!response.ok) {

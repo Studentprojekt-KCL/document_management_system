@@ -12,10 +12,10 @@ LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
 # These label triggers have been tweaked for hours, only touch if absolutly certain
 LABEL_TRIGGERS = [
-    "publicly available source code, documentation, or open material",
-    "internal company policy and employee guidelines",
-    "sensitive personal, employee, or security data",
-    "strictly confidential executive leadership strategy",
+    "public open-source documentation",
+    "internal employee policy or guidelines",
+    "sensitive financial review or performance data",
+    "confidential strategic project plan",
 ]
 
 

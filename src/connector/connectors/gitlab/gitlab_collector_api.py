@@ -59,7 +59,7 @@ class API:
         try:
             url = upload_file(content, "gitlabs_content.json")
             return {"subdata": content.get("subdata"), "file_url": url}
-        except Exception as err:
+        except (IOError, ValueError) as err:
             dms_warning(f"Could not upload gitlab payload to object storage: {err}")
             return {"subdata": content.get("subdata"), "files": content.get("files", []), "deleted": content.get("deleted", [])}
 
@@ -79,6 +79,8 @@ def run() -> None:
         dms_error("Port for Gitlab connector not set in local environment, please export GITLAB_CONNECTOR_PORT.")
         return
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))
+
+
 if __name__ == "__main__":
     run()
 app = API().app

@@ -1,8 +1,10 @@
+"""SMB API matching GitLab connector exactly."""
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import argparse
 import logging
-from typing import Any, Optional, List
+from typing import Any, Dict, Optional, List
 from datetime import datetime
 
 import uvicorn
@@ -14,7 +16,6 @@ from fastapi.encoders import jsonable_encoder
 from smb import SMBCollector
 
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pydantic import BaseModel
 
 
@@ -35,8 +36,11 @@ SMB_HOST = os.environ.get("SMB_CONNECTOR_HOST", "0.0.0.0")
 
 
 class BatchFileRequest(BaseModel):
+    """Request model for batch file fetching."""
+
     paths: List[str]
     include_content: bool = True
+
 
 class API:
     """SMB API matching GitLab connector exactly."""
@@ -48,17 +52,12 @@ class API:
         """Create API app, collector and route bindings."""
         self.collector = SMBCollector()
 
-        self.app.add_exception_handler(
-            RequestValidationError,
-            self.validation_exception_handler
-        )
+        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
-        # ✅ SAME endpoints as GitLab
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        self.app.add_api_route("/files/batch",self.files_batch,methods=["POST"]
-)
+        self.app.add_api_route("/files/batch", self.files_batch, methods=["POST"])
 
     # =========================
     # ERROR HANDLER (same as GitLab)
@@ -85,17 +84,20 @@ class API:
     def _normalize_file(self, file_data: dict) -> dict:
         """Make SMB file match GitLab format exactly."""
 
-        metadata = file_data.get("metadata", {})
+        raw_metadata = file_data.get("metadata")
 
-        # 🔥 Normalize fields
-        normalized = {
+        metadata: Dict[str, Any] = {}
+        if isinstance(raw_metadata, dict):
+            metadata = raw_metadata
+
+        normalized: Dict[str, Any] = {
             "metadata": {
                 "unique_pointer": metadata.get("unique_pointer"),
                 "name": metadata.get("name"),
                 "size": str(metadata.get("size")),  # GitLab = string
                 "last_edit_date": self._to_iso(metadata.get("last_edit_date")),
                 "type": "source_file",
-                "clickable_url": None,  # GitLab field
+                "clickable_url": None,
             }
         }
 
@@ -108,7 +110,7 @@ class API:
         """Convert SMB timestamp → GitLab ISO8601."""
         try:
             return datetime.utcfromtimestamp(float(timestamp)).isoformat() + "Z"
-        except Exception:
+        except (ValueError, TypeError, OSError):
             return ""
 
     # =========================
@@ -122,10 +124,7 @@ class API:
         """
         result = self.collector.pointers_to_all_files_to_index(subdata)
 
-        return {
-            "file_pointers": result.get("file_pointers", []),
-            "subdata": result.get("subdata")
-        }
+        return {"file_pointers": result.get("file_pointers", []), "subdata": result.get("subdata")}
 
     async def file(self, file_pointer: str, include_content: bool = True) -> dict:
         """
@@ -133,7 +132,7 @@ class API:
         """
 
         # SMB → internal processing
-        raw = self.collector._process_file(file_pointer)
+        raw = self.collector.get_file(file_pointer, include_content)
 
         if not include_content:
             raw.pop("content", None)
@@ -148,18 +147,11 @@ class API:
 
         result = self.collector.files_to_index(subdata)
 
-        normalized_files = [
-            self._normalize_file(f)
-            for f in result.get("files", [])
-        ]
+        normalized_files = [self._normalize_file(f) for f in result.get("files", [])]
 
-        return {
-            "files": normalized_files,
-            "deleted": result.get("deleted", []),
-            "subdata": result.get("subdata")
-        }
+        return {"files": normalized_files, "deleted": result.get("deleted", []), "subdata": result.get("subdata")}
 
-    async def files_batch(self, req: BatchFileRequest):
+    async def files_batch(self, req: BatchFileRequest) -> dict:
         """Fetch multiple files concurrently in one request."""
 
         if not req.paths:
@@ -172,14 +164,7 @@ class API:
         errors = []
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {
-                executor.submit(
-                    self.collector.get_file,
-                    path,
-                    req.include_content
-                ): path
-                for path in req.paths
-            }
+            futures = {executor.submit(self.collector.get_file, path, req.include_content): path for path in req.paths}
 
             for future in as_completed(futures):
                 path = futures[future]
@@ -189,20 +174,16 @@ class API:
                     file_data = self._normalize_file(file_data)
                     results.append(file_data)
 
-                except Exception as e:
-                    errors.append({
-                        "path": path,
-                        "error": str(e)
-                    })
+                except (OSError, ValueError, TypeError, KeyError) as e:
+                    errors.append({"path": path, "error": str(e)})
 
-        return {
-            "files": results,
-            "errors": errors
-        }
+        return {"files": results, "errors": errors}
+
 
 # =========================
 # RUN (same style as GitLab)
 # =========================
+
 
 def run() -> None:
     """Start SMB FastAPI service using environment configuration."""
@@ -221,12 +202,7 @@ def run() -> None:
         logging.error("SMB_CONNECTOR_PORT not set")
         return
 
-    uvicorn.run(
-        api.app,
-        host=SMB_HOST,
-        port=int(port),
-        log_level=api.log_level or "info"
-    )
+    uvicorn.run(api.app, host=SMB_HOST, port=int(port), log_level=api.log_level or "info")
 
 
 if __name__ == "__main__":

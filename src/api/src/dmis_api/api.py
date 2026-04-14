@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from json.decoder import JSONDecodeError
 import argparse
 from typing import Any
 from collections.abc import Sequence
@@ -93,9 +94,9 @@ class API:
             params = dict(request.query_params)
         except TypeError:
             params = None
-        except requests.JSONDecodeError:
+        except JSONDecodeError:
             dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {request.body()}")
-            return JSONResponse(status_code=400)
+            return JSONResponse(status_code=400, content={})
 
         try:
             response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.

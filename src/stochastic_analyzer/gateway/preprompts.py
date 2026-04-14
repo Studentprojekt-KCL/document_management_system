@@ -10,9 +10,7 @@ SUMMARIZER_SYSTEM_PROMPT = """Summarization engine. Rules:
 # User prompt
 SUMMARIZER_PROMPT = """Summarize the document in {language}.
 
-<documents>
-{combined_context}
-</documents>
+Document name: {doc_name}
 
 Return ONLY:
 

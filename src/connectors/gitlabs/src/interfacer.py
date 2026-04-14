@@ -27,20 +27,29 @@ class GitLabs:
     GIT_HEAD: str = "?ref=HEAD"
     session: requests.Session
     source_system: str
+    project_information: dict | None = None
+    blame_cache: dict = {}
 
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        address = read_env_variable("GITLAB_ADDRESS")
         self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
-        if not address.endswith("/"):
-            address += "/"
-        self.base = urljoin(str(address), self.API_URL)
+        address = read_env_variable("GITLAB_ADDRESS")
+        self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
 
     def _get_projects(self) -> dict | list:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        return self._execute_request(url)
+        projects = self._execute_request(url)
+        self.project_information = {
+            str(project.get("id")): {
+                "web_url": project.get("web_url"),
+                "default_branch": project.get("default_branch"),
+            }
+            for project in projects
+        }
+
+        return projects
 
     def get_project_ids(self) -> dict[int, str]:
         """Retrieve a dictionary of IDs for all available projects.
@@ -113,21 +122,23 @@ class GitLabs:
             file_path: Precise path to file in project.
         """
         project_id = self._get_project_id(url)
-        projects_endpoint = urljoin(self.base, "projects/")
-        project_information = self._execute_request(urljoin(projects_endpoint, project_id))
-        if isinstance(project_information, list):
+        if self.project_information is None or project_id not in self.project_information:
+            self._get_projects()
+
+        project_information = self.project_information.get(project_id)  # type: ignore
+        if not isinstance(project_information, dict):
             dms_info(f"Was not able to generate clickable link for {url}")
             return ""
         web_url = project_information.get("web_url")
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, include_content: bool = True) -> dict:
-        """
+    def get_file(self, url: str, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
+        """Retrieve information about file.
 
         Args:
         ----
-            URL: The URL should be given formatted like:
+            url: The URL should be given formatted like:
               https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
 
@@ -142,29 +153,46 @@ class GitLabs:
                 "size": content.get("x-gitlab-size"),
                 "file_path": content.get("x-gitlab-file-path"),
             }
-
         if isinstance(file, list):
             file = {}
-        blame = self._execute_request(urljoin(url.rstrip("/") + "/", self.GIT_BLAME))
 
         base_structure: dict[Any, Any] = {
-            "metadata": {
-                "unique_pointer": url,
-                "name": file.get("file_name"),
-                "size": file.get("size"),
-                "last_edit_date": unpack_values(blame, (0, "commit", "committed_date")),
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
-            }
+            "unique_pointer": url,
+            "name": file.get("file_name"),
+            "size": file.get("size"),
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
         }
+        if include_last_edit_date:
+            url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
+            if url not in self.blame_cache:
+                self.blame_cache[url] = self._execute_request(url)
+            base_structure |= {"last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))}
+
         file_path = file.get("file_path")
         if isinstance(file_path, str):
-            base_structure["metadata"] |= {"clickable_url": self._get_clickable_url(url, file_path)}
+            base_structure |= {"clickable_url": self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}
-
         return base_structure
+
+    def get_files(self, urls: list, include_content: bool = False, include_last_edit_date: bool = False) -> list:
+        """Retrieve wanted information about each file in a list of files.
+
+        Args:
+        ----
+            urls: The URL should be given formatted like:
+              https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
+            include_content: Determine if actual file content should be included or not.
+            include_last_edit_date: Include last edit date of file.
+
+        """
+        files: list = []
+        for url in urls:
+            files.append(self.get_file(url, include_content, include_last_edit_date))
+
+        return files
 
     def _unpack_zip(self, content: bytes, project_id: int) -> list:
         """Unpack .zip content and return a list containing all the files."""
@@ -182,7 +210,7 @@ class GitLabs:
                     file_content = zip_file.read(file).decode("utf-8")
                 except UnicodeDecodeError as err:
                     file_content = ""
-                    dms_warning(f"Could not decode file: {file}. {err}")
+                    dms_info(f"Could not decode file: {file}. {err}")
                 files_data.append(
                     {
                         "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
@@ -238,41 +266,31 @@ class GitLabs:
 
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
-        return {"files": files_data, "subdata": generated_subdata}
+        return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
 
-    def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
-        """Retrieve a containing URLs pointing to all available individual files available, except those in projects
-            already indexed according to subdata.
+    def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
+        """Simple check if reindex is needed based on subdata.
 
         Args:
         ----
-            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
-                 of the system, but should always be supplied).
+            subdata: Base64 encoded isostructured timestamp.
 
         Returns:
         --------
-            Dict structure {"subdata": generated_subdata, "file_pointers": file_pointers}, where generated_subdata
-                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
-                (this should always be passed back by client from previous request).
+            Dict structure {"index_needed": <BOOL>}
         """
         provided_date = self._provided_date(subdata)
-
-        file_pointers: list = []
         project_ids = self.get_project_ids()
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
-        for project_id, change_time in project_ids.items():
+
+        for change_time in project_ids.values():
             if not isinstance(change_time, str):
                 continue
             new_timestamp_object = datetime.fromisoformat(change_time.replace("Z", "+00:00"))
             if new_timestamp_object <= provided_date:
                 continue
-            latest_update = max(latest_update, new_timestamp_object)
+            return {"index_needed": True}
 
-            file_pointers.extend(self.get_files_in_project(project_id))
-
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-
-        return {"subdata": generated_subdata, "file_pointers": file_pointers}
+        return {"index_needed": False}
 
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:

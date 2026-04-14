@@ -1,8 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import os
-from logging import error, warning, info
 from datetime import datetime
+from logging import error, warning, info
 from typing import Any
 from socket import gethostname
 
@@ -16,7 +16,7 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Error message.
     """
-    error(msg)
+    error(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
@@ -42,7 +42,7 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Warning message.
     """
-    warning(msg)
+    warning(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):
@@ -67,7 +67,7 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Info message.
     """
-    info(msg)
+    info(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
     if not isinstance(log_service, str):

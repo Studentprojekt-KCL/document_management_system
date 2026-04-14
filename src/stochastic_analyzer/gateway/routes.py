@@ -1,7 +1,7 @@
 """Define API and routes."""
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 
 from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
@@ -14,7 +14,7 @@ from gateway.schemas import (
     PointerRequest,
     SummaryResult,
 )
-from gateway.services.classifier import classify_documents
+from gateway.services.classifier import classify_documents, LABELS
 from gateway.services.connector import get_file_contents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
@@ -90,6 +90,11 @@ def create_router(config: APIConfiguration) -> APIRouter:
             raise HTTPException(status_code=500, detail="Summarization failed.")
 
         return result.model_dump()
+
+    @router.get("/classifications")
+    def classifications() -> Response:
+        """Enpoint for retrieving existing classifications."""
+        return JSONResponse(content=LABELS, status_code=200)
 
     @router.post("/md-to-pdf")
     def md_pdf_converter(summary: SummaryResult) -> Response:

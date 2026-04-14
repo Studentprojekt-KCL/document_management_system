@@ -1,8 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import logging
-from multiprocessing import Process
-from multiprocessing.connection import Connection
 import base64
 import json
 from dmis_logger import dms_info, dms_warning
@@ -15,9 +12,8 @@ from tantivy import (
     Searcher,
 )
 
-from search_engine.search.connector import Connector
 
-class SearchEngine(Process):
+class SearchEngine:
     """Search engine service
 
     Attributes:
@@ -26,45 +22,10 @@ class SearchEngine(Process):
 
     index: Index
     categories: list[str]
-    interface: Connection
-    connector: Connector
 
-    log_level: str
-
-    def __init__(self, interface: Connection, log_level: str) -> None: 
-        super().__init__()
-        self.interface = interface
-        self.connector = Connector()
-        self.log_level = log_level
-
-    def run(self) -> None:
-        logging.basicConfig()
-        if self.log_level == "debug":
-            logging.getLogger().setLevel(logging.DEBUG)
-        else: 
-            logging.getLogger().setLevel(logging.INFO)
-
-        dms_info("Launching search engine.")
+    def __init__(self) -> None:
         self.categories = ["unique_pointer", "content"]
         self.rebuild()
-        while True:
-            query, count, offset = self.interface.recv()
-            if self.connector.reindex_needed():
-                matches: list = self.query_files(query, offset + count)[offset : count + offset]
-                files: list[dict] = self.connector.fetch_files(matches)
-                self.interface.send(files)
-                new_files: list[dict] = self.connector.get_files()
-                dms_info(f"New files: {len(new_files)}")
-                if new_files:
-                    if self.have_new_category(new_files[0]):
-                        self.rebuild()
-                        self.connector.reset()
-                        new_files = self.connector.get_files()
-                    self.add_files(new_files)
-            else:
-                matches: list = self.query_files(query, offset + count)[offset : count + offset]
-                files: list[dict] = self.connector.fetch_files(matches)
-                self.interface.send(files)
 
     def rebuild(self) -> None:
         """Rebuild the index schema with the saved categories."""

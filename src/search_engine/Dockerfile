@@ -4,4 +4,4 @@ COPY src/shared_functions /src/shared_functions
 WORKDIR /src/search_engine
 RUN python -m pip install build; python -m build; python -m pip install .
 
-ENTRYPOINT ["search_engine"]
+ENTRYPOINT ["se_api"]

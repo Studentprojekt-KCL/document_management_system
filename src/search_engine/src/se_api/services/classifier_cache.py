@@ -2,13 +2,11 @@
 
 import json
 
-from dmis_logger import dms_error, dms_info
+from dmis_logger import dms_error, dms_info, dms_warning
 from initialisation_tools import read_env_variable
 
-from search_engine.classifier.writer import Writer
 
-
-class Cache:
+class ClassifierCache:
     """Classifier Cache class"""
 
     CACHE_FILE: str = "classification_cache.json"
@@ -16,9 +14,6 @@ class Cache:
     cache_directory: str
     cache_file: str
     cache: dict[str, str]
-
-    write_queue: list[dict[str, str]]
-    writer: Writer
 
     def __init__(self) -> None:
         """Constructor"""
@@ -43,12 +38,20 @@ class Cache:
 
         self.cache_file = cache_file
 
-        self.writer = Writer(self.cache_file)
-        self.writer.start()
-
     def reset(self) -> None:
         """Reset cache."""
         self.cache = {}
+        self._write_memory()
+
+    def _write_memory(self) -> None:
+        """Write current cache to file."""
+        try:
+            with open(self.cache_file, "w", encoding="utf=8") as f:
+                f.write(json.dumps(self.cache))
+        except OSError:
+            dms_warning(f"Failed to open (write): {self.cache_file}.")
+        except json.JSONDecodeError:
+            dms_warning("Failed to parse cache dict.")
 
     def add_classification(self, pointer: str, classification: str) -> None:
         """Add classification to cache.
@@ -58,9 +61,8 @@ class Cache:
             classification: the assigned classification.
         """
 
-        if pointer not in self.cache.keys():
-            self.writer.add({pointer: classification})
         self.cache.update({pointer: classification})
+        self._write_memory()
 
     def remove_classification(self, pointer: str) -> None:
         """Remove classification from cache.
@@ -70,6 +72,7 @@ class Cache:
         """
 
         self.cache.pop(pointer)
+        self._write_memory()
 
     def remove_classifications(self, files: list[dict[str, str]]) -> None:
         """Remove a list classifications from cache.
@@ -84,6 +87,7 @@ class Cache:
             pointer: str | None = file.get("unique_pointer")
             if pointer is not None:
                 self.cache.pop(pointer)
+        self._write_memory()
 
     def fetch_classification(self, pointer: str) -> str | None:
         """Fetch a classification.
@@ -92,4 +96,3 @@ class Cache:
             pointer: unique pointer.
         Returns: classification string or None."""
         return self.cache.get(pointer)
-

@@ -126,7 +126,6 @@ const resultsLabel = computed(() => {
 }
 
 .result-title {
-  margin: 0;
   font-size: 1.1rem;
   line-height: 1.25;
   color: #0f172a;

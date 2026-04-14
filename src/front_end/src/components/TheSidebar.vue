@@ -44,7 +44,7 @@ const visibleMenuItems = computed(() => {
   }
   // else if when we get another role higher than user
   else {
-    return menuItems.filter((item) => item.id === 'search')
+    return menuItems.filter((item) => item.id === 'connections' || item.id === 'search')
   }
 })
 

@@ -44,12 +44,14 @@ class ServiceConfig:
         ministral: Ministral LLM configuration.
         language: language detection configuration.
     """
+
     tei_url: str
     classifier_url: str
     connector_url: str
     escalation_threshold: float
     ministral: MinistralConfig
     language: LanguageConfig
+
 
 class APIConfiguration:
     """API Configuration.
@@ -115,6 +117,7 @@ class APIConfiguration:
         self._load_language_config()
 
     def _load_urls(self) -> bool:
+        """Validate and assign URL and string service config. Returns False on failure."""
         tei_url = environ.get("TEI_URL")
         classifier_url = environ.get("CLASSIFIER_URL")
         ministral_url = environ.get("MINISTRAL_URL")
@@ -146,6 +149,7 @@ class APIConfiguration:
         return True
 
     def _load_llm_config(self) -> bool:
+        """Validate and assign numeric LLM config. Returns False on failure."""
         escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
         ministral_max_tokens = environ.get("MINISTRAL_MAX_TOKENS", "400")
         ministral_temperature = environ.get("MINISTRAL_TEMPERATURE", "0.3")

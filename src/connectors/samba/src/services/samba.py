@@ -2,7 +2,7 @@
 
 from datetime import datetime
 import base64
-from os import environ, walk
+from os import DirEntry, environ, scandir, walk
 import os
 from subprocess import run, CompletedProcess
 from dmis_logger import dms_error
@@ -55,13 +55,26 @@ class Samba:
             "-t",
             "cifs",
             "-o",
-            f"username={self.user},password={self.password},iocharset=utf8",
+            f"username={self.user},password={self.password},iocharset=utf8,actimeo=60",
             f"//{self.host}/{self.share}",
             f"{self.path}",
         ]
         res: CompletedProcess = run(command)
         if res.returncode != 0:
             dms_error(f"Failed to mount Samba share {self.host}/{self.share} with user {self.user}.")
+
+    def _scan_dir(self, path: str, last_time: datetime | None) -> list[str]:
+        pointers: list[str] = []
+        with scandir(path) as dir:
+            for entry in dir:
+                if entry.is_file():
+                    edited = datetime.fromtimestamp(entry.stat().st_mtime)
+                    if last_time is None or edited > last_time:
+                        pointers.append(f"//{self.host}/{self.share}{entry.path}")
+                elif entry.is_dir():
+                    pointers.extend(self._scan_dir(entry.path, last_time))
+        return pointers
+
 
     def get_files(self, subdata: str | None) -> dict:
         """Get new files from SMB share.
@@ -71,27 +84,12 @@ class Samba:
         Return: Dict containting a list of file pointers and subdata.
 
         """
-        pointers: list = []
-
-        latest_edit: datetime | None = None
         last_edit: datetime | None = None
 
         if subdata is not None:
             last_edit = datetime.fromisoformat(base64.b64decode(subdata).decode("utf-8"))
 
-        for root, _, files in walk("/mnt"):
-            for file in files:
-                file_path = f"{root}/{file}"
-                edited = datetime.fromtimestamp(os.path.getmtime(file_path))
-                if latest_edit is None:
-                    latest_edit = edited
-                elif (latest_edit - edited).total_seconds() < 0:
-                    latest_edit = edited
-
-                if last_edit is None or (last_edit - edited).total_seconds() < 0:
-                    pointers.append(f"//{self.host}/{self.share}{file_path}")
-
-        if latest_edit is not None:
-            subdata = base64.b64encode(latest_edit.isoformat().encode("utf-8")).decode("utf-8")
+        pointers: list = self._scan_dir(self.path, last_edit)
+        subdata = base64.b64encode(datetime.now().isoformat().encode("utf-8")).decode("utf-8")
 
         return {"pointers": pointers, "subdata": subdata}

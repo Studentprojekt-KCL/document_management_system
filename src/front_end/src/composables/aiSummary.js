@@ -35,7 +35,7 @@ export function useAISummary(props) {
     const access_token = sessionStorage.getItem('access_token')
 
     try {
-      const response = await globalThis.fetch(`${API_BASE_URL}/summary`, {
+      const response = await globalThis.fetch(`${API_BASE_URL}/stochastic-analyzer/summarize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

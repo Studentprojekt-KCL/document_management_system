@@ -23,7 +23,7 @@ class ClassifierCache:
         cache_directory: str = read_env_variable("SE_API_CACHE_DIRECTORY")
         self.cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
         try:
-            with shelve.open(self.cache_file, writeback=True) as f:
+            with shelve.open(self.cache_file) as f:
                 self.cache = f.get("classification", {})
         except OSError:
             dms_error(f"Failed to open file: {self.cache_file}.")
@@ -51,7 +51,7 @@ class ClassifierCache:
                 await wait_for(self.close_event.wait(), timeout=ClassifierCache.SYNC_INTERVAL)
             except TimeoutError:
                 dms_info("Syncing cache file.")
-                with shelve.open(self.cache_file, writeback=True) as f:
+                with shelve.open(self.cache_file) as f:
                     f["classification"] = self.cache
         dms_info("Closing sync thread.")
 

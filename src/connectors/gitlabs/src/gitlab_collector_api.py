@@ -59,7 +59,7 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers"), include_content, include_last_edit_date)
+        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers", []), include_content, include_last_edit_date)
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""

@@ -11,7 +11,7 @@
 
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
+import { Search, Network, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
 import { hasRole } from '@/utils/auth'
 
 /* Router instances for navigation and route info */
@@ -23,6 +23,7 @@ const isOpen = ref(true)
 
 /* Define all possible menu items with their respective icons and paths */
 const menuItems = [
+  { id: 'connections', label: 'Connections', icon: Network, path: '/connections' },
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
   { id: 'intelligence', label: 'Intelligence', icon: BarChart3, path: '/intelligence' },

@@ -1,8 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import json
+from asyncio import Event, get_running_loop, wait_for
+import shelve
 
-from dmis_logger import dms_error, dms_info, dms_warning
+from dmis_logger import dms_error, dms_info
 from initialisation_tools import read_env_variable
 
 
@@ -10,48 +11,45 @@ class ClassifierCache:
     """Classifier Cache class"""
 
     CACHE_FILE: str = "classification_cache.json"
+    SYNC_INTERVAL: int = 600
 
-    cache_directory: str
-    cache_file: str
-    cache: dict[str, str]
+    cache: shelve.Shelf[str]
+    close_event: Event
 
     def __init__(self) -> None:
         """Constructor"""
         cache_directory: str = read_env_variable("SE_API_CACHE_DIRECTORY")
         cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
-
         try:
-            with open(cache_file, encoding="utf=8") as f:
-                dms_info(f"Found {cache_file}.")
-                cache: dict = json.loads(f.read())
-                self.cache = cache
-        except OSError:
+            self.cache: shelve.Shelf[str] = shelve.open(cache_file, writeback=True)
+        except IOError:
+            dms_error(f"Failed to open file: {cache_file}.")
+        self.close_event = Event()
+        loop = get_running_loop()
+        self.sync_thread = loop.create_task(ClassifierCache._cache_sync(self.close_event, self.cache))
+
+    async def close(self) -> None:
+        """Clean up"""
+        self.close_event.set()
+        await self.sync_thread
+        self.cache.close()
+
+    @staticmethod
+    async def _cache_sync(close_event: Event, cache: shelve.Shelf[str]) -> None:
+        """Sync cache file with in memory cache.
+
+        Args:
+            close_event: exits the thread when the event is set.
+            cache: in memory cache.
+        """
+        dms_info("Launching sync thread.")
+        while not close_event.is_set():
             try:
-                dms_info(f"Creating {cache_file}.")
-                with open(cache_file, "x", encoding="utf=8"):
-                    self.cache = {}
-            except OSError:
-                dms_error(f"Failed to create {cache_file}.")
-                return
-        except json.JSONDecodeError:
-            self.cache = {}
-
-        self.cache_file = cache_file
-
-    def reset(self) -> None:
-        """Reset cache."""
-        self.cache = {}
-        self._write_memory()
-
-    def _write_memory(self) -> None:
-        """Write current cache to file."""
-        try:
-            with open(self.cache_file, "w", encoding="utf=8") as f:
-                f.write(json.dumps(self.cache))
-        except OSError:
-            dms_warning(f"Failed to open (write): {self.cache_file}.")
-        except json.JSONDecodeError:
-            dms_warning("Failed to parse cache dict.")
+                await wait_for(close_event.wait(), timeout=ClassifierCache.SYNC_INTERVAL)
+            except TimeoutError:
+                dms_info("Syncing cache file.")
+                cache.sync()
+        dms_info("Closing sync thread.")
 
     def add_classification(self, pointer: str, classification: str) -> None:
         """Add classification to cache.
@@ -61,8 +59,7 @@ class ClassifierCache:
             classification: the assigned classification.
         """
 
-        self.cache.update({pointer: classification})
-        self._write_memory()
+        self.cache[pointer] = classification
 
     def remove_classification(self, pointer: str) -> None:
         """Remove classification from cache.
@@ -72,7 +69,6 @@ class ClassifierCache:
         """
 
         self.cache.pop(pointer)
-        self._write_memory()
 
     def remove_classifications(self, files: list[dict[str, str]]) -> None:
         """Remove a list classifications from cache.
@@ -87,7 +83,6 @@ class ClassifierCache:
             pointer: str | None = file.get("unique_pointer")
             if pointer is not None:
                 self.cache.pop(pointer)
-        self._write_memory()
 
     def fetch_classification(self, pointer: str) -> str | None:
         """Fetch a classification.

@@ -24,6 +24,10 @@ class Handler:
         self.search_engine = SearchEngine()
         self.query = Query()
 
+    async def close(self):
+        """Clean up"""
+        await self.query.close()
+
     def reset(self) -> None:
         """Reset the connector."""
         self.search_engine = SearchEngine()

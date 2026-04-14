@@ -21,9 +21,9 @@ class Query:
         self.classify_url = address.rstrip("/") + "/classify"
         self.cache = ClassifierCache()
 
-    def reset(self) -> None:
-        """Reset the cache."""
-        self.cache.reset()
+    async def close(self) -> None:
+        """Clean up"""
+        await self.cache.close()
 
     def classify(self, files: list[dict]) -> dict[str, str]:
         """Classify the files at the pointers.
@@ -33,7 +33,7 @@ class Query:
         Returns: list of file pointers with their classification.
         """
         classifications: dict[str, str] = {}
-        none_cached: list[str] = []
+        not_cached: list[str] = []
         pointers: list[str] = []
         classification: str | None = None
 
@@ -48,12 +48,12 @@ class Query:
             if classification is not None:
                 classifications.update({pointer: classification})
             else:
-                none_cached.append(pointer)
+                not_cached.append(pointer)
 
-        if not none_cached:
+        if not not_cached:
             return classifications
 
-        response: Any | None = self._get_classification(none_cached)
+        response: Any | None = self._get_classification(not_cached)
 
         if not isinstance(response, list):
             dms_warning("Returned invalid response from classifier, expected list.")

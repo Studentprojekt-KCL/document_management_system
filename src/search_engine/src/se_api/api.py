@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import argparse
+from contextlib import asynccontextmanager
 import logging
 from typing import Any
 from collections.abc import Sequence
@@ -49,9 +50,8 @@ class API:
         self.port: int = read_port("SE_API_PORT")
         self.host: str = read_env_variable("SE_API_HOST")
 
-        self.handler = Handler()
 
-        self.app = FastAPI()
+        self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/search", self.query, methods=["GET"])
@@ -62,6 +62,12 @@ class API:
         """Start the API."""
 
         uvicorn.run(self.app, host=self.host, log_level=self.log_level, port=self.port)
+
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        self.handler = Handler()
+        yield
+        await self.handler.close()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""

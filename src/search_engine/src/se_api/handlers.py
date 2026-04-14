@@ -24,7 +24,7 @@ class Handler:
         self.search_engine = SearchEngine()
         self.query = Query()
 
-    async def close(self):
+    async def close(self) -> None:
         """Clean up"""
         await self.query.close()
 

@@ -13,29 +13,29 @@ class ClassifierCache:
     CACHE_FILE: str = "classification_cache.json"
     SYNC_INTERVAL: int = 600
 
-    cache: shelve.Shelf[str]
+    cache: dict[str, str]
     close_event: Event
+    cache_file: str
 
     def __init__(self) -> None:
         """Constructor"""
         cache_directory: str = read_env_variable("SE_API_CACHE_DIRECTORY")
-        cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
+        self.cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
         try:
-            self.cache: shelve.Shelf[str] = shelve.open(cache_file, writeback=True)
-        except IOError:
-            dms_error(f"Failed to open file: {cache_file}.")
+            with shelve.open(self.cache_file, writeback=True) as f:
+                self.cache = f.get("classification", {})
+        except OSError:
+            dms_error(f"Failed to open file: {self.cache_file}.")
         self.close_event = Event()
         loop = get_running_loop()
-        self.sync_thread = loop.create_task(ClassifierCache._cache_sync(self.close_event, self.cache))
+        self.sync_thread = loop.create_task(self._cache_sync())
 
     async def close(self) -> None:
         """Clean up"""
         self.close_event.set()
         await self.sync_thread
-        self.cache.close()
 
-    @staticmethod
-    async def _cache_sync(close_event: Event, cache: shelve.Shelf[str]) -> None:
+    async def _cache_sync(self) -> None:
         """Sync cache file with in memory cache.
 
         Args:
@@ -43,12 +43,13 @@ class ClassifierCache:
             cache: in memory cache.
         """
         dms_info("Launching sync thread.")
-        while not close_event.is_set():
+        while not self.close_event.is_set():
             try:
-                await wait_for(close_event.wait(), timeout=ClassifierCache.SYNC_INTERVAL)
+                await wait_for(self.close_event.wait(), timeout=ClassifierCache.SYNC_INTERVAL)
             except TimeoutError:
                 dms_info("Syncing cache file.")
-                cache.sync()
+                with shelve.open(self.cache_file, writeback=True) as f:
+                    f["classification"] = self.cache
         dms_info("Closing sync thread.")
 
     def add_classification(self, pointer: str, classification: str) -> None:

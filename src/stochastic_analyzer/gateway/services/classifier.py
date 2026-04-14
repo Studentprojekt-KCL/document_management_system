@@ -10,18 +10,12 @@ from gateway.schemas import InputItem, ClassificationResult
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
+# These label triggers have been tweaked for hours, only touch if absolutly certain
 LABEL_TRIGGERS = [
-    # Public
-    "This is general information intended for the public, such as manuals, public announcements, or open event invitations.",
-    # Internal
-    "This is internal company information meant only for employees, such as sales targets, project plans,team updates, "
-    "system migrations, or internal process changes.",
-    # Sensitive
-    "This document contains sensitive employee or operational data such as performance reviews, salary information, "
-    "disciplinary records, access credentials, or HR matters.",
-    # Confidential
-    "This is strictly confidential information such as executive strategy, mergers and acquisitions, financial projections, "
-    "medical records, patient data, or personal identification numbers.",
+    "public open-source documentation",
+    "internal employee policy or guidelines",
+    "sensitive financial review or performance data",
+    "confidential strategic project plan",
 ]
 
 
@@ -39,32 +33,21 @@ def _build_inputs(items: list[InputItem], max_chars: int) -> list[list[str]]:
     return inputs
 
 
-def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: float = 0.02) -> int:
-    """Bump classification up if a higher-ranked label is within threshold.
-
-    Threshold halves after each escalation step (For example: 0.02 → 0.01 → 0.005)
-    """
+def _escalate(doc_scores: list[float], best_index: int, escalation_threshold: float) -> int:
+    """Bump classification up if a higher-ranked label is within threshold."""
     label_rank = {"Public": 0, "Internal": 1, "Sensitive": 2, "Confidential": 3}
-    best_score = doc_scores[best_index]
-    step = 0
-
+    original_score = doc_scores[best_index]
+    original_rank = label_rank[LABELS[best_index]]
     for i, score in enumerate(doc_scores):
-        is_higher_rank = label_rank[LABELS[i]] > label_rank[LABELS[best_index]]
-        current_threshold = escalation_threshold / (2**step)
-        is_within_threshold = (best_score - score) < current_threshold
-
-        if is_higher_rank and is_within_threshold:
+        if label_rank[LABELS[i]] > original_rank and (original_score - score) < escalation_threshold:
             best_index = i
-            best_score = score
-            step += 1
-
     return best_index
 
 
 def _resolve_labels(
     items: list[InputItem],
     all_scores: list[float],
-    escalation_threshold: float = 0.02,
+    escalation_threshold: float,
 ) -> list[ClassificationResult]:
     """Map entailment scores back to classification labels per document."""
     results = []
@@ -85,10 +68,10 @@ def _resolve_labels(
 
 
 async def classify_documents(
-    items: list[InputItem], classifier_url: str, escalation_threshold: float = 0.02
+    items: list[InputItem], classifier_url: str, escalation_threshold: float
 ) -> list[ClassificationResult]:
     """Classify a batch of documents using parallel NLI inference against a TEI container."""
-    inputs = _build_inputs(items, max_chars=800)
+    inputs = _build_inputs(items, max_chars=2000)
     all_scores = [0.0] * len(inputs)
     batch_size = 32
 

@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from asyncio import Event, get_running_loop, wait_for
+import dbm
 import shelve
 
 from dmis_logger import dms_error, dms_info
@@ -26,6 +27,8 @@ class ClassifierCache:
                 self.cache = f.get("classification", {})
         except OSError:
             dms_error(f"Failed to open file: {self.cache_file}.")
+        except dbm.error:
+            dms_error(f"Failed opening file: {self.cache_file}")
         self.close_event = Event()
         loop = get_running_loop()
         self.sync_thread = loop.create_task(self._cache_sync())

@@ -10,7 +10,7 @@ from initialisation_tools import read_env_variable
 class ClassifierCache:
     """Classifier Cache class"""
 
-    CACHE_FILE: str = "classification_cache.json"
+    CACHE_FILE: str = "classification_cache"
     SYNC_INTERVAL: int = 600
 
     cache: dict[str, str]

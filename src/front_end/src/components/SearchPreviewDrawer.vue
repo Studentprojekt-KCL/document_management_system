@@ -9,7 +9,7 @@
  */
 
 import { ref, computed, watch } from 'vue'
-import { 
+import {
   X,
   StarsIcon,
   CalendarDays,
@@ -19,8 +19,8 @@ import {
   ShieldCheck,
   Pencil,
   CheckCircle,
-  AlertCircle 
-}from 'lucide-vue-next'
+  AlertCircle
+} from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
 import { hasRole } from '@/utils/auth'
@@ -49,7 +49,6 @@ const API_BASE_URL = import.meta.env.API_BASE_URL?.replace(/\/$/, '') ?? ''
 
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
-
 
 /* Local override for optimistic updates */
 const localSecurityLevel = ref('')
@@ -80,7 +79,6 @@ const showToast = (success, message) => {
     toast.value.visible = false
   }, 4000)
 }
-
 
 /* Save classification */
 const handleClassificationSave = async (level) => {
@@ -151,15 +149,9 @@ watch(
       <!-- SECURITY CLASSIFICATION -->
       <section class="panel-section">
         <div class="section-header">
-          <p class="section-title">
-            <ShieldCheck :size="15" /> SECURITY CLASSIFICATION
-          </p>
+          <p class="section-title"><ShieldCheck :size="15" /> SECURITY CLASSIFICATION</p>
 
-          <button
-            v-if="canEdit"
-            class="edit-btn"
-            @click="isEditingClassification = true"
-          >
+          <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
             <Pencil :size="14" />
             Edit
           </button>
@@ -215,7 +207,7 @@ watch(
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
-    <!-- MODAL -->
+      <!-- MODAL -->
       <ClassificationEditor
         ref="classificationEditorRef"
         :visible="isEditingClassification"

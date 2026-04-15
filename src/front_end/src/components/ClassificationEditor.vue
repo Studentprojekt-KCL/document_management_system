@@ -185,10 +185,22 @@ defineExpose({ resetSaving })
   background: #faf5ff;
 }
 
-.level-option.selected.option-public { border-color: #059669; background: #ecfdf5; }
-.level-option.selected.option-internal { border-color: #2563eb; background: #eff6ff; }
-.level-option.selected.option-sensitive { border-color: #d97706; background: #fffbeb; }
-.level-option.selected.option-confidential { border-color: #dc2626; background: #fef2f2; }
+.level-option.selected.option-public {
+  border-color: #059669;
+  background: #ecfdf5;
+}
+.level-option.selected.option-internal {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.level-option.selected.option-sensitive {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+.level-option.selected.option-confidential {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
 
 /* Radio circle */
 .level-radio {
@@ -202,11 +214,21 @@ defineExpose({ resetSaving })
   flex-shrink: 0;
 }
 
-.level-option.selected .level-radio { border-color: #7c3aed; }
-.level-option.selected.option-public .level-radio { border-color: #059669; }
-.level-option.selected.option-internal .level-radio { border-color: #2563eb; }
-.level-option.selected.option-sensitive .level-radio { border-color: #d97706; }
-.level-option.selected.option-confidential .level-radio { border-color: #dc2626; }
+.level-option.selected .level-radio {
+  border-color: #7c3aed;
+}
+.level-option.selected.option-public .level-radio {
+  border-color: #059669;
+}
+.level-option.selected.option-internal .level-radio {
+  border-color: #2563eb;
+}
+.level-option.selected.option-sensitive .level-radio {
+  border-color: #d97706;
+}
+.level-option.selected.option-confidential .level-radio {
+  border-color: #dc2626;
+}
 
 .level-radio-dot {
   width: 8px;
@@ -215,10 +237,18 @@ defineExpose({ resetSaving })
   background: #7c3aed;
 }
 
-.level-option.selected.option-public .level-radio-dot { background: #059669; }
-.level-option.selected.option-internal .level-radio-dot { background: #2563eb; }
-.level-option.selected.option-sensitive .level-radio-dot { background: #d97706; }
-.level-option.selected.option-confidential .level-radio-dot { background: #dc2626; }
+.level-option.selected.option-public .level-radio-dot {
+  background: #059669;
+}
+.level-option.selected.option-internal .level-radio-dot {
+  background: #2563eb;
+}
+.level-option.selected.option-sensitive .level-radio-dot {
+  background: #d97706;
+}
+.level-option.selected.option-confidential .level-radio-dot {
+  background: #dc2626;
+}
 
 .level-label {
   font-size: 0.9rem;

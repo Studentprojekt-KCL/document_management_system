@@ -1,10 +1,11 @@
 """Define API and routes."""
 
+from dataclasses import dataclass
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
 from dmis_logger import dms_warning
-from gateway.config import APIConfiguration
 from gateway.schemas import (
     RerankRequest,
     RankResponse,
@@ -20,6 +21,17 @@ from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
+
+
+@dataclass
+class Services:
+    """Pre-configured service dependencies."""
+
+    connector: Connector
+    summarizer: Summarizer
+    classifier: Classifier
+    ranker: Ranker
+    pdf_converter: PdfConverter
 
 
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
@@ -40,54 +52,49 @@ async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> S
     return result
 
 
-def create_router(config: APIConfiguration) -> APIRouter:
-    """Create router with configuration bound via closure.
+def create_router(services: Services, device: str) -> APIRouter:
+    """Create router with pre-constructed service dependencies.
 
     Args:
-        config: API configuration.
+        services: Pre-configured service instances.
+        device: Device identifier for health checks.
 
     Returns:
         Configured APIRouter with all endpoints.
     """
     router = APIRouter()
 
-    connector = Connector(url=config.services.connector_url)
-    summarizer = Summarizer(
-        url=config.services.ministral_url,
-        model=config.services.ministral_model,
-        timeout=config.services.ministral_timeout,
-    )
-    classifier = Classifier(
-        url=config.services.classifier_url,
-        escalation_threshold=config.services.escalation_threshold,
-    )
-    ranker = Ranker(url=config.services.tei_url)
-    pdf_converter = PdfConverter()
-
     @router.get("/health", response_model=HealthCheck)
     async def health_check() -> dict:
         """Health checks."""
-        return {"status": "active", "model_loaded": True, "device": config.device}
+        return {"status": "active", "model_loaded": True, "device": device}
 
     @router.post("/rerank", response_model=RankResponse)
     async def rerank_documents(payload: RerankRequest) -> dict:
         """Endpoint for pointer-based semantic reranking."""
-        reference_items = await connector.get_file_contents([payload.reference])
+        reference_items = await services.connector.get_file_contents([payload.reference])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
+            raise HTTPException(
+                status_code=502, detail="Failed to retrieve reference document."
+            )
 
-        compare_items = await connector.get_file_contents(payload.pointers)
+        compare_items = await services.connector.get_file_contents(payload.pointers)
         if not compare_items:
             dms_warning("Failed to retrieve comparison documents from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
+            raise HTTPException(
+                status_code=502, detail="Failed to retrieve comparison documents."
+            )
 
         query = reference_items[0].content
         texts = [item.content for item in compare_items]
-        scores = await ranker.rank(query, texts)
+        scores = await services.ranker.rank(query, texts)
 
         scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
+            [
+                ScoredPointer(score=float(s), pointer=p)
+                for s, p in zip(scores, payload.pointers, strict=False)
+            ],
             key=lambda x: x.score,
             reverse=True,
         )
@@ -96,15 +103,15 @@ def create_router(config: APIConfiguration) -> APIRouter:
     @router.post("/classify", response_model=list[ClassificationResult])
     async def classify_endpoint(payload: PointerRequest) -> list[dict]:
         """Endpoint to classify documents via batched NLI inference."""
-        items = await _retrieve_documents(connector, payload.pointers)
-        results = await classifier.classify(items)
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        results = await services.classifier.classify(items)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
     async def summarize_batch(payload: PointerRequest) -> dict:
         """Endpoint to summarize documents by fetching content via file pointers."""
-        items = await _retrieve_documents(connector, payload.pointers)
-        result = await _generate_summary(summarizer, items)
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        result = await _generate_summary(services.summarizer, items)
         return result.model_dump()
 
     @router.get("/classifications")
@@ -115,9 +122,9 @@ def create_router(config: APIConfiguration) -> APIRouter:
     @router.post("/md-to-pdf")
     async def md_pdf_converter(payload: PointerRequest) -> Response:
         """Endpoint to summarize documents and return result as PDF."""
-        items = await _retrieve_documents(connector, payload.pointers)
-        result = await _generate_summary(summarizer, items)
-        pdf: bytes = pdf_converter.convert(result.summary)
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        result = await _generate_summary(services.summarizer, items)
+        pdf: bytes = services.pdf_converter.convert(result.summary)
         return Response(
             content=pdf,
             status_code=200,

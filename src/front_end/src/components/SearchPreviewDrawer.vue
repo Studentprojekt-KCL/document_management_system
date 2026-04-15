@@ -95,6 +95,17 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
+
+      <!-- Rerank (similarity) section -->
+      <section class="panel-section">
+        <p class="section-title">SIMILARITY</p>
+        <button class="meta-cell meta-cell-summary summary-cell-button" type="button" @click="$emit('rerank', selectedMatch)">
+          <p>
+            <StarsIcon :size="13" />
+            Find Matches
+          </p>
+        </button>
+      </section>
     </div>
 
     <div class="preview-footer">

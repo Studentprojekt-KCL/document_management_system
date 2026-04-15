@@ -3,6 +3,7 @@
 import re
 from urllib.parse import urljoin
 import base64
+import json
 import io
 from pathlib import Path
 import zipfile
@@ -332,7 +333,7 @@ class GitLabs:
             chunk = await output_queue.get() #TODO define datachunk
             if chunk is None:
                 break
-            yield chunk
+            yield json.dumps(chunk).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.

@@ -23,7 +23,7 @@ const sources = ref([
   },
   {
     id: 'smb',
-    name: 'SMB Share',
+    name: 'Shared Folders (SMB)',
     icon: HardDrive,
     status: 'disconnected'
   },

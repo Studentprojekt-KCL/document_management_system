@@ -47,39 +47,19 @@ class TestSearchEngine(TestCase):
 
     def test_add_file(self):
         self.instance = SearchEngine()
-        self.instance.add_files([
-            {
-                "unique_pointer": "file/pointer/at/somewhere",
-                "content": "dGhpcyBpcyBhIGZpbGU="
-            }
-        ])
+        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": "dGhpcyBpcyBhIGZpbGU="}])
         pointers = self.instance.query_files("this", 10)
         assert pointers == ["file/pointer/at/somewhere"]
-        self.instance.add_files([
-            {
-                "unique_pointer": "file/pointer/at/somewhere",
-                "content": "dGhpcyBpcyBhIGZpbGU="
-            }
-        ])
+        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": "dGhpcyBpcyBhIGZpbGU="}])
         pointers = self.instance.query_files("this", 10)
         assert pointers == ["file/pointer/at/somewhere"]
-        self.instance.add_files([
-            {
-                "unique_pointer": "file/pointer/at/somewhere/else",
-                "content": "dGhpcyBpcyBhIGZpbGU="
-            }
-        ])
+        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere/else", "content": "dGhpcyBpcyBhIGZpbGU="}])
         pointers = self.instance.query_files("this", 10)
         assert pointers == ["file/pointer/at/somewhere", "file/pointer/at/somewhere/else"]
 
     def test_remove_file(self):
         self.instance = SearchEngine()
-        self.instance.add_files([
-            {
-                "unique_pointer": "file/pointer/at/somewhere",
-                "content": "dGhpcyBpcyBhIGZpbGU="
-            }
-        ])
+        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": "dGhpcyBpcyBhIGZpbGU="}])
         self.instance.remove_file("file/pointer/at/somewhere")
         pointers = self.instance.query_files("this", 10)
         assert pointers == []

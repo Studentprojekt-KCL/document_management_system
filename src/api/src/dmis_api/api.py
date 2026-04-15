@@ -31,6 +31,7 @@ class API:
         self,
         search_api_url: str,
         query_api_url: str,
+        connctor_url: str,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -39,6 +40,7 @@ class API:
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
         self.query_api_url = query_api_url.rstrip("/")
+        self.connctor_url = connctor_url
 
         self.app.add_exception_handler(
             RequestValidationError,
@@ -49,6 +51,8 @@ class API:
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
+        self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
+        self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -132,6 +136,14 @@ class API:
         """POST request to stochastic analyzer."""
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
 
+    async def connector_get(self, endpoint: str, request: Request) -> JSONResponse:
+        """GET request to stochastic analyzer."""
+        return await self.execute_get_request(f"{self.connctor_url}/{endpoint}", request)
+
+    async def connector_post(self, endpoint: str, request: Request) -> JSONResponse:
+        """POST request to stochastic analyzer."""
+        return await self.execute_post_request(f"{self.connctor_url}/{endpoint}", request)
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
@@ -143,12 +155,14 @@ def run() -> None:
     port = read_port("API_PORT")
     search_api_url = read_env_variable("DMIS_SEARCH_API_URL")
     query_api_url = read_env_variable("DMIS_QUERY_API_URL")
+    connctor_url = read_env_variable("DMIS_API_CONNECTOR_URL")
 
     log_level = "debug" if args.dev else None
 
     api = API(
         search_api_url=search_api_url,
         query_api_url=query_api_url,
+        connctor_url=connctor_url,
         log_level=log_level,
     )
 

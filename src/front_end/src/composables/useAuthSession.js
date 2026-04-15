@@ -11,7 +11,7 @@ export function useAuthSession() {
   let intervalID = null
 
   const TIME_LIMIT = 57 * 60 * 1000
-  const REFRESH_TIME = 50 * 60 * 1000
+  const REFRESH_TIME = 52 * 60 * 1000
 
   // Activity tracking
   const updateActivity = () => {

@@ -82,6 +82,7 @@ const showToast = (success, message) => {
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
+    // TODO: Replace with real endpoint when backend supports classification updates.
     const res = await fetch(`${API_BASE_URL}/metadata`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

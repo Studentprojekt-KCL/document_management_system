@@ -45,7 +45,7 @@ class TokenVerifier:
                 signing_key.key,
                 algorithms=["RS256"],
                 issuer=self.issuer,
-                options={"verify_aud": False},
+                options={"verify_aud": False},  # TODO: verify audience validation?
             )
         except jwt.InvalidTokenError as exc:
             dms_info(f"Invalid access token: {exc}")
@@ -53,15 +53,20 @@ class TokenVerifier:
 
         azp = claims.get("azp")
         if azp != self.expected_azp:
-            dms_info(f"Unexpected azp: {azp!r}")
+            dms_info(f"Unexpected azp: {azp!r}, expected {self.expected_azp!r}")
             raise HTTPException(status_code=403)
 
         realm_roles = set(claims.get("realm_access", {}).get("roles", []))
         client_roles = set(claims.get("resource_access", {}).get(self.expected_azp, {}).get("roles", []))
         all_roles = realm_roles | client_roles
 
-        if "user" not in all_roles and "admin" not in all_roles:
-            dms_info(f"Missing required role. realm_roles={sorted(realm_roles)}, client_roles={sorted(client_roles)}")
+        if "user" not in all_roles and "admin" not in all_roles:  # TODO: remove hardcoded roles when all roles are finalized
+            dms_info(
+                "Missing required role. "
+                f"expected one of ['user', 'admin], "
+                f"realm_roles={sorted(realm_roles)}, "
+                f"client_roles={sorted(client_roles)}"
+            )
             raise HTTPException(status_code=403)
 
         return claims

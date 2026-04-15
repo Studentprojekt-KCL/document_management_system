@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from json.decoder import JSONDecodeError
 import argparse
 from typing import Any
 from collections.abc import Sequence
 
 import requests
 import uvicorn
-from fastapi import FastAPI, Request, Query, HTTPException, Header
+from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -21,6 +22,8 @@ from .auth import TokenVerifier
 
 class API:
     """Management class for main API."""
+
+    app: FastAPI = FastAPI()
 
     log_level: str | None = None
     search_api_url: str
@@ -47,8 +50,10 @@ class API:
             self.validation_exception_handler,
         )
 
-        self.app.add_api_route("/search", self.search, methods=["GET"])
-        self.app.add_api_route("/summary", self.summary, methods=["POST"])
+        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
+        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
+        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
+        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -62,86 +67,98 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def search(
-        self,
-        query: str = Query(..., min_length=1, max_length=200),
-        authorization: str | None = Header(default=None),
-    ) -> JSONResponse:
-        """Forward search request to upstream search API, enrich results with classification, and return results."""
+    def authorize(self, authorization: str | None) -> dict[str, Any]:
+        """Validate bearer token and return claims."""
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
-            f"Authorized search request: "
+            f"Authorized request: "
             f"sub={claims.get('sub')} "
             f"user={claims.get('preferred_username')} "
             f"azp={claims.get('azp')}"
         )
+        return claims
 
-        query = query.strip()
-        if not query:
-            dms_warning("Search request received empty query.")
-            raise HTTPException(status_code=422)
+    async def execute_get_request(self, url: str, request: Request) -> JSONResponse:
+        """Execute GET request."""
+        try:
+            params = dict(request.query_params)
+        except TypeError:
+            dms_info(f"API retrieved a GET request ({url}) with incorrect param format: {request.query_params}")
+            return JSONResponse(status_code=400)
 
         try:
             response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
-                f"{self.search_api_url}/search",
-                params={"query": query},
+                url,
+                params=params,
                 timeout=120,
             )
             response.raise_for_status()
-            search_data = response.json()
+            response_data = response.json()
         except requests.JSONDecodeError as exc:
-            dms_warning(f"Upstream search API returned invalid JSON: {exc}")
+            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except requests.RequestException as exc:
-            dms_warning(f"Search request to upstream API failed: {exc}")
+            dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        if not isinstance(search_data, list):
-            dms_warning("Search API returned unexpected JSON shape.")
-            raise HTTPException(status_code=502)
+        return JSONResponse(status_code=200, content=response_data)
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "results": search_data,
-                "query": query,
-            },
-        )
-
-    async def summary(
-        self,
-        body: dict[str, Any],
-        authorization: str | None = Header(default=None),
-    ) -> JSONResponse:
-        """Forward summary request to upstream summary API and return response."""
-        claims = self.token_verifier.verify_access_token(authorization)
-        dms_info(
-            f"Authorized summary request: "
-            f"sub={claims.get('sub')} "
-            f"user={claims.get('preferred_username')} "
-            f"azp={claims.get('azp')}"
-        )
-
-        file_pointer = body.get("file_pointer")
-        if not isinstance(file_pointer, str):
-            dms_info(f"Summary endpoint request expected 'file_pointer' to be string but got: {file_pointer!r}")
-            raise HTTPException(status_code=422)
+    async def execute_post_request(self, url: str, request: Request) -> JSONResponse:
+        """Execute POST request."""
+        try:
+            body = await request.json()
+            params = dict(request.query_params)
+        except TypeError:
+            params = None
+        except JSONDecodeError:
+            dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {request.body()}")
+            return JSONResponse(status_code=400, content={})
 
         try:
             response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
-                f"{self.query_api_url}/summarize",
-                json={"pointers": [file_pointer]},
-                timeout=100,
+                url,
+                params=params,
+                json=body,
+                timeout=120,
             )
             response.raise_for_status()
-            return response.json()
+            response_data = response.json()
         except requests.JSONDecodeError as exc:
-            dms_warning(f"Summary API returned invalid JSON: {exc}")
+            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except requests.RequestException as exc:
-            response_text = exc.response.text if exc.response is not None else ""
-            dms_warning(f"Summary request to upstream API failed: {exc}. " f"Response body: {response_text}")
+            dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
+
+        return JSONResponse(status_code=200, content=response_data)
+
+    async def search_engine_get(
+        self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> JSONResponse:
+        """GET request to search engine."""
+        self.authorize(authorization)
+        return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request)
+
+    async def search_engine_post(
+        self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> JSONResponse:
+        """POST request to search engine."""
+        self.authorize(authorization)
+        return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request)
+
+    async def stochastic_analyzer_get(
+        self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> JSONResponse:
+        """GET request to stochastic analyzer."""
+        self.authorize(authorization)
+        return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request)
+
+    async def stochastic_analyzer_post(
+        self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> JSONResponse:
+        """POST request to stochastic analyzer."""
+        self.authorize(authorization)
+        return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
 
 
 def run() -> None:
@@ -160,11 +177,7 @@ def run() -> None:
 
     log_level = "debug" if args.dev else None
 
-    token_verifier = TokenVerifier(
-        issuer=keycloak_issuer,
-        jwks_url=keycloak_jwks_url,
-        expected_azp=keycloak_expected_azp,
-    )
+    token_verifier = TokenVerifier(issuer=keycloak_issuer, jwks_url=keycloak_jwks_url, expected_azp=keycloak_expected_azp)
 
     api = API(
         search_api_url=search_api_url,

@@ -24,9 +24,9 @@ export function useAuthSession() {
   }
 
   const syncLogout = (event) => {
-    if (event.key === LOGOUT_KEY) {
-      logout()
-    }
+    if (event.key !== LOGOUT_KEY) return 
+      clearInterval(intervalID)
+      window.location.replace('/')
   }
   // Refresh lock (avoids multi-tab refresh)
   const acquireLock = () => {

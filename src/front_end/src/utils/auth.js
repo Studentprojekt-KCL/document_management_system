@@ -95,10 +95,6 @@ export async function refreshToken() {
 export function logout() {
   const idToken = localStorage.getItem('id_token')
 
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-
   localStorage.setItem('logout-event', Date.now())
 
   const postLogoutRedirectUri = `${window.location.origin}/`
@@ -113,4 +109,15 @@ export function logout() {
   }
 
   window.location.assign(logoutUrl)
+  clearStroage()
+}
+
+function clearStroage(){
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('id_token')
+
+  localStorage.removeItem('oidc_state')
+  localStorage.removeItem('pkce_verifier')
+  localStorage.removeItem('logout-event')
 }

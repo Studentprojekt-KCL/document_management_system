@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 
 // Will eventually fetch these filter options from the backend or something??
-// const sourceFilters = ['GitHub', 'GitLab', 'Network File System'] // Add more sources needed if possible
 const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
 const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 const sourceFilters = ref([])

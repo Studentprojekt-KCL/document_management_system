@@ -44,8 +44,7 @@ const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
-/* API */
-const API_BASE_URL = window.__ENV__.API_BASE_URL?.replace(/\/$/, '') ?? ''
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)

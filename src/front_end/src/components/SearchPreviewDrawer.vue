@@ -44,31 +44,78 @@ const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
+/* API */
+const API_BASE_URL = import.meta.env.API_BASE_URL?.replace(/\/$/, '') ?? ''
+
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
 
-const canEditClassification = computed(() => {
-  return hasRole('admin') // Additional permission checks can be added here
-})
 
-const handleClassificationSave = async (newLevel) => {
+/* Local override for optimistic updates */
+const localSecurityLevel = ref('')
+
+/* Sync initial value */
+watch(
+  () => previewSecurityClass.value,
+  (val) => {
+    localSecurityLevel.value = val || ''
+  },
+  { immediate: true }
+)
+
+/* Final value used in UI */
+const currentSecurityLevel = computed(() => localSecurityLevel.value)
+
+/* Permissions */
+const canEdit = computed(() => hasRole('admin'))
+
+/* Toast */
+const toast = ref({ visible: false, success: true, message: '' })
+let toastTimer = null
+
+const showToast = (success, message) => {
+  if (toastTimer) clearTimeout(toastTimer)
+  toast.value = { visible: true, success, message }
+  toastTimer = setTimeout(() => {
+    toast.value.visible = false
+  }, 4000)
+}
+
+
+/* Save classification */
+const handleClassificationSave = async (level) => {
   try {
-    // Här emittar vi uppåt till en store eller view som hanterar API-anropet (NFR-50)
-    emit('update-metadata', {
-      fileId: props.selectedFile,
-      field: 'security_class',
-      value: newLevel
+    const res = await fetch(`${API_BASE_URL}/metadata`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: props.selectedFile,
+        metadata: { classification: level }
+      })
     })
-    
-    // Stäng modalen efter lyckad "emit"
+
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`)
+
+    /* Optimistic UI update */
+    localSecurityLevel.value = level
+
+    showToast(true, 'Security classification updated successfully.')
     isEditingClassification.value = false
-  } catch (error) {
-    console.error('Kunde inte uppdatera säkerhetsklass:', error)
+  } catch (err) {
+    showToast(false, `Update failed: ${err.message}`)
   } finally {
-    // Nollställ laddningsstatus i barnkomponenten
     classificationEditorRef.value?.resetSaving()
   }
 }
+
+/* Reset UI on change */
+watch(
+  () => [props.selectedFile, props.open],
+  () => {
+    isEditingClassification.value = false
+    toast.value.visible = false
+  }
+)
 </script>
 
 <template>
@@ -86,11 +133,44 @@ const handleClassificationSave = async (newLevel) => {
 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
+      <!-- Toast -->
+      <Transition name="toast-fade">
+        <div v-if="toast.visible" :class="['toast', toast.success ? 'toast-success' : 'toast-error']">
+          <CheckCircle v-if="toast.success" :size="16" />
+          <AlertCircle v-else :size="16" />
+          <span>{{ toast.message }}</span>
+        </div>
+      </Transition>
+
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
       <div class="tag-row">
         <span class="tag">{{ previewType }}</span>
       </div>
+
+      <!-- SECURITY CLASSIFICATION -->
+      <section class="panel-section">
+        <div class="section-header">
+          <p class="section-title">
+            <ShieldCheck :size="15" /> SECURITY CLASSIFICATION
+          </p>
+
+          <button
+            v-if="canEdit"
+            class="edit-btn"
+            @click="isEditingClassification = true"
+          >
+            <Pencil :size="14" />
+            Edit
+          </button>
+        </div>
+
+        <div class="classification-display">
+          <span :class="['classification-badge', `badge-${(currentSecurityLevel || 'none').toLowerCase()}`]">
+            {{ currentSecurityLevel || 'Not classified' }}
+          </span>
+        </div>
+      </section>
 
       <!-- Technical Metadata section -->
       <section class="panel-section">
@@ -110,7 +190,7 @@ const handleClassificationSave = async (newLevel) => {
           </div>
           <div class="meta-cell">
             <span>Security Class</span>
-            <p>{{ previewSecurityClass || 'Unknown' }}</p>
+            <p>{{ currentSecurityLevel || 'Unknown' }}</p>
           </div>
         </div>
       </section>
@@ -135,6 +215,14 @@ const handleClassificationSave = async (newLevel) => {
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
+    <!-- MODAL -->
+      <ClassificationEditor
+        ref="classificationEditorRef"
+        :visible="isEditingClassification"
+        :current-level="currentSecurityLevel"
+        @save="handleClassificationSave"
+        @cancel="isEditingClassification = false"
+      />
     </div>
 
     <div class="preview-footer">

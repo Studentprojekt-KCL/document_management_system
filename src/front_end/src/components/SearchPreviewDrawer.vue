@@ -11,6 +11,7 @@
 import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { useAIRerank } from '@/composables/aiRerank'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -29,6 +30,9 @@ const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, 
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+
+/* AI rerank composable */
+const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -99,11 +103,25 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
       <!-- Rerank (similarity) section -->
       <section class="panel-section">
         <p class="section-title">SIMILARITY</p>
-        <button class="meta-cell meta-cell-summary summary-cell-button" type="button" @click="$emit('rerank', selectedMatch)">
+        <div v-if="aiRerankResults.length" class="meta-cell meta-cell-summary">
+          <ul>
+            <li v-for="(result, index) in aiRerankResults" :key="index">
+              {{ result.filename }} (Score: {{ result.score.toFixed(2) }})
+            </li>
+          </ul>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isReranking"
+          @click="generateAIRerank"
+        >
           <p>
             <StarsIcon :size="13" />
-            Find Matches
+            {{ isReranking ? 'Finding matches...' : 'Find Similar Files' }}
           </p>
+          <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
         </button>
       </section>
     </div>

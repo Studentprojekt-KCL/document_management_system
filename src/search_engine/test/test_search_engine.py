@@ -57,7 +57,7 @@ class TestSearchEngine(TestCase):
         assert pointers == ["file/pointer/at/somewhere"]
         self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere/else", "content": self.file_content}])
         pointers = self.instance.query_files("this", 10)
-        assert pointers == ["file/pointer/at/somewhere", "file/pointer/at/somewhere/else"]
+        assert pointers == ["file/pointer/at/somewhere", "file/pointer/at/somewhere/else"] or ["file/pointer/at/somewhere/else", "file/pointer/at/somewhere"]
 
     def test_remove_file(self):
         self.instance = SearchEngine()

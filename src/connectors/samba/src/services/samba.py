@@ -47,10 +47,10 @@ class Samba:
         self.password = read_env_variable("SC_SAMBA_PASS")
 
     def connect(self):
-        logging.getLogger('smbprotocol').setLevel(logging.DEBUG)
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logging.getLogger('smbprotocol').addHandler(handler)
+        # logging.getLogger('smbprotocol').setLevel(logging.DEBUG)
+        # handler = logging.StreamHandler()
+        # handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        # logging.getLogger('smbprotocol').addHandler(handler)
 
         connection = Connection(uuid.uuid4(), self.host, self.port)
         connection.connect()
@@ -62,7 +62,15 @@ class Samba:
             print(self.share)
             tree = TreeConnect(session, self.share)
             tree.connect()
-            dir_open = Open(tree, ".")
+            dir_open = Open(tree, "Kernel")
+            dir_open.create(
+                ImpersonationLevel.Impersonation,
+                DirectoryAccessMask.GENERIC_READ,
+                FileAttributes.FILE_ATTRIBUTE_DIRECTORY,
+                ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE,
+                CreateDisposition.FILE_OPEN_IF,
+                CreateOptions.FILE_DIRECTORY_FILE,
+            )
             compound_messages = [
                 dir_open.query_directory("*", FileInformationClass.FILE_NAMES_INFORMATION, send=False),
                 dir_open.close(False, send=False),

@@ -1,25 +1,26 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+from datetime import datetime
+import threading
 import uuid
-import logging
-from dmis_logger import dms_warning
-from smbprotocol import exceptions
-from smbprotocol.connection import Connection, SMBConnectionClosed, SMBException
+from smbprotocol.connection import Connection
 from smbprotocol.session import Session
 from smbprotocol.tree import TreeConnect
+from smbprotocol.change_notify import ChangeNotifyFlags, CompletionFilter, FileNotifyInformation, FileSystemWatcher
 from initialisation_tools import read_env_variable, read_port
+from smbclient import register_session, scandir
+from base64 import urlsafe_b64encode
 
 from smbprotocol.open import (
     CreateDisposition,
     CreateOptions,
     DirectoryAccessMask,
     FileAttributes,
-    FileInformationClass,
-    FilePipePrinterAccessMask,
     ImpersonationLevel,
     Open,
     ShareAccess,
 )
+from uvicorn.config import is_dir
 
 class Samba:
     """Service for the Samba contection.
@@ -38,6 +39,8 @@ class Samba:
     user: str
     password: str
 
+    channges: dict[str, str]
+
     def __init__(self) -> None:
         """Constructor."""
         self.host = read_env_variable("SC_SAMBA_HOST")
@@ -46,23 +49,27 @@ class Samba:
         self.user = read_env_variable("SC_SAMBA_USER")
         self.password = read_env_variable("SC_SAMBA_PASS")
 
-    def connect(self):
-        # logging.getLogger('smbprotocol').setLevel(logging.DEBUG)
-        # handler = logging.StreamHandler()
-        # handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        # logging.getLogger('smbprotocol').addHandler(handler)
+        self.changes = {}
+        register_session(self.host, port=self.port, username=self.user, password=self.password)
 
-        connection = Connection(uuid.uuid4(), self.host, self.port)
+
+    def start_watch(self):
+        thread = threading.Thread(
+            target=Samba._watch_files,
+            args=(self.host, self.port, self.share, self.user, self.password, self.changes)
+        ) 
+        thread.start()
+    
+    @staticmethod
+    def _watch_files(host: str, port: int, share: str, user: str, password: str, changes: dict[str, str]):
+        connection = Connection(uuid.uuid4(), host, port)
         connection.connect()
         try:
-            session = Session(connection, username=self.user, password=self.password)
+            session = Session(connection, username=user, password=password)
             session.connect()
-            if session.session_id is not None:
-                print(connection.echo(sid=session.session_id))
-            print(self.share)
-            tree = TreeConnect(session, self.share)
+            tree = TreeConnect(session, share)
             tree.connect()
-            dir_open = Open(tree, "Kernel")
+            dir_open = Open(tree, "")
             dir_open.create(
                 ImpersonationLevel.Impersonation,
                 DirectoryAccessMask.GENERIC_READ,
@@ -71,18 +78,34 @@ class Samba:
                 CreateDisposition.FILE_OPEN_IF,
                 CreateOptions.FILE_DIRECTORY_FILE,
             )
-            compound_messages = [
-                dir_open.query_directory("*", FileInformationClass.FILE_NAMES_INFORMATION, send=False),
-                dir_open.close(False, send=False),
-            ]
-            requests = connection.send_compound([x[0] for x in compound_messages], session.session_id, tree.tree_connect_id)
-            for i, request in enumerate(requests):
-                response = compound_messages[i][1](request)
-                print(response)
+            while True:
+                watcher = FileSystemWatcher(dir_open) 
+                watcher.start(
+                    CompletionFilter.FILE_NOTIFY_CHANGE_LAST_WRITE,
+                    flags=ChangeNotifyFlags.SMB2_WATCH_TREE
+                )
+                results: list[FileNotifyInformation] | None = watcher.wait()
+                if results is None:
+                    continue
+                for result in results:
+                    path: str = result["file_name"].get_value()
+                    print(type(path))
+                    pointer: str = f"{share}\\{path}".replace("\\", "/")
+                    changes[path] = pointer
+                        
         finally:
             connection.disconnect()
 
+    def _full_scan(self, path: str) -> list[str]:
+        pointers: list[str] = []
+        print(f"checking: {path}")
+        for file in scandir(rf"{path}"):
+            if file.is_file():
+                pointers.append(file.path.replace("\\", "/"))
+            elif file.is_dir():
+                pointers.extend(self._full_scan(file.path))
 
+        return pointers
 
     def get_files(self, subdata: str | None) -> dict:
         """Get new files from SMB share.
@@ -92,24 +115,12 @@ class Samba:
         Return: Dict containting a list of file pointers and subdata.
 
         """
-
-        connection = Connection(uuid.uuid4(), self.host, self.port, False)
-        connection.connect()
-        try:
-            session = Session(connection, self.user, self.password, require_encryption=False)
-            session.connect()
-            tree = TreeConnect(session, self.share)
-            tree.connect()
-            # dir_open = Open(tree, "Kernel")
-            # compound_messages = [
-            #     dir_open.query_directory("*", FileInformationClass.FILE_NAMES_INFORMATION, send=False),
-            #     dir_open.close(False, send=False),
-            # ]
-            # requests = connection.send_compound([x[0] for x in compound_messages], session.session_id, tree.tree_connect_id)
-            # for i, request in enumerate(requests):
-            #     response = compound_messages[i][1](request)
-            #     print(response)
-        finally:
-            connection.disconnect()
-
-        return {}
+        changes = {}
+        if subdata is None:
+            changes["pointers"] = self._full_scan(self.share)
+            changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
+        else:
+            changes["pointers"] = [item for item in self.changes.values()]
+            changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
+            self.changes.clear()
+        return changes

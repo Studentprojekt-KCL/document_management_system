@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 from contextlib import asynccontextmanager
+import logging
 from os import environ
 from typing import Any, Sequence
 from dmis_logger import dms_error
@@ -54,7 +55,7 @@ class API:
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
-        self.samba_service.connect()
+        self.samba_service.start_watch()
         yield
 
     def start(self) -> None:
@@ -63,6 +64,7 @@ class API:
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
+        logging.basicConfig()
 
         errors: dict[str, str | Sequence[Any]]
         if isinstance(exc, RequestValidationError):
@@ -72,8 +74,10 @@ class API:
         content: str | dict[str, str]
         if self.log_level == "debug":
             content = jsonable_encoder(errors)
+            logging.getLogger().setLevel(logging.DEBUG)
         else:
             content = "ERROR"
+            logging.getLogger().setLevel(logging.INFO)
         return JSONResponse(status_code=422, content=content)
 
     async def files(self, subdata: str | None = None) -> JSONResponse:

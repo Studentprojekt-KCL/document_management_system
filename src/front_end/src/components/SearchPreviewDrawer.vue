@@ -8,9 +8,23 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import { 
+  X,
+  StarsIcon,
+  CalendarDays,
+  HardDrive,
+  FileType2,
+  ExternalLink,
+  ShieldCheck,
+  Pencil,
+  CheckCircle,
+  AlertCircle 
+}from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { hasRole } from '@/utils/auth'
+import ClassificationEditor from '@/components/ClassificationEditor.vue'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -29,6 +43,32 @@ const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, 
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+
+const isEditingClassification = ref(false)
+const classificationEditorRef = ref(null)
+
+const canEditClassification = computed(() => {
+  return hasRole('admin') // Additional permission checks can be added here
+})
+
+const handleClassificationSave = async (newLevel) => {
+  try {
+    // Här emittar vi uppåt till en store eller view som hanterar API-anropet (NFR-50)
+    emit('update-metadata', {
+      fileId: props.selectedFile,
+      field: 'security_class',
+      value: newLevel
+    })
+    
+    // Stäng modalen efter lyckad "emit"
+    isEditingClassification.value = false
+  } catch (error) {
+    console.error('Kunde inte uppdatera säkerhetsklass:', error)
+  } finally {
+    // Nollställ laddningsstatus i barnkomponenten
+    classificationEditorRef.value?.resetSaving()
+  }
+}
 </script>
 
 <template>

@@ -24,7 +24,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, previewSecurityClass } = useSearchMetadata(props)
+const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass } = useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
@@ -99,7 +99,7 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
     <div class="preview-footer">
       <a v-if="previewLink" class="open-file-btn" :href="previewLink" target="_blank" rel="noopener noreferrer">
         <ExternalLink :size="14" />
-        Open file
+        Open file in {{ sourceSystem }}
       </a>
       <button v-else class="open-file-btn" type="button" disabled>
         <ExternalLink :size="14" />

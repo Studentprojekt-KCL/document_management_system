@@ -24,5 +24,5 @@ jobs:
       - name: Run stack
         run: |
             cd $DEPLOY_DIR
-            docker compose -f $COMPOSE_FILE up --wait
+            docker compose -f $COMPOSE_FILE up --wait --remove-orphans
             docker compose -f $COMPOSE_FILE stop

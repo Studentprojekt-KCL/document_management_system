@@ -2,45 +2,74 @@
 
 from typing import Any
 
-from dmis_logger import dms_error, dms_warning
+from dmis_logger import dms_warning
 from requests import exceptions, post
 from initialisation_tools import read_env_variable
+from se_api.services.classifier_cache import ClassifierCache
 
 
 class Query:
     """Class handling query connections."""
 
     classify_url: str
+    cache: ClassifierCache
 
     def __init__(self) -> None:
+        """Constructor."""
         address: str = read_env_variable("SE_API_QUERY_ADDRESS")
 
-        if address is None:
-            dms_error("SE_API_QUERY_ADDRESS is not defined.")
-            return
-
         self.classify_url = address.rstrip("/") + "/classify"
+        self.cache = ClassifierCache()
 
-    def classify(self, pointers: list[str]) -> dict[str, str]:
+    async def close(self) -> None:
+        """Clean up"""
+        await self.cache.close()
+
+    def classify(self, files: list[dict]) -> dict[str, str]:
         """Classify the files at the pointers.
 
         Args:
             pointers: list of unique file pointers
         Returns: list of file pointers with their classification.
         """
-        response: Any | None = self._get_classification(pointers)
+        classifications: dict[str, str] = {}
+        not_cached: list[str] = []
+        pointers: list[str] = []
+        classification: str | None = None
+
+        for file in files:
+            pointer: str | None = file.get("unique_pointer")
+            if pointer is None:
+                continue
+            pointers.append(pointer)
+
+        for pointer in pointers:
+            classification = self.cache.fetch_classification(pointer)
+            if classification is not None:
+                classifications.update({pointer: classification})
+            else:
+                not_cached.append(pointer)
+
+        if not not_cached:
+            return classifications
+
+        response: Any | None = self._get_classification(not_cached)
+
         if not isinstance(response, list):
-            dms_warning(f"Query returned unreqognized structure, url {self.classify_url}.")
+            dms_warning("Returned invalid response from classifier, expected list.")
             return {}
 
-        classifications: dict[str, str] = {}
         for r in response:
-            unique_pointer = r.get("unique_pointer")
+            if not isinstance(r, dict):
+                dms_warning("Returned invalid response from classifier, expected list of dicts.")
+                continue
+            unique_pointer: str | None = r.get("unique_pointer")
             classification = r.get("Security-class")
-            if unique_pointer is None or classifications is None:
-                dms_warning("Returned invalid response from classifier.")
+            if unique_pointer is None or classification is None:
+                dms_warning("Returned invalid response from classifier, neither unique_pointer or Security-class does not exist.")
                 continue
             classifications.update({unique_pointer: classification})
+            self.cache.add_classification(unique_pointer, classification)
 
         return classifications
 

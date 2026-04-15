@@ -1,7 +1,7 @@
 """Define API and routes."""
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 
 from dmis_logger import dms_warning
 from gateway.config import APIConfiguration
@@ -14,7 +14,7 @@ from gateway.schemas import (
     PointerRequest,
     SummaryResult,
 )
-from gateway.services.classifier import classify_documents
+from gateway.services.classifier import classify_documents, LABELS
 from gateway.services.connector import get_file_contents
 from gateway.services.summarizer import summarize_documents
 from gateway.services.ranker import rank_documents
@@ -83,7 +83,12 @@ def create_router(config: APIConfiguration) -> APIRouter:
             dms_warning("No documents could be retrieved from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
 
-        result = await summarize_documents(items, config.services.ministral_url, config.services.ministral_model)
+        result = await summarize_documents(
+            items,
+            config.services.ministral_url,
+            config.services.ministral_model,
+            config.services.ministral_timeout,
+        )
 
         if result is None:
             dms_warning("Summarization returned no result.")
@@ -91,10 +96,32 @@ def create_router(config: APIConfiguration) -> APIRouter:
 
         return result.model_dump()
 
+    @router.get("/classifications")
+    def classifications() -> Response:
+        """Enpoint for retrieving existing classifications."""
+        return JSONResponse(content=LABELS, status_code=200)
+
     @router.post("/md-to-pdf")
-    def md_pdf_converter(summary: SummaryResult) -> Response:
-        """Endpoint to convert from markdown to pdf."""
-        pdf: bytes = md_to_pdf(summary.summary)
+    async def md_pdf_converter(payload: PointerRequest) -> Response:
+        """Endpoint to summarize documents and return result as PDF."""
+        items = await get_file_contents(config.services.connector_url, payload.pointers)
+
+        if not items:
+            dms_warning("No documents could be retrieved from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
+
+        result = await summarize_documents(
+            items,
+            config.services.ministral_url,
+            config.services.ministral_model,
+            config.services.ministral_timeout,
+        )
+
+        if result is None:
+            dms_warning("Summarization returned no result.")
+            raise HTTPException(status_code=500, detail="Summarization failed.")
+
+        pdf: bytes = md_to_pdf(result.summary)
         return Response(
             content=pdf,
             status_code=200,

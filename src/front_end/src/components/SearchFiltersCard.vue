@@ -3,9 +3,43 @@ import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 
 // Will eventually fetch these filter options from the backend or something??
-const sourceFilters = ['GitHub', 'GitLab', 'Network File System'] // Add more sources needed if possible
 const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
-const securityFilters = ['Public', 'Internal', 'Sensitive', 'Confidential']
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+const sourceFilters = ref([])
+const securityFilters = ref([])
+
+const fetchSourceFilters = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`)
+
+    if (!res.ok) {
+      console.error(`Failed to fetch source systems: ${res.statusText}`)
+      return
+    }
+    const data = await res.json()
+    sourceFilters.value = data
+  } catch (error) {
+    console.error(`Error fetching source systems: ${error}`)
+  }
+}
+
+const fetchSecurityFilters = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`)
+
+    if (!res.ok) {
+      console.error(`Failed to fetch security classifications: ${res.statusText}`)
+      return
+    }
+    const data = await res.json()
+    securityFilters.value = data
+  } catch (error) {
+    console.error(`Error fetching security classifications: ${error}`)
+  }
+}
+
+fetchSourceFilters()
+fetchSecurityFilters()
 
 const props = defineProps({
   selectedFilters: Object

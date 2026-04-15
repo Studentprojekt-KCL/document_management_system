@@ -77,13 +77,10 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        client: Session = Session()
-        response: Any | None = self._get_file_from_pointer(pointers, client)
-
+        with Session() as client:
+            response: Any | None = self._get_file_from_pointer(pointers, client)
         if not isinstance(response, list):
             return []
-
-        client.close()
 
         return response
 
@@ -123,9 +120,6 @@ class Connector:
         response: Any | None = self._get_file_to_index()
         if response is None or not isinstance(response, dict) or response.get("index_needed") is False:
             return None
-        if not isinstance(response, dict):
-            dms_warning(f"Response is not formated as a dict, url: {self.url_files_to_index}.")
-            return None
 
         subdata = response.get("subdata")
         file_url = response.get("file_url")
@@ -142,12 +136,14 @@ class Connector:
     def _get_file_from_pointer(self, pointers: list[str], client: Session) -> Any | None:
         """Get file from pointer"""
         try:
-            return client.post(
+            resp = client.post(
                 self.url_get_files,
                 params=[("include_content", False), ("include_last_edit_date", True)],
                 json={"file_pointers": pointers},
                 timeout=Connector.TIMEOUT,
-            ).json()
+            )
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_get_files}.")
         except exceptions.HTTPError:
@@ -163,7 +159,9 @@ class Connector:
     def _get_files_from_url(self, url: str) -> Any | None:
         """Get files from url"""
         try:
-            return get(url, timeout=Connector.TIMEOUT).json()
+            resp = get(url, timeout=Connector.TIMEOUT)
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {url}.")
         except exceptions.HTTPError:
@@ -179,11 +177,13 @@ class Connector:
     def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
         try:
-            return get(
+            resp = get(
                 self.url_files_to_index,
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
                 timeout=Connector.TIMEOUT,
-            ).json()
+            )
+            resp.raise_for_status()
+            return resp.json()
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
         except exceptions.HTTPError:

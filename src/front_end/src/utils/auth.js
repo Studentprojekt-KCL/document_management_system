@@ -24,7 +24,7 @@ function decodeJwtPayload(token) {
 
 /* Check if the user has a specific role */
 export function hasRole(role) {
-  const token = sessionStorage.getItem('access_token')
+  const token = localStorage.getItem('access_token')
   if (!token) return false
 
   const payload = decodeJwtPayload(token)
@@ -38,22 +38,22 @@ export function hasRole(role) {
 
 // For authentication
 export function getAccessToken() {
-  return sessionStorage.getItem('access_token')
+  return localStorage.getItem('access_token')
 }
 
 export function getRefreshToken() {
-  return sessionStorage.getItem('refresh_token')
+  return localStorage.getItem('refresh_token')
 }
 
 export function saveTokens({ access_token, id_token, refresh_token }) {
   if (access_token) {
-    sessionStorage.setItem('access_token', access_token)
+    localStorage.setItem('access_token', access_token)
   }
   if (id_token) {
-    sessionStorage.setItem('id_token', id_token)
+    localStorage.setItem('id_token', id_token)
   }
   if (refresh_token) {
-    sessionStorage.setItem('refresh_token', refresh_token)
+    localStorage.setItem('refresh_token', refresh_token)
   }
 }
 
@@ -68,6 +68,7 @@ export function isTokenExpired(token) {
 // refresh Token
 export async function refreshToken() {
   const refresh_token = getRefreshToken()
+
   const url = `${BASE_URL}/realms/${REALM}/protocol/openid-connect/token`
 
   const params = new URLSearchParams()
@@ -77,38 +78,31 @@ export async function refreshToken() {
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params
   })
+
   const data = await response.json()
 
-  // call the save_tokens function
-  saveTokens({
-    access_token: data.access_token,
-    id_token: data.id_token,
-    refresh_token: data.refresh_token
-  })
+  localStorage.setItem('access_token', data.access_token)
+  localStorage.setItem('refresh_token', data.refresh_token)
+  localStorage.setItem('id_token', data.id_token)
+
   return data
 }
 
 // logout functionality
 export function logout() {
-  const idToken = sessionStorage.getItem('id_token')
+  const idToken = localStorage.getItem('id_token')
+
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('id_token')
+
+  localStorage.setItem('logout-event', Date.now())
+
   const postLogoutRedirectUri = `${window.location.origin}/`
 
-  // 1. clear frontend session
-  sessionStorage.removeItem('access_token')
-  sessionStorage.removeItem('refresh_token')
-  sessionStorage.removeItem('id_token')
-  sessionStorage.removeItem('pkce_verifier')
-  sessionStorage.removeItem('oidc_state')
-
-  // 2. notify other tabs
-  localStorage.setItem('logout-event', Date.now().toString())
-
-  // 3. build logout URL (ALWAYS works)
   let logoutUrl =
     `${BASE_URL}/realms/${REALM}/protocol/openid-connect/logout` +
     `?post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
@@ -118,6 +112,5 @@ export function logout() {
     logoutUrl += `&id_token_hint=${encodeURIComponent(idToken)}`
   }
 
-  // 4. redirect to Keycloak
   window.location.assign(logoutUrl)
 }

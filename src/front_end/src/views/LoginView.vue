@@ -43,6 +43,14 @@ async function createPkcePair() {
 
 /* Initiates the Microsoft Entra ID login flow using PKCE. */
 const handleEntraIdLogin = async () => {
+  const tabId = crypto.randomUUID()
+
+  // mark tab identity (local session only)
+  sessionStorage.setItem('tab-id', tabId)
+
+  // mark login owner (shared across tabs)
+  localStorage.setItem('login-owner', tabId)
+
   const { verifier, challenge } = await createPkcePair()
 
   sessionStorage.setItem('pkce_verifier', verifier)

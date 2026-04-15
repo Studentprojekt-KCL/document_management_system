@@ -1,86 +1,119 @@
 import { onMounted, onUnmounted } from 'vue'
-import router from '@/router'
 import { refreshToken, logout, getAccessToken, isTokenExpired } from '@/utils/auth.js'
+
+const LOGOUT_KEY = 'logout-event'
+const REFRESH_KEY = 'refresh-event'
+const REFRESH_LOCK = 'refresh-lock'
 
 export function useAuthSession() {
   let lastActivity = Date.now()
   let lastRefresh = Date.now()
   let intervalID = null
 
-  // configuration
-  const TIME_LIMIT = 28 * 60 * 1000 //28 minutes idle logout
-  const REFRESH_TIME = 25 * 60 * 1000 // 25 minutes refresh early (safe buffer)
+  const TIME_LIMIT = 57 * 60 * 1000
+  const REFRESH_TIME = 50 * 60 * 1000
 
-  // update functions for lastActivity
+  // Activity tracking
   const updateActivity = () => {
     lastActivity = Date.now()
   }
+  // Cross-tab logout sync
   const triggerLogout = () => {
+    localStorage.setItem(LOGOUT_KEY, Date.now().toString())
     logout()
   }
-  // Synchronize logout across multiple tabs for storage events.
+
   const syncLogout = (event) => {
-    if (event.key === 'logout-event') {
-      sessionStorage.clear()
-      router.push('/')
+    if (event.key === LOGOUT_KEY) {
+      logout()
     }
   }
+  // Refresh lock (avoids multi-tab refresh)
+  const acquireLock = () => {
+    const now = Date.now()
+    const raw = localStorage.getItem(REFRESH_LOCK)
 
+    if (raw) {
+      const lock = JSON.parse(raw)
+      if (now - lock.time < 10000) return false
+    }
+
+    localStorage.setItem(REFRESH_LOCK, JSON.stringify({ time: now }))
+    return true
+  }
+
+  const releaseLock = () => {
+    localStorage.removeItem(REFRESH_LOCK)
+  }
+
+  // Refresh token
+  const handleRefresh = async (now) => {
+    if (!acquireLock()) return
+
+    try {
+      await refreshToken()
+      lastRefresh = now
+
+      localStorage.setItem(REFRESH_KEY, JSON.stringify({ time: now }))
+    } catch (err) {
+      console.log("Error:", err)
+      triggerLogout()
+    } finally {
+      releaseLock()
+    }
+  }
+  // Main loop
   const activity_loop = () => {
     intervalID = setInterval(
       async () => {
         const now = Date.now()
         const isActive = now - lastActivity < TIME_LIMIT
-
-        if (!isActive) {
-          console.log('inactive -> logging out')
-          triggerLogout()
-          return
-        }
         const token = getAccessToken()
 
         if (!token) {
-          console.log('no token')
           triggerLogout()
           return
         }
 
-        try {
-          if (isTokenExpired(token)) {
-            await refreshToken()
-            lastRefresh = now
-            return
-          }
+        if (!isActive) {
+          triggerLogout()
+          return
+        }
 
-          const shouldRefresh = now - lastRefresh > REFRESH_TIME
-          if (shouldRefresh) {
-            console.log('active- should refresh...')
-            await refreshToken()
-            lastRefresh = now
-          }
-        } catch (err) {
-          console.error('refresh failed:', err)
+        // expired token → refresh
+        if (isTokenExpired(token)) {
+          await handleRefresh(now)
+          return
+        }
+
+        // proactive refresh
+        if (now - lastRefresh > REFRESH_TIME) {
+          await handleRefresh(now)
         }
       },
       2 * 60 * 1000
-    ) // 1 minute check
+    )
   }
-  // life cycle
+  // Lifecycle
   onMounted(() => {
     window.addEventListener('mousemove', updateActivity)
     window.addEventListener('keydown', updateActivity)
     window.addEventListener('click', updateActivity)
     window.addEventListener('scroll', updateActivity)
+
     window.addEventListener('storage', syncLogout)
 
     activity_loop()
   })
+
   onUnmounted(() => {
     window.removeEventListener('mousemove', updateActivity)
     window.removeEventListener('keydown', updateActivity)
     window.removeEventListener('click', updateActivity)
     window.removeEventListener('scroll', updateActivity)
+
     window.removeEventListener('storage', syncLogout)
+
     clearInterval(intervalID)
   })
 }

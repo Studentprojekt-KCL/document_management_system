@@ -114,13 +114,13 @@ const router = createRouter({
 
 /* router guard so that you can't go to protected pages without logging in */
 router.beforeEach((to) => {
-  const token = sessionStorage.getItem('access_token')
+  const token = localStorage.getItem('access_token')
   const isAuthed = !!token
 
   if (to.name === 'AuthCallback') {
     const hasCode = typeof to.query?.code === 'string' && to.query.code.length > 0
     const hasError = typeof to.query?.error === 'string' && to.query.error.length > 0
-    const hasPkceVerifier = !!sessionStorage.getItem('pkce_verifier')
+    const hasPkceVerifier = !!localStorage.getItem('pkce_verifier')
 
     if (!hasError && (!hasCode || !hasPkceVerifier)) {
       return { path: '/401' }

@@ -31,7 +31,7 @@ class API:
     connector_api_url: str
     token_verifier: TokenVerifier
 
-    def __init__( # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         search_api_url: str,
         query_api_url: str,

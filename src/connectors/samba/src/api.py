@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+from contextlib import asynccontextmanager
 from os import environ
 from typing import Any, Sequence
 from dmis_logger import dms_error
@@ -45,12 +46,16 @@ class API:
         self.log_level = "debug"
 
         self.samba_service = Samba()
-        self.samba_service.mount()
 
-        self.app = FastAPI()
+        self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])
+
+    @asynccontextmanager
+    async def lifespan(self, _: FastAPI):
+        self.samba_service.connect()
+        yield
 
     def start(self) -> None:
         """Start the API."""

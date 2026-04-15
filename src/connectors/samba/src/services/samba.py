@@ -1,12 +1,25 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-from datetime import datetime
-import base64
-from os import DirEntry, environ, scandir, walk
-import os
-from subprocess import run, CompletedProcess
-from dmis_logger import dms_error
+import uuid
+import logging
+from dmis_logger import dms_warning
+from smbprotocol import exceptions
+from smbprotocol.connection import Connection, SMBConnectionClosed, SMBException
+from smbprotocol.session import Session
+from smbprotocol.tree import TreeConnect
+from initialisation_tools import read_env_variable, read_port
 
+from smbprotocol.open import (
+    CreateDisposition,
+    CreateOptions,
+    DirectoryAccessMask,
+    FileAttributes,
+    FileInformationClass,
+    FilePipePrinterAccessMask,
+    ImpersonationLevel,
+    Open,
+    ShareAccess,
+)
 
 class Samba:
     """Service for the Samba contection.
@@ -19,61 +32,48 @@ class Samba:
         path: where to mount the share.
     """
 
-    host: str | None
-    share: str | None
-    user: str | None
-    password: str | None
-    path: str
+    host: str
+    port: int
+    share: str
+    user: str
+    password: str
 
     def __init__(self) -> None:
         """Constructor."""
-        host: str | None = environ.get("SC_SAMBA_HOST")
-        share: str | None = environ.get("SC_SAMBA_SHARE")
-        user: str | None = environ.get("SC_SAMBA_USER")
-        password: str | None = environ.get("SC_SAMBA_PASS")
-        path: str = environ.get("SC_SAMBA_PATH", "/mnt")
+        self.host = read_env_variable("SC_SAMBA_HOST")
+        self.port = read_port("SC_SAMBA_PORT")
+        self.share = rf"\\{self.host}\{read_env_variable("SC_SAMBA_SHARE")}"
+        self.user = read_env_variable("SC_SAMBA_USER")
+        self.password = read_env_variable("SC_SAMBA_PASS")
 
-        if host is None:
-            dms_error("Expected variable SC_SAMBA_HOST to be defined.")
-        if share is None:
-            dms_error("Expected variable SC_SAMBA_SHARE to be defined.")
-        if user is None:
-            dms_error("Expected variable SC_SAMBA_USER to be defined.")
-        if password is None:
-            dms_error("Expected variable SC_SAMBA_PASS to be defined.")
+    def connect(self):
+        logging.getLogger('smbprotocol').setLevel(logging.DEBUG)
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logging.getLogger('smbprotocol').addHandler(handler)
 
-        self.host = host
-        self.share = share
-        self.user = user
-        self.password = password
-        self.path = path
+        connection = Connection(uuid.uuid4(), self.host, self.port)
+        connection.connect()
+        try:
+            session = Session(connection, username=self.user, password=self.password)
+            session.connect()
+            if session.session_id is not None:
+                print(connection.echo(sid=session.session_id))
+            print(self.share)
+            tree = TreeConnect(session, self.share)
+            tree.connect()
+            dir_open = Open(tree, ".")
+            compound_messages = [
+                dir_open.query_directory("*", FileInformationClass.FILE_NAMES_INFORMATION, send=False),
+                dir_open.close(False, send=False),
+            ]
+            requests = connection.send_compound([x[0] for x in compound_messages], session.session_id, tree.tree_connect_id)
+            for i, request in enumerate(requests):
+                response = compound_messages[i][1](request)
+                print(response)
+        finally:
+            connection.disconnect()
 
-    def mount(self) -> None:
-        """Mount the SMB share."""
-        command: list = [
-            "mount",
-            "-t",
-            "cifs",
-            "-o",
-            f"username={self.user},password={self.password},iocharset=utf8,actimeo=60",
-            f"//{self.host}/{self.share}",
-            f"{self.path}",
-        ]
-        res: CompletedProcess = run(command)
-        if res.returncode != 0:
-            dms_error(f"Failed to mount Samba share {self.host}/{self.share} with user {self.user}.")
-
-    def _scan_dir(self, path: str, last_time: datetime | None) -> list[str]:
-        pointers: list[str] = []
-        with scandir(path) as dir:
-            for entry in dir:
-                if entry.is_file():
-                    edited = datetime.fromtimestamp(entry.stat().st_mtime)
-                    if last_time is None or edited > last_time:
-                        pointers.append(f"//{self.host}/{self.share}{entry.path}")
-                elif entry.is_dir():
-                    pointers.extend(self._scan_dir(entry.path, last_time))
-        return pointers
 
 
     def get_files(self, subdata: str | None) -> dict:
@@ -84,12 +84,24 @@ class Samba:
         Return: Dict containting a list of file pointers and subdata.
 
         """
-        last_edit: datetime | None = None
 
-        if subdata is not None:
-            last_edit = datetime.fromisoformat(base64.b64decode(subdata).decode("utf-8"))
+        connection = Connection(uuid.uuid4(), self.host, self.port, False)
+        connection.connect()
+        try:
+            session = Session(connection, self.user, self.password, require_encryption=False)
+            session.connect()
+            tree = TreeConnect(session, self.share)
+            tree.connect()
+            # dir_open = Open(tree, "Kernel")
+            # compound_messages = [
+            #     dir_open.query_directory("*", FileInformationClass.FILE_NAMES_INFORMATION, send=False),
+            #     dir_open.close(False, send=False),
+            # ]
+            # requests = connection.send_compound([x[0] for x in compound_messages], session.session_id, tree.tree_connect_id)
+            # for i, request in enumerate(requests):
+            #     response = compound_messages[i][1](request)
+            #     print(response)
+        finally:
+            connection.disconnect()
 
-        pointers: list = self._scan_dir(self.path, last_edit)
-        subdata = base64.b64encode(datetime.now().isoformat().encode("utf-8")).decode("utf-8")
-
-        return {"pointers": pointers, "subdata": subdata}
+        return {}

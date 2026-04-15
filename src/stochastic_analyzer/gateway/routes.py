@@ -75,26 +75,19 @@ def create_router(services: Services, device: str) -> APIRouter:
         reference_items = await services.connector.get_file_contents([payload.reference])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
-            raise HTTPException(
-                status_code=502, detail="Failed to retrieve reference document."
-            )
+            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
         compare_items = await services.connector.get_file_contents(payload.pointers)
         if not compare_items:
             dms_warning("Failed to retrieve comparison documents from connector.")
-            raise HTTPException(
-                status_code=502, detail="Failed to retrieve comparison documents."
-            )
+            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
 
         query = reference_items[0].content
         texts = [item.content for item in compare_items]
         scores = await services.ranker.rank(query, texts)
 
         scored = sorted(
-            [
-                ScoredPointer(score=float(s), pointer=p)
-                for s, p in zip(scores, payload.pointers, strict=False)
-            ],
+            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
             key=lambda x: x.score,
             reverse=True,
         )

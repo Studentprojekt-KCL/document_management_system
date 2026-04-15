@@ -57,9 +57,7 @@ class API:
         )
 
         self.app.include_router(create_router(services, self.config.device))
-        self.app.add_exception_handler(
-            RequestValidationError, self.validation_exception_handler
-        )
+        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     def start(self) -> None:
         """Start the API."""
@@ -70,9 +68,7 @@ class API:
             log_level=self.config.log_level,
         )
 
-    async def validation_exception_handler(
-        self, _: Request, exc: Exception
-    ) -> JSONResponse:
+    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
         errors: dict[str, str | Sequence[Any]]
         if isinstance(exc, RequestValidationError):

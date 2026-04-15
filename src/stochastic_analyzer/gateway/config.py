@@ -4,6 +4,7 @@ from os import environ
 import argparse
 
 from dmis_logger import dms_error
+from initialisation_tools import read_env_variable
 
 
 class ServiceConfig:
@@ -22,6 +23,7 @@ class ServiceConfig:
     classifier_url: str
     ministral_url: str
     ministral_model: str
+    ministral_timeout: int
     connector_url: str
     escalation_threshold: float
 
@@ -95,12 +97,13 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
 
-        tei_url: str | None = environ.get("TEI_URL")
-        classifier_url: str | None = environ.get("CLASSIFIER_URL")
-        ministral_url: str | None = environ.get("MINISTRAL_URL")
-        ministral_model: str | None = environ.get("MINISTRAL_MODEL")
-        address: str | None = environ.get("CONNECTOR_ADDRESS")
-        escalation_threshold = environ.get("ESCALATION_THRESHOLD", "0.02")
+        tei_url: str | None = read_env_variable("TEI_URL")
+        classifier_url: str | None = read_env_variable("CLASSIFIER_URL")
+        ministral_url: str | None = read_env_variable("MINISTRAL_URL")
+        ministral_model: str | None = read_env_variable("MINISTRAL_MODEL")
+        ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
+        address: str | None = read_env_variable("CONNECTOR_ADDRESS")
+        escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
 
         if tei_url is None:
             dms_error("TEI_URL is not defined.")
@@ -130,5 +133,6 @@ class APIConfiguration:
         self.services.classifier_url = classifier_url
         self.services.ministral_url = ministral_url
         self.services.ministral_model = ministral_model
+        self.services.ministral_timeout = int(ministral_timeout)
         self.services.connector_url = address
         self.services.escalation_threshold = float(escalation_threshold)

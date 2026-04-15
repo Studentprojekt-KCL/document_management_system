@@ -1,22 +1,19 @@
+# Run instaurctions
 
-### 3. Start the API
+## Required environment variables
 
-dmis_api --dev
+    DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
+    DMIS_QUERY_API_URL=<DMIS_QUERY_API>
+    API_PORT=XXXX
+    API_BIND_ADDRESS=<BIND_ADDR>
+    DMIS_API_CONNECTOR_URL=<CONNECTOR_URL>
 
-### 4. Test request to API:
+## In python venv
 
-curl "http://127.0.0.1:8001/docs"
+    pip install src/api
+    dmis_api --dev
 
-Expected "200 ok" code
-
-## Run with Docker
-
-Create .env in src/api/src
-
-  DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
-  DMIS_QUERY_API_URL=<DMIS_QUERY_API>
-  API_PORT=XXXX
-  API_BIND_ADDRESS=<BIND_ADDR>
+## Using docker
 
 ### 1. Build the image from the project root:
 
@@ -26,15 +23,12 @@ sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
 
-### 3. Test the API's
+# Make request to API
 
-#### Testing main API endpoint
-curl "http://127.0.0.1:8001/docs"
+## Search engine endpoint
 
-#### Testing search API endpoint
-curl "http://127.0.0.1:8001/search?query=test"
+    curl '<API_HOST>/search_engine/search?query=<QUERY>'
 
-#### Testing summary API endpoint
-curl -X POST "http://127.0.0.1:8001/summary" \
-  -H "Content-Type: application/json" \
-  -d '{"file_pointer":"THEFILEPOINTER"}'
+## Summery endpoint
+
+    curl -X 'POST' '<API_HOST>/stochastic-analyzer/summarize' -H 'accept: application/json' -d '{"pointers": ["<UNIQUE_FILE_POINTER>"]}'

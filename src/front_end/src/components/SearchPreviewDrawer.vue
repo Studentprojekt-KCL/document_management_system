@@ -446,11 +446,31 @@ watch(
   letter-spacing: 0.02em;
 }
 
-.badge-public { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-.badge-internal { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-.badge-sensitive { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
-.badge-confidential { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-.badge-none { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+.badge-public {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.badge-internal {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+.badge-sensitive {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+.badge-confidential {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.badge-none {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
 
 .toast {
   display: flex;
@@ -463,12 +483,22 @@ watch(
   margin-bottom: 0.75rem;
 }
 
-.toast-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-.toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.toast-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.toast-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
 
 .toast-fade-enter-active,
 .toast-fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 .toast-fade-enter-from,

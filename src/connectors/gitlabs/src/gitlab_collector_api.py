@@ -49,7 +49,7 @@ class API:
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
-    ) -> Any:connected_source_systems
+    ) -> Any:
         """Endpoint for retrieving specific file.
         Example request:
             curl -X 'POST' \

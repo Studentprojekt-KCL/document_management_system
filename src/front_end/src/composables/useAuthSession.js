@@ -56,7 +56,7 @@ export function useAuthSession() {
 
       localStorage.setItem(REFRESH_KEY, JSON.stringify({ time: now }))
     } catch (err) {
-      console.log("Error:", err)
+      console.log('Error:', err)
       triggerLogout()
     } finally {
       releaseLock()

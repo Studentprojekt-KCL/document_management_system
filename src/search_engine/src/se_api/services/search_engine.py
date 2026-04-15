@@ -32,7 +32,10 @@ class SearchEngine:
         dms_info(f"Rebuilding schema, new set: {self.categories}.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
-            _ = schema_builder.add_text_field(category, stored=True)
+            if category == "unique_pointer":
+                schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
+            else:
+                schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
         self.index = Index(schema)
 

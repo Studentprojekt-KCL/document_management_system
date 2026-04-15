@@ -11,7 +11,7 @@ const securityFilters = ref([])
 
 const fetchSourceFilters = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/connector/`) // TODO: ADD CORRECT ENDPOINT TO FETCH SOURCE SYSTEMS
+    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`)
 
     if (!res.ok) {
       console.error(`Failed to fetch source systems: ${res.statusText}`)

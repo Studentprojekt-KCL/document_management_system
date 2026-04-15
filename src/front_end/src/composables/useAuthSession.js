@@ -10,8 +10,8 @@ export function useAuthSession() {
   let lastRefresh = Date.now()
   let intervalID = null
 
-  const TIME_LIMIT = 57 * 60 * 1000
-  const REFRESH_TIME = 52 * 60 * 1000
+  const TIME_LIMIT = 30 * 60 * 1000
+  const REFRESH_TIME = 24 * 60 * 1000
 
   // Activity tracking
   const updateActivity = () => {
@@ -74,7 +74,7 @@ export function useAuthSession() {
           triggerLogout()
           return
         }
-
+        // main logout if one is inactive beyond the TIME_LIMIT
         if (!isActive) {
           triggerLogout()
           return

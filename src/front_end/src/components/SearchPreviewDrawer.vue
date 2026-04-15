@@ -405,4 +405,75 @@ watch(
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d8dee7;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #faf5ff;
+}
+
+.classification-display {
+  margin-top: 0.25rem;
+}
+
+.classification-badge {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-public { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.badge-internal { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-sensitive { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.badge-confidential { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.badge-none { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.toast-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 </style>

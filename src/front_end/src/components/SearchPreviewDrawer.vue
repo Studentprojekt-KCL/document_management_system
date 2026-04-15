@@ -319,6 +319,8 @@ watch(
   font-weight: 700;
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  margin: 0;
 }
 
 .meta-grid {

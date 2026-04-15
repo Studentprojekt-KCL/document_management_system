@@ -1,100 +1,134 @@
 import { onMounted, onUnmounted } from 'vue'
-import { refreshToken, logout, getAccessToken, isTokenExpired } from '@/utils/auth.js'
+import {
+  refreshToken,
+  logout,
+  getAccessToken,
+  isTokenExpired
+} from '@/utils/auth.js'
 
-const LOGOUT_KEY = 'logout-event'
-const REFRESH_KEY = 'refresh-event'
-const REFRESH_LOCK = 'refresh-lock'
+import {
+  tryBecomeLeader,
+  isLeader,
+  setLeader,
+  broadcastActivity,
+  getLastActivity,
+  broadcastLogout
+} from '@/utils/authSync.js'
 
 export function useAuthSession() {
-  let lastActivity = Date.now()
+  let leaderLoop = null
+  let watchdogLoop = null
   let lastRefresh = Date.now()
-  let intervalID = null
+  let heartbeatLoop = null
 
-  const TIME_LIMIT = 30 * 60 * 1000
-  const REFRESH_TIME = 24 * 60 * 1000
+  const TIME_LIMIT = 60 * 60 * 1000
+  const REFRESH_TIME = 25* 60 * 1000
+  const LEADER_TIMEOUT = 15000
 
-  // Activity tracking
+  // ACTIVITY (ALL TABS)
   const updateActivity = () => {
-    lastActivity = Date.now()
+    broadcastActivity()
   }
-  // Cross-tab logout sync
+
+  // LOGOUT
   const triggerLogout = () => {
-    localStorage.setItem(LOGOUT_KEY, Date.now().toString())
+    broadcastLogout()
     logout()
   }
-
-  const syncLogout = (event) => {
-    if (event.key !== LOGOUT_KEY) return 
-      clearInterval(intervalID)
-      window.location.replace('/')
-  }
-  // Refresh lock (avoids multi-tab refresh)
-  const acquireLock = () => {
-    const now = Date.now()
-    const raw = localStorage.getItem(REFRESH_LOCK)
-
-    if (raw) {
-      const lock = JSON.parse(raw)
-      if (now - lock.time < 10000) return false
-    }
-
-    localStorage.setItem(REFRESH_LOCK, JSON.stringify({ time: now }))
-    return true
-  }
-
-  const releaseLock = () => {
-    localStorage.removeItem(REFRESH_LOCK)
-  }
-
-  // Refresh token
-  const handleRefresh = async (now) => {
-    if (!acquireLock()) return
-
-    try {
-      await refreshToken()
-      lastRefresh = now
-
-      localStorage.setItem(REFRESH_KEY, JSON.stringify({ time: now }))
-    } catch (err) {
-      console.log('Error:', err)
-      triggerLogout()
-    } finally {
-      releaseLock()
+  // syncs logout forcing tabs to change window.
+  const syncLogout = (e) => {
+    if (e.key === 'logout-event') {
+      stopAll()
+      window.location.href = '/'
     }
   }
-  // Main loop
-  const activity_loop = () => {
-    intervalID = setInterval(
-      async () => {
-        const now = Date.now()
-        const isActive = now - lastActivity < TIME_LIMIT
-        const token = getAccessToken()
 
-        if (!token) {
+  // Leader loop (ONLY ONE TAB!)
+  const startLeaderLoop = () => {
+    if (leaderLoop) return
+
+    leaderLoop = setInterval(async () => {
+      if (!isLeader()) return
+
+      const now = Date.now()
+      const token = getAccessToken()
+      const lastActivity = getLastActivity()
+
+      const isActive = now - lastActivity < TIME_LIMIT
+
+      if (!token) return
+
+      // inactivity logout
+      if (!isActive) {
+        triggerLogout()
+        return
+      }
+
+      if (isTokenExpired(token)) {
+        try {
+          await refreshToken()
+          lastRefresh = now
+        } catch {
           triggerLogout()
-          return
         }
-        // main logout if one is inactive beyond the TIME_LIMIT
-        if (!isActive) {
+        return
+      }
+
+      if (now - lastRefresh > REFRESH_TIME) {
+        try {
+          await refreshToken()
+          lastRefresh = now
+        } catch {
           triggerLogout()
-          return
         }
-
-        // expired token → refresh
-        if (isTokenExpired(token)) {
-          await handleRefresh(now)
-          return
-        }
-
-        // proactive refresh
-        if (now - lastRefresh > REFRESH_TIME) {
-          await handleRefresh(now)
-        }
-      },
-      2 * 60 * 1000
-    )
+      }
+    }, 5000)
   }
-  // Lifecycle
+
+  // watchdog on all tabs
+  // ensures leader always exists
+  const startWatchdog = () => {
+    if (watchdogLoop) return
+
+    watchdogLoop = setInterval(() => {
+      const leader = JSON.parse(localStorage.getItem('auth-leader') || '{}')
+
+      const leaderDead =
+        !leader.id ||
+        Date.now() - (leader.ts || 0) > LEADER_TIMEOUT
+
+      if (leaderDead) {
+        if (tryBecomeLeader()) {
+          setLeader()
+          startLeaderHeartbeat()
+          startLeaderLoop()
+        }
+      }
+    }, 3000)
+  }
+
+  // hearbeat only leader tab
+  const startLeaderHeartbeat = () => {
+    if (heartbeatLoop) return
+
+    heartbeatLoop = setInterval(() => {
+      if (!isLeader()) return
+      setLeader()
+    }, 5000)
+  }
+
+  // stops everything
+  const stopAll = () => {
+    if (leaderLoop) clearInterval(leaderLoop)
+    if (watchdogLoop) clearInterval(watchdogLoop)
+    if (heartbeatLoop) clearInterval(heartbeatLoop)
+
+    leaderLoop = null
+    watchdogLoop = null
+    heartbeatLoop = null
+  }
+
+  // Cycle
   onMounted(() => {
     window.addEventListener('mousemove', updateActivity)
     window.addEventListener('keydown', updateActivity)
@@ -103,17 +137,25 @@ export function useAuthSession() {
 
     window.addEventListener('storage', syncLogout)
 
-    activity_loop()
+    // initial leader attempt
+    if (tryBecomeLeader()) {
+      setLeader()
+      startLeaderHeartbeat()
+      startLeaderLoop()
+    }
+
+    // watchdog runs in ALL tabs
+    startWatchdog()
   })
 
+  // CLEANUP
   onUnmounted(() => {
     window.removeEventListener('mousemove', updateActivity)
     window.removeEventListener('keydown', updateActivity)
     window.removeEventListener('click', updateActivity)
     window.removeEventListener('scroll', updateActivity)
-
     window.removeEventListener('storage', syncLogout)
 
-    clearInterval(intervalID)
+    stopAll()
   })
 }

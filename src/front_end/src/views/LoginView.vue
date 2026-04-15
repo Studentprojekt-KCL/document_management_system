@@ -8,7 +8,7 @@ import { ref } from 'vue'
 
 const isLoading = ref(false)
 
-/* Keycloak configuration from environment variables. */
+// Keycloak configuration from environment variables.
 const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
 const REALM = window.__ENV__.KEYCLOAK_REALM
 const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
@@ -21,36 +21,28 @@ function base64UrlEncode(buffer) {
     .replace(/=+$/g, '')
 }
 
-/* SHA-256 hashing function for PKCE challenge generation. */
+// SHA-256 hashing function for PKCE challenge generation.
 async function sha256(input) {
   const data = new TextEncoder().encode(input)
   return await crypto.subtle.digest('SHA-256', data)
 }
 
-/* Generates a random string of specified byte length, used for PKCE verifier and state. */
+// Generates a random string of specified byte length, used for PKCE verifier and state.
 function randomString(bytesLen = 32) {
   const bytes = new Uint8Array(bytesLen)
   crypto.getRandomValues(bytes)
   return base64UrlEncode(bytes)
 }
 
-/* Creates a PKCE pair (verifier and challenge) for secure OAuth authentication. */
+// Creates a PKCE pair (verifier and challenge) for secure OAuth authentication. 
 async function createPkcePair() {
   const verifier = randomString(64)
   const challenge = base64UrlEncode(await sha256(verifier))
   return { verifier, challenge }
 }
 
-/* Initiates the Microsoft Entra ID login flow using PKCE. */
+// Initiates the Entra ID login flow using PKCE. 
 const handleEntraIdLogin = async () => {
-  const tabId = crypto.randomUUID()
-
-  // mark tab identity (local session only)
-  sessionStorage.setItem('tab-id', tabId)
-
-  // mark login owner (shared across tabs)
-  localStorage.setItem('login-owner', tabId)
-
   const { verifier, challenge } = await createPkcePair()
 
   sessionStorage.setItem('pkce_verifier', verifier)

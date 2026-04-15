@@ -13,16 +13,6 @@ const errorMsg = ref('')
 onMounted(async () => {
   let alreadyProcessed = false
 
-  // LOGIN OWNER CHECK (multi-tab safety)
-  const loginOwner = localStorage.getItem('login-owner')
-  const tabId = sessionStorage.getItem('tab-id')
-
-  if (loginOwner && tabId && loginOwner !== tabId) {
-    console.log('Not login owner tab → skipping callback')
-    router.replace('/search')
-    return
-  }
-
   if (route.query.error) {
     errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`
     return
@@ -52,7 +42,7 @@ onMounted(async () => {
   if (alreadyProcessed) return
   alreadyProcessed = true
 
-  // TOKEN EXCHANGE
+  // token exchange
   const redirectUri = `${window.location.origin}/auth/callback`
   const tokenUrl = `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/token`
 
@@ -77,17 +67,14 @@ onMounted(async () => {
       return
     }
 
-    // STORE TOKENS
+    // store tokens
     localStorage.setItem('access_token', data.access_token)
     localStorage.setItem('refresh_token', data.refresh_token)
     localStorage.setItem('id_token', data.id_token)
 
-    // CLEANUP PKCE + LOCKS
+    // cleanup
     sessionStorage.removeItem('pkce_verifier')
     sessionStorage.removeItem('oidc_state')
-
-    localStorage.removeItem('login-owner')
-    sessionStorage.removeItem('tab-id')
 
     router.replace('/search')
   } catch (e) {

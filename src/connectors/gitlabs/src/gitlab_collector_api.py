@@ -8,6 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
+import asyncio
 
 from interfacer import GitLabs
 
@@ -30,6 +32,7 @@ class API:
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -63,7 +66,8 @@ class API:
         return self.gitlabs_instance.get_files(file_pointers.get("file_pointers", []), include_content, include_last_edit_date)
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
-        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
+          OBS; this method will be depricated."""
         content = self.gitlabs_instance.files_to_index(subdata)
         url = upload_file(content, "gitlabs_content.json")
         return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
@@ -72,6 +76,9 @@ class API:
         """NOT; THIS IS A TEMPORARY ENDPOINT WHICH WILL BE MIGRATED TO SHARED CONNECTOR."""
         return ["GitLab"]
 
+    async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        return StreamingResponse(self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

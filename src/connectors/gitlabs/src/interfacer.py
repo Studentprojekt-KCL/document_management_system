@@ -9,8 +9,11 @@ import zipfile
 from typing import Any
 from datetime import datetime, timezone
 import binascii
+import asyncio
+from typing import Generator
 
-import requests
+import requests #TODO migrate everything away from this.
+import httpx
 
 from shared_functions.variables import PROJECT, SOURCE_FILE
 
@@ -26,6 +29,7 @@ class GitLabs:
     API_URL: str = "api/v4/"
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
+    NUM_WORKERS: int = 10
     session: requests.Session
     source_system: str
     project_information: dict | None = None
@@ -72,40 +76,6 @@ class GitLabs:
             ids[project.get("id")] = last_activity
 
         return ids
-
-    def get_projects_as_units(self) -> dict:
-        """Retrieve information about available projects."""
-        content = self._get_projects()
-
-        projects: dict = {}
-        for project in content:
-            projects[project.get("web_url")] = {
-                "name": unpack_values(project, ("name",)),
-                "creator": unpack_values(project, ("namespace", "name")),
-                "created_date": unpack_values(project, ("created_at",)),
-                "last_edit_date": unpack_values(project, ("last_activity_at",)),
-                "type": PROJECT,
-            }
-
-        return projects
-
-    def get_files_in_project(self, project_id: int) -> list:
-        """Retrieve URLs for all available files in a project.
-
-        Args:
-        ----
-            project_id: Gitlabs integer value for a specific project.
-        """
-        tree_args: str = f"projects/{project_id}/repository/tree?recursive=true&per_page=1000&pagination=none"
-        url = urljoin(self.base, tree_args)
-        content = self._execute_request(url)
-        base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
-        files: list = []
-        for file in content:
-            if file.get("type") == "tree":
-                continue
-            files.append(urljoin(base_path, file.get("path").replace("/", "%2F")))
-        return files
 
     @staticmethod
     def _get_project_id(url: str) -> None | str:
@@ -208,7 +178,6 @@ class GitLabs:
     def _unpack_zip(self, content: bytes, project_id: int) -> list:
         """Unpack .zip content and return a list containing all the files."""
         base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
-
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
             for file in zip_file.namelist():
@@ -238,6 +207,14 @@ class GitLabs:
 
         return files_data
 
+    def _subdata_setup(self, subdata: str | None = None) -> datetime:
+        """."""
+        if subdata is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        return self._provided_date(subdata)
+
+
     def files_to_index(self, subdata: str | None = None) -> dict:
         """Retrieve a structure of files to index.
 
@@ -252,16 +229,10 @@ class GitLabs:
                 contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
                 (this should always be passed back by client from previous request).
         """
-        provided_date: datetime = self._provided_date(subdata)
         files_data: list = []
-
+        latest_update = self._subdata_setup(subdata)
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
-
-        if subdata is None:
-            latest_update = datetime.min.replace(tzinfo=timezone.utc)
-        else:
-            latest_update = provided_date
 
         for project in projects:
             project_id = project.get("id")
@@ -269,7 +240,7 @@ class GitLabs:
             if not isinstance(new_timestamp, str):
                 continue
             new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object <= provided_date:
+            if new_timestamp_object <= latest_update:
                 continue
             latest_update = max(latest_update, new_timestamp_object)
 
@@ -281,6 +252,87 @@ class GitLabs:
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
         return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
+
+    async def download_files(self, task_queue, zip_queue):
+        """ ."""
+        async with httpx.AsyncClient() as client: #TODO, this seems to work
+            while True:
+                task_data = await task_queue.get()
+                if task_data is None:
+                    break
+                url, project_id = task_data
+                async with client.stream("GET", url) as response:
+                    data = await response.aread() #TODO ,.content (maybe use .aread())
+                    await zip_queue.put({"data": data, "project_id": project_id})
+                task_queue.task_done()
+
+    async def unzip_files(self, input_queue, output_queue): #TODO, proj id prob needs to be solved for here.
+        """ ."""
+        while True:
+            input_content = await input_queue.get()
+            if input_content is None:
+                break
+            content = input_content.get("data")
+            project_id = input_content.get("project_id")
+            unpacked_content = self._unpack_zip(content, project_id)
+            await output_queue.put(unpacked_content)
+            input_queue.task_done()
+
+    def _project_urls(self, subdata) -> Generator[tuple]:
+        """ ."""
+        subdata_date = self._subdata_setup(subdata) #THIS is very flawed. 
+        current_subdata = self.get_project_ids()
+        projects = self._get_projects()
+
+        project_data: list[tuple] = []
+        for project in projects:
+            project_id = project.get("id")
+            new_timestamp = current_subdata.get(project_id)
+            if not isinstance(new_timestamp, str):
+                continue
+            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
+            if new_timestamp_object <= subdata_date:
+                continue
+            new_date = max(subdata_date, new_timestamp_object) #TODO declare this for new subdata
+            branch = project.get("default_branch")
+            project_data.append((f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id))
+
+        generated_subdata = base64.urlsafe_b64encode(new_date.isoformat().encode()).decode()
+
+        return project_data, generated_subdata
+
+
+    async def stream_files_to_index(self, subdata: str | None = None):
+        """ ."""
+        task_queue = asyncio.Queue()
+        zip_queue = asyncio.Queue()
+        output_queue = asyncio.Queue()
+
+        pointers_to_projects, new_subdata = self._project_urls(subdata)
+        for project_pointers in pointers_to_projects:
+            await task_queue.put(project_pointers)
+
+        download_tasks: list = [asyncio.create_task(self.download_files(task_queue, zip_queue)) for _ in range(self.NUM_WORKERS)]
+        unzip_tasks: list = [asyncio.create_task(self.unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
+
+        async def task_producer(): #TODO, could prob migrate a better looking solution
+            await task_queue.join()
+            for _ in download_tasks:
+                await task_queue.put(None)
+
+            await zip_queue.join()
+            for _ in unzip_tasks:
+                await zip_queue.put(None)
+
+            await output_queue.put(None)
+
+        asyncio.create_task(task_producer())
+
+        while True:
+            chunk = await output_queue.get() #TODO define datachunk
+            if chunk is None:
+                break
+            yield chunk
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.

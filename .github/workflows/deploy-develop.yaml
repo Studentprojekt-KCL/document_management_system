@@ -54,5 +54,6 @@ jobs:
         run: |
           set -euo pipefail
           cd $DEPLOY_DIR
+          cat .env.pr > .env
           docker compose -f docker-compose.yaml pull
           docker compose -f docker-compose.yaml up -d --remove-orphans

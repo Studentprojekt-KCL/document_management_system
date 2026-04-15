@@ -120,7 +120,7 @@ router.beforeEach((to) => {
   if (to.name === 'AuthCallback') {
     const hasCode = typeof to.query?.code === 'string' && to.query.code.length > 0
     const hasError = typeof to.query?.error === 'string' && to.query.error.length > 0
-    const hasPkceVerifier = !!localStorage.getItem('pkce_verifier')
+    const hasPkceVerifier = !!sessionStorage.getItem('pkce_verifier')
 
     if (!hasError && (!hasCode || !hasPkceVerifier)) {
       return { path: '/401' }

@@ -8,9 +8,9 @@ The code in this subdirectory contains the package for the Search engine.
 
 Performs a search and returns the metadata for the result.
 
-- `q`: search query, required.
-- `k`: page size, default 10.
-- `p`: page index, default 1.
+- `query`: search query, required.
+- `count`: page size, default 10.
+- `offset`: page index, default 0.
 
 ```url
 http://<host>:<port>/search?q=<search query>&k=<page size>&p=<page index>
@@ -78,7 +78,10 @@ An automated API documentation is constructed when the API service is initiaded,
 Configuration is done through environment variables.
 
 - `SE_API_PORT` Search engine port.
+- `SE_API_HOST` Search engine bind address.
 - `SE_API_CONNECTOR_ADDRESS` Connector address.
+- `SE_API_QUERY_ADDRESS` Query address.
+- `SE_API_CACHE_DIRECTORY` Cache file location.
 
 Optional flags:
 

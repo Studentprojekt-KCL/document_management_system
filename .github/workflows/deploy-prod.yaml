@@ -1,0 +1,58 @@
+name: Push and Deploy Images
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  DEPLOY_DIR: "/opt/prod/"
+  COMPOSE_FILE: "docker-compose-build-all.yaml"
+  REGISTRY: "registry.dms-lookup.com"
+
+jobs:
+  deploy:
+    runs-on: production
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Build images
+        run: docker compose -f docker-compose-build-all.yaml build --no-cache
+
+      - name: Push images to registry
+        run: |
+          set -euo pipefail
+          IMAGES="$(docker compose -f $COMPOSE_FILE config --images)"
+          echo "Images from compose:"
+          echo "$IMAGES"
+          
+          # Give every image a tag
+          # <image>:prod
+          #
+          while IFS= read -r img; do
+            [ -z "$img" ] && continue
+            base="$img"
+            if echo "$img" | grep -qE ':[^/]+$'; then
+              base="${img%:*}"
+            fi
+        
+            # Strip registry if already present
+            base_no_registry="${base#*/}"
+        
+            full="$REGISTRY/$base_no_registry"
+        
+            echo "Tagging $img -> $full:prod"
+            docker tag "$img" "$full:prod"
+            echo "Pushing $full:prod"
+            docker push "$full:prod"
+          done <<< "$IMAGES"
+
+      - name: Redeploy images
+        run: |
+          set -euo pipefail
+          cd $DEPLOY_DIR
+          docker compose -f docker-compose.yaml pull
+          docker compose -f docker-compose.yaml up -d --remove-orphans

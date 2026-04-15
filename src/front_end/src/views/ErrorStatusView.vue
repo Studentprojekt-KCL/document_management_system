@@ -1,6 +1,11 @@
 <script setup>
+/**
+ * ErrorStatusView.vue - A reusable view for displaying error status pages (e.g., 401, 403, 404).
+ * A button that either goes back to the previous page or redirects to login if the error is 401 and the user is not logged in.
+ */
 import { useRouter } from 'vue-router'
 
+/* Props for error code, title, and description. */
 const props = defineProps({
   code: {
     type: [String, Number],
@@ -18,10 +23,12 @@ const props = defineProps({
 
 const router = useRouter()
 
+/* Helper functions to determine login status and whether to redirect to login. */
 const isLoggedIn = () => !!sessionStorage.getItem('access_token')
 const isUnauthorized = () => Number(props.code) === 401
 const shouldGoToLogin = () => isUnauthorized() && !isLoggedIn()
 
+/* Function to handle the button click - either go back or redirect to login. */
 const goBack = () => {
   if (shouldGoToLogin()) {
     router.push('/')
@@ -33,12 +40,11 @@ const goBack = () => {
 
 <template>
   <section class="not-found-wrapper">
+    <!-- Card displaying the error code, title, description, and action button. -->
     <article class="not-found-card">
       <p class="error-code">{{ code }}</p>
       <h1>{{ title }}</h1>
       <p class="text-secondary description">{{ description }}</p>
-      <!-- <p class="text-secondary path">Requested path: {{ attemptedPath }}</p> -->
-
       <div class="actions">
         <button class="btn-primary" @click="goBack">
           {{ shouldGoToLogin() ? 'Go to login' : 'Go back to previous page' }}
@@ -78,12 +84,6 @@ const goBack = () => {
 
 .description {
   margin-bottom: 1.5rem;
-}
-
-.path {
-  font-size: 0.875rem;
-  margin-bottom: 2rem;
-  word-break: break-word;
 }
 
 .actions {

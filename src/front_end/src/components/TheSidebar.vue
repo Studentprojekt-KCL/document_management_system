@@ -1,13 +1,27 @@
 <script setup>
+/**
+ * TheSidebar Component
+ * Application sidebar for navigation between main sections of the app.
+ * Role-based access control to show/hide menu items based on user permissions.
+ *
+ * @component
+ * @example usage:
+ * <TheSidebar />
+ */
+
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
+import { hasRole } from '@/utils/auth'
 
-import { hasRole } from '../utils/auth'
+/* Router instances for navigation and route info */
 const router = useRouter()
 const route = useRoute()
+
+/* State for sidebar collapse/expand */
 const isOpen = ref(true)
 
+/* Define all possible menu items with their respective icons and paths */
 const menuItems = [
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
@@ -16,11 +30,13 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
+/* Check if the user has admin role */
 const isAdmin = computed(() => {
   route.fullPath
   return hasRole('admin')
 })
 
+/* Compute visible menu items based on user role */
 const visibleMenuItems = computed(() => {
   if (isAdmin.value) {
     return menuItems
@@ -31,16 +47,19 @@ const visibleMenuItems = computed(() => {
   }
 })
 
+/* Compute the active menu item based on current route */
 const activeItem = computed(() => {
   const currentPath = route.path
   const found = menuItems.find((item) => item.path === currentPath)
   return found ? found.id : 'search'
 })
 
+/* Toggle sidebar open/collapse state */
 const toggleSidebar = () => {
   isOpen.value = !isOpen.value
 }
 
+/* Navigate to the selected menu item's path */
 const navigateTo = (path) => {
   router.push(path)
 }

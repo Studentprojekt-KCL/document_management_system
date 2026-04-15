@@ -10,10 +10,7 @@ build-backend = "setuptools.build_meta"
 name = "log_api"
 version = "0.0.1"
 description = "Logging API"
-dependencies = [
-  "mysql-connector-python >= 9.5",
-  "fastapi[standard] >= 0.128",
-]
+dynamic = ["dependencies"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

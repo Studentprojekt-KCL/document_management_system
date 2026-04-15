@@ -32,7 +32,10 @@ class SearchEngine:
         dms_info(f"Rebuilding schema, new set: {self.categories}.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
-            _ = schema_builder.add_text_field(category, stored=True)
+            if category == "unique_pointer":
+                schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
+            else:
+                schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
         self.index = Index(schema)
 
@@ -47,7 +50,7 @@ class SearchEngine:
         """
 
         new: bool = False
-        for key in categories.keys():
+        for key in categories:
             category = categories.get(key)
             if isinstance(category, dict):
                 new = new or self.have_new_category(category)
@@ -103,15 +106,31 @@ class SearchEngine:
                 dms_warning("File is missing unique pointer.")
                 continue
 
+            writer.delete_documents("unique_pointer", unique_pointer)
+
             content_bytes: bytes = base64.b64decode(content)
             content = content_bytes.decode("utf-8")
             flat_file["content"] = content
 
-            _ = writer.add_json(json.dumps(flat_file))
+            writer.add_json(json.dumps(flat_file))
 
-        _ = writer.commit()
+        writer.commit()
         writer.wait_merging_threads()
 
+        self.index.reload()
+
+    def remove_file(self, pointer: str) -> None:
+        """Remove a file from the index.
+
+        Args:
+            pointer: unique pointer.
+        """
+
+        writer: IndexWriter = self.index.writer()
+        writer.delete_documents("unique_pointer", pointer)
+        writer.commit()
+        writer.wait_merging_threads()
+        dms_info(f"Removed {pointer} from index.")
         self.index.reload()
 
     def _flatten_dict(self, d: dict) -> dict:

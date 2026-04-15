@@ -1,5 +1,13 @@
-// auth.js
-// read the Jason Web Token
+/**
+ * Decode the payload of a JSON Web Token (JWT).
+ *
+ * @param {string} token - The JWT string.
+ * @returns {Object|null} The decoded payload, or null if decoding fails.
+ */
+
+const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+
+/* Read the JSON Web Token */
 function decodeJwtPayload(token) {
   try {
     const base64Url = token.split('.')[1]
@@ -11,6 +19,7 @@ function decodeJwtPayload(token) {
   }
 }
 
+/* Check if the user has a specific role */
 export function hasRole(role) {
   const token = sessionStorage.getItem('access_token')
   if (!token) return false
@@ -18,7 +27,7 @@ export function hasRole(role) {
   const payload = decodeJwtPayload(token)
   if (!payload) return false
 
-  const clientRoles = payload?.resource_access?.['dms-frontend']?.roles ?? []
+  const clientRoles = payload?.resource_access?.[CLIENT_ID]?.roles ?? []
   const realmRoles = payload?.realm_access?.roles ?? []
 
   return clientRoles.includes(role) || realmRoles.includes(role)

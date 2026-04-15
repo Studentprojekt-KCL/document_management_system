@@ -1,3 +1,10 @@
+<script setup>
+/**
+ * SettingsView.vue - Placeholder for the system settings view.
+ * If we want it
+ */
+</script>
+
 <template>
   <div class="settings-view">
     <h1>System Settings</h1>

@@ -1,6 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from typing import Any
+import argparse
+from contextlib import asynccontextmanager
+import logging
+from collections.abc import AsyncGenerator
 from collections.abc import Sequence
 
 import uvicorn
@@ -10,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
-from se_api.config import APIConfiguration
+from initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -22,13 +25,33 @@ class API:
         handler: data handler and processor.
     """
 
-    app: FastAPI = FastAPI()
-    config: APIConfiguration
+    app: FastAPI
     handler: Handler
 
+    port: int
+    host: str
+    log_level: str
+    MAX_PORT: int = 65536
+
     def __init__(self) -> None:
-        self.config = APIConfiguration()
-        self.handler = Handler()
+        """Constructor"""
+        logging.basicConfig()
+
+        parser = argparse.ArgumentParser()
+        _ = parser.add_argument("--dev", action="store_true")
+        args = parser.parse_args()
+
+        if args.dev:
+            self.log_level = "debug"
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
+            self.log_level = "info"
+
+        self.port: int = read_port("SE_API_PORT")
+        self.host: str = read_env_variable("SE_API_HOST")
+
+        self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/search", self.query, methods=["GET"])
@@ -38,24 +61,29 @@ class API:
     def start(self) -> None:
         """Start the API."""
 
-        uvicorn.run(self.app, host=self.config.host, log_level=self.config.log_level)
+        uvicorn.run(self.app, host=self.host, log_level=self.log_level, port=self.port)
+
+    @asynccontextmanager
+    async def lifespan(self, _: FastAPI) -> AsyncGenerator:
+        """FastAPI lifespan"""
+        self.handler = Handler()
+        yield
+        await self.handler.close()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
 
-        errors: dict[str, str | Sequence[Any]]
+        errors: dict[str, str | Sequence]
         if isinstance(exc, RequestValidationError):
             errors = {"detail": exc.errors(), "body": exc.body}
         else:
             errors = {"detail": str(exc)}
         content: str | dict[str, str]
-        if self.config.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, q: str, k: int = 10, p: int = 1) -> list:
+    async def query(self, query: str, count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -65,7 +93,7 @@ class API:
             List of found files or None.
         """
 
-        return self.handler.preform_search(q, k, p)
+        return self.handler.preform_search(query, count, offset)
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""

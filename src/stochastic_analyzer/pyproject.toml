@@ -1,19 +1,15 @@
 [build-system]
-requires = [
-    "setuptools >= 77.0.3",
-    "fastapi[standard] >= 0.128",
-]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "embedded-ranker"
+name = "stochastic-analyzer"
 version = "1.0.0"
-description = "Embedded Ranker Service"
+description = "Unified query gateway service"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
-packages = ["embedded_ranker", "classification_analyzer"]
+packages = ["gateway", "gateway.services"]
 
 [project.scripts]
-reranker = "embedded_ranker.main:start"
-classification_analyzer = "classification_analyzer.main:main"
+gateway = "gateway.main:start"

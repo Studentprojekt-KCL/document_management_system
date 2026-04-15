@@ -1,15 +1,19 @@
 <script setup>
+/**
+ * LoginView.vue - View for handling user login with placeholder for Microsoft Entra ID.
+ * Includes PKCE (Proof Key for Code Exchange) for secure authentication.
+ */
+
 import { ref } from 'vue'
 
 const isLoading = ref(false)
 
-// Keycloak attributes
+/* Keycloak configuration from environment variables. */
+const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
+const REALM = window.__ENV__.KEYCLOAK_REALM
+const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
 
-const KEYCLOAK_BASE = import.meta.env.VITE_KEYCLOAK_BASE
-const REALM = import.meta.env.VITE_REALM
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
-
-// Used for getting the token
+/* Used for getting the token */
 function base64UrlEncode(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
     .replace(/\+/g, '-')
@@ -17,30 +21,32 @@ function base64UrlEncode(buffer) {
     .replace(/=+$/g, '')
 }
 
+/* SHA-256 hashing function for PKCE challenge generation. */
 async function sha256(input) {
   const data = new TextEncoder().encode(input)
   return await crypto.subtle.digest('SHA-256', data)
 }
 
+/* Generates a random string of specified byte length, used for PKCE verifier and state. */
 function randomString(bytesLen = 32) {
   const bytes = new Uint8Array(bytesLen)
   crypto.getRandomValues(bytes)
   return base64UrlEncode(bytes)
 }
 
+/* Creates a PKCE pair (verifier and challenge) for secure OAuth authentication. */
 async function createPkcePair() {
   const verifier = randomString(64)
   const challenge = base64UrlEncode(await sha256(verifier))
   return { verifier, challenge }
 }
 
+/* Initiates the Microsoft Entra ID login flow using PKCE. */
 const handleEntraIdLogin = async () => {
   const { verifier, challenge } = await createPkcePair()
 
-  // Save for callback step
   sessionStorage.setItem('pkce_verifier', verifier)
 
-  // Recommended: CSRF/state protection
   const state = randomString(32)
   sessionStorage.setItem('oidc_state', state)
 

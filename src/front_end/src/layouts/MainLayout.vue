@@ -1,22 +1,41 @@
 <script setup>
-import AppHeader from '@/components/AppHeader.vue'
-import AppSidebar from '@/components/AppSidebar.vue'
-import AppFooter from '@/components/AppFooter.vue'
+/**
+ * MainLayout Component
+ * Defines the overall layout of the application.
+ *
+ * Layout structure:
+ * Header (top)
+ * ├── Sidebar (left)
+ * └── Content (router-view)
+ * Footer (bottom)
+ *
+ * @component
+ * @example usage:
+ * <MainLayout />
+ */
+
+import TheHeader from '@/components/TheHeader.vue'
+import TheSidebar from '@/components/TheSidebar.vue'
+import TheFooter from '@/components/TheFooter.vue'
 </script>
 
 <template>
   <div class="layout">
-    <AppHeader />
+    <!-- Global header -->
+    <TheHeader />
 
     <div class="main">
-      <AppSidebar />
+      <!-- Navigation sidebar -->
+      <TheSidebar />
 
+      <!-- Dynamic page content -->
       <div class="content">
         <router-view />
       </div>
     </div>
 
-    <AppFooter />
+    <!-- Global footer -->
+    <TheFooter />
   </div>
 </template>
 

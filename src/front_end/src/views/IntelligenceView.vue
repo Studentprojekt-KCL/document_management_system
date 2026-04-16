@@ -12,7 +12,7 @@
 import { ref, computed } from 'vue'
 import { BarChart3, FileText, Search, Sparkles, TrendingUp, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-vue-next'
 
-/* ── TODO: Replace with real backend data ── */
+/* TODO: Replace with real backend data */
 const stats = ref([
   { id: 'docs', label: 'Documents indexed', value: 1_284, delta: 12, icon: FileText },
   { id: 'searches', label: 'Searches (7d)', value: 3_420, delta: 8, icon: Search },
@@ -184,7 +184,7 @@ const activityIcon = (type) => {
         </ul>
       </article>
 
-      <!-- ── Recent activity ── -->
+      <!-- Recent activity -->
       <article class="panel">
         <header class="panel-header">
           <h2>Recent activity</h2>
@@ -227,7 +227,6 @@ const activityIcon = (type) => {
   font-size: 0.95rem;
 }
 
-/* ── Stat cards ── */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -289,7 +288,6 @@ const activityIcon = (type) => {
   color: #dc2626;
 }
 
-/* ── Panels ── */
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
@@ -329,7 +327,6 @@ const activityIcon = (type) => {
   gap: 0.3rem;
 }
 
-/* ── Bar list ── */
 .bar-list {
   list-style: none;
   margin: 0;
@@ -386,7 +383,6 @@ const activityIcon = (type) => {
   transition: width 0.4s ease;
 }
 
-/* ── Donut ── */
 .donut-wrap {
   display: grid;
   grid-template-columns: 160px 1fr;
@@ -447,7 +443,6 @@ const activityIcon = (type) => {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Top searches ── */
 .search-list {
   list-style: none;
   margin: 0;
@@ -502,7 +497,6 @@ const activityIcon = (type) => {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Activity feed ── */
 .activity-list {
   list-style: none;
   margin: 0;

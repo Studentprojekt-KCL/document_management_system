@@ -13,7 +13,7 @@ import { User, Palette, Monitor, Clock, LogOut, Shield, Mail, Key } from 'lucide
 
 const router = useRouter()
 
-/* ── Decode JWT to get user profile ── */
+/*  Decode JWT to get user profile */
 const decodeJwtPayload = (token) => {
   try {
     const base64Url = token.split('.')[1]
@@ -45,7 +45,7 @@ const userProfile = computed(() => {
   }
 })
 
-/* ── Session countdown ── */
+/* Session countdown */
 const tokenExpiresAt = computed(() => (payload?.exp ? payload.exp * 1000 : 0))
 const now = ref(Date.now())
 let tickTimer = null
@@ -69,7 +69,7 @@ const sessionHealth = computed(() => {
   return 'ok'
 })
 
-/* ── Preferences persisted to localStorage ── */
+/* Preferences persisted to localStorage */
 const PREFS_KEY = 'dmis-user-prefs'
 const defaultPrefs = {
   theme: 'light',
@@ -90,7 +90,7 @@ const resetPrefs = () => {
   savePrefs()
 }
 
-/* ── Sign out ── */
+/* Sign out */
 const handleSignOut = () => {
   localStorage.setItem('logout-event', Date.now().toString())
   sessionStorage.clear()
@@ -116,7 +116,7 @@ onUnmounted(() => {
     </header>
 
     <div class="settings-grid">
-      <!-- ── Profile Card ── -->
+      <!-- Profile Card -->
       <article class="settings-card">
         <div class="card-header">
           <div class="card-icon"><User :size="18" /></div>
@@ -146,7 +146,7 @@ onUnmounted(() => {
         </dl>
       </article>
 
-      <!-- ── Session Card ── -->
+      <!-- Session Card -->
       <article class="settings-card">
         <div class="card-header">
           <div class="card-icon"><Clock :size="18" /></div>
@@ -169,7 +169,7 @@ onUnmounted(() => {
         </button>
       </article>
 
-      <!-- ── Appearance Card ── -->
+      <!-- Appearance Card -->
       <article class="settings-card">
         <div class="card-header">
           <div class="card-icon"><Palette :size="18" /></div>
@@ -216,7 +216,7 @@ onUnmounted(() => {
         </div>
       </article>
 
-      <!-- ── Search Preferences Card ── -->
+      <!-- Search Preferences Card -->
       <article class="settings-card">
         <div class="card-header">
           <div class="card-icon"><Monitor :size="18" /></div>
@@ -312,7 +312,6 @@ onUnmounted(() => {
   color: #1f2937;
 }
 
-/* ── Profile ── */
 .profile-block {
   display: flex;
   align-items: center;
@@ -402,7 +401,6 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* ── Session ── */
 .session-block {
   padding: 0.85rem;
   background: #f8fafc;
@@ -447,7 +445,6 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-/* ── Preferences ── */
 .pref-group {
   margin-bottom: 1rem;
 }
@@ -539,7 +536,6 @@ onUnmounted(() => {
   accent-color: #7c3aed;
 }
 
-/* ── Action buttons ── */
 .action-btn {
   display: inline-flex;
   align-items: center;

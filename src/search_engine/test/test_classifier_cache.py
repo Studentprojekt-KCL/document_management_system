@@ -15,22 +15,22 @@ class TestClassifierCache(TestCase):
         self.instance.cache = {}
         self.instance.add_classification("pointer_1", "class")
         self.instance.add_classification("pointer_2", "class")
-        assert self.instance.cache == {"pointer_1": "class", "pointer_2": "class"}
+        assert self.instance.cache == {"pointer_1": {"classification": "class", 'unique_pointer': 'pointer_1', "edited": False}, "pointer_2": {"classification": "class", 'unique_pointer': 'pointer_2', "edited": False}}
 
     def test_remove_classification(self):
-        self.instance.cache = {"pointer_1": "class", "pointer_2": "class"}
+        self.instance.cache = {"pointer_1": {"classification": "class", "edited": False}, "pointer_2": {"classification": "class", "edited": True}}
         self.instance.remove_classification("pointer_1")
         self.instance.remove_classification("pointer_2")
         assert self.instance.cache == {}
 
     def test_remove_classifications(self):
-        self.instance.cache = {"pointer_1": "class", "pointer_2": "class"}
+        self.instance.cache = {"pointer_1": {"classification": "class", "edited": False}, "pointer_2": {"classification": "class", "edited": True}}
         self.instance.remove_classifications([{"unique_pointer": "pointer_1"}, {"unique_pointer": "pointer_2"}])
         assert self.instance.cache == {}
 
     def test_fetch_classification(self):
-        self.instance.cache = {"pointer_1": "class1", "pointer_2": "class2"}
+        self.instance.cache = {"pointer_1": {"classification": "class", 'unique_pointer': 'pointer_1', "edited": False}, "pointer_2": {"classification": "class", 'unique_pointer': 'pointer_2', "edited": True}}
         classification: str | None = self.instance.fetch_classification("pointer_1")
-        assert classification == "class1"
+        assert classification == "class"
         classification: str | None = self.instance.fetch_classification("pointer_3")
         assert classification == None

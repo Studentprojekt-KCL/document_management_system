@@ -10,7 +10,11 @@ const securityFilters = ref([])
 
 const fetchSourceFilters = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`)
+    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
+      }
+    })
 
     if (!res.ok) {
       console.error(`Failed to fetch source systems: ${res.statusText}`)
@@ -25,7 +29,11 @@ const fetchSourceFilters = async () => {
 
 const fetchSecurityFilters = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`)
+    const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
+      }
+    })
 
     if (!res.ok) {
       console.error(`Failed to fetch security classifications: ${res.statusText}`)

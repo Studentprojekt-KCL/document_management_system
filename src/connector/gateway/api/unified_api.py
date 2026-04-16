@@ -1,6 +1,6 @@
 """copy right 2024, gpt_index contributors"""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -26,7 +26,7 @@ class BatchRequest(BaseModel):
 class SubdataRequest(BaseModel):
     """Request model for files to index retrieval, with optional subdata."""
 
-    subdata: Optional[str] = None
+    subdata: Optional[Dict[str, Any]] = None
 
 
 # =========================
@@ -46,7 +46,7 @@ def health() -> dict:
 
 
 @app.get("/files")
-def files() -> List[dict]:
+def files() -> Dict[str, Any]:
     """Get all file pointers from all connectors."""
     try:
         return router.get_all_pointers()
@@ -74,7 +74,7 @@ def file(pointer: str, include_content: bool = True) -> dict:
 
 
 @app.post("/files/batch")
-def batch(req: BatchRequest) -> List[dict]:
+def batch(req: BatchRequest) -> Dict[str, Any]:
     """Get multiple files by pointers. E.g. ["smb://path/to/file.txt", "gitlab://repo/path/to/file.md"]"""
     try:
         return router.batch(req.paths, req.include_content)
@@ -88,7 +88,7 @@ def batch(req: BatchRequest) -> List[dict]:
 
 
 @app.post("/files_to_index")
-def files_to_index(req: SubdataRequest) -> List[dict]:
+def files_to_index(req: SubdataRequest) -> Dict[str, Any]:
     """Get files to index from all connectors, with optional subdata for
     each connector. Returns combined list of files and deleted pointers."""
     try:
@@ -99,7 +99,7 @@ def files_to_index(req: SubdataRequest) -> List[dict]:
 
 # OPTIONAL: keep GET for quick manual testing
 @app.get("/files_to_index")
-def files_to_index_get() -> List[dict]:
+def files_to_index_get() -> Dict[str, Any]:
     """Get files to index from all connectors, with optional subdata
     for each connector. Returns combined list of files and deleted pointers."""
     try:

@@ -220,7 +220,7 @@ class GitLabs:
 
         return files_data
 
-    def files_to_index(self) -> dict:
+    def files_to_index(self, subdata: str | None = None) -> dict:
         """Retrieve a structure of files to index.
 
         Returns:
@@ -310,6 +310,7 @@ class GitLabs:
                 subdata_bytes = base64.b64decode(subdata)
             except binascii.Error:
                 dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
+                return datetime.min.replace(tzinfo=timezone.utc)
             subdata_str = subdata_bytes.decode("utf-8")
             try:
                 return datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))

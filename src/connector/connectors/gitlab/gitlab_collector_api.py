@@ -19,12 +19,11 @@ from dmis_logger import dms_error, dms_warning
 class API:
     """Management class for Gitlabs connector API."""
 
-    app = FastAPI()
-
     log_level: str | None = None
 
     def __init__(self) -> None:
         """Constructor."""
+        self.app = FastAPI()
         self.gitlabs_instance = GitLabs()
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])

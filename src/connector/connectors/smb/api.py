@@ -45,11 +45,11 @@ class BatchFileRequest(BaseModel):
 class API:
     """SMB API matching GitLab connector exactly."""
 
-    app = FastAPI()
     log_level: str | None = None
 
     def __init__(self) -> None:
         """Create API app, collector and route bindings."""
+        self.app = FastAPI()
         self.collector = SMBCollector()
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)

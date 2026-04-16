@@ -5,48 +5,41 @@
  */
 
 import { computed, ref } from 'vue'
-import { FolderGit2, GitBranch, HardDrive, Cloud, ShieldCheck, Wifi } from 'lucide-vue-next'
+import { ShieldCheck, Wifi } from 'lucide-vue-next'
 
-/* HARDCODED SOURCES - In a real application, this would be fetched from backend */
-const sources = ref([
-  {
-    id: 'github',
-    name: 'GitHub',
-    icon: FolderGit2,
-    status: 'connected'
-  },
-  {
-    id: 'gitlab',
-    name: 'GitLab',
-    icon: GitBranch,
-    status: 'connected'
-  },
-  {
-    id: 'smb',
-    name: 'Shared Folders (SMB)',
-    icon: HardDrive,
-    status: 'disconnected'
-  },
-  {
-    id: 'sharepoint',
-    name: 'SharePoint',
-    icon: Cloud,
-    status: 'disconnected'
-  }
-])
+const access_token = sessionStorage.getItem('access_token')
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+const sources = ref([])
+const connectedSources = ref([])
 
-const connectedCount = computed(() => sources.value.filter((source) => source.status === 'connected').length)
+const fetchSources = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    })
 
-const isConnected = (source) => source.status === 'connected'
-
-const connectSource = (sourceId) => {
-  sources.value = sources.value.map((source) => {
-    if (source.id !== sourceId) return source
-    return {
-      ...source,
-      status: 'connected'
+    if (!res.ok) {
+      console.error(`Failed to fetch source systems: ${res.statusText}`)
+      return
     }
-  })
+    const data = await res.json()
+    sources.value = data
+  } catch (error) {
+    console.error(`Error fetching source systems: ${error}`)
+  }
+}
+fetchSources()
+
+const connectedCount = computed(() => sources.value.filter((source) => isConnected(source)).length)
+
+const isConnected = (source) => connectedSources.value.includes(source)
+
+const connectSource = (source) => {
+  if (!connectedSources.value.includes(source)) {
+    connectedSources.value = [...connectedSources.value, source]
+  }
 }
 </script>
 
@@ -56,25 +49,24 @@ const connectSource = (sourceId) => {
       <h1>Connected Sources</h1>
       <div class="hero-status">
         <Wifi class="hero-status-icon" />
-        <span>{{ connectedCount }} / {{ sources.length }} connected</span>
+        <span>{{ connectedCount }} / {{ sources.length }} Connected</span>
       </div>
     </div>
 
     <ul class="sources-list">
-      <li v-for="source in sources" :key="source.id" class="source-row">
+      <li v-for="source in sources" :key="source" class="source-row">
         <div class="source-main">
-          <component :is="source.icon" class="source-icon" />
-          <h3>{{ source.name }}</h3>
+          <h3>{{ source }}</h3>
         </div>
 
         <div class="source-right">
-          <span v-if="source.status === 'connected'" class="status-pill" :class="{ connected: source.status === 'connected' }">
+          <span v-if="isConnected(source)" class="status-pill" :class="{ connected: isConnected(source) }">
             <ShieldCheck class="status-icon" />
             Connected
           </span>
 
           <div class="source-actions">
-            <button v-if="!isConnected(source)" class="btn-primary" @click="connectSource(source.id)">Connect</button>
+            <button v-if="!isConnected(source)" class="btn-primary" @click="connectSource(source)">Connect</button>
           </div>
         </div>
       </li>

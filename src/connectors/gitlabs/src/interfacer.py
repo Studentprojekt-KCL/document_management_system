@@ -232,7 +232,7 @@ class GitLabs:
             new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
             if new_timestamp_object <= subdata_date:
                 continue
-            new_date = max(subdata_date, new_timestamp_object)
+            new_date = max(new_date, new_timestamp_object)
             branch = project.get("default_branch")
             project_data.append(
                 (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
@@ -254,7 +254,13 @@ class GitLabs:
             Dict structure {"subdata": generated_subdata, "files": file_data, "index_needed":
               <BOOL INDICATIANG IF REINDEX IS NEEED>}
         """
-        files_data, generated_subdata = self._project_urls(subdata)
+        files_data: list = []
+        pointers_to_projects, generated_subdata = self._project_urls(subdata)
+
+        for project_pointers in pointers_to_projects:
+            url, project_id = project_pointers
+            content = requests.get(url, timeout=120).content
+            files_data.extend(self._unpack_zip(content, project_id))
 
         return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
 

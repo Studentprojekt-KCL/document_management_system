@@ -52,9 +52,11 @@ class API:
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/files", self.files, methods=["GET"])
+        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
+        self.samba_service.inital_run()
         self.samba_service.start_watch()
         yield
 
@@ -80,8 +82,11 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self, subdata: str | None = None) -> JSONResponse:
-        response = self.samba_service.get_files(subdata)
+    async def index_needed_bool(self) -> Any:
+        return self.samba_service.check_index_needed()
+
+    async def files(self) -> JSONResponse:
+        response = self.samba_service.get_files()
         return JSONResponse(content=response)
 
 

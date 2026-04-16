@@ -1,15 +1,17 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 from datetime import datetime
+from os import scandir
 import threading
 import uuid
+from dmis_logger import dms_error, dms_info
 from smbprotocol.connection import Connection
 from smbprotocol.session import Session
 from smbprotocol.tree import TreeConnect
 from smbprotocol.change_notify import ChangeNotifyFlags, CompletionFilter, FileNotifyInformation, FileSystemWatcher
 from initialisation_tools import read_env_variable, read_port
-from smbclient import register_session, scandir
 from base64 import urlsafe_b64encode
+from subprocess import run, CompletedProcess
 
 from smbprotocol.open import (
     CreateDisposition,
@@ -20,7 +22,6 @@ from smbprotocol.open import (
     Open,
     ShareAccess,
 )
-from uvicorn.config import is_dir
 
 class Samba:
     """Service for the Samba contection.
@@ -38,8 +39,9 @@ class Samba:
     share: str
     user: str
     password: str
+    mount_path: str
 
-    channges: dict[str, str]
+    changes: set[str]
 
     def __init__(self) -> None:
         """Constructor."""
@@ -48,10 +50,9 @@ class Samba:
         self.share = rf"\\{self.host}\{read_env_variable("SC_SAMBA_SHARE")}"
         self.user = read_env_variable("SC_SAMBA_USER")
         self.password = read_env_variable("SC_SAMBA_PASS")
+        self.mount_path = read_env_variable("SC_SAMBA_MOUNT_PATH")
 
-        self.changes = {}
-        register_session(self.host, port=self.port, username=self.user, password=self.password)
-
+        self.changes = set([])
 
     def start_watch(self):
         thread = threading.Thread(
@@ -61,7 +62,7 @@ class Samba:
         thread.start()
     
     @staticmethod
-    def _watch_files(host: str, port: int, share: str, user: str, password: str, changes: dict[str, str]):
+    def _watch_files(host: str, port: int, share: str, user: str, password: str, changes: set[str]):
         connection = Connection(uuid.uuid4(), host, port)
         connection.connect()
         try:
@@ -89,25 +90,43 @@ class Samba:
                     continue
                 for result in results:
                     path: str = result["file_name"].get_value()
-                    print(type(path))
                     pointer: str = f"{share}\\{path}".replace("\\", "/")
-                    changes[path] = pointer
+                    changes.add(pointer)
                         
         finally:
             connection.disconnect()
 
+    def _mount(self):
+        command: list = [
+            "mount",
+            "-t", "cifs",
+            "-o", f"username={self.user},password={self.password},iocharset=utf8,port={self.port}",
+            self.share.replace("\\","/"),
+            self.mount_path
+        ]
+        res: CompletedProcess = run(command)
+        if res.returncode != 0:
+            dms_error(f"Failed to mount Samba share {self.share} with user {self.user}.")
+
     def _full_scan(self, path: str) -> list[str]:
         pointers: list[str] = []
-        print(f"checking: {path}")
-        for file in scandir(rf"{path}"):
+        for file in scandir(path):
             if file.is_file():
-                pointers.append(file.path.replace("\\", "/"))
+                pointers.append(file.path)
             elif file.is_dir():
                 pointers.extend(self._full_scan(file.path))
 
         return pointers
 
-    def get_files(self, subdata: str | None) -> dict:
+    def inital_run(self):
+        dms_info("Mounting smb.")
+        self._mount() 
+        dms_info("Find files.")
+        changes = self._full_scan(self.mount_path)
+        for change in changes:
+            self.changes.add(change)
+
+    def get_files(self) -> dict:
         """Get new files from SMB share.
 
         Args:
@@ -116,11 +135,11 @@ class Samba:
 
         """
         changes = {}
-        if subdata is None:
-            changes["pointers"] = self._full_scan(self.share)
-            changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
-        else:
-            changes["pointers"] = [item for item in self.changes.values()]
-            changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
-            self.changes.clear()
+        changes["pointers"] = self.changes
+        changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
+        self.changes.clear()
+        print(len(changes["pointers"]))
         return changes
+
+    def check_index_needed(self) -> dict:
+        return {"index_needed": self.changes != {}}

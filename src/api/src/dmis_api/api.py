@@ -74,7 +74,7 @@ class API:
 
     def authorize(self, authorization: str | None, host: str | None) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if "127.0.0.1" in host or "localhost" in host: #NOTE; THIS MUST BE REMOVED
+        if host is not None and ("127.0.0.1" in host or "localhost" in host):  # NOTE; THIS MUST BE REMOVED
             return {}
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(

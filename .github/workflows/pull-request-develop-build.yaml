@@ -3,15 +3,26 @@ on:
   pull_request:
     branches: ["develop"]
 
+env:
+  DEPLOY_DIR: "/opt/dev-dms-lookup/"
+  COMPOSE_FILE: "develop-pr.yaml"
+  
 jobs:
   build:
     permissions:
       contents: read
-    runs-on: self-hosted
+    runs-on: development
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Build docker images in .
         working-directory: .
-        run: docker compose -f docker-compose-build-all.yaml build --pull
+        run: docker compose -f docker-compose-build-all.yaml build 
+      # 
+      - name: Run stack
+        run: |
+            cd $DEPLOY_DIR
+            docker compose -f $COMPOSE_FILE up --wait
+            docker compose -f $COMPOSE_FILE stop

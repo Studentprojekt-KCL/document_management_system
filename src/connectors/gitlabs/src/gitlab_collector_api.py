@@ -29,6 +29,7 @@ class API:
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -59,13 +60,17 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers"), include_content, include_last_edit_date)
+        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers", []), include_content, include_last_edit_date)
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         content = self.gitlabs_instance.files_to_index(subdata)
         url = upload_file(content, "gitlabs_content.json")
         return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
+
+    async def connected_source_systems(self) -> list:
+        """NOT; THIS IS A TEMPORARY ENDPOINT WHICH WILL BE MIGRATED TO SHARED CONNECTOR."""
+        return ["GitLab"]
 
 
 def run() -> None:

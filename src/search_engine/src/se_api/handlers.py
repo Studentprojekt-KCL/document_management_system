@@ -19,9 +19,14 @@ class Handler:
     search_engine: SearchEngine
 
     def __init__(self) -> None:
+        """Constructor"""
         self.connector = Connector()
         self.search_engine = SearchEngine()
         self.query = Query()
+
+    async def close(self) -> None:
+        """Clean up"""
+        await self.query.close()
 
     def reset(self) -> None:
         """Reset the connector."""
@@ -29,6 +34,21 @@ class Handler:
         self.connector = Connector()
         self.query = Query()
         dms_info("Search engine was reset.")
+
+    def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
+        """Remove missing files from cache and index.
+
+        Args:
+            matches: list of pointers
+            grabbed: list of file dicts.
+        """
+
+        grabs = [grab.get("unique_pointer") for grab in grabbed]
+        for match in matches:
+            if match in grabs:
+                continue
+            self.search_engine.remove_file(match)
+            self.query.cache.remove_classification(match)
 
     def preform_search(self, request: str, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
@@ -55,11 +75,11 @@ class Handler:
                     self.connector.reset()
                     new_files = self.connector.get_files()
                 self.search_engine.add_files(new_files)
-
+                self.query.cache.remove_classifications(new_files)
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = self.connector.fetch_files(matches)
-
-        classifications: dict = self.query.classify(matches)  # Maybe should base this of the returned pointers from the connectors.
+        self.clean_misses(matches, files)
+        classifications: dict = self.query.classify(files)
         for file in files:
             unique_pointer: str = file.get("unique_pointer", "")
             classification: str = classifications.get(unique_pointer, "")

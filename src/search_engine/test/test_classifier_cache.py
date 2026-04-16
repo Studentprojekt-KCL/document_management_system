@@ -39,10 +39,10 @@ class TestClassifierCache(TestCase):
 
     def test_fetch_classification(self):
         self.instance.cache = {
-            "pointer_1": {"classification": "class", "unique_pointer": "pointer_1", "edited": False},
-            "pointer_2": {"classification": "class", "unique_pointer": "pointer_2", "edited": True},
+            "pointer_1": {"classification": "class1", "unique_pointer": "pointer_1", "edited": False},
+            "pointer_2": {"classification": "class2", "unique_pointer": "pointer_2", "edited": True},
         }
         classification: str | None = self.instance.fetch_classification("pointer_1")
-        assert classification == "class"
+        assert classification == "class1"
         classification: str | None = self.instance.fetch_classification("pointer_3")
         assert classification == None

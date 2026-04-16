@@ -1,9 +1,12 @@
 [
     {"description": "Text (.md)", "extension": ".md", "type": "text"},
     {"description": "Word (.docx)", "extension": ".docx", "type": "text"},
+	{"description": "Word (.doc)", "extension": ".doc", "type": "text"},
     {"description": "PDF (.pdf)", "extension": ".pdf", "type": "text"},
     {"description": "Text (.txt)", "extension": ".txt", "type": "text"},
     {"description": "Excel (.xlsx)", "extension": ".xlsx", "type": "sheet"},
+	{"description": "PowerPoint (.pptx)", "extension": ".pptx", "type": "slide"},
+	{"description": "PowerPoint (.ppt)", "extension": ".ppt", "type": "slide"},
     {"description": "Ada lib (.1.ada)", "extension": ".1.ada", "type": "code"},
     {"description": "Ada lib (.2.ada)", "extension": ".2.ada", "type": "code"},
     {"description": "Ada lib (.3.ada)", "extension": ".3.ada", "type": "code"},
@@ -170,9 +173,9 @@
     {"description": "Nim (.nim)", "extension": ".nim", "type": "code"},
     {"description": "NSV video (.nsv)", "extension": ".nsv", "type": "video"},
     {"description": "OBJ model (.obj)", "extension": ".obj", "type": "3D"},
-    {"description": "ODP slides (.odp)", "extension": ".odp", "type": "slide"},
     {"description": "ODS sheet (.ods)", "extension": ".ods", "type": "sheet"},
     {"description": "ODT text (.odt)", "extension": ".odt", "type": "text"},
+	{"description": "ODP slides (.odp)", "extension": ".odp", "type": "slide"},
     {"description": "Ogg audio (.ogg)", "extension": ".ogg", "type": "audio"},
     {"description": "OGM video (.ogm)", "extension": ".ogm", "type": "video"},
     {"description": "OGV video (.ogv)", "extension": ".ogv", "type": "video"},
@@ -194,8 +197,6 @@
     {"description": "PNG image (.png)", "extension": ".png", "type": "image"},
     {"description": "PO file (.po)", "extension": ".po", "type": "code"},
     {"description": "Puppet (.pp)", "extension": ".pp", "type": "code"},
-    {"description": "PowerPoint (.ppt)", "extension": ".ppt", "type": "slide"},
-    {"description": "PowerPoint (.pptx)", "extension": ".pptx", "type": "slide"},
     {"description": "PRQL (.prql)", "extension": ".prql", "type": "code"},
 	{"description": "PostScript (.ps)", "extension": ".ps", "type": "image"},
     {"description": "PowerShell (.ps1)", "extension": ".ps1", "type": "code"},
@@ -283,5 +284,6 @@
     {"description": "ZIP (.zip)", "extension": ".zip", "type": "archive"},
     {"description": "ZIPX (.zipx)", "extension": ".zipx", "type": "archive"},
     {"description": "Zsh (.zsh)", "extension": ".zsh", "type": "code"},
-    {"description": "Zstd (.zst)", "extension": ".zst", "type": "archive"}
+    {"description": "Dockerfile", "extension": "Dockerfile", "type": "code"},
+	{"description": "Jenkinsfile", "extension": "Jenkinsfile", "type": "code"}
 ]

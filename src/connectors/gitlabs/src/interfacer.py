@@ -14,9 +14,10 @@ import requests
 
 from variables import PROJECT, SOURCE_FILE
 
-from unpacker import unpack_values
-from dmis_logger import dms_error, dms_info, dms_warning
-from initialisation_tools import read_env_variable
+from shared_functions.unpacker import unpack_values
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.file_type_logic import get_file_resource, determine_file_type
 
 
 class GitLabs:
@@ -29,6 +30,7 @@ class GitLabs:
     source_system: str
     project_information: dict | None = None
     blame_cache: dict = {}
+    file_extensions: list = []
 
     def __init__(self) -> None:
         """Constructor."""
@@ -36,6 +38,9 @@ class GitLabs:
         self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
         address = read_env_variable("GITLAB_ADDRESS")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
+        file_type_resource = get_file_resource()
+        self.file_extensions = [extension.get("extension") for extension in file_type_resource]
+        self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
 
     def _get_projects(self) -> dict | list:
         """Retrieve all available projects."""

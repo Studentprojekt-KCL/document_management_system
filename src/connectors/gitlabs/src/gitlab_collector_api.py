@@ -77,7 +77,13 @@ class API:
 
     async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+<<<<<<< HEAD
         return StreamingResponse(self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
+=======
+        return StreamingResponse(
+            self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream"
+        )  # TODO, define octet-stream
+>>>>>>> 9ac1f88 (Reformat)
 
 
 def run() -> None:

@@ -8,15 +8,15 @@ import io
 from pathlib import Path
 import zipfile
 from typing import Any
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import binascii
 import asyncio
-from typing import Generator
 
-import requests #TODO migrate everything away from this.
+import requests
 import httpx
 
-from shared_functions.variables import PROJECT, SOURCE_FILE
+from variables import SOURCE_FILE
 
 from shared_functions.unpacker import unpack_values
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
@@ -209,81 +209,19 @@ class GitLabs:
         return files_data
 
     def _subdata_setup(self, subdata: str | None = None) -> datetime:
-        """."""
+        """Set up subdata, either by parsind data, or if None, return datatime.min data."""
         if subdata is None:
             return datetime.min.replace(tzinfo=timezone.utc)
 
         return self._provided_date(subdata)
 
+    def _project_urls(self, subdata: str | None = None) -> tuple[list, str]:
+        """Retrieve a structure of files to index."""
 
-    def files_to_index(self, subdata: str | None = None) -> dict:
-        """Retrieve a structure of files to index.
-
-        Args:
-        ----
-            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
-                 of the system, but should always be supplied).
-
-        Returns:
-        -------
-            Dict structure {"subdata": generated_subdata, "files": file_data}, where generated_subdata
-                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
-                (this should always be passed back by client from previous request).
-        """
-        files_data: list = []
-        latest_update = self._subdata_setup(subdata)
+        subdata_date = self._subdata_setup(subdata)
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
-
-        for project in projects:
-            project_id = project.get("id")
-            new_timestamp = current_subdata.get(project_id)
-            if not isinstance(new_timestamp, str):
-                continue
-            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object <= latest_update:
-                continue
-            latest_update = max(latest_update, new_timestamp_object)
-
-            branch = project.get("default_branch")
-            url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
-            content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content, project_id))
-
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-
-        return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
-
-    async def download_files(self, task_queue, zip_queue):
-        """ ."""
-        async with httpx.AsyncClient() as client: #TODO, this seems to work
-            while True:
-                task_data = await task_queue.get()
-                if task_data is None:
-                    break
-                url, project_id = task_data
-                async with client.stream("GET", url) as response:
-                    data = await response.aread() #TODO ,.content (maybe use .aread())
-                    await zip_queue.put({"data": data, "project_id": project_id})
-                task_queue.task_done()
-
-    async def unzip_files(self, input_queue, output_queue): #TODO, proj id prob needs to be solved for here.
-        """ ."""
-        while True:
-            input_content = await input_queue.get()
-            if input_content is None:
-                break
-            content = input_content.get("data")
-            project_id = input_content.get("project_id")
-            unpacked_content = self._unpack_zip(content, project_id)
-            await output_queue.put(unpacked_content)
-            input_queue.task_done()
-
-    def _project_urls(self, subdata) -> Generator[tuple]:
-        """ ."""
-        subdata_date = self._subdata_setup(subdata) #THIS is very flawed. 
-        current_subdata = self.get_project_ids()
-        projects = self._get_projects()
+        new_date = subdata_date
 
         project_data: list[tuple] = []
         for project in projects:
@@ -294,29 +232,77 @@ class GitLabs:
             new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
             if new_timestamp_object <= subdata_date:
                 continue
-            new_date = max(subdata_date, new_timestamp_object) #TODO declare this for new subdata
+            new_date = max(subdata_date, new_timestamp_object)
             branch = project.get("default_branch")
-            project_data.append((f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id))
+            project_data.append(
+                (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+            )
 
         generated_subdata = base64.urlsafe_b64encode(new_date.isoformat().encode()).decode()
 
         return project_data, generated_subdata
 
+    def files_to_index(self, subdata: str | None = None) -> dict:
+        """Retrieve a structure of files to index.
 
-    async def stream_files_to_index(self, subdata: str | None = None):
-        """ ."""
-        task_queue = asyncio.Queue()
-        zip_queue = asyncio.Queue()
-        output_queue = asyncio.Queue()
+        Args:
+        ----
+            subdata: Base64 encoded isostructured timestamp.
+
+        Returns:
+        -------
+            Dict structure {"subdata": generated_subdata, "files": file_data, "index_needed":
+              <BOOL INDICATIANG IF REINDEX IS NEEED>}
+        """
+        files_data, generated_subdata = self._project_urls(subdata)
+
+        return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
+
+    async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
+        """Download all artifacts from tast_queue and put in zip_queue."""
+        async with httpx.AsyncClient() as client:
+            while True:
+                task_data = await task_queue.get()
+                if task_data is None:
+                    break
+                url, project_id = task_data
+                async with client.stream("GET", url) as response:
+                    data = await response.aread()
+                    await zip_queue.put({"data": data, "project_id": project_id})
+                task_queue.task_done()
+
+    async def unzip_files(self, input_queue: asyncio.Queue, output_queue: asyncio.Queue) -> None:
+        """Unzip all files in input queue and put content in output queue."""
+        while True:
+            input_content = await input_queue.get()
+            if input_content is None:
+                break
+            content = input_content.get("data")
+            project_id = input_content.get("project_id")
+            unpacked_content = self._unpack_zip(content, project_id)
+            await output_queue.put(unpacked_content)
+            input_queue.task_done()
+
+    async def stream_files_to_index(self, subdata: str | None = None) -> AsyncGenerator[bytes]:
+        """Streaming for files to index.
+
+        Args:
+        ----
+            subdata: Base64 encoded isostructured timestamp.
+        """
+        task_queue: asyncio.Queue = asyncio.Queue()
+        zip_queue: asyncio.Queue = asyncio.Queue()
+        output_queue: asyncio.Queue = asyncio.Queue()
 
         pointers_to_projects, new_subdata = self._project_urls(subdata)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 
-        download_tasks: list = [asyncio.create_task(self.download_files(task_queue, zip_queue)) for _ in range(self.NUM_WORKERS)]
+        download_tasks: list = [asyncio.create_task(self._download_files(task_queue, zip_queue)) for _ in range(self.NUM_WORKERS)]
         unzip_tasks: list = [asyncio.create_task(self.unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
 
-        async def task_producer(): #TODO, could prob migrate a better looking solution
+        async def producer() -> None:
+            """Shutdown signaling to each worker defined in stream_files_to_index."""
             await task_queue.join()
             for _ in download_tasks:
                 await task_queue.put(None)
@@ -327,13 +313,15 @@ class GitLabs:
 
             await output_queue.put(None)
 
-        asyncio.create_task(task_producer())
+        asyncio.create_task(producer())
+
+        yield json.dumps({"subdata": new_subdata}).encode("utf-8")
 
         while True:
-            chunk = await output_queue.get() #TODO define datachunk
+            chunk = await output_queue.get()
             if chunk is None:
                 break
-            yield json.dumps(chunk).encode("utf-8")
+            yield json.dumps({"data": chunk}).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.

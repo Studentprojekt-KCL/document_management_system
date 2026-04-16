@@ -9,7 +9,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-import asyncio
 
 from interfacer import GitLabs
 
@@ -67,7 +66,7 @@ class API:
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
-          OBS; this method will be depricated."""
+        OBS; this method will be depricated."""
         content = self.gitlabs_instance.files_to_index(subdata)
         url = upload_file(content, "gitlabs_content.json")
         return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
@@ -79,6 +78,7 @@ class API:
     async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         return StreamingResponse(self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

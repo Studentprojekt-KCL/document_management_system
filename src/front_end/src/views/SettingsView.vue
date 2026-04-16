@@ -184,8 +184,10 @@ onUnmounted(() => {
               :key="opt"
               :class="['segment', { active: prefs.theme === opt }]"
               @click="
-                prefs.theme = opt
-                savePrefs()
+                () => {
+                  prefs.theme = opt
+                  savePrefs()
+                }
               "
             >
               {{ opt }}
@@ -202,8 +204,10 @@ onUnmounted(() => {
               :key="opt"
               :class="['segment', { active: prefs.density === opt }]"
               @click="
-                prefs.density = opt
-                savePrefs()
+                () => {
+                  prefs.density = opt
+                  savePrefs()
+                }
               "
             >
               {{ opt }}

@@ -48,10 +48,7 @@ export function isLeader() {
 // Activity sync of different tabs, -
 // - so we don't get logged out because of activity only in another tab than leader.
 export function broadcastActivity() {
-  localStorage.setItem(
-    ACTIVITY_KEY,
-    Date.now().toString()
-  )
+  localStorage.setItem(ACTIVITY_KEY, Date.now().toString())
 }
 export function getLastActivity() {
   return Number(localStorage.getItem(ACTIVITY_KEY) || Date.now())

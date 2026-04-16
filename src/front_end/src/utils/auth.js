@@ -112,7 +112,7 @@ export function logout() {
   clearStroage()
 }
 
-function clearStroage(){
+function clearStroage() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('id_token')

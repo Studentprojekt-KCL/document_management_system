@@ -1,19 +1,7 @@
 import { onMounted, onUnmounted } from 'vue'
-import {
-  refreshToken,
-  logout,
-  getAccessToken,
-  isTokenExpired
-} from '@/utils/auth.js'
+import { refreshToken, logout, getAccessToken, isTokenExpired } from '@/utils/auth.js'
 
-import {
-  tryBecomeLeader,
-  isLeader,
-  setLeader,
-  broadcastActivity,
-  getLastActivity,
-  broadcastLogout
-} from '@/utils/authSync.js'
+import { tryBecomeLeader, isLeader, setLeader, broadcastActivity, getLastActivity, broadcastLogout } from '@/utils/authSync.js'
 
 export function useAuthSession() {
   let leaderLoop = null
@@ -22,7 +10,7 @@ export function useAuthSession() {
   let heartbeatLoop = null
 
   const TIME_LIMIT = 60 * 60 * 1000
-  const REFRESH_TIME = 25* 60 * 1000
+  const REFRESH_TIME = 25 * 60 * 1000
   const LEADER_TIMEOUT = 15000
 
   // ACTIVITY (ALL TABS)
@@ -93,9 +81,7 @@ export function useAuthSession() {
     watchdogLoop = setInterval(() => {
       const leader = JSON.parse(localStorage.getItem('auth-leader') || '{}')
 
-      const leaderDead =
-        !leader.id ||
-        Date.now() - (leader.ts || 0) > LEADER_TIMEOUT
+      const leaderDead = !leader.id || Date.now() - (leader.ts || 0) > LEADER_TIMEOUT
 
       if (leaderDead) {
         if (tryBecomeLeader()) {

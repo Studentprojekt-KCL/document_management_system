@@ -34,14 +34,14 @@ function randomString(bytesLen = 32) {
   return base64UrlEncode(bytes)
 }
 
-// Creates a PKCE pair (verifier and challenge) for secure OAuth authentication. 
+// Creates a PKCE pair (verifier and challenge) for secure OAuth authentication.
 async function createPkcePair() {
   const verifier = randomString(64)
   const challenge = base64UrlEncode(await sha256(verifier))
   return { verifier, challenge }
 }
 
-// Initiates the Entra ID login flow using PKCE. 
+// Initiates the Entra ID login flow using PKCE.
 const handleEntraIdLogin = async () => {
   const { verifier, challenge } = await createPkcePair()
 

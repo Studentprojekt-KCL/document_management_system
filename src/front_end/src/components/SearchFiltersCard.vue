@@ -5,7 +5,6 @@ import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 // Will eventually fetch these filter options from the backend or something??
 const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
 
-const access_token = sessionStorage.getItem('access_token')
 const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 const sourceFilters = ref([])
 const securityFilters = ref([])
@@ -14,7 +13,7 @@ const fetchSourceFilters = async () => {
   try {
     const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`, {
       headers: {
-        Authorization: `Bearer ${access_token}`
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
       }
     })
 
@@ -33,7 +32,7 @@ const fetchSecurityFilters = async () => {
   try {
     const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`, {
       headers: {
-        Authorization: `Bearer ${access_token}`
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
       }
     })
 

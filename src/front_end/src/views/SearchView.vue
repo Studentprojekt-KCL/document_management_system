@@ -56,7 +56,7 @@ const handleSearch = async (query) => {
   try {
     const res = await fetch(`${API_BASE_URL}/search_engine/search?query=${encodeURIComponent(query)}`, {
       headers: {
-        Authorization: `Bearer ${sessionStorage.getItem('access_token')}`
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
       }
     })
 

@@ -1,7 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from dmis_logger import dms_info, dms_warning
-from fastapi import HTTPException
 from se_api.services.connector import Connector
 from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
@@ -35,23 +34,6 @@ class Handler:
         self.connector = Connector()
         self.query = Query()
         dms_info("Search engine was reset.")
-
-    def set_classification(self, change: dict[str, str]) -> dict[str, str]:
-        """Set the classification of a file.
-
-        Args:
-            change: dict containing the unique pointer and new classification.
-        Returns: dict containing the unique pointer, classification, and if edited.
-        """
-
-        pointer: str | None = change.get("unique_pointer")
-        classification: str | None = change.get("classification")
-        if pointer is None or classification is None:
-            raise HTTPException(status_code=400)
-        file: dict | None = self.query.set_classification(pointer, classification)
-        if file is None:
-            raise HTTPException(status_code=400)
-        return file
 
     def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
         """Remove missing files from cache and index.

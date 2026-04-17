@@ -57,7 +57,6 @@ class API:
         self.app.add_api_route("/search", self.query, methods=["GET"])
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
-        self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
 
     def start(self) -> None:
         """Start the API."""
@@ -95,10 +94,6 @@ class API:
         """
 
         return self.handler.preform_search(query, count, offset)
-
-    async def set_classification(self, change: dict[str, str]) -> dict:
-        """Manualy set the classification of a pointer."""
-        return self.handler.set_classification(change)
 
     async def check_health(self) -> JSONResponse:
         """Respond to health check"""

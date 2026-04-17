@@ -34,7 +34,7 @@ class ClassifierCache:
         loop = get_running_loop()
         self.sync_thread = loop.create_task(self._cache_sync())
 
-    def delete_cache_file(self):
+    def delete_cache_file(self) -> None:
         """Delete the cache file."""
         if path.exists(self.cache_file):
             remove(self.cache_file)

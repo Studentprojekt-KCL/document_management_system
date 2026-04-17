@@ -29,7 +29,7 @@ class Query:
             return
         self.classifications = classifications
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset query service"""
         self.cache.delete_cache_file()
 

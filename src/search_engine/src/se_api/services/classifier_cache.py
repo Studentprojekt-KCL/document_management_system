@@ -14,7 +14,7 @@ class ClassifierCache:
     CACHE_FILE: str = "classification_cache"
     SYNC_INTERVAL: int = 600
 
-    cache: dict[str, dict]
+    cache: dict[str, str]
     close_event: Event
     cache_file: str
 
@@ -55,24 +55,6 @@ class ClassifierCache:
                     f["classification"] = self.cache
         dms_info("Closing sync thread.")
 
-    def set_classification(self, pointer: str, classification: str) -> dict | None:
-        """Set classification of a file.
-
-        Args:
-            pointer: file unique pointer.
-            classification: new classification
-        Return: None on failure otherwise CacheModel
-        """
-
-        file: dict | None = self.cache.get(pointer)
-        if file is None:
-            return None
-
-        file["classification"] = classification
-        file["edited"] = True
-
-        return file
-
     def add_classification(self, pointer: str, classification: str) -> None:
         """Add classification to cache.
 
@@ -81,9 +63,7 @@ class ClassifierCache:
             classification: the assigned classification.
         """
 
-        file: dict | None = self.cache.get(pointer)
-        if file is None or not file.get("edited", False):
-            self.cache[pointer] = {"classification": classification, "unique_pointer": pointer, "edited": False}
+        self.cache[pointer] = classification
 
     def remove_classification(self, pointer: str) -> None:
         """Remove classification from cache.
@@ -114,7 +94,4 @@ class ClassifierCache:
         Args:
             pointer: unique pointer.
         Returns: classification string or None."""
-        file: dict | None = self.cache.get(pointer)
-        if file is None:
-            return None
-        return file.get("classification")
+        return self.cache.get(pointer)

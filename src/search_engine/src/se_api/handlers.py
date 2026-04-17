@@ -33,6 +33,7 @@ class Handler:
         """Reset the connector."""
         self.search_engine = SearchEngine()
         self.connector = Connector()
+        self.query.reset()
         self.query = Query()
         dms_info("Search engine was reset.")
 

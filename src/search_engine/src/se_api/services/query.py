@@ -29,6 +29,10 @@ class Query:
             return
         self.classifications = classifications
 
+    def reset(self):
+        """Reset query service"""
+        self.cache.delete_cache_file()
+
     async def close(self) -> None:
         """Clean up"""
         await self.cache.close()

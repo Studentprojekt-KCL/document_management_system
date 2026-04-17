@@ -2,6 +2,7 @@
 
 from asyncio import Event, get_running_loop, wait_for
 import dbm
+from os import path, remove
 import shelve
 
 from dmis_logger import dms_error, dms_info
@@ -32,6 +33,11 @@ class ClassifierCache:
         self.close_event = Event()
         loop = get_running_loop()
         self.sync_thread = loop.create_task(self._cache_sync())
+
+    def delete_cache_file(self):
+        """Delete the cache file."""
+        if path.exists(self.cache_file):
+            remove(self.cache_file)
 
     async def close(self) -> None:
         """Clean up"""

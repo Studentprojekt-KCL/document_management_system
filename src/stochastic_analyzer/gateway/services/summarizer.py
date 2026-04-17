@@ -63,7 +63,7 @@ async def _synthesize(
     ministral_model: str,
     language: str,
     headers: dict,
-    timeout: int = 120,
+    timeout: int,
 ) -> SummaryResult | None:
     """Synthesize individual summaries into a final combined summary."""
     combined_summaries = "\n\n".join(per_doc_blocks)

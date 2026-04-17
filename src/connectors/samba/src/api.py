@@ -56,7 +56,6 @@ class API:
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
-        self.samba_service.inital_run()
         self.samba_service.start_watch()
         yield
 
@@ -82,8 +81,8 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
         return JSONResponse(status_code=422, content=content)
 
-    async def index_needed_bool(self) -> Any:
-        return self.samba_service.check_index_needed()
+    async def index_needed_bool(self, subdata: str | None = None) -> Any:
+        return self.samba_service.check_index_needed(subdata)
 
     async def files(self) -> JSONResponse:
         response = self.samba_service.get_files()

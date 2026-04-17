@@ -53,6 +53,7 @@ class Samba:
         self.mount_path = read_env_variable("SC_SAMBA_MOUNT_PATH")
 
         self.changes = set([])
+        self._mount()
 
     def start_watch(self):
         thread = threading.Thread(
@@ -63,6 +64,7 @@ class Samba:
     
     @staticmethod
     def _watch_files(host: str, port: int, share: str, user: str, password: str, changes: set[str]):
+        dms_info(f"Launching notification watcher for {share}.")
         connection = Connection(uuid.uuid4(), host, port)
         connection.connect()
         try:
@@ -107,6 +109,7 @@ class Samba:
         res: CompletedProcess = run(command)
         if res.returncode != 0:
             dms_error(f"Failed to mount Samba share {self.share} with user {self.user}.")
+        dms_info(f"Mounted {self.share} at {self.mount_path}.")
 
     def _full_scan(self, path: str) -> list[str]:
         pointers: list[str] = []
@@ -118,14 +121,6 @@ class Samba:
 
         return pointers
 
-    def inital_run(self):
-        dms_info("Mounting smb.")
-        self._mount() 
-        dms_info("Find files.")
-        changes = self._full_scan(self.mount_path)
-        for change in changes:
-            self.changes.add(change)
-
     def get_files(self) -> dict:
         """Get new files from SMB share.
 
@@ -136,10 +131,14 @@ class Samba:
         """
         changes = {}
         changes["pointers"] = self.changes
-        changes["subdata"] = urlsafe_b64encode("jeppe".encode("utf-8")).decode("utf-8")
+        changes["subdata"] = urlsafe_b64encode(datetime.now().isoformat().encode("utf-8")).decode("utf-8")
         self.changes.clear()
         print(len(changes["pointers"]))
         return changes
 
-    def check_index_needed(self) -> dict:
+    def check_index_needed(self, subdata: str | None) -> dict:
+        if subdata is None:
+            changes = self._full_scan(self.mount_path)
+            for change in changes:
+                self.changes.add(change)
         return {"index_needed": self.changes != {}}

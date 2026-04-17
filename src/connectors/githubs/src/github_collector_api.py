@@ -16,9 +16,9 @@ from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from interfacer_github import GitHub
 
 from shared_functions.boto_tools import upload_file
-from interfacer_github import GitHub
 from shared_functions.initialisation_tools import read_env_variable, read_port
 
 

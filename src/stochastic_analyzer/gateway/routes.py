@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
-from dmis_logger import dms_warning
 from gateway.schemas import (
     RerankRequest,
     RankResponse,
@@ -21,6 +20,8 @@ from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
+
+from shared_functions.dmis_logger import dms_warning
 
 
 @dataclass

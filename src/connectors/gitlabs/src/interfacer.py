@@ -12,7 +12,7 @@ import binascii
 
 import requests
 
-from variables import PROJECT, SOURCE_FILE
+from shared_functions.variables import PROJECT, SOURCE_FILE
 
 from shared_functions.unpacker import unpack_values
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning

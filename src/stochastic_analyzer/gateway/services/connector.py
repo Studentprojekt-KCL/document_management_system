@@ -5,8 +5,9 @@ from base64 import b64decode
 
 import httpx
 
-from shared_functions.dmis_logger import dms_warning
 from gateway.schemas import InputItem, MetadataTemplate
+
+from shared_functions.dmis_logger import dms_warning
 
 
 class Connector:

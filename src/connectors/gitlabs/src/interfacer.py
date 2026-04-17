@@ -31,6 +31,7 @@ class GitLabs:
     project_information: dict | None = None
     blame_cache: dict = {}
     file_extensions: list = []
+    extension_descriptions: dict = {}
 
     def __init__(self) -> None:
         """Constructor."""
@@ -161,18 +162,23 @@ class GitLabs:
         if isinstance(file, list):
             file = {}
 
+        file_name: str | None = file.get("file_name")
+        extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
         base_structure: dict[Any, Any] = {
             "unique_pointer": url,
-            "name": file.get("file_name"),
+            "name": file_name,
             "size": file.get("size"),
             "type": SOURCE_FILE,
             "source_system": self.source_system,
-        }
+        } | extension
+
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
                 self.blame_cache[url] = self._execute_request(url)
-            base_structure |= {"last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))}
+            blame = self.blame_cache.get(url)
+            if isinstance(blame, list):
+                base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):

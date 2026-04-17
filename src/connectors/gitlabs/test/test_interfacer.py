@@ -42,7 +42,7 @@ class TestGitLabs(TestCase):
         }
     ]
 
-    FILE_DATA = {"file_name": "test_file", "size": 0, "content": "unittest"}
+    FILE_DATA = {"file_name": "test_file.txt", "size": 0, "content": "unittest"}
 
     BLAME_DATA = [{"commit": {"committed_date": "1970-01-01T00:00:00.000Z"}}]
 
@@ -64,6 +64,8 @@ class TestGitLabs(TestCase):
         mock_session.get.side_effect = self.get_side_effect
         self.instance.base = ""
         self.instance.session = mock_session
+        self.instance.file_extensions = [".txt"]
+        self.instance.extension_descriptions = {".txt": "text file"}
 
     def test_execute_request(self):
         """Test _execute_request method."""
@@ -88,12 +90,15 @@ class TestGitLabs(TestCase):
     def test_get_file(self):
         """Test get_file method."""
         self.instance.source_system = "system"
+        print(self.instance.get_file("test_url", True))
         assert self.instance.get_file("test_url", True) == {
             "unique_pointer": "test_url",
-            "name": "test_file",
+            "name": "test_file.txt",
             "size": 0,
             "last_edit_date": "1970-01-01T00:00:00.000Z",
             "type": "source_file",
             "source_system": "system",
             "content": "unittest",
+            'file_type': '.txt',
+            'file_type_description': 'text file'
         }

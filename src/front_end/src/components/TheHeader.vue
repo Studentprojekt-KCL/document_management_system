@@ -44,7 +44,7 @@ const handleLogout = () => {
 <template>
   <!--- Main Header container-->
   <header class="header">
-    <img src="@/assets/logo.png" alt="Logo" class="logo-image" />
+    <img src="@/assets/newLogo.png" alt="Logo" class="logo-image" />
 
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
@@ -72,9 +72,11 @@ const handleLogout = () => {
 }
 
 .logo-image {
-  width: 140px;
+  width: 190px;
   height: auto;
   object-fit: contain;
+  border-radius: 10px;
+  margin-left: 1.3rem;
 }
 
 .spacer {

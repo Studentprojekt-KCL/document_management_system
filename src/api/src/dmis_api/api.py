@@ -143,42 +143,42 @@ class API:
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to search engine."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request)
 
     async def search_engine_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to search engine."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request)
 
     async def stochastic_analyzer_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request)
 
     async def stochastic_analyzer_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
 
     async def connector_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to connector API."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request)
 
     async def connector_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to connector API."""
-        self.authorize(authorization, request.headers.get("host"))
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request)
 
 

@@ -2,6 +2,7 @@
 
 from asyncio import Event, get_running_loop, wait_for
 import dbm
+from os import path, remove
 import shelve
 
 from dmis_logger import dms_error, dms_info
@@ -14,7 +15,7 @@ class ClassifierCache:
     CACHE_FILE: str = "classification_cache"
     SYNC_INTERVAL: int = 600
 
-    cache: dict[str, str]
+    cache: dict[str, dict]
     close_event: Event
     cache_file: str
 
@@ -32,6 +33,11 @@ class ClassifierCache:
         self.close_event = Event()
         loop = get_running_loop()
         self.sync_thread = loop.create_task(self._cache_sync())
+
+    def delete_cache_file(self) -> None:
+        """Delete the cache file."""
+        if path.exists(self.cache_file):
+            remove(self.cache_file)
 
     async def close(self) -> None:
         """Clean up"""
@@ -55,6 +61,24 @@ class ClassifierCache:
                     f["classification"] = self.cache
         dms_info("Closing sync thread.")
 
+    def set_classification(self, pointer: str, classification: str) -> dict | None:
+        """Set classification of a file.
+
+        Args:
+            pointer: file unique pointer.
+            classification: new classification
+        Return: None on failure otherwise CacheModel
+        """
+
+        file: dict | None = self.cache.get(pointer)
+        if file is None:
+            return None
+
+        file["classification"] = classification
+        file["edited"] = True
+
+        return file
+
     def add_classification(self, pointer: str, classification: str) -> None:
         """Add classification to cache.
 
@@ -63,7 +87,9 @@ class ClassifierCache:
             classification: the assigned classification.
         """
 
-        self.cache[pointer] = classification
+        file: dict | None = self.cache.get(pointer)
+        if file is None or not file.get("edited", False):
+            self.cache[pointer] = {"classification": classification, "unique_pointer": pointer, "edited": False}
 
     def remove_classification(self, pointer: str) -> None:
         """Remove classification from cache.
@@ -94,4 +120,7 @@ class ClassifierCache:
         Args:
             pointer: unique pointer.
         Returns: classification string or None."""
-        return self.cache.get(pointer)
+        file: dict | None = self.cache.get(pointer)
+        if file is None:
+            return None
+        return file.get("classification")

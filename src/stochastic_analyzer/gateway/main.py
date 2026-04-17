@@ -17,6 +17,7 @@ from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
 
 
 class API:
@@ -54,6 +55,10 @@ class API:
             ),
             ranker=Ranker(url=self.config.services.tei_url),
             pdf_converter=PdfConverter(),
+            indexer=Indexer(
+                embedding_url=self.config.services.vector.embedding_url,
+                qdrant_url=self.config.services.vector.qdrant_url,
+            ),
         )
 
         self.app.include_router(create_router(services, self.config.device))

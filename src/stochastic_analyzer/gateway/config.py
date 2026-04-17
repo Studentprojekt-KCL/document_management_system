@@ -1,10 +1,22 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-from os import environ
 import argparse
+from os import environ
 
 from dmis_logger import dms_error
 from initialisation_tools import read_env_variable
+
+
+class VectorConfig:
+    """Vector search service configuration.
+
+    Attributes:
+        embedding_url: URL for the TEI embedding container.
+        qdrant_url: URL for the Qdrant vector database.
+    """
+
+    embedding_url: str
+    qdrant_url: str
 
 
 class ServiceConfig:
@@ -15,8 +27,10 @@ class ServiceConfig:
         classifier_url: URL for the TEI classifier container.
         ministral_url: URL for the Ministral LLM container.
         ministral_model: model identifier for Ministral.
-        connector_url: connector url
-        escalation_threshold: score gap threshold for security-first classification escalation.
+        ministral_timeout: timeout for Ministral requests.
+        connector_url: connector url.
+        escalation_threshold: score gap threshold for classification escalation.
+        vector: vector search service configuration.
     """
 
     tei_url: str
@@ -26,13 +40,14 @@ class ServiceConfig:
     ministral_timeout: int
     connector_url: str
     escalation_threshold: float
+    vector: VectorConfig
 
 
 class APIConfiguration:
     """API Configuration.
 
     Attributes:
-        BIND: which address to bind to.
+        bind: which address to bind to.
         port: port to bind on.
         log_level: log level.
         device: compute device identifier.
@@ -96,43 +111,31 @@ class APIConfiguration:
         """Load external service configuration."""
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
+        self.services.vector = VectorConfig()
 
-        tei_url: str = read_env_variable("TEI_URL")
-        classifier_url: str = read_env_variable("CLASSIFIER_URL")
-        ministral_url: str = read_env_variable("MINISTRAL_URL")
-        ministral_model: str = read_env_variable("MINISTRAL_MODEL")
-        ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
-        address: str = read_env_variable("CONNECTOR_ADDRESS")
-        escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
+        required = {
+            "TEI_URL": read_env_variable("TEI_URL"),
+            "CLASSIFIER_URL": read_env_variable("CLASSIFIER_URL"),
+            "MINISTRAL_URL": read_env_variable("MINISTRAL_URL"),
+            "MINISTRAL_MODEL": read_env_variable("MINISTRAL_MODEL"),
+            "MINISTRAL_TIMEOUT": read_env_variable("MINISTRAL_TIMEOUT"),
+            "CONNECTOR_ADDRESS": read_env_variable("CONNECTOR_ADDRESS"),
+            "ESCALATION_THRESHOLD": read_env_variable("ESCALATION_THRESHOLD"),
+            "EMBEDDING_URL": read_env_variable("EMBEDDING_URL"),
+            "QDRANT_URL": read_env_variable("QDRANT_URL"),
+        }
 
-        if tei_url is None:
-            dms_error("TEI_URL is not defined.")
-            return
+        for name, value in required.items():
+            if value is None:
+                dms_error(f"{name} is not defined.")
+                return
 
-        if classifier_url is None:
-            dms_error("CLASSIFIER_URL is not defined.")
-            return
-
-        if ministral_url is None:
-            dms_error("MINISTRAL_URL is not defined.")
-            return
-
-        if ministral_model is None:
-            dms_error("MINISTRAL_MODEL is not defined.")
-            return
-
-        if address is None:
-            dms_error("CONNECTOR_ADDRESS is not defined.")
-            return
-
-        if escalation_threshold is None:
-            dms_error("ESCALATION_THRESHOLD is not defined.")
-            return
-
-        self.services.tei_url = tei_url
-        self.services.classifier_url = classifier_url
-        self.services.ministral_url = ministral_url
-        self.services.ministral_model = ministral_model
-        self.services.ministral_timeout = int(ministral_timeout)
-        self.services.connector_url = address
-        self.services.escalation_threshold = float(escalation_threshold)
+        self.services.tei_url = required["TEI_URL"]
+        self.services.classifier_url = required["CLASSIFIER_URL"]
+        self.services.ministral_url = required["MINISTRAL_URL"]
+        self.services.ministral_model = required["MINISTRAL_MODEL"]
+        self.services.ministral_timeout = int(required["MINISTRAL_TIMEOUT"])
+        self.services.connector_url = required["CONNECTOR_ADDRESS"]
+        self.services.escalation_threshold = float(required["ESCALATION_THRESHOLD"])
+        self.services.vector.embedding_url = required["EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required["QDRANT_URL"]

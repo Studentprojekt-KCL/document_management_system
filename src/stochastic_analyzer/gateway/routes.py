@@ -7,7 +7,6 @@ from fastapi.responses import Response, JSONResponse
 
 from dmis_logger import dms_warning
 from gateway.schemas import (
-    RerankRequest,
     RankResponse,
     ScoredPointer,
     HealthCheck,
@@ -21,6 +20,7 @@ from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
 
 
 @dataclass
@@ -32,6 +32,7 @@ class Services:
     classifier: Classifier
     ranker: Ranker
     pdf_converter: PdfConverter
+    indexer: Indexer
 
 
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
@@ -70,28 +71,41 @@ def create_router(services: Services, device: str) -> APIRouter:
         return {"status": "active", "model_loaded": True, "device": device}
 
     @router.post("/rerank", response_model=RankResponse)
-    async def rerank_documents(payload: RerankRequest) -> dict:
-        """Endpoint for pointer-based semantic reranking."""
-        reference_items = await services.connector.get_file_contents([payload.reference])
+    async def rerank_documents(payload: PointerRequest) -> dict:
+        """Endpoint for semantic reranking against the full document index."""
+        if len(payload.pointers) != 1:
+            raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
+
+        reference_items = await services.connector.get_file_contents([payload.pointers[0]])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
-        compare_items = await services.connector.get_file_contents(payload.pointers)
-        if not compare_items:
-            dms_warning("Failed to retrieve comparison documents from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
-
         query = reference_items[0].content
-        texts = [item.content for item in compare_items]
+
+        candidate_pointers = await services.indexer.search_similar(query)
+        if not candidate_pointers:
+            return {"ranked_results": []}
+
+        candidate_items = await services.connector.get_file_contents(candidate_pointers)
+        if not candidate_items:
+            dms_warning("Failed to retrieve candidate documents from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve candidate documents.")
+
+        texts = [item.content for item in candidate_items]
         scores = await services.ranker.rank(query, texts)
 
         scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
+            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, candidate_pointers, strict=False)],
             key=lambda x: x.score,
             reverse=True,
         )
         return {"ranked_results": scored}
+
+    @router.post("/index")
+    async def trigger_index() -> dict:
+        """Trigger document indexing into Qdrant."""
+        return await services.indexer.index(services.connector.url)
 
     @router.post("/classify", response_model=list[ClassificationResult])
     async def classify_endpoint(payload: PointerRequest) -> list[dict]:

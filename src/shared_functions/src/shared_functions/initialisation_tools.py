@@ -1,7 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 from os import environ
-from dmis_logger import dms_error
+from shared_functions.dmis_logger import dms_error
 
 
 def read_port(env_variable: str, allowed_ports: tuple[int, ...] = tuple(range(0, 65536))) -> int:

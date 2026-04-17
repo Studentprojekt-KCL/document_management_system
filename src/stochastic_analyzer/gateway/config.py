@@ -3,8 +3,8 @@
 from os import environ
 import argparse
 
-from dmis_logger import dms_error
-from initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class ServiceConfig:

@@ -2,10 +2,11 @@
 
 from typing import Any
 
-from dmis_logger import dms_error, dms_warning
 from requests import exceptions, get, post
-from initialisation_tools import read_env_variable
 from se_api.services.classifier_cache import ClassifierCache
+from shared_functions.initialisation_tools import read_env_variable
+
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class Query:

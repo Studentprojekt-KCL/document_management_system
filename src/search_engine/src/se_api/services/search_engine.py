@@ -2,7 +2,6 @@
 
 import base64
 import json
-from dmis_logger import dms_info, dms_warning
 from tantivy import (
     Document,
     Index,
@@ -11,6 +10,8 @@ from tantivy import (
     SearchResult,
     Searcher,
 )
+
+from shared_functions.dmis_logger import dms_info, dms_warning
 
 
 class SearchEngine:

@@ -107,10 +107,6 @@ const clearAllFilters = () => {
 }
 </script>
 
-// This component is a placeholder for the search filters UI. It currently displays static filter options for demonstration
-purposes. // Later on these filter section needs to be more dynamic and interactive, allowing users to select and apply them to
-their search queries.
-
 <template>
   <div class="filters-card">
     <div class="filters-row">

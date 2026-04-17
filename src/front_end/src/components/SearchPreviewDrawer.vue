@@ -105,8 +105,8 @@ const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRer
         <p class="section-title">SIMILARITY</p>
         <div v-if="aiRerankResults.length" class="meta-cell meta-cell-summary">
           <ul>
-            <li v-for="(result, index) in aiRerankResults" :key="index">
-              {{ result.filename }} (Score: {{ result.score.toFixed(2) }})
+            <li v-for="result in aiRerankResults" :key="result.pointer">
+              {{ result.rank }}. {{ result.filename }} Score: {{ result.scorePercent }}
             </li>
           </ul>
         </div>

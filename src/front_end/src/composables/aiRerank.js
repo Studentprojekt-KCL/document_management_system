@@ -4,13 +4,38 @@ import { useSearchMetadata } from '@/composables/useSearchMetadata'
 export function useAIRerank(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
-
-  const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+  // const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
   /* Rerank state */
   const aiRerankResults = ref([])
+  const rerankPointer = ref('')
   const isReranking = ref(false)
   const rerankError = ref('')
+
+  /* Rerank for specific file and disappears when new file is selected */
+  // const aiRerankResultsComputed = computed(() => (rerankPointer.value === uniquePointer.value ? aiRerankResults.value : []))
+
+  /* HARDCODED results for testing UI without backend, remove when backend is ready */
+  const testResult = [
+    {
+      rank: 1,
+      pointer: `Similar-file-1`,
+      filename: 'emil_i_lÃ¶nneberga.txt',
+      scorePercent: '93.0%'
+    },
+    {
+      rank: 2,
+      pointer: `Similar-file-2`,
+      filename: 'jesper_lennehag.txt',
+      scorePercent: '89.0%'
+    },
+    {
+      rank: 3,
+      pointer: `Similar-file-3`,
+      filename: 'dmis_api.md',
+      scorePercent: '84.0%'
+    }
+  ]
 
   /* When clicking button Rerank */
   const generateAIRerank = async () => {
@@ -22,17 +47,24 @@ export function useAIRerank(props) {
 
     isReranking.value = true
     rerankError.value = ''
+    rerankPointer.value = ''
     aiRerankResults.value = []
-    const access_token = sessionStorage.getItem('access_token')
+    // const access_token = sessionStorage.getItem('access_token')
 
     try {
+      // testing
+      await new Promise((resolve) => setTimeout(resolve, 1500)) // Remove when backend is ready
+      aiRerankResults.value = testResult // Remove when backend is ready
+      rerankPointer.value = uniquePointer.value // Remove when backend is ready
+      return // Remove when backend is ready
+      /*
       const response = await globalThis.fetch(`${API_BASE_URL}/stochastic-analyzer/rerank`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${access_token}`
         },
-        body: JSON.stringify({ pointer: uniquePointer.value })
+        body: JSON.stringify({ pointers: [uniquePointer.value] })
       })
 
       if (!response.ok) {
@@ -41,6 +73,8 @@ export function useAIRerank(props) {
 
       const data = await response.json()
       aiRerankResults.value = Array.isArray(data.reranked_results) ? data.reranked_results : []
+      rerankPointer.value = data.rerank_pointer || ''
+    }     */
     } catch (error) {
       rerankError.value = error.message || 'An error occurred while generating AI rerank.'
     } finally {

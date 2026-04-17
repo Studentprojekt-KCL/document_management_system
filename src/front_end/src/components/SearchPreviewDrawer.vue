@@ -38,7 +38,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
+const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass, uniquePointer } =
   useSearchMetadata(props)
 
 /* AI summary composable */
@@ -82,13 +82,12 @@ const showToast = (success, message) => {
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
-    // TODO: Replace with real endpoint when backend supports classification updates.
-    const res = await fetch(`${API_BASE_URL}/metadata`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(`${API_BASE_URL}/search_engine/classification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('access_token')} ` },
       body: JSON.stringify({
-        filename: props.selectedFile,
-        metadata: { classification: level }
+        unique_pointer: uniquePointer.value,
+        classification: level
       })
     })
 

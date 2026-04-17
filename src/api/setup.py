@@ -11,6 +11,7 @@ setup(
         "fastapi[standard]>=0.128",
         "requests>=2.32",
         "uvicorn>=0.30",
+        "pyjwt[crypto]",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

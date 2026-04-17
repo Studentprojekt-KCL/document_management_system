@@ -11,7 +11,12 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from gateway.config import APIConfiguration
-from gateway.routes import create_router
+from gateway.routes import Services, create_router
+from gateway.services.classifier import Classifier
+from gateway.services.connector import Connector
+from gateway.services.summarizer import Summarizer
+from gateway.services.ranker import Ranker
+from gateway.services.summarizer_pdf import PdfConverter
 
 
 class API:
@@ -36,12 +41,32 @@ class API:
 
         self.app = FastAPI(title="stochastic analyzer gateway", version="1.0.0")
 
-        self.app.include_router(create_router(self.config))
+        services = Services(
+            connector=Connector(url=self.config.services.connector_url),
+            summarizer=Summarizer(
+                url=self.config.services.ministral_url,
+                model=self.config.services.ministral_model,
+                timeout=self.config.services.ministral_timeout,
+            ),
+            classifier=Classifier(
+                url=self.config.services.classifier_url,
+                escalation_threshold=self.config.services.escalation_threshold,
+            ),
+            ranker=Ranker(url=self.config.services.tei_url),
+            pdf_converter=PdfConverter(),
+        )
+
+        self.app.include_router(create_router(services, self.config.device))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     def start(self) -> None:
         """Start the API."""
-        uvicorn.run(self.app, host=self.config.bind, port=self.config.port, log_level=self.config.log_level)
+        uvicorn.run(
+            self.app,
+            host=self.config.bind,
+            port=self.config.port,
+            log_level=self.config.log_level,
+        )
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""

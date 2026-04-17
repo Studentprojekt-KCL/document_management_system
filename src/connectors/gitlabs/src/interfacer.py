@@ -231,12 +231,10 @@ class GitLabs:
                             "name": file_name,
                             "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
                             "size": info.file_size,
-                        } | extension,
+                        }
+                        | extension,
                     }
                 )
-                print(files_data)
-                import sys
-                sys.exit(1)
 
         return files_data
 

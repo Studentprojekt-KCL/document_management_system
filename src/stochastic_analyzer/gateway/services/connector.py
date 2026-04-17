@@ -5,7 +5,7 @@ from base64 import b64decode
 
 import httpx
 
-from dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_warning
 from gateway.schemas import InputItem, MetadataTemplate
 
 

@@ -99,6 +99,6 @@ class TestGitLabs(TestCase):
             "type": "source_file",
             "source_system": "system",
             "content": "unittest",
-            'file_type': '.txt',
-            'file_type_description': 'text file'
+            "file_type": ".txt",
+            "file_type_description": "text file",
         }

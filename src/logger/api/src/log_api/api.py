@@ -13,7 +13,7 @@ from fastapi.encoders import jsonable_encoder
 
 from log_api.database import Database
 from log_api.models import Log
-from initialisation_tools import read_port, read_env_variable
+from shared_functions.initialisation_tools import read_port, read_env_variable
 
 
 class API:

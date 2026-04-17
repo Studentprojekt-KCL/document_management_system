@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from se_api.handlers import Handler
-from initialisation_tools import read_env_variable, read_port
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 
 class API:

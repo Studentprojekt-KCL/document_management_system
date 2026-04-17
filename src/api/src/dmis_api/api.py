@@ -14,8 +14,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from dmis_logger import dms_warning, dms_info
-from initialisation_tools import read_env_variable, read_port
+from shared_functions.dmis_logger import dms_warning, dms_info
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .auth import TokenVerifier
 

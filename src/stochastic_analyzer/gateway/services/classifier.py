@@ -5,7 +5,7 @@ from json.decoder import JSONDecodeError
 
 import httpx
 
-from dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_warning
 from gateway.schemas import InputItem, ClassificationResult
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]

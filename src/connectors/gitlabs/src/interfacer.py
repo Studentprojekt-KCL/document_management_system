@@ -222,16 +222,21 @@ class GitLabs:
                 except UnicodeDecodeError as err:
                     file_content = ""
                     dms_info(f"Could not decode file: {file}. {err}")
+                file_name = file_path.name
+                extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
                 files_data.append(
                     {
                         "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
                         "metadata": {
-                            "name": file_path.name,
+                            "name": file_name,
                             "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
                             "size": info.file_size,
-                        },
+                        } | extension,
                     }
                 )
+                print(files_data)
+                import sys
+                sys.exit(1)
 
         return files_data
 

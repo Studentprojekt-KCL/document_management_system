@@ -47,7 +47,7 @@ class Indexer:
 
         return {"status": "complete", "total": len(files), "indexed": indexed}
 
-    async def search_similar(self, text: str, limit: int = 50) -> list[str]:
+    async def search_similar(self, text: str, limit: int = 5) -> list[str]:
         """Find the most similar documents in Qdrant for a given text.
 
         Args:
@@ -91,6 +91,25 @@ class Indexer:
         resp.raise_for_status()
         return resp.json().get("files", [])
 
+    @staticmethod
+    def _build_points(valid: list[dict], vectors: list[list[float]]) -> list[dict]:
+        """Build Qdrant point dicts from file metadata and vectors."""
+        points = []
+        for f, vec in zip(valid, vectors, strict=True):
+            meta = f.get("metadata", {})
+            pointer = meta.get("unique_pointer", "")
+            points.append(
+                {
+                    "id": _to_uuid(pointer),
+                    "vector": vec,
+                    "payload": {
+                        "unique_pointer": pointer,
+                        "name": meta.get("name", ""),
+                    },
+                }
+            )
+        return points
+
     async def _embed_and_upsert(self, files: list[dict], client: httpx.AsyncClient) -> int:
         """Embed documents and upsert them into Qdrant in batches."""
         check = await client.get(f"{self.qdrant_url}/collections/{COLLECTION}")
@@ -123,20 +142,7 @@ class Indexer:
             resp.raise_for_status()
             vectors = resp.json()
 
-            points = []
-            for f, vec in zip(valid, vectors, strict=True):
-                meta = f.get("metadata", {})
-                pointer = meta.get("unique_pointer", "")
-                points.append(
-                    {
-                        "id": _to_uuid(pointer),
-                        "vector": vec,
-                        "payload": {
-                            "unique_pointer": pointer,
-                            "name": meta.get("name", ""),
-                        },
-                    }
-                )
+            points = self._build_points(valid, vectors)
 
             await client.put(
                 f"{self.qdrant_url}/collections/{COLLECTION}/points",

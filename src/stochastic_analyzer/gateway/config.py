@@ -19,27 +19,37 @@ class VectorConfig:
     qdrant_url: str
 
 
+class MinistralConfig:
+    """Ministral LLM configuration.
+
+    Attributes:
+        url: URL for the Ministral LLM container.
+        model: model identifier for Ministral.
+        timeout: timeout for Ministral requests.
+    """
+
+    url: str
+    model: str
+    timeout: int
+
+
 class ServiceConfig:
     """External service connection configuration.
 
     Attributes:
         tei_url: URL for the TEI reranker container.
         classifier_url: URL for the TEI classifier container.
-        ministral_url: URL for the Ministral LLM container.
-        ministral_model: model identifier for Ministral.
-        ministral_timeout: timeout for Ministral requests.
         connector_url: connector url.
         escalation_threshold: score gap threshold for classification escalation.
+        ministral: Ministral LLM configuration.
         vector: vector search service configuration.
     """
 
     tei_url: str
     classifier_url: str
-    ministral_url: str
-    ministral_model: str
-    ministral_timeout: int
     connector_url: str
     escalation_threshold: float
+    ministral: MinistralConfig
     vector: VectorConfig
 
 
@@ -112,6 +122,7 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
+        self.services.ministral = MinistralConfig()
 
         required = {
             "TEI_URL": read_env_variable("TEI_URL"),
@@ -132,10 +143,10 @@ class APIConfiguration:
 
         self.services.tei_url = required["TEI_URL"]
         self.services.classifier_url = required["CLASSIFIER_URL"]
-        self.services.ministral_url = required["MINISTRAL_URL"]
-        self.services.ministral_model = required["MINISTRAL_MODEL"]
-        self.services.ministral_timeout = int(required["MINISTRAL_TIMEOUT"])
         self.services.connector_url = required["CONNECTOR_ADDRESS"]
         self.services.escalation_threshold = float(required["ESCALATION_THRESHOLD"])
+        self.services.ministral.url = required["MINISTRAL_URL"]
+        self.services.ministral.model = required["MINISTRAL_MODEL"]
+        self.services.ministral.timeout = int(required["MINISTRAL_TIMEOUT"])
         self.services.vector.embedding_url = required["EMBEDDING_URL"]
         self.services.vector.qdrant_url = required["QDRANT_URL"]

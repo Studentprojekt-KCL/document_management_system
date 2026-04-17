@@ -45,9 +45,9 @@ class API:
         services = Services(
             connector=Connector(url=self.config.services.connector_url),
             summarizer=Summarizer(
-                url=self.config.services.ministral_url,
-                model=self.config.services.ministral_model,
-                timeout=self.config.services.ministral_timeout,
+                url=self.config.services.ministral.url,
+                model=self.config.services.ministral.model,
+                timeout=self.config.services.ministral.timeout,
             ),
             classifier=Classifier(
                 url=self.config.services.classifier_url,

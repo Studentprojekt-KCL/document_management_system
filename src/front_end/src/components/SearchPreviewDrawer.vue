@@ -106,7 +106,7 @@ const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRer
         <div v-if="aiRerankResults.length" class="meta-cell meta-cell-summary">
           <ul>
             <li v-for="result in aiRerankResults" :key="result.pointer">
-              {{ result.rank }}. {{ result.filename }} Score: {{ result.scorePercent }}
+              {{ result.rank }}. {{ result.pointer }} Score: {{ result.scorePercent }}
             </li>
           </ul>
         </div>

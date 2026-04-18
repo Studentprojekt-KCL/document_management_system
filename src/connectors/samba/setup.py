@@ -9,6 +9,7 @@ setup(
     install_requires=[
         "fastapi[standard]>=0.128",
         "smbprotocol>=1.16.1",
+        "aiofiles>=25.1.0",
         # "requests>=2.32",
         f"shared-functions @ {shared_lib_path}",
     ]

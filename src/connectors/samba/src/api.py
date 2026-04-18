@@ -2,10 +2,11 @@
 
 from contextlib import asynccontextmanager
 import logging
-from os import environ
+import argparse
 from typing import Any, Sequence
-from dmis_logger import dms_error
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+from initialisation_tools import read_env_variable, read_port
 from starlette.responses import JSONResponse
 import uvicorn
 from services.samba import Samba
@@ -33,31 +34,36 @@ class API:
 
     def __init__(self) -> None:
         """constructor"""
-        host: str = environ.get("SC_HOST", "0.0.0.0")
-        port: str = environ.get("SC_PORT", "8000")
+        self.host: str = read_env_variable("SC_BIND_ADDRESS")
+        self.port: int = read_port("SC_PORT")
 
-        if not port.isdigit():
-            dms_error("SC_PORT is expected to be a number.")
-        self.port = int(port)
-        if self.port <= 0 or self.port > 65534:
-            dms_error("SC_PORT has to be between 0 and 65535.")
+        logging.basicConfig()
 
-        self.host = host
-        # TODO: remove hard code
-        self.log_level = "debug"
+        parser = argparse.ArgumentParser()
+        _ = parser.add_argument("--dev", action="store_true")
+        args = parser.parse_args()
+
+        if args.dev:
+            self.log_level = "debug"
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
+            self.log_level = "info"
 
         self.samba_service = Samba()
 
         self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
+        self.app.add_api_route("/get_files", self.files, methods=["POST"])
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
         self.samba_service.start_watch()
         yield
+        self.samba_service.stop_watch()
 
     def start(self) -> None:
         """Start the API."""
@@ -84,9 +90,18 @@ class API:
     async def index_needed_bool(self, subdata: str | None = None) -> Any:
         return self.samba_service.check_index_needed(subdata)
 
-    async def files(self) -> JSONResponse:
-        response = self.samba_service.get_files()
+    async def files(self, content: dict[str, list[str]], include_content: bool = True, include_last_edit_date: bool = True) -> JSONResponse:
+        pointers: list[str] | None = content.get("file_pointers")
+        if pointers is None:
+            return JSONResponse(content=[])
+        response = self.samba_service.grab_files(pointers, include_content, include_last_edit_date)
         return JSONResponse(content=response)
+
+    async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        return StreamingResponse(
+            self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream"
+        )
 
 
 def run() -> None:

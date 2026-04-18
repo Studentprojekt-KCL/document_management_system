@@ -1,0 +1,13 @@
+[
+    {"description": "Text (.md)", "extension": ".md", "type": "text"},
+    {"description": "Word (.docx)", "extension": ".docx", "type": "text"},
+    {"description": "Word (.doc)", "extension": ".doc", "type": "text"},
+    {"description": "PDF (.pdf)", "extension": ".pdf", "type": "text"},
+    {"description": "Text (.txt)", "extension": ".txt", "type": "text"},
+    {"description": "Excel (.xlsx)", "extension": ".xlsx", "type": "sheet"},
+    {"description": "PowerPoint (.pptx)", "extension": ".pptx", "type": "slide"},
+	{"description": "PowerPoint (.ppt)", "extension": ".ppt", "type": "slide"},
+    {"description": "ODT text (.odt)", "extension": ".odt", "type": "text"},
+    {"description": "ODS sheet (.ods)", "extension": ".ods", "type": "sheet"},
+    {"description": "ODP slides (.odp)", "extension": ".odp", "type": "slide"}
+]

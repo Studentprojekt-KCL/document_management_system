@@ -12,11 +12,12 @@ import binascii
 
 import requests
 
-from variables import PROJECT, SOURCE_FILE
+from shared_functions.variables import PROJECT, SOURCE_FILE
 
-from unpacker import unpack_values
-from dmis_logger import dms_error, dms_info, dms_warning
-from initialisation_tools import read_env_variable
+from shared_functions.unpacker import unpack_values
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.file_type_logic import get_file_resource, determine_file_type
 
 
 class GitLabs:
@@ -29,6 +30,8 @@ class GitLabs:
     source_system: str
     project_information: dict | None = None
     blame_cache: dict = {}
+    file_extensions: list = []
+    extension_descriptions: dict = {}
 
     def __init__(self) -> None:
         """Constructor."""
@@ -36,6 +39,9 @@ class GitLabs:
         self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
         address = read_env_variable("GITLAB_ADDRESS")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
+        file_type_resource = get_file_resource()
+        self.file_extensions = [extension.get("extension") for extension in file_type_resource]
+        self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
 
     def _get_projects(self) -> dict | list:
         """Retrieve all available projects."""
@@ -156,18 +162,23 @@ class GitLabs:
         if isinstance(file, list):
             file = {}
 
+        file_name: str | None = file.get("file_name")
+        extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
         base_structure: dict[Any, Any] = {
             "unique_pointer": url,
-            "name": file.get("file_name"),
+            "name": file_name,
             "size": file.get("size"),
             "type": SOURCE_FILE,
             "source_system": self.source_system,
-        }
+        } | extension
+
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
                 self.blame_cache[url] = self._execute_request(url)
-            base_structure |= {"last_edit_date": unpack_values(self.blame_cache.get(url), (0, "commit", "committed_date"))}
+            blame = self.blame_cache.get(url)
+            if isinstance(blame, list):
+                base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):
@@ -211,14 +222,17 @@ class GitLabs:
                 except UnicodeDecodeError as err:
                     file_content = ""
                     dms_info(f"Could not decode file: {file}. {err}")
+                file_name = file_path.name
+                extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
                 files_data.append(
                     {
                         "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
                         "metadata": {
-                            "name": file_path.name,
+                            "name": file_name,
                             "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
                             "size": info.file_size,
-                        },
+                        }
+                        | extension,
                     }
                 )
 

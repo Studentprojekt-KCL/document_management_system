@@ -17,10 +17,10 @@ from urllib.parse import quote, unquote, urljoin
 
 import requests
 
-from variables import SOURCE_FILE
-from unpacker import unpack_values
-from dmis_logger import dms_error, dms_info, dms_warning
-from initialisation_tools import read_env_variable
+from shared_functions.variables import SOURCE_FILE
+from shared_functions.unpacker import unpack_values
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
 

@@ -19,19 +19,22 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     error(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
-    if not isinstance(log_service, str):
+    if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):
         warning("Log service not set, export 'LOG_SERVICE'.")
-    else:
-        _res = requests.post(
-            log_service,
-            json={
-                "service": gethostname(),  # Probably not the best solution
-                "message": msg,
-                "event_type": "ERROR",
-                "occured": timestamp.isoformat(),
-            },
-            timeout=60,
-        )
+        os.environ["SERVICE_NOT_SET_SENT"] = "true"
+        os._exit(1)
+    if not isinstance(log_service, str):
+        os._exit(1)
+    _res = requests.post(
+        log_service,
+        json={
+            "service": gethostname(),  # Probably not the best solution
+            "message": msg,
+            "event_type": "ERROR",
+            "occured": timestamp.isoformat(),
+        },
+        timeout=60,
+    )
     os._exit(1)
 
 
@@ -45,8 +48,11 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     warning(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
-    if not isinstance(log_service, str):
+    if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):
         warning("Log service not set, export 'LOG_SERVICE'.")
+        os.environ["SERVICE_NOT_SET_SENT"] = "true"
+        return
+    if not isinstance(log_service, str):
         return
     _res = requests.post(
         log_service,
@@ -70,8 +76,11 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     info(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOG_SERVICE")
-    if not isinstance(log_service, str):
+    if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):
         warning("Log service not set, export 'LOG_SERVICE'.")
+        os.environ["SERVICE_NOT_SET_SENT"] = "true"
+        return
+    if not isinstance(log_service, str):
         return
     _res = requests.post(
         log_service,

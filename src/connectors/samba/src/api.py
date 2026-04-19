@@ -3,16 +3,16 @@
 from contextlib import asynccontextmanager
 import logging
 import argparse
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from initialisation_tools import read_env_variable, read_port
 from starlette.responses import JSONResponse
 import uvicorn
 from services.samba import Samba
-
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
 
 
 class API:
@@ -61,6 +61,7 @@ class API:
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
+        """API lifespan handler."""
         self.samba_service.start_watch()
         yield
         self.samba_service.stop_watch()
@@ -88,20 +89,30 @@ class API:
         return JSONResponse(status_code=422, content=content)
 
     async def index_needed_bool(self, subdata: str | None = None) -> Any:
-        return self.samba_service.check_index_needed(subdata)
+        """Check if indexing is needed.
 
-    async def files(self, content: dict[str, list[str]], include_content: bool = True, include_last_edit_date: bool = True) -> JSONResponse:
-        pointers: list[str] | None = content.get("file_pointers")
-        if pointers is None:
-            return JSONResponse(content=[])
-        response = self.samba_service.grab_files(pointers, include_content, include_last_edit_date)
+        Args:
+            subdata: base64 encoded date.
+        Returns: true if needed else false.
+        """
+
+        return await self.samba_service.check_index_needed(subdata)
+
+    async def files(self, content: dict, include_content: bool = True, include_last_edit_date: bool = True) -> JSONResponse:
+        """Grab a list of files as a user.
+
+        Args:
+            content: json body containing pointers and authentication details.
+            include_content: if file content is wanted or not.
+            include_last_edit_date: if last modification date is wanted or not.
+        Returns: json response with the files.
+        """
+        response = self.samba_service.grab_files(content, include_content, include_last_edit_date)
         return JSONResponse(content=response)
 
     async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
-        return StreamingResponse(
-            self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream"
-        )
+        return StreamingResponse(self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream")
 
 
 def run() -> None:

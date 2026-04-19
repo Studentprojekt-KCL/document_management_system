@@ -7,15 +7,6 @@
  * @component
  * @example usage:
  * <ClassificationEditor
- *   :visible="isEditingClassification"<script setup>
-/**
- * ClassificationEditor Component
- * A modal overlay for editing a document's security classification.
- * Intended to be used inside SearchPreviewDrawer.
- *
- * @component
- * @example usage:
- * <ClassificationEditor
  *   :visible="isEditingClassification"
  *   :current-level="currentSecurityLevel"
  *   @save="handleClassificationSave"
@@ -23,8 +14,9 @@
  * />
  */
 
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { ShieldCheck, Save, XCircle } from 'lucide-vue-next'
+import { securityLevels, fetchSecurityLevels } from '@/composables/useSearchMetadata'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -33,8 +25,9 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel'])
 
-/* Security classification levels */
-const SECURITY_LEVELS = ['Public', 'Internal', 'Sensitive', 'Confidential']
+onMounted(() => {
+  fetchSecurityLevels()
+})
 
 const selectedLevel = ref('')
 const isSaving = ref(false)
@@ -82,7 +75,7 @@ defineExpose({ resetSaving })
 
           <div class="level-options">
             <button
-              v-for="level in SECURITY_LEVELS"
+              v-for="level in securityLevels"
               :key="level"
               :class="['level-option', { selected: selectedLevel === level }, `option-${level.toLowerCase()}`]"
               type="button"

@@ -1,14 +1,22 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
+import { securityLevels, fetchSecurityLevels } from '@/composables/useSearchMetadata'
 
-// Will eventually fetch these filter options from the backend or something??
-const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
+const props = defineProps({
+  selectedFilters: Object
+})
+const emit = defineEmits(['update:filters'])
 
+/* API cofig*/
 const access_token = sessionStorage.getItem('access_token')
 const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+
+/* (Static) filter options */
+const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
+
+/* Dynamic filter options */
 const sourceFilters = ref([])
-const securityFilters = ref([])
 
 const fetchSourceFilters = async () => {
   try {
@@ -29,32 +37,8 @@ const fetchSourceFilters = async () => {
   }
 }
 
-const fetchSecurityFilters = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`, {
-      headers: {
-        Authorization: `Bearer ${access_token}`
-      }
-    })
-
-    if (!res.ok) {
-      console.error(`Failed to fetch security classifications: ${res.statusText}`)
-      return
-    }
-    const data = await res.json()
-    securityFilters.value = data
-  } catch (error) {
-    console.error(`Error fetching security classifications: ${error}`)
-  }
-}
-
 fetchSourceFilters()
-fetchSecurityFilters()
-
-const props = defineProps({
-  selectedFilters: Object
-})
-const emit = defineEmits(['update:filters'])
+fetchSecurityLevels()
 
 /* Local refs for filter selection */
 const localSource = ref([...props.selectedFilters.source])
@@ -157,7 +141,7 @@ their search queries.
           SECURITY:
         </span>
         <button
-          v-for="item in securityFilters"
+          v-for="item in securityLevels"
           :key="item"
           :class="['chip', { active: isSelected('security', item) }]"
           @click="toggleFilter('security', item)"

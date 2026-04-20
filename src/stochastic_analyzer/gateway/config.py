@@ -13,10 +13,14 @@ class VectorConfig:
     Attributes:
         embedding_url: URL for the TEI embedding container.
         qdrant_url: URL for the Qdrant vector database.
+        batch_size: Number of documents per batch.
+        max_chars: Maximum characters per documents sent for embedding.
     """
 
     embedding_url: str
     qdrant_url: str
+    batch_size: int
+    max_chars: int
 
 
 class MinistralConfig:
@@ -37,7 +41,6 @@ class ServiceConfig:
     """External service connection configuration.
 
     Attributes:
-        tei_url: URL for the TEI reranker container.
         classifier_url: URL for the TEI classifier container.
         connector_url: connector url.
         escalation_threshold: score gap threshold for classification escalation.
@@ -45,7 +48,6 @@ class ServiceConfig:
         vector: vector search service configuration.
     """
 
-    tei_url: str
     classifier_url: str
     connector_url: str
     escalation_threshold: float
@@ -125,7 +127,6 @@ class APIConfiguration:
         self.services.ministral = MinistralConfig()
 
         required = {
-            "TEI_URL": read_env_variable("TEI_URL"),
             "CLASSIFIER_URL": read_env_variable("CLASSIFIER_URL"),
             "MINISTRAL_URL": read_env_variable("MINISTRAL_URL"),
             "MINISTRAL_MODEL": read_env_variable("MINISTRAL_MODEL"),
@@ -141,7 +142,6 @@ class APIConfiguration:
                 dms_error(f"{name} is not defined.")
                 return
 
-        self.services.tei_url = required["TEI_URL"]
         self.services.classifier_url = required["CLASSIFIER_URL"]
         self.services.connector_url = required["CONNECTOR_ADDRESS"]
         self.services.escalation_threshold = float(required["ESCALATION_THRESHOLD"])
@@ -150,3 +150,5 @@ class APIConfiguration:
         self.services.ministral.timeout = int(required["MINISTRAL_TIMEOUT"])
         self.services.vector.embedding_url = required["EMBEDDING_URL"]
         self.services.vector.qdrant_url = required["QDRANT_URL"]
+        self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
+        self.services.vector.max_chars = int(environ.get("INDEX_MAX_CHARS", "2000"))

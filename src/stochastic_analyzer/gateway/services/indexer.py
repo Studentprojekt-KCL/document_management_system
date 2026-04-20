@@ -2,21 +2,16 @@
 
 import hashlib
 from base64 import b64decode
+from http import HTTPStatus
 
 import httpx
 
 from dmis_logger import dms_warning
 
-COLLECTION = "documents"
-VECTOR_SIZE = 384
-BATCH_SIZE = 8
-MAX_CHARS = 2000
-HTTP_OK = 200
-
 
 def _to_uuid(pointer: str) -> str:
     """Hash a pointer string into a UUID for Qdrant."""
-    h = hashlib.md5(pointer.encode()).hexdigest()  # noqa: S324
+    h = hashlib.md5(pointer.encode()).hexdigest()
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
 
 
@@ -26,11 +21,21 @@ class Indexer:
     Attributes:
         embedding_url: URL for the TEI embedding container.
         qdrant_url: URL for the Qdrant vector database.
+        batch_size: Number of documents embedded per batch.
+        max_chars: Maximum characters per document sent for embedding.
     """
 
-    def __init__(self, embedding_url: str, qdrant_url: str) -> None:
+    def __init__(
+        self,
+        embedding_url: str,
+        qdrant_url: str,
+        batch_size: int = 8,
+        max_chars: int = 2000,
+    ) -> None:
         self.embedding_url = embedding_url
         self.qdrant_url = qdrant_url
+        self.batch_size = batch_size
+        self.max_chars = max_chars
 
     async def index(self, connector_url: str) -> dict:
         """Run the full indexing pipeline.
@@ -47,7 +52,7 @@ class Indexer:
 
         return {"status": "complete", "total": len(files), "indexed": indexed}
 
-    async def search_similar(self, text: str, limit: int = 5) -> list[str]:
+    async def search_similar(self, text: str, limit: int = 5) -> list[tuple[str, float]]:
         """Find the most similar documents in Qdrant for a given text.
 
         Args:
@@ -55,18 +60,18 @@ class Indexer:
             limit: number of candidates to return.
 
         Returns:
-            List of unique_pointers for the top matches.
+            List of (unique_pointer, score) tuples for the top matches.
         """
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 f"{self.embedding_url}/embed",
-                json={"inputs": [text[:MAX_CHARS]]},
+                json={"inputs": [text[: self.max_chars]]},
             )
             resp.raise_for_status()
             vector = resp.json()[0]
 
             resp = await client.post(
-                f"{self.qdrant_url}/collections/{COLLECTION}/points/query",
+                f"{self.qdrant_url}/collections/documents/points/query",
                 json={
                     "query": vector,
                     "limit": limit,
@@ -76,7 +81,7 @@ class Indexer:
             resp.raise_for_status()
             points = resp.json().get("result", {}).get("points", [])
 
-        return [p["payload"]["unique_pointer"] for p in points if p.get("payload", {}).get("unique_pointer")]
+        return [(p["payload"]["unique_pointer"], p["score"]) for p in points if p.get("payload", {}).get("unique_pointer")]
 
     async def _fetch_files(self, connector_url: str, client: httpx.AsyncClient) -> list[dict]:
         """Get the file list from the connector's indexing endpoint."""
@@ -110,23 +115,33 @@ class Indexer:
             )
         return points
 
+    async def _ensure_collection(self, client: httpx.AsyncClient) -> None:
+        """Create the Qdrant collection if missing, probing for vector dimension."""
+        check = await client.get(f"{self.qdrant_url}/collections/documents")
+        if check.status_code == HTTPStatus.OK:
+            return
+
+        probe = await client.post(f"{self.embedding_url}/embed", json={"inputs": ["x"]})
+        probe.raise_for_status()
+        size = len(probe.json()[0])
+
+        await client.put(
+            f"{self.qdrant_url}/collections/documents",
+            json={"vectors": {"size": size, "distance": "Cosine"}},
+        )
+
     async def _embed_and_upsert(self, files: list[dict], client: httpx.AsyncClient) -> int:
         """Embed documents and upsert them into Qdrant in batches."""
-        check = await client.get(f"{self.qdrant_url}/collections/{COLLECTION}")
-        if check.status_code != HTTP_OK:
-            await client.put(
-                f"{self.qdrant_url}/collections/{COLLECTION}",
-                json={"vectors": {"size": VECTOR_SIZE, "distance": "Cosine"}},
-            )
+        await self._ensure_collection(client)
 
         indexed = 0
-        for i in range(0, len(files), BATCH_SIZE):
-            batch = files[i : i + BATCH_SIZE]
+        for i in range(0, len(files), self.batch_size):
+            batch = files[i : i + self.batch_size]
 
             texts, valid = [], []
             for f in batch:
                 try:
-                    content = b64decode(f["content"]).decode("utf-8")[:MAX_CHARS]
+                    content = b64decode(f["content"]).decode("utf-8")[: self.max_chars]
                 except (UnicodeDecodeError, ValueError, KeyError):
                     dms_warning(f"Failed to decode: {f.get('metadata', {}).get('name', '?')}")
                     continue
@@ -145,7 +160,7 @@ class Indexer:
             points = self._build_points(valid, vectors)
 
             await client.put(
-                f"{self.qdrant_url}/collections/{COLLECTION}/points",
+                f"{self.qdrant_url}/collections/documents/points",
                 json={"points": points},
             )
             indexed += len(points)

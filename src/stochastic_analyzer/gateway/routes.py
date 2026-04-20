@@ -18,7 +18,6 @@ from gateway.schemas import (
 from gateway.services.classifier import Classifier, LABELS
 from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
-from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
 
@@ -30,7 +29,6 @@ class Services:
     connector: Connector
     summarizer: Summarizer
     classifier: Classifier
-    ranker: Ranker
     pdf_converter: PdfConverter
     indexer: Indexer
 
@@ -72,7 +70,7 @@ def create_router(services: Services, device: str) -> APIRouter:
 
     @router.post("/rerank", response_model=RankResponse)
     async def rerank_documents(payload: PointerRequest) -> dict:
-        """Endpoint for semantic reranking against the full document index."""
+        """Endpoint for semantic document similarity search using vector retrieval."""
         if len(payload.pointers) != 1:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
 
@@ -83,23 +81,11 @@ def create_router(services: Services, device: str) -> APIRouter:
 
         query = reference_items[0].content
 
-        candidate_pointers = await services.indexer.search_similar(query)
-        if not candidate_pointers:
+        results = await services.indexer.search_similar(query)
+        if not results:
             return {"ranked_results": []}
 
-        candidate_items = await services.connector.get_file_contents(candidate_pointers)
-        if not candidate_items:
-            dms_warning("Failed to retrieve candidate documents from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve candidate documents.")
-
-        texts = [item.content for item in candidate_items]
-        scores = await services.ranker.rank(query, texts)
-
-        scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, candidate_pointers, strict=False)],
-            key=lambda x: x.score,
-            reverse=True,
-        )
+        scored = [ScoredPointer(score=float(score), pointer=pointer) for pointer, score in results]
         return {"ranked_results": scored}
 
     @router.post("/index")

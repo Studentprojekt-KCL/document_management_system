@@ -2,7 +2,7 @@ The following must be exported in the local environment:
 
     CONGITHUB_BIND_PORT=<PORT>
     CONGITHUB_BIND_ADDR=<BIND_ADDRESS>
-    CONGITHUB_GITHUB_API_URL=<GITHUB_FRONTEND_DMISAPI_BASE_URL>        # e.g. https://api.github.com/
+    CONGITHUB_GITHUB_API_URL=<GITHUB_API_BASE_URL>        # e.g. https://api.github.com/
     CONGITHUB_GITHUB_SYSTEM_NAME=<SOURCE_SYSTEM_NAME>
     CONGITHUB_GITHUB_API_VERSION=<API_VERSION>            # e.g. 2022-11-28
 

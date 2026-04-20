@@ -9,12 +9,34 @@ import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 // new import
 import { useAuthSession } from '@/composables/useAuthSession'
+import router from './router'
+import { LOCAL_KEY_LOGOUT_EVENT } from '@/utils/config'
 
 /* Determine if the current route is a public or error page. */
 const route = useRoute()
 const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
 
+/*
+// This is the new way. 
 useAuthSession()
+*/
+
+/* Synchronize logout across multiple tabs for storage events. */
+const syncLogout = (event) => {
+  if (event.key === LOCAL_KEY_LOGOUT_EVENT) {
+    sessionStorage.clear()
+    router.push('/')
+  }
+}
+
+/* Event listeners for storage events to handle logout synchronization. */
+onMounted(() => {
+  window.addEventListener('storage', syncLogout)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', syncLogout)
+})
 </script>
 
 <template>

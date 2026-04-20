@@ -2,9 +2,10 @@
 
 from os import environ
 from typing import Any
-from dmis_logger import dms_error, dms_warning
 from requests import Session, get
 from requests import exceptions
+
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class Connector:

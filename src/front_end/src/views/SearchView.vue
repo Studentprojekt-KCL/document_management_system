@@ -17,6 +17,7 @@ import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveFilename, resolveSecurityClass, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { authFetch, API_PATHS } from '@/utils/api'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
@@ -27,8 +28,6 @@ const error = ref('')
 const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
-/* Base URL for API requests, configurable via environment variable */
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -54,11 +53,7 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/search_engine/search?query=${encodeURIComponent(query)}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('access_token')}`
-      }
-    })
+    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`

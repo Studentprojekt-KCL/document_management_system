@@ -12,4 +12,10 @@ dependencies = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "shared_functions"}
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+shared_functions = ["data/file_types.json", "data/documents_only_types.json"]

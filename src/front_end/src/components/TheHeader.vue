@@ -15,13 +15,52 @@ import { logout } from '@/utils/auth'
 /* Handles user logout by clearing session storage and redirecting to login page. */
 const handleLogout = () => {
   logout()
+
+// fix this in auth.js
+import {
+  KEYCLOAK_CLIENT_ID,
+  keycloakLogoutUrl,
+  SESSION_KEY_ACCESS_TOKEN,
+  SESSION_KEY_ID_TOKEN,
+  SESSION_KEY_PKCE_VERIFIER,
+  SESSION_KEY_OIDC_STATE,
+  LOCAL_KEY_LOGOUT_EVENT
+} from '@/utils/config'
+
+/* Placeholder for future notifications feature. */
+const handleNotification = () => {
+  console.log('Notifications not yet implemented.')
+}
+
+/* Handles user logout by clearing session storage and redirecting to login page. */
+const handleLogout = () => {
+  const idToken = sessionStorage.getItem(SESSION_KEY_ID_TOKEN)
+  const postLogoutRedirectUri = `${window.location.origin}/`
+
+  sessionStorage.removeItem(SESSION_KEY_ACCESS_TOKEN)
+  sessionStorage.removeItem(SESSION_KEY_ID_TOKEN)
+  sessionStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+  sessionStorage.removeItem(SESSION_KEY_OIDC_STATE)
+
+  localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
+
+  if (idToken) {
+    const logoutUrl =
+      keycloakLogoutUrl() +
+      `?id_token_hint=${encodeURIComponent(idToken)}` +
+      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
+      `&client_id=${encodeURIComponent(KEYCLOAK_CLIENT_ID)}`
+
+    window.location.assign(logoutUrl)
+    return
+  }
 }
 </script>
 
 <template>
   <!--- Main Header container-->
   <header class="header">
-    <img src="@/assets/logo.png" alt="Logo" class="logo-image" />
+    <img src="@/assets/newLogo.png" alt="Logo" class="logo-image" />
 
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
@@ -49,9 +88,11 @@ const handleLogout = () => {
 }
 
 .logo-image {
-  width: 140px;
+  width: 190px;
   height: auto;
   object-fit: contain;
+  border-radius: 10px;
+  margin-left: 1.3rem;
 }
 
 .spacer {

@@ -5,10 +5,7 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 
-// use env variables from .env
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
-const BASE_URL = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
+import { KEYCLOAK_CLIENT_ID, SESSION_KEY_ACCESS_TOKEN } from '@/utils/config'
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {
@@ -22,15 +19,20 @@ function decodeJwtPayload(token) {
   }
 }
 
+/** Returns true if the user currently has a valid access token in sessionStorage. */
+export function isLoggedIn() {
+  return !!localStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
+}
+
 /* Check if the user has a specific role */
 export function hasRole(role) {
-  const token = localStorage.getItem('access_token')
+  const token = localStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
   if (!token) return false
 
   const payload = decodeJwtPayload(token)
   if (!payload) return false
 
-  const clientRoles = payload?.resource_access?.[CLIENT_ID]?.roles ?? []
+  const clientRoles = payload?.resource_access?.[KEYCLOAK_CLIENT_ID]?.roles ?? []
   const realmRoles = payload?.realm_access?.roles ?? []
 
   return clientRoles.includes(role) || realmRoles.includes(role)

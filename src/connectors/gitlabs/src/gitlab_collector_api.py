@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLabs
-from boto_tools import upload_file
 
-from initialisation_tools import read_port, read_env_variable
+from shared_functions.boto_tools import upload_file
+from shared_functions.initialisation_tools import read_port, read_env_variable
 
 
 class API:

@@ -7,7 +7,7 @@ from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
-from initialisation_tools import read_env_variable
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class Database:

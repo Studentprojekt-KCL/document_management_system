@@ -79,6 +79,7 @@ class API:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         return StreamingResponse(self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
 
+
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()

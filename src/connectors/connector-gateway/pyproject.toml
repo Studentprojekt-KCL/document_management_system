@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "connector-gateway"
+description = "Main interface to connectors"
+dynamic = ["dependencies"]
+version = "0.0.1"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+connector-gateway = "connector-gateway.api:run"

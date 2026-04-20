@@ -23,7 +23,6 @@ Configuration is done through environment variables.
 - `STOCHAN_CLASSIFIER_URL` — URL for the TEI classifier container.
 - `STOCHAN_LLM_URL` — URL for the Ministral LLM container.
 - `STOCHAN_LLM_MODEL` — Model identifier for Ministral.
-- `DEVICE` — Compute device identifier (optional, defaults to `external`).
 
 Optional flags:
 

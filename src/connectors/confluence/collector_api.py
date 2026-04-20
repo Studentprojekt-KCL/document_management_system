@@ -6,8 +6,8 @@ Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
 ``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
 
 Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). Needs
-``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``; optional MinIO env vars for uploads.
+``ConfluenceInterfacer``). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
+optional MinIO env vars for uploads.
 """
 
 import argparse
@@ -24,13 +24,15 @@ from pydantic import BaseModel, Field
 from boto_tools import upload_file
 from dmis_logger import dms_warning
 
-from interfacer_confluence import ConfluenceInterfacer
+from interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
 
 class GetFilesBody(BaseModel):
     """JSON body for ``POST /get_files``."""
 
     file_pointers: list[str] = Field(default_factory=list)
+    include_content: bool = False
+    include_last_edit_date: bool = True
 
 
 class API:
@@ -41,18 +43,28 @@ class API:
     def __init__(self) -> None:
         self.app = FastAPI()
         self.confluence_instance = ConfluenceInterfacer()
-        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+        self.app.add_exception_handler(
+            RequestValidationError, self.validation_exception_handler
+        )
         # Legacy (same as older GitLab connector in this repo)
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
         # DMS-aligned routes
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+        self.app.add_api_route(
+            "/index_needed_bool", self.index_needed_bool, methods=["GET"]
+        )
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route(
+            "/connected_source_systems", self.connected_source_systems, methods=["GET"]
+        )
+        self.app.add_api_route(
+            "/stream_files_to_index", self.stream_files_to_index, methods=["GET"]
+        )
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
-    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+    async def validation_exception_handler(
+        self, _: Request, exc: Exception
+    ) -> JSONResponse:
         """Return a JSON error payload for FastAPI request validation failures."""
         errors: dict[str, Any]
         if isinstance(exc, RequestValidationError):
@@ -73,28 +85,36 @@ class API:
     async def files(
         self,
         subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> Any:
         """Return file pointers for incremental indexing (honours ``subdata`` checkpoint)."""
         if x_confluence_email is None or x_confluence_token is None:
             return {"subdata": subdata, "file_pointers": []}
         token = self._token(x_confluence_token)
-        assert token is not None
-        return await self.confluence_instance.pointers_to_all_files_to_index(subdata, x_confluence_email.strip(), token)
+        return await self.confluence_instance.pointers_to_all_files_to_index(
+            subdata, x_confluence_email.strip(), token
+        )
 
     async def file(
         self,
         file_pointer: str,
         include_content: bool = True,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> Any:
         """Return one page as metadata plus optional base64-encoded plain text."""
         if x_confluence_email is None or x_confluence_token is None:
             return {}
         token = self._token(x_confluence_token)
-        assert token is not None
         return await self.confluence_instance.get_page(
             file_pointer, include_content, x_confluence_email.strip(), token
         )
@@ -102,35 +122,43 @@ class API:
     async def index_needed_bool(
         self,
         subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> dict[str, Any]:
         """Whether a new index run has work (DMS ``/index_needed_bool``)."""
         if x_confluence_email is None or x_confluence_token is None:
             return {"index_needed": False}
         token = self._token(x_confluence_token)
-        assert token is not None
-        return await self.confluence_instance.check_index_needed(subdata, x_confluence_email.strip(), token)
+        return await self.confluence_instance.check_index_needed(
+            subdata, x_confluence_email.strip(), token
+        )
 
     async def get_files(
         self,
         body: GetFilesBody,
-        include_content: bool = False,
-        include_last_edit_date: bool = True,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> list[dict[str, Any]]:
         """Batch fetch pages by pointers (DMS ``POST /get_files``)."""
         if x_confluence_email is None or x_confluence_token is None:
             return []
         token = self._token(x_confluence_token)
-        assert token is not None
         return await self.confluence_instance.get_files(
-            body.file_pointers,
-            include_content,
-            include_last_edit_date,
-            x_confluence_email.strip(),
-            token,
+            GetFilesInput(
+                file_pointers=body.file_pointers,
+                include_content=body.include_content,
+                include_last_edit_date=body.include_last_edit_date,
+                email=x_confluence_email.strip(),
+                api_token=token,
+            )
         )
 
     async def connected_source_systems(self) -> list[str]:
@@ -140,15 +168,25 @@ class API:
     async def stream_files_to_index(
         self,
         subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> StreamingResponse:
         """Stream JSON chunks of pages to index (DMS ``/stream_files_to_index``)."""
-        token = self._token(x_confluence_token) if x_confluence_email and x_confluence_token else None
+        token = (
+            self._token(x_confluence_token)
+            if x_confluence_email and x_confluence_token
+            else None
+        )
         email = x_confluence_email.strip() if x_confluence_email else None
 
         async def stream() -> Any:
-            async for chunk in self.confluence_instance.stream_files_to_index(subdata, email, token):
+            async for chunk in self.confluence_instance.stream_files_to_index(
+                subdata, email, token
+            ):
                 yield chunk
 
         return StreamingResponse(stream(), media_type="application/octet-stream")
@@ -156,15 +194,25 @@ class API:
     async def files_to_index(
         self,
         subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        x_confluence_email: str | None = Header(
+            default=None, alias="X-Confluence-Email"
+        ),
+        x_confluence_token: str | None = Header(
+            default=None, alias="X-Confluence-Token"
+        ),
     ) -> dict[str, Any]:
         """Full payload; prefers upload URL like DMS GitLab ``/files_to_index``."""
         if x_confluence_email is None or x_confluence_token is None:
-            return {"subdata": subdata, "files": [], "deleted": [], "index_needed": False}
+            return {
+                "subdata": subdata,
+                "files": [],
+                "deleted": [],
+                "index_needed": False,
+            }
         tok = self._token(x_confluence_token)
-        assert tok is not None
-        content = await self.confluence_instance.files_to_index(subdata, x_confluence_email.strip(), tok)
+        content = await self.confluence_instance.files_to_index(
+            subdata, x_confluence_email.strip(), tok
+        )
         try:
             url = upload_file(content, "confluence_content.json")
             return {
@@ -172,7 +220,7 @@ class API:
                 "index_needed": content.get("index_needed"),
                 "file_url": url,
             }
-        except (IOError, OSError, ValueError) as err:
+        except (OSError, ValueError) as err:
             dms_warning(f"Could not upload confluence payload to object storage: {err}")
             return {
                 "subdata": content.get("subdata"),

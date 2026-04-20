@@ -1,13 +1,7 @@
 [
-    {"description": "Word (.docx)", "extension": ".docx", "type": "text"},
-    {"description": "PDF (.pdf)", "extension": ".pdf", "type": "text"},
-    {"description": "Excel (.xlsx)", "extension": ".xlsx", "type": "sheet"},
-    {"description": "PowerPoint (.pptx)", "extension": ".pptx", "type": "slide"},
-    {"description": "Text (.txt)", "extension": ".txt", "type": "text"},
-    {"description": "Text (.md)", "extension": ".md", "type": "text"},
-    {"description": "Word (.doc)", "extension": ".doc", "type": "text"},
-	{"description": "PowerPoint (.ppt)", "extension": ".ppt", "type": "slide"},
-    {"description": "ODT text (.odt)", "extension": ".odt", "type": "text"},
-    {"description": "ODS sheet (.ods)", "extension": ".ods", "type": "sheet"},
-    {"description": "ODP slides (.odp)", "extension": ".odp", "type": "slide"}
+    {"description": "PDF", "extension": [".pdf"], "type": "text"},
+    {"description": "Word", "extension": [".docx", ".doc", ".odt"], "type": "text"},
+    {"description": "Text", "extension": [".txt", ".md"], "type": "text"},
+    {"description": "Excel", "extension": [".xlsx", ".ods"], "type": "sheet"},
+    {"description": "PowerPoint", "extension": [".pptx", ".ppt", ".odp"], "type": "slide"}
 ]

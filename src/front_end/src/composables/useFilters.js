@@ -33,7 +33,7 @@ export function useSourceFilters() {
 /**
  * Fetches the file types for "documents only" filter
  *
- * @returns {Ref<string[]>}
+ * @returns {Ref<Array<{description: string, extension: string[], type: string}>>}
  */
 export function useDocumentsOnlyFilters() {
   const documentsOnlyFilters = ref([])
@@ -47,7 +47,15 @@ export function useDocumentsOnlyFilters() {
       return res.json()
     })
     .then((data) => {
-      if (data) documentsOnlyFilters.value = data
+      if (!Array.isArray(data)) return
+
+      documentsOnlyFilters.value = data
+        .map((item) => ({
+          description: item?.description || '',
+          extension: (item?.extension || []).map((ext) => String(ext)),
+          type: item?.type || ''
+        }))
+        .filter((item) => item.description && item.extension.length > 0)
     })
     .catch((error) => console.error(`Error fetching documents only filters: ${error}`))
 

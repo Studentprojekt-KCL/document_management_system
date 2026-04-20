@@ -19,7 +19,7 @@ class Query:
 
     def __init__(self) -> None:
         """Constructor."""
-        address: str = read_env_variable("SE_API_QUERY_ADDRESS")
+        address: str = read_env_variable("SEARCHENG_STOCHAN_URL")
 
         self.classify_url = address.rstrip("/") + "/classify"
         self.classifications_url = address.rstrip("/") + "/classifications"

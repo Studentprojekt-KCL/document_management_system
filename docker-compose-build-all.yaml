@@ -23,10 +23,10 @@ services:
     image: front-end:pr
     build: ./src/front_end
 
-  connector-gitlabs:
-    image: connector-gitlabs:pr
+  connector-gitlab:
+    image: connector-gitlab:pr
     build:
-      dockerfile: src/connectors/gitlabs/Dockerfile
+      dockerfile: src/connectors/gitlab/Dockerfile
 
   connector-githubs:
     image: connector-githubs:pr

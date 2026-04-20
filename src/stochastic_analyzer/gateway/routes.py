@@ -74,7 +74,8 @@ def create_router(services: Services, device: str) -> APIRouter:
         if len(payload.pointers) != 1:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
 
-        reference_items = await services.connector.get_file_contents([payload.pointers[0]])
+        query_pointer = payload.pointers[0]
+        reference_items = await services.connector.get_file_contents([query_pointer])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
@@ -82,6 +83,7 @@ def create_router(services: Services, device: str) -> APIRouter:
         query = reference_items[0].content
 
         results = await services.indexer.search_similar(query)
+        results = [(p, s) for p, s in results if p != query_pointer]
         if not results:
             return {"ranked_results": []}
 

@@ -28,10 +28,10 @@ services:
     build:
       dockerfile: src/connectors/gitlab/Dockerfile
 
-  connector-githubs:
-    image: connector-githubs:pr
+  connector-github:
+    image: connector-github:pr
     build:
-      dockerfile: src/connectors/githubs/Dockerfile
+      dockerfile: src/connectors/github/Dockerfile
 
   connector-minio:
     image: connector-minio:pr

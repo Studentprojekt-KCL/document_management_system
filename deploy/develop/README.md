@@ -39,12 +39,12 @@ IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
 # log-api
-LOGGER_BIND_ADDRESS=<bind address>
-LOGGER_PORT=<port number>
-LOGGER_DB_HOST=<database host>
-LOGGER_DB_USER=<database username>
-LOGGER_DB_PASS=<database password>
-LOGGER_DB_DATABASE=<database name>
+LOGAPI_BIND_ADDR=<bind address>
+LOGAPI_BIND_PORT=<port number>
+LOGAPI_LOGDB_URL=<database host>
+LOGAPI_LOGDB_USER=<database username>
+LOGAPI_LOGDB_PASSW=<database password>
+LOGAPI_LOGDB_DATABASE=<database name>
 
 # log-database
 MYSQL_DATABASE=<database name>

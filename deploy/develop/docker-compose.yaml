@@ -23,12 +23,12 @@ services:
       dev_net:
         ipv4_address: ${IP_LOG_API}
     environment:
-      LOGGER_BIND_ADDRESS: ${LOGGER_BIND_ADDRESS}
-      LOGGER_PORT: ${LOGGER_PORT}
-      LOGGER_DB_HOST: ${LOGGER_DB_HOST}
-      LOGGER_DB_USER: ${LOGGER_DB_USER}
-      LOGGER_DB_PASS: ${LOGGER_DB_PASS}
-      LOGGER_DB_DATABASE: ${LOGGER_DB_DATABASE}
+      LOGAPI_BIND_ADDR: ${LOGAPI_BIND_ADDR}
+      LOGAPI_BIND_PORT: ${LOGAPI_BIND_PORT}
+      LOGAPI_LOGDB_URL: ${LOGAPI_LOGDB_URL}
+      LOGAPI_LOGDB_USER: ${LOGAPI_LOGDB_USER}
+      LOGAPI_LOGDB_PASSW: ${LOGAPI_LOGDB_PASSW}
+      LOGAPI_LOGDB_DATABASE: ${LOGAPI_LOGDB_DATABASE}
 
   log-database:
     image: registry.dms-lookup.com/log-database:latest

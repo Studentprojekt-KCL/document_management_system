@@ -4,8 +4,17 @@
  * @param {string} token - The JWT string.
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
-
-import { KEYCLOAK_CLIENT_ID, SESSION_KEY_ACCESS_TOKEN } from '@/utils/config'
+import {
+  KEYCLOAK_CLIENT_ID,
+  keycloakLogoutUrl,
+  SESSION_KEY_ACCESS_TOKEN,
+  SESSION_KEY_ID_TOKEN,
+  SESSION_KEY_PKCE_VERIFIER,
+  SESSION_KEY_OIDC_STATE,
+  LOCAL_KEY_LOGOUT_EVENT,
+  KEYCLOAK_BASE_URL,
+  KEYCLOAK_REALM
+} from '@/utils/config'
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {
@@ -71,11 +80,11 @@ export function isTokenExpired(token) {
 export async function refreshToken() {
   const refresh_token = getRefreshToken()
 
-  const url = `${BASE_URL}/realms/${REALM}/protocol/openid-connect/token`
+  const url = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
 
   const params = new URLSearchParams()
   params.append('grant_type', 'refresh_token')
-  params.append('client_id', CLIENT_ID)
+  params.append('client_id', KEYCLOAK_CLIENT_ID)
   params.append('refresh_token', refresh_token)
 
   const response = await fetch(url, {
@@ -95,31 +104,24 @@ export async function refreshToken() {
 
 // logout functionality
 export function logout() {
-  const idToken = localStorage.getItem('id_token')
-
-  localStorage.setItem('logout-event', Date.now())
-
+  const idToken = localStorage.getItem(SESSION_KEY_ID_TOKEN)
   const postLogoutRedirectUri = `${window.location.origin}/`
 
-  let logoutUrl =
-    `${BASE_URL}/realms/${REALM}/protocol/openid-connect/logout` +
-    `?post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-    `&client_id=${encodeURIComponent(CLIENT_ID)}`
+  localStorage.removeItem(SESSION_KEY_ACCESS_TOKEN)
+  localStorage.removeItem(SESSION_KEY_ID_TOKEN)
+  localStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+  localStorage.removeItem(SESSION_KEY_OIDC_STATE)
+
+  localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
 
   if (idToken) {
-    logoutUrl += `&id_token_hint=${encodeURIComponent(idToken)}`
+    const logoutUrl =
+      keycloakLogoutUrl() +
+      `?id_token_hint=${encodeURIComponent(idToken)}` +
+      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
+      `&client_id=${encodeURIComponent(KEYCLOAK_CLIENT_ID)}`
+
+    window.location.assign(logoutUrl)
+    return
   }
-
-  window.location.assign(logoutUrl)
-  clearStroage()
-}
-
-function clearStroage() {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('id_token')
-
-  localStorage.removeItem('oidc_state')
-  localStorage.removeItem('pkce_verifier')
-  localStorage.removeItem('logout-event')
 }

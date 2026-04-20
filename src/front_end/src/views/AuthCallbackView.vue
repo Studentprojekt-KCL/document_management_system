@@ -31,14 +31,14 @@ onMounted(async () => {
   }
 
   /* Check state to prevent CSRF attacks */
-  const expectedState = sessionStorage.getItem(SESSION_KEY_OIDC_STATE)
+  const expectedState = localStorage.getItem(SESSION_KEY_OIDC_STATE)
   if (expectedState && returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
     return
   }
 
   /* Verifier that is exchanged for tokens */
-  const verifier = sessionStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
+  const verifier = localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
     return
@@ -72,12 +72,12 @@ onMounted(async () => {
     }
 
     /* Store token(s) and data in sessionStorage */
-    if (data.access_token) sessionStorage.setItem(SESSION_KEY_ACCESS_TOKEN, data.access_token)
-    if (data.id_token) sessionStorage.setItem(SESSION_KEY_ID_TOKEN, data.id_token)
+    if (data.access_token) localStorage.setItem(SESSION_KEY_ACCESS_TOKEN, data.access_token)
+    if (data.id_token) localStorage.setItem(SESSION_KEY_ID_TOKEN, data.id_token)
 
     /* Cleanup old items */
-    sessionStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
-    sessionStorage.removeItem(SESSION_KEY_OIDC_STATE)
+    localStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+    localStorage.removeItem(SESSION_KEY_OIDC_STATE)
 
     router.replace('/search')
   } catch (e) {

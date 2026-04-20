@@ -90,7 +90,7 @@ STOCHAN_TEI_URL=<rerank endpoint URL>
 STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
 STOCHAN_LLM_URL=<LLM endpoint URL>
 STOCHAN_LLM_MODEL=<model name>
-DMISAPI_CONGATEWAY_URL=<connector file endpoint URL>
+STOCHAN_CONGATEWAY_URL=<connector file endpoint URL>
  ``` 
  
  4. Create .env file for Caddy reverse proxy (HTTPS for front-end container)

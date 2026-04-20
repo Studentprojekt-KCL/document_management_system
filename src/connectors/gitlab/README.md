@@ -1,9 +1,13 @@
 The following needs to be exported in local environment:
 
-    GITLAB_CONNECTOR_PORT=<CONNECTOR_PORT>
-    GITLAB_ADDRESS=<GITLAB_ADDRESS>
-    GITLAB_CONNECTOR_BIND_ADDR=<GITLAB_CONNECTOR_BIND_ADDR>
-    GITLAB_SYSTEM_NAME=<Name to display in frontend for this Gitlab instance (e.g. 'gitlab').>
+    
+    CONGITLAB_BIND_ADDR=<CONGITLAB_BIND_ADDR>
+    CONGITLAB_BIND_PORT=<CONNECTOR_PORT>
+    CONGITLAB_GITLAB_URL=<CONGITLAB_GITLAB_URL>
+    CONGITLAB_MINIO_ACCESS_ADDRESS=
+    CONGITLAB_MINIO_USERNAME=
+    CONGITLAB_MINIO_PASSWORD=
+    CONGITLAB_SYSTEM_NAME=<Name to display in frontend for this Gitlab instance (eg 'GitLab').>
 
 
 # Response structure
@@ -17,7 +21,7 @@ The following needs to be exported in local environment:
     "size": 6042,
     "last_edit_date": <EDIT DATE>,
     "type": <TYPE OF OBJECT>,
-    "source_system": "gitlab",
+    "source_system": "GitLab",
     "clickable_url": <CLICKABLE URL TO OBJ>
     },
     "content": <FILE CONTENT>

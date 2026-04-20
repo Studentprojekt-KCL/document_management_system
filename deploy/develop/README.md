@@ -32,9 +32,9 @@ touch .env
 IP_LOG_API=<IP address for log-api container>
 IP_LOG_DB=<IP address for log-database container>
 IP_SEARCH_ENGINE=<IP address for search-engine container>
-IP_DMIS_API=<IP address for dmis-api container>
+IP_DMISAPI=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
-IP_CONNECTOR_GITLAB=<IP address for connector-gitlab container>
+IP_CONGITLAB=<IP address for connector-gitlab container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
@@ -68,13 +68,13 @@ KEYCLOAK_CLIENT_ID=<keycloak id>
 API_BASE_URL=<api endpoint>
 
 # connector-gitlab
-GITLAB_CONNECTOR_PORT=<port number>
-GITLAB_ADDRESS=<GitLab instance URL>
-MINIO_ACCESS_ADDRESS=<MinIO access URL>
-MINIO_USERNAME=<username>
-MINIO_PASSWORD=<password>
-GITLAB_CONNECTOR_BIND_ADDR=<bind address>
-GITLAB_SYSTEM_NAME:<system name>
+CONGITLAB_BIND_PORT=<port number>
+CONGITLAB_GITLAB_URL=<GitLab instance URL>
+CONGITLAB_MINIO_ACCESS_ADDRESS=<MinIO access URL>
+CONGITLAB_MINIO_USERNAME=<username>
+CONGITLAB_MINIO_PASSWORD=<password>
+CONGITLAB_BIND_ADDR=<bind address>
+CONGITLAB_SYSTEM_NAME:<system name>
 
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>

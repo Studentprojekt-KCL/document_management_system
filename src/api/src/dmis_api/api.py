@@ -198,14 +198,14 @@ def run() -> None:
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    bind_address = read_env_variable("DMIS_API_BIND_ADDRESS")
-    port = read_port("DMIS_API_PORT")
-    search_api_url = read_env_variable("DMIS_API_SEARCH_URL")
-    query_api_url = read_env_variable("DMIS_API_QUERY_URL")
-    connector_api_url = read_env_variable("DMIS_API_CONNECTOR_URL")
-    keycloak_issuer = read_env_variable("DMIS_API_KEYCLOAK_ISSUER")
-    keycloak_jwks_url = read_env_variable("DMIS_API_KEYCLOAK_JWKS_URL")
-    keycloak_expected_azp = read_env_variable("DMIS_API_KEYCLOAK_EXPECTED_AZP")
+    bind_address = read_env_variable("DMISAPI_BIND_ADDR")
+    port = read_port("DMISAPI_BIND_PORT")
+    search_api_url = read_env_variable("DMISAPI_SEARCHENG_URL")
+    query_api_url = read_env_variable("DMISAPI_STOCHAN_URL")
+    connector_api_url = read_env_variable("DMISAPI_CONGATEWAY_URL")
+    keycloak_issuer = read_env_variable("DMISAPI_AD_URL")
+    keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL")
+    keycloak_expected_azp = read_env_variable("DMISAPI_AD_AUTHORIZED_PARTY")
 
     log_level = "debug" if args.dev else None
 

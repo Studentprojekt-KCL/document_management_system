@@ -40,8 +40,8 @@ class GitLab:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
-        address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
+        address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
@@ -377,7 +377,7 @@ class GitLab:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}
         except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         if response.status_code != 200:  # noqa: PLR2004
             dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
         return content

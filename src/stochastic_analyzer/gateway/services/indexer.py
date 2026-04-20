@@ -6,7 +6,7 @@ from http import HTTPStatus
 
 import httpx
 
-from dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_warning
 
 
 def _to_uuid(pointer: str) -> str:

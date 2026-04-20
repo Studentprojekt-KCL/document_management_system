@@ -3,10 +3,19 @@ import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
 import { securityLevels, fetchSecurityLevels } from '@/composables/useSearchMetadata'
 
+import { TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { useSourceFilters, useSecurityFilters } from '@/composables/useFilters'
+
+/* Type filter labels derived from the canonical TYPE_FILTERS map. */
+const typeFilters = Object.keys(TYPE_FILTERS) // WIll be changed soon
+const sourceFilters = useSourceFilters()
+const securityFilters = useSecurityFilters()
+
 const props = defineProps({
   selectedFilters: Object
 })
 const emit = defineEmits(['update:filters'])
+
 
 /* API cofig*/
 const access_token = sessionStorage.getItem('access_token')
@@ -90,10 +99,6 @@ const clearAllFilters = () => {
   })
 }
 </script>
-
-// This component is a placeholder for the search filters UI. It currently displays static filter options for demonstration
-purposes. // Later on these filter section needs to be more dynamic and interactive, allowing users to select and apply them to
-their search queries.
 
 <template>
   <div class="filters-card">

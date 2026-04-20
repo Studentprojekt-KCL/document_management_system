@@ -51,7 +51,7 @@ class ServiceConfig:
     classifier_url: str
     connector_url: str
     escalation_threshold: float
-    ministral: MinistralConfig
+    any_llm: MinistralConfig
     vector: VectorConfig
 
 
@@ -92,7 +92,7 @@ class APIConfiguration:
 
     def _load_bind(self) -> None:
         """Load bind configuration."""
-        bind: str | None = environ.get("BIND")
+        bind: str | None = environ.get("STOCHAN_BIND_ADDR")
 
         if bind is None:
             dms_error("BIND is not defined.")
@@ -103,7 +103,7 @@ class APIConfiguration:
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
         # Note: This will be migrated to a shared solution
-        port: str | None = environ.get("PORT")
+        port: str | None = environ.get("STOCHAN_BIND_PORT")
 
         if port is None:
             dms_error("PORT is not defined.")
@@ -124,17 +124,17 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
-        self.services.ministral = MinistralConfig()
+        self.services.any_llm = MinistralConfig()
 
         required = {
-            "CLASSIFIER_URL": read_env_variable("CLASSIFIER_URL"),
-            "MINISTRAL_URL": read_env_variable("MINISTRAL_URL"),
-            "MINISTRAL_MODEL": read_env_variable("MINISTRAL_MODEL"),
-            "MINISTRAL_TIMEOUT": read_env_variable("MINISTRAL_TIMEOUT"),
-            "CONNECTOR_ADDRESS": read_env_variable("CONNECTOR_ADDRESS"),
-            "ESCALATION_THRESHOLD": read_env_variable("ESCALATION_THRESHOLD"),
-            "EMBEDDING_URL": read_env_variable("EMBEDDING_URL"),
-            "QDRANT_URL": read_env_variable("QDRANT_URL"),
+            "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
+            "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),
+            "STOCHAN_LLM_MODEL": read_env_variable("STOCHAN_LLM_MODEL"),
+            "STOCHAN_LLM_TIMEOUT": read_env_variable("STOCHAN_LLM_TIMEOUT"),
+            "STOCHAN_CONNECTOR_ADDRESS": read_env_variable("STOCHAN_CONNECTOR_ADDRESS"),
+            "STOCHAN_ESCALATION_THRESHOLD": read_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
+            "STOCHAN_EMBEDDING_URL": read_env_variable("STOCHAN_EMBEDDING_URL"),
+            "STOCHAN_QDRANT_URL": read_env_variable("STOCHAN_QDRANT_URL"),
         }
 
         for name, value in required.items():
@@ -142,13 +142,13 @@ class APIConfiguration:
                 dms_error(f"{name} is not defined.")
                 return
 
-        self.services.classifier_url = required["CLASSIFIER_URL"]
-        self.services.connector_url = required["CONNECTOR_ADDRESS"]
-        self.services.escalation_threshold = float(required["ESCALATION_THRESHOLD"])
-        self.services.ministral.url = required["MINISTRAL_URL"]
-        self.services.ministral.model = required["MINISTRAL_MODEL"]
-        self.services.ministral.timeout = int(required["MINISTRAL_TIMEOUT"])
-        self.services.vector.embedding_url = required["EMBEDDING_URL"]
-        self.services.vector.qdrant_url = required["QDRANT_URL"]
+        self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
+        self.services.connector_url = required["STOCHAN_CONNECTOR_ADDRESS"]
+        self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])
+        self.services.any_llm.url = required["STOCHAN_LLM_URL"]
+        self.services.any_llm.model = required["STOCHAN_LLM_MODEL"]
+        self.services.any_llm.timeout = int(required["STOCHAN_LLM_TIMEOUT"])
+        self.services.vector.embedding_url = required["STOCHAN_EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required["STOCHAN_QDRANT_URL"]
         self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
-        self.services.vector.max_chars = int(environ.get("INDEX_MAX_CHARS", "2000"))
+        self.services.vector.max_chars = int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000"))

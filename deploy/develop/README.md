@@ -84,13 +84,13 @@ MINIO_USERNAME=<username>
 MINIO_PASSWORD=<password>
 
 # stochastic-analyzer
-BIND=<bind address>
-PORT=<port number>
-TEI_URL=<rerank endpoint URL>
-CLASSIFIER_URL=<classifier endpoint URL>
-MINISTRAL_URL=<LLM endpoint URL>
-MINISTRAL_MODEL=<model name>
-CONNECTOR_ADDRESS=<connector file endpoint URL>
+STOCHAN_BIND_ADDR=<bind address>
+STOCHAN_BIND_PORT=<port number>
+STOCHAN_TEI_URL=<rerank endpoint URL>
+STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
+STOCHAN_LLM_URL=<LLM endpoint URL>
+STOCHAN_LLM_MODEL=<model name>
+STOCHAN_CONNECTOR_ADDRESS=<connector file endpoint URL>
  ``` 
  
  4. Create .env file for Caddy reverse proxy (HTTPS for front-end container)

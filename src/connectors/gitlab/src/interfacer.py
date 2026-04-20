@@ -326,7 +326,8 @@ class GitLab:
             chunk = await output_queue.get()
             if chunk is None:
                 break
-            yield json.dumps({"data": chunk}).encode("utf-8")
+            for file in chunk:
+                yield json.dumps(file).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.

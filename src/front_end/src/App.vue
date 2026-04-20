@@ -8,6 +8,7 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import router from './router'
+import { LOCAL_KEY_LOGOUT_EVENT } from '@/utils/config'
 
 /* Determine if the current route is a public or error page. */
 const route = useRoute()
@@ -15,7 +16,7 @@ const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].include
 
 /* Synchronize logout across multiple tabs for storage events. */
 const syncLogout = (event) => {
-  if (event.key === 'logout-event') {
+  if (event.key === LOCAL_KEY_LOGOUT_EVENT) {
     sessionStorage.clear()
     router.push('/')
   }

@@ -5,11 +5,14 @@
  */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-
-/* Keycloak attributes */
-const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+import {
+  KEYCLOAK_CLIENT_ID,
+  keycloakTokenUrl,
+  SESSION_KEY_ACCESS_TOKEN,
+  SESSION_KEY_ID_TOKEN,
+  SESSION_KEY_PKCE_VERIFIER,
+  SESSION_KEY_OIDC_STATE
+} from '@/utils/config'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,32 +37,30 @@ onMounted(async () => {
   }
 
   /* Check state to prevent CSRF attacks */
-  const expectedState = sessionStorage.getItem('oidc_state')
+  const expectedState = sessionStorage.getItem(SESSION_KEY_OIDC_STATE)
   if (expectedState && returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
     return
   }
 
   /* Verifier that is exchanged for tokens */
-  const verifier = sessionStorage.getItem('pkce_verifier')
+  const verifier = sessionStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
     return
   }
   /* Redirection URL */
   const redirectUri = `${window.location.origin}/auth/callback`
-  /* API address to get tokens */
-  const tokenUrl = `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/token`
 
   try {
     const body = new URLSearchParams()
     body.set('grant_type', 'authorization_code')
-    body.set('client_id', CLIENT_ID)
+    body.set('client_id', KEYCLOAK_CLIENT_ID)
     body.set('code', String(code))
     body.set('redirect_uri', redirectUri)
     body.set('code_verifier', verifier)
 
-    const resp = await fetch(tokenUrl, {
+    const resp = await fetch(keycloakTokenUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
@@ -74,12 +75,12 @@ onMounted(async () => {
     }
 
     /* Store token(s) and data in sessionStorage */
-    if (data.access_token) sessionStorage.setItem('access_token', data.access_token)
-    if (data.id_token) sessionStorage.setItem('id_token', data.id_token)
+    if (data.access_token) sessionStorage.setItem(SESSION_KEY_ACCESS_TOKEN, data.access_token)
+    if (data.id_token) sessionStorage.setItem(SESSION_KEY_ID_TOKEN, data.id_token)
 
     /* Cleanup old items */
-    sessionStorage.removeItem('pkce_verifier')
-    sessionStorage.removeItem('oidc_state')
+    sessionStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+    sessionStorage.removeItem(SESSION_KEY_OIDC_STATE)
 
     router.replace('/search')
   } catch (e) {

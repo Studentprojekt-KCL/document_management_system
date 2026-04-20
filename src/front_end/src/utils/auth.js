@@ -6,14 +6,14 @@
  */
 import {
   KEYCLOAK_CLIENT_ID,
+  KEYCLOAK_BASE,
+  KEYCLOAK_REALM,
   keycloakLogoutUrl,
   SESSION_KEY_ACCESS_TOKEN,
   SESSION_KEY_ID_TOKEN,
   SESSION_KEY_PKCE_VERIFIER,
   SESSION_KEY_OIDC_STATE,
-  LOCAL_KEY_LOGOUT_EVENT,
-  KEYCLOAK_BASE_URL,
-  KEYCLOAK_REALM
+  LOCAL_KEY_LOGOUT_EVENT
 } from '@/utils/config'
 
 /* Read the JSON Web Token */
@@ -80,7 +80,7 @@ export function isTokenExpired(token) {
 export async function refreshToken() {
   const refresh_token = getRefreshToken()
 
-  const url = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
+  const url = `${KEYCLOAK_BASE}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
 
   const params = new URLSearchParams()
   params.append('grant_type', 'refresh_token')

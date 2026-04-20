@@ -32,36 +32,16 @@ export const resolveFilename = (entry, index = 0) => {
   return pick(metadata?.name, entry?.name, `result-${index + 1}`)
 }
 
-/* Function to resolve the document type from source type and name. */
-export const TYPE_KEYWORDS = {
-  'PDF Document': ['.pdf'],
-  'Word Document': ['word', 'doc', '.docx'],
-  'Excel Spreadsheet': ['excel', 'sheet', '.xlsx'],
-  'Text Document': ['.txt'],
-  'Markdown Document': ['markdown', '.md']
+export const resolveDocumentType = (entry) => {
+  const metadata = getMetadata(entry)
+
+  return pick(metadata?.file_type_description, entry?.file_type_description)
 }
 
-/* Used for filtering doc types (SearchView, SearchFilterCard)*/
-export const TYPE_FILTERS = {
-  'PDF (.pdf)': ['.pdf'],
-  'Word (.docx)': ['.doc', '.docx', 'word'],
-  'Excel (.xlsx)': ['.xlsx'],
-  'Text / Markdown (.txt, .md)': ['.md', '.txt']
-}
+export const resolveDocumentExtension = (entry) => {
+  const metadata = getMetadata(entry)
 
-/* Function to resolve the document type from source type and name. */
-export const resolveDocumentType = ({ sourceType, sourceName }) => {
-  const type = String(sourceType || '').toLowerCase()
-  const name = String(sourceName || '').toLowerCase()
-  const typeOrName = `${type} ${name}`
-
-  for (const [docType, keywords] of Object.entries(TYPE_KEYWORDS)) {
-    if (keywords.some((keyword) => typeOrName.includes(keyword))) {
-      return docType
-    }
-  }
-
-  return pick(sourceType, sourceName)
+  return pick(metadata?.file_type, entry?.file_type)
 }
 
 /* Function to resolve the source of the document from metadata. */
@@ -106,23 +86,11 @@ export const useSearchMetadata = (props) => {
 
   const previewSize = computed(() => pick(metadata.value.size))
 
-  /* TODO: REMOVE HARDCODED LOCIG LATER */
-  const previewType = computed(() => {
-    const sourceType = pick(props.selectedMatch?.type, metadata.value.type, metadata.value.file_type, metadata.value.source_type)
-    const sourceName = pick(
-      metadata.value.name,
-      metadata.value.filename,
-      metadata.value.file_name,
-      metadata.value.unique_pointer,
-      metadata.value.source_file,
-      metadata.value.clickable_url,
-      props.selectedFile
-    )
-
-    return resolveDocumentType({ sourceType, sourceName })
-  })
-
   const sourceSystem = computed(() => resolveSource(props.selectedMatch))
+
+  const previewFileDescription = computed(() => resolveDocumentType(props.selectedMatch))
+
+  const previewFileExtension = computed(() => resolveDocumentExtension(props.selectedMatch))
 
   const previewCreatedAt = computed(() => resolveDateOnly(props.selectedMatch))
 
@@ -150,7 +118,8 @@ export const useSearchMetadata = (props) => {
     uniquePointer,
     previewTitle,
     previewSize,
-    previewType,
+    previewFileDescription,
+    previewFileExtension,
     previewCreatedAt,
     sourceSystem,
     previewLink,
@@ -158,6 +127,8 @@ export const useSearchMetadata = (props) => {
     normalizeMatches,
     resolveSecurityClass,
     resolveDateOnly,
-    resolveSource
+    resolveSource,
+    resolveDocumentType,
+    resolveDocumentExtension
   }
 }

@@ -16,8 +16,7 @@ import asyncio
 import requests
 import httpx
 
-from variables import SOURCE_FILE
-
+from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable

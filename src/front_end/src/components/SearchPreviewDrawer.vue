@@ -8,9 +8,23 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import {
+  X,
+  StarsIcon,
+  CalendarDays,
+  HardDrive,
+  FileType2,
+  ExternalLink,
+  ShieldCheck,
+  Pencil,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { hasRole } from '@/utils/auth'
+import ClassificationEditor from '@/components/ClassificationEditor.vue'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -24,11 +38,81 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
+const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass, uniquePointer } =
   useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+
+const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+
+const isEditingClassification = ref(false)
+const classificationEditorRef = ref(null)
+
+/* Local override for optimistic updates */
+const localSecurityLevel = ref('')
+
+/* Sync initial value */
+watch(
+  () => previewSecurityClass.value,
+  (val) => {
+    localSecurityLevel.value = val || ''
+  },
+  { immediate: true }
+)
+
+/* Final value used in UI */
+const currentSecurityLevel = computed(() => localSecurityLevel.value)
+
+/* Permissions */
+const canEdit = computed(() => hasRole('admin'))
+
+/* Toast */
+const toast = ref({ visible: false, success: true, message: '' })
+let toastTimer = null
+
+const showToast = (success, message) => {
+  if (toastTimer) clearTimeout(toastTimer)
+  toast.value = { visible: true, success, message }
+  toastTimer = setTimeout(() => {
+    toast.value.visible = false
+  }, 4000)
+}
+
+/* Save classification */
+const handleClassificationSave = async (level) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/search_engine/classification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('access_token')} ` },
+      body: JSON.stringify({
+        unique_pointer: uniquePointer.value,
+        classification: level
+      })
+    })
+
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`)
+
+    /* Optimistic UI update */
+    localSecurityLevel.value = level
+
+    showToast(true, 'Security classification updated successfully.')
+    isEditingClassification.value = false
+  } catch (err) {
+    showToast(false, `Update failed: ${err.message}`)
+  } finally {
+    classificationEditorRef.value?.resetSaving()
+  }
+}
+
+/* Reset UI on change */
+watch(
+  () => [props.selectedFile, props.open],
+  () => {
+    isEditingClassification.value = false
+    toast.value.visible = false
+  }
+)
 </script>
 
 <template>
@@ -46,11 +130,38 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
+      <!-- Toast -->
+      <Transition name="toast-fade">
+        <div v-if="toast.visible" :class="['toast', toast.success ? 'toast-success' : 'toast-error']">
+          <CheckCircle v-if="toast.success" :size="16" />
+          <AlertCircle v-else :size="16" />
+          <span>{{ toast.message }}</span>
+        </div>
+      </Transition>
+
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
       <div class="tag-row">
         <span class="tag">{{ previewType }}</span>
       </div>
+
+      <!-- SECURITY CLASSIFICATION -->
+      <section class="panel-section">
+        <div class="section-header">
+          <p class="section-title"><ShieldCheck :size="15" /> SECURITY CLASSIFICATION</p>
+
+          <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
+            <Pencil :size="14" />
+            Edit
+          </button>
+        </div>
+
+        <div class="classification-display">
+          <span :class="['classification-badge', `badge-${(currentSecurityLevel || 'none').toLowerCase()}`]">
+            {{ currentSecurityLevel || 'Not classified' }}
+          </span>
+        </div>
+      </section>
 
       <!-- Technical Metadata section -->
       <section class="panel-section">
@@ -70,7 +181,7 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           </div>
           <div class="meta-cell">
             <span>Security Class</span>
-            <p>{{ previewSecurityClass || 'Unknown' }}</p>
+            <p>{{ currentSecurityLevel || 'Unknown' }}</p>
           </div>
         </div>
       </section>
@@ -95,6 +206,14 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
+      <!-- MODAL -->
+      <ClassificationEditor
+        ref="classificationEditorRef"
+        :visible="isEditingClassification"
+        :current-level="currentSecurityLevel"
+        @save="handleClassificationSave"
+        @cancel="isEditingClassification = false"
+      />
     </div>
 
     <div class="preview-footer">
@@ -199,6 +318,8 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   font-weight: 700;
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  margin: 0;
 }
 
 .meta-grid {
@@ -285,5 +406,106 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 .open-file-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d8dee7;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #faf5ff;
+}
+
+.classification-display {
+  margin-top: 0.25rem;
+}
+
+.classification-badge {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-public {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.badge-internal {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+.badge-sensitive {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+.badge-confidential {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.badge-none {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.toast-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.toast-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

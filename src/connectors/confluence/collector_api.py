@@ -31,6 +31,7 @@ class API:
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+        """Return a JSON error payload for FastAPI request validation failures."""
         errors: dict[str, Any]
         if isinstance(exc, RequestValidationError):
             errors = {"detail": exc.errors(), "body": exc.body}
@@ -47,6 +48,7 @@ class API:
         x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
         x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
     ) -> Any:
+        """Return file pointers for incremental indexing (honours ``subdata`` checkpoint)."""
         if x_confluence_email is None or x_confluence_token is None:
             return {"subdata": subdata, "file_pointers": []}
         token = x_confluence_token.removeprefix("Bearer ").strip()
@@ -59,6 +61,7 @@ class API:
         x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
         x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
     ) -> Any:
+        """Return one page as metadata plus optional base64-encoded plain text."""
         if x_confluence_email is None or x_confluence_token is None:
             return {}
         token = x_confluence_token.removeprefix("Bearer ").strip()
@@ -72,6 +75,7 @@ class API:
         x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
         x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
     ) -> dict[str, Any]:
+        """Return full page payloads for every pointer due for indexing."""
         if x_confluence_email is None or x_confluence_token is None:
             return {"subdata": subdata, "files": [], "deleted": []}
         token = x_confluence_token.removeprefix("Bearer ").strip()

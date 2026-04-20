@@ -104,6 +104,7 @@ class ConfluenceInterfacer:
         return text
 
     def get_spaces(self, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
+        """Return Confluence spaces as connector-shaped entries (key, name, URL)."""
         payload = self._execute_request("space", {"limit": 250}, email, api_token)
         results = payload.get("results", [])
         if not isinstance(results, list):
@@ -140,6 +141,7 @@ class ConfluenceInterfacer:
         return []
 
     def get_page_ids(self, email: str | None = None, api_token: str | None = None) -> dict[str, str]:
+        """Return the latest page edit time per space key (ISO strings)."""
         ids: dict[str, str] = {}
         for space in self.get_spaces(email, api_token):
             key = space.get("key")
@@ -154,6 +156,7 @@ class ConfluenceInterfacer:
         return ids
 
     def get_pages_in_space(self, space_key: str, email: str | None = None, api_token: str | None = None) -> list[str]:
+        """Return page pointers for one space."""
         pages = self._pages_in_space(space_key, email, api_token)
         pointers: list[str] = []
         for page in pages:
@@ -169,6 +172,7 @@ class ConfluenceInterfacer:
         email: str | None = None,
         api_token: str | None = None,
     ) -> dict[str, Any]:
+        """Fetch one page by pointer; metadata plus optional base64-encoded plain text."""
         page_id = file_pointer.split("://", 1)[1] if "://" in file_pointer else file_pointer
         payload = self._execute_request(
             f"content/{page_id}",
@@ -178,7 +182,14 @@ class ConfluenceInterfacer:
         )
         if not payload:
             return {"metadata": {"unique_pointer": self._pointer(page_id), "type": SOURCE_FILE}}
+        return self._format_page_payload(payload, page_id, include_content)
 
+    def _format_page_payload(
+        self,
+        payload: dict[str, Any],
+        page_id: str,
+        include_content: bool,
+    ) -> dict[str, Any]:
         title = payload.get("title")
         version = payload.get("version", {}) if isinstance(payload.get("version"), dict) else {}
         when = version.get("when")
@@ -201,12 +212,32 @@ class ConfluenceInterfacer:
             out["content"] = base64.b64encode(text.encode("utf-8")).decode("utf-8")
         return out
 
+    def _space_latest_and_page_ids(
+        self,
+        space_key: str,
+        email: str | None,
+        api_token: str | None,
+    ) -> tuple[datetime, list[str]]:
+        pages = self._pages_in_space(space_key, email, api_token)
+        space_latest = datetime.min.replace(tzinfo=timezone.utc)
+        page_ids: list[str] = []
+        for page in pages:
+            page_id = page.get("id")
+            if isinstance(page_id, str):
+                page_ids.append(page_id)
+            when = self._safe_when(
+                page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None
+            )
+            space_latest = max(space_latest, when)
+        return space_latest, page_ids
+
     def pointers_to_all_files_to_index(
         self,
         subdata: str | None,
         email: str | None = None,
         api_token: str | None = None,
     ) -> dict[str, Any]:
+        """Return pointers for spaces with activity newer than the ``subdata`` checkpoint."""
         if self._resolve_auth(email, api_token) is None:
             return {"subdata": subdata, "file_pointers": []}
 
@@ -218,15 +249,7 @@ class ConfluenceInterfacer:
             key = space.get("key")
             if not isinstance(key, str):
                 continue
-            pages = self._pages_in_space(key, email, api_token)
-            space_latest = datetime.min.replace(tzinfo=timezone.utc)
-            page_ids: list[str] = []
-            for page in pages:
-                page_id = page.get("id")
-                if isinstance(page_id, str):
-                    page_ids.append(page_id)
-                when = self._safe_when(page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None)
-                space_latest = max(space_latest, when)
+            space_latest, page_ids = self._space_latest_and_page_ids(key, email, api_token)
             latest = max(latest, space_latest)
             if space_latest > provided:
                 pointers.extend([self._pointer(pid) for pid in page_ids])
@@ -240,6 +263,7 @@ class ConfluenceInterfacer:
         email: str | None = None,
         api_token: str | None = None,
     ) -> dict[str, Any]:
+        """Expand changed pointers into full ``get_page`` payloads for indexing."""
         if self._resolve_auth(email, api_token) is None:
             return {"subdata": subdata, "files": [], "deleted": []}
 

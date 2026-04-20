@@ -131,7 +131,7 @@ class APIConfiguration:
             "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),
             "STOCHAN_LLM_MODEL": read_env_variable("STOCHAN_LLM_MODEL"),
             "STOCHAN_LLM_TIMEOUT": read_env_variable("STOCHAN_LLM_TIMEOUT"),
-            "STOCHAN_CONNECTOR_ADDRESS": read_env_variable("STOCHAN_CONNECTOR_ADDRESS"),
+            "DMISAPI_CONGATEWAY_URL": read_env_variable("DMISAPI_CONGATEWAY_URL"),
             "STOCHAN_ESCALATION_THRESHOLD": read_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
             "STOCHAN_EMBEDDING_URL": read_env_variable("STOCHAN_EMBEDDING_URL"),
             "STOCHAN_QDRANT_URL": read_env_variable("STOCHAN_QDRANT_URL"),
@@ -143,7 +143,7 @@ class APIConfiguration:
                 return
 
         self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
-        self.services.connector_url = required["STOCHAN_CONNECTOR_ADDRESS"]
+        self.services.connector_url = required["DMISAPI_CONGATEWAY_URL"]
         self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])
         self.services.any_llm.url = required["STOCHAN_LLM_URL"]
         self.services.any_llm.model = required["STOCHAN_LLM_MODEL"]

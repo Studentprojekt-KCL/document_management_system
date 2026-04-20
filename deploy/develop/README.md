@@ -54,7 +54,7 @@ MYSQL_RANDOM_ROOT_PASSWORD=<true or false>
 
 # search-engine
 SE_API_PORT=<port number>
-SE_API_CONNECTOR_ADDRESS=<connector service URL>
+DMISAPI_CONGATEWAY_URL=<connector service URL>
 SE_API_HOST=<bind address>
 
 # dmis-api
@@ -90,7 +90,7 @@ STOCHAN_TEI_URL=<rerank endpoint URL>
 STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
 STOCHAN_LLM_URL=<LLM endpoint URL>
 STOCHAN_LLM_MODEL=<model name>
-STOCHAN_CONNECTOR_ADDRESS=<connector file endpoint URL>
+DMISAPI_CONGATEWAY_URL=<connector file endpoint URL>
  ``` 
  
  4. Create .env file for Caddy reverse proxy (HTTPS for front-end container)

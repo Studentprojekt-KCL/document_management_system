@@ -1,4 +1,12 @@
-"""Confluence connector MVP with GitLab-like output format."""
+"""Confluence connector MVP with GitLab-like output format.
+
+Authentication (aligned with GitHub connector pattern):
+- Prefer per-request ``email`` + ``api_token`` (Atlassian Cloud: Basic auth).
+- If either is omitted, falls back to ``CONFLUENCE_EMAIL`` and ``CONFLUENCE_API_TOKEN``
+  in the environment (useful for local scripts / single-tenant containers).
+- HTTP API in ``collector_api`` requires ``X-Confluence-Email`` and
+  ``X-Confluence-Token`` headers (same idea as ``X-GitHub-Token`` for GitHub).
+"""
 
 import base64
 import binascii
@@ -22,10 +30,6 @@ class ConfluenceInterfacer:
     def __init__(self) -> None:
         self.session = requests.session()
         self.address = os.environ.get("CONFLUENCE_ADDRESS", "").rstrip("/")
-        self.email = os.environ.get("CONFLUENCE_EMAIL")
-        self.api_token = os.environ.get("CONFLUENCE_API_TOKEN")
-        if self.email and self.api_token:
-            self.session.auth = (self.email, self.api_token)
         self.base = self._api_base(self.address)
 
     @staticmethod
@@ -35,6 +39,15 @@ class ConfluenceInterfacer:
         if address.endswith("/wiki"):
             return f"{address}/rest/api/"
         return f"{address}/wiki/rest/api/"
+
+    def _resolve_auth(self, email: str | None, api_token: str | None) -> tuple[str, str] | None:
+        """Resolve (email, token) from arguments or environment."""
+        e = (email or os.environ.get("CONFLUENCE_EMAIL") or "").strip()
+        raw = api_token or os.environ.get("CONFLUENCE_API_TOKEN")
+        t = (raw or "").removeprefix("Bearer ").strip() if raw else ""
+        if e and t:
+            return e, t
+        return None
 
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:
@@ -46,12 +59,22 @@ class ConfluenceInterfacer:
         except (binascii.Error, ValueError, UnicodeDecodeError):
             return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _execute_request(
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None,
+        email: str | None,
+        api_token: str | None,
+    ) -> dict[str, Any]:
         if not self.base:
             return {}
+        creds = self._resolve_auth(email, api_token)
+        if not creds:
+            return {}
+        user, token = creds
         url = urljoin(self.base, endpoint)
         try:
-            response = self.session.get(url, params=params, timeout=120)
+            response = self.session.get(url, params=params, timeout=120, auth=(user, token))
             response.raise_for_status()
             payload = response.json()
             if isinstance(payload, dict):
@@ -75,14 +98,13 @@ class ConfluenceInterfacer:
 
     @staticmethod
     def _extract_text(storage_value: str) -> str:
-        # MVP: strip XHTML tags and decode entities.
         text = re.sub(r"<[^>]+>", " ", storage_value)
         text = unescape(text)
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
-    def get_spaces(self) -> list[dict[str, Any]]:
-        payload = self._execute_request("space", params={"limit": 250})
+    def get_spaces(self, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
+        payload = self._execute_request("space", {"limit": 250}, email, api_token)
         results = payload.get("results", [])
         if not isinstance(results, list):
             return []
@@ -105,23 +127,25 @@ class ConfluenceInterfacer:
             )
         return spaces
 
-    def _pages_in_space(self, space_key: str) -> list[dict[str, Any]]:
+    def _pages_in_space(self, space_key: str, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
         payload = self._execute_request(
             "content",
-            params={"spaceKey": space_key, "type": "page", "limit": 1000, "expand": "version"},
+            {"spaceKey": space_key, "type": "page", "limit": 1000, "expand": "version"},
+            email,
+            api_token,
         )
         results = payload.get("results", [])
         if isinstance(results, list):
             return [p for p in results if isinstance(p, dict)]
         return []
 
-    def get_page_ids(self) -> dict[str, str]:
+    def get_page_ids(self, email: str | None = None, api_token: str | None = None) -> dict[str, str]:
         ids: dict[str, str] = {}
-        for space in self.get_spaces():
+        for space in self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
                 continue
-            pages = self._pages_in_space(key)
+            pages = self._pages_in_space(key, email, api_token)
             latest = datetime.min.replace(tzinfo=timezone.utc)
             for page in pages:
                 when = self._safe_when(page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None)
@@ -129,8 +153,8 @@ class ConfluenceInterfacer:
             ids[key] = latest.isoformat()
         return ids
 
-    def get_pages_in_space(self, space_key: str) -> list[str]:
-        pages = self._pages_in_space(space_key)
+    def get_pages_in_space(self, space_key: str, email: str | None = None, api_token: str | None = None) -> list[str]:
+        pages = self._pages_in_space(space_key, email, api_token)
         pointers: list[str] = []
         for page in pages:
             page_id = page.get("id")
@@ -138,9 +162,20 @@ class ConfluenceInterfacer:
                 pointers.append(self._pointer(page_id))
         return pointers
 
-    def get_page(self, file_pointer: str, include_content: bool = True) -> dict[str, Any]:
+    def get_page(
+        self,
+        file_pointer: str,
+        include_content: bool = True,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> dict[str, Any]:
         page_id = file_pointer.split("://", 1)[1] if "://" in file_pointer else file_pointer
-        payload = self._execute_request(f"content/{page_id}", params={"expand": "body.storage,version,space"})
+        payload = self._execute_request(
+            f"content/{page_id}",
+            {"expand": "body.storage,version,space"},
+            email,
+            api_token,
+        )
         if not payload:
             return {"metadata": {"unique_pointer": self._pointer(page_id), "type": SOURCE_FILE}}
 
@@ -166,16 +201,24 @@ class ConfluenceInterfacer:
             out["content"] = base64.b64encode(text.encode("utf-8")).decode("utf-8")
         return out
 
-    def pointers_to_all_files_to_index(self, subdata: str | None) -> dict[str, Any]:
+    def pointers_to_all_files_to_index(
+        self,
+        subdata: str | None,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> dict[str, Any]:
+        if self._resolve_auth(email, api_token) is None:
+            return {"subdata": subdata, "file_pointers": []}
+
         provided = self._provided_date(subdata)
         latest = datetime.min.replace(tzinfo=timezone.utc)
         pointers: list[str] = []
 
-        for space in self.get_spaces():
+        for space in self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
                 continue
-            pages = self._pages_in_space(key)
+            pages = self._pages_in_space(key, email, api_token)
             space_latest = datetime.min.replace(tzinfo=timezone.utc)
             page_ids: list[str] = []
             for page in pages:
@@ -191,12 +234,20 @@ class ConfluenceInterfacer:
         token = base64.b64encode(latest.isoformat().encode("utf-8")).decode("utf-8")
         return {"subdata": token, "file_pointers": pointers}
 
-    def files_to_index(self, subdata: str | None = None) -> dict[str, Any]:
-        pointer_payload = self.pointers_to_all_files_to_index(subdata)
+    def files_to_index(
+        self,
+        subdata: str | None = None,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> dict[str, Any]:
+        if self._resolve_auth(email, api_token) is None:
+            return {"subdata": subdata, "files": [], "deleted": []}
+
+        pointer_payload = self.pointers_to_all_files_to_index(subdata, email, api_token)
         pointers = pointer_payload.get("file_pointers", [])
         files: list[dict[str, Any]] = []
         if isinstance(pointers, list):
             for pointer in pointers:
                 if isinstance(pointer, str):
-                    files.append(self.get_page(pointer, include_content=True))
+                    files.append(self.get_page(pointer, include_content=True, email=email, api_token=api_token))
         return {"subdata": pointer_payload.get("subdata"), "files": files, "deleted": []}

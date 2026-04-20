@@ -1,11 +1,15 @@
-"""Confluence connector API with GitLab-like endpoints."""
+"""Confluence connector API with GitLab-like endpoints.
+
+Authentication matches the GitHub connector idea: credentials are supplied per HTTP
+request via headers (not stored in the connector process as the only source).
+"""
 
 import argparse
 import os
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -37,14 +41,41 @@ class API:
             content = jsonable_encoder(errors)
         return JSONResponse(status_code=422, content=content)
 
-    async def files(self, subdata: str | None = None) -> Any:
-        return self.confluence_instance.pointers_to_all_files_to_index(subdata)
+    async def files(
+        self,
+        subdata: str | None = None,
+        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
+        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+    ) -> Any:
+        if x_confluence_email is None or x_confluence_token is None:
+            return {"subdata": subdata, "file_pointers": []}
+        token = x_confluence_token.removeprefix("Bearer ").strip()
+        return self.confluence_instance.pointers_to_all_files_to_index(subdata, x_confluence_email.strip(), token)
 
-    async def file(self, file_pointer: str, include_content: bool = True) -> Any:
-        return self.confluence_instance.get_page(file_pointer, include_content)
+    async def file(
+        self,
+        file_pointer: str,
+        include_content: bool = True,
+        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
+        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+    ) -> Any:
+        if x_confluence_email is None or x_confluence_token is None:
+            return {}
+        token = x_confluence_token.removeprefix("Bearer ").strip()
+        return self.confluence_instance.get_page(
+            file_pointer, include_content, x_confluence_email.strip(), token
+        )
 
-    async def files_to_index(self, subdata: str | None = None) -> dict[str, Any]:
-        return self.confluence_instance.files_to_index(subdata)
+    async def files_to_index(
+        self,
+        subdata: str | None = None,
+        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
+        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+    ) -> dict[str, Any]:
+        if x_confluence_email is None or x_confluence_token is None:
+            return {"subdata": subdata, "files": [], "deleted": []}
+        token = x_confluence_token.removeprefix("Bearer ").strip()
+        return self.confluence_instance.files_to_index(subdata, x_confluence_email.strip(), token)
 
 
 def run() -> None:

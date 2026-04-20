@@ -19,7 +19,6 @@ from urllib.parse import urljoin
 
 import requests
 
-
 PROJECT = "project"
 SOURCE_FILE = "source_file"
 
@@ -225,9 +224,7 @@ class ConfluenceInterfacer:
             page_id = page.get("id")
             if isinstance(page_id, str):
                 page_ids.append(page_id)
-            when = self._safe_when(
-                page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None
-            )
+            when = self._safe_when(page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None)
             space_latest = max(space_latest, when)
         return space_latest, page_ids
 

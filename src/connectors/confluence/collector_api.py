@@ -65,9 +65,7 @@ class API:
         if x_confluence_email is None or x_confluence_token is None:
             return {}
         token = x_confluence_token.removeprefix("Bearer ").strip()
-        return self.confluence_instance.get_page(
-            file_pointer, include_content, x_confluence_email.strip(), token
-        )
+        return self.confluence_instance.get_page(file_pointer, include_content, x_confluence_email.strip(), token)
 
     async def files_to_index(
         self,

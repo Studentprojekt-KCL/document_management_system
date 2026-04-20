@@ -11,7 +11,8 @@ import {
   SESSION_KEY_ACCESS_TOKEN,
   SESSION_KEY_ID_TOKEN,
   SESSION_KEY_PKCE_VERIFIER,
-  SESSION_KEY_OIDC_STATE
+  SESSION_KEY_OIDC_STATE,
+  SESSION_KEY_REFRESH_TOKEN
 } from '@/utils/config'
 
 const route = useRoute()
@@ -86,6 +87,7 @@ onMounted(async () => {
     /* Store token(s) and data in sessionStorage */
     if (data.access_token) localStorage.setItem(SESSION_KEY_ACCESS_TOKEN, data.access_token)
     if (data.id_token) localStorage.setItem(SESSION_KEY_ID_TOKEN, data.id_token)
+    if (data.refresh_token) localStorage.setItem(SESSION_KEY_REFRESH_TOKEN, data.refresh_token)
 
     /* Cleanup old items */
     localStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)

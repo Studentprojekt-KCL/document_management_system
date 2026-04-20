@@ -9,8 +9,8 @@ export function useAuthSession() {
   let lastRefresh = Date.now()
   let heartbeatLoop = null
 
-  const TIME_LIMIT = 60 * 60 * 1000
-  const REFRESH_TIME = 25 * 60 * 1000
+  const TIME_LIMIT = 4 * 60 * 1000
+  const REFRESH_TIME = 1 * 60 * 1000
   const LEADER_TIMEOUT = 15000
 
   // ACTIVITY (ALL TABS)

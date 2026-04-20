@@ -18,6 +18,7 @@ export const SESSION_KEY_ACCESS_TOKEN = 'access_token'
 export const SESSION_KEY_ID_TOKEN = 'id_token'
 export const SESSION_KEY_PKCE_VERIFIER = 'pkce_verifier'
 export const SESSION_KEY_OIDC_STATE = 'oidc_state'
+export const SESSION_KEY_REFRESH_TOKEN = 'refresh_token'
 
 /* LocalStorage key names */
 export const LOCAL_KEY_LOGOUT_EVENT = 'logout-event'

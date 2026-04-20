@@ -34,7 +34,7 @@ IP_LOG_DB=<IP address for log-database container>
 IP_SEARCH_ENGINE=<IP address for search-engine container>
 IP_DMISAPI=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
-IP_CONNECTOR_GITLAB=<IP address for connector-gitlab container>
+IP_CONGITLAB=<IP address for connector-gitlab container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 

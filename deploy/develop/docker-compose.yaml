@@ -94,7 +94,7 @@ services:
     restart: always
     networks:
       dev_net:
-        ipv4_address: ${IP_CONNECTOR_GITLAB}
+        ipv4_address: ${IP_CONGITLAB}
     environment:
       CONGITLAB_BIND_PORT: ${CONGITLAB_BIND_PORT}
       CONGITLAB_GITLAB_URL: ${CONGITLAB_GITLAB_URL}

@@ -5,7 +5,6 @@ from json.decoder import JSONDecodeError
 
 import httpx
 
-from dmis_logger import dms_warning
 from gateway.config import LanguageConfig
 from gateway.preprompts import (
     INDIVIDUAL_SUMMARY_PROMPT,
@@ -33,10 +32,6 @@ def detect_language(text: str, sample_size: int, swedish_char_threshold: int) ->
                 return "swedish"
 
     return "english"
-from gateway.preprompts import INDIVIDUAL_SUMMARY_PROMPT, SYNTHESIS_PROMPT
-from gateway.schemas import InputItem, SummaryResult
-
-from shared_functions.dmis_logger import dms_warning
 
 
 class Summarizer:

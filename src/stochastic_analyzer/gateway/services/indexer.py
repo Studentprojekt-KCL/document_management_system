@@ -12,6 +12,7 @@ from dmis_logger import dms_warning
 def _to_uuid(pointer: str) -> str:
     """Hash a pointer string into a UUID for Qdrant."""
     h = hashlib.md5(pointer.encode()).hexdigest()
+    # Slice the 32-char hex digest into some super cool groups for vector db support
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
 
 

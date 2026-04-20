@@ -1,4 +1,8 @@
 <script setup>
+/**
+ * AuthCallbackView.vue - Handles the OAuth callback from Keycloak.
+ * This view handles the redirection from Keycloak after the user has authenticated.
+ */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -14,6 +18,10 @@ const route = useRoute()
 const router = useRouter()
 const errorMsg = ref('')
 
+/**
+ * On mount, handle the OAuth callback from Keycloak
+ * Different errors can occur during the authentication process.
+ */
 onMounted(async () => {
   let alreadyProcessed = false
 
@@ -22,6 +30,7 @@ onMounted(async () => {
     return
   }
 
+  /* Authorization code returned by Keycloak */
   const code = route.query.code
   const returnedState = route.query.state
 
@@ -92,3 +101,11 @@ onMounted(async () => {
     <p v-if="errorMsg">{{ errorMsg }}</p>
   </section>
 </template>
+<style scoped>
+.auth-callback-view {
+  padding: 2rem;
+}
+.error-message {
+  white-space: pre-wrap;
+}
+</style>

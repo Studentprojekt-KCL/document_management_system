@@ -36,18 +36,18 @@ class GitHub:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.Session()
-        raw = read_env_variable("GITHUB_API_URL")
+        raw = read_env_variable("CONGITHUB_GITHUB_API_URL")
         if not raw:
-            raise ValueError("Missing GITHUB_API_URL")
-        self.source_system = read_env_variable("GITHUB_SYSTEM_NAME")
+            raise ValueError("Missing CONGITHUB_GITHUB_API_URL")
+        self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
-        self.org = os.environ.get("GITHUB_ORG")
+        self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()
 
     def _set_default_headers(self) -> None:
-        api_version = read_env_variable("GITHUB_API_VERSION")
+        api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github+json",

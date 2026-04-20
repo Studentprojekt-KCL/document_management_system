@@ -1,11 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law.
 
-GitHub connector following same structure as GitLab connector.
-Must return:
-- files
-- subdata
-- file_pointers
-Same format as GitLab.
+GitHub connector API following the same route contract as the GitLab connector.
 """
 
 import argparse
@@ -15,7 +10,8 @@ import uvicorn
 from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+
 from interfacer_github import GitHub
 
 from shared_functions.boto_tools import upload_file
@@ -23,7 +19,7 @@ from shared_functions.initialisation_tools import read_env_variable, read_port
 
 
 class API:
-    """Management class for GitHub connector API (same routes/shape as GitLab connector)."""
+    """Management class for GitHub connector API."""
 
     app = FastAPI()
 
@@ -33,9 +29,11 @@ class API:
         """Constructor."""
         self.github_instance = GitHub()
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
-        self.app.add_api_route("/file", self.file, methods=["GET"])
+        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+        self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -45,45 +43,57 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict
-        content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+        content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(
+    async def index_needed_bool(
         self,
         subdata: str | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
-    ) -> Any:
-        """List file pointers plus subdata (same as GitLab /files)."""
-        if x_github_token is None:
-            return {"subdata": subdata, "file_pointers": []}
-        token = x_github_token.removeprefix("Bearer ").strip()
-        return self.github_instance.pointers_to_all_files_to_index(subdata, token)
+    ) -> dict[str, Any]:
+        """Check whether any repo has new content to index."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return self.github_instance.check_index_needed(subdata, token)
 
-    async def file(
+    async def get_files(
         self,
-        file_pointer: str,
-        include_content: bool = True,
+        file_pointers: dict[str, list],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
     ) -> Any:
-        """Single file by pointer (same metadata/content shape as GitLab /file)."""
-        if x_github_token is None:
-            return {}
-        token = x_github_token.removeprefix("Bearer ").strip()
-        return self.github_instance.get_file(file_pointer, include_content, token)
+        """Fetch specific files by pointer."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return self.github_instance.get_files(
+            file_pointers.get("file_pointers", []), include_content, include_last_edit_date, token
+        )
 
     async def files_to_index(
         self,
         subdata: str | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
-    ) -> dict:
-        """Bulk payload uploaded like GitLab; response includes subdata and file_url."""
-        if x_github_token is None:
-            return {"subdata": subdata, "file_url": None}
-        token = x_github_token.removeprefix("Bearer ").strip()
+    ) -> dict[str, Any]:
+        """Bulk payload of all files to index; uploads to storage and returns file_url."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
         content = self.github_instance.files_to_index(subdata, token)
         url = upload_file(content, "github_content.json")
         return {"subdata": content.get("subdata"), "file_url": url}
+
+    async def stream_files_to_index(
+        self,
+        subdata: str | None = None,
+        x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
+    ) -> StreamingResponse:
+        """Streaming endpoint for all files to index."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return StreamingResponse(
+            self.github_instance.stream_files_to_index(subdata, token),
+            media_type="application/octet-stream",
+        )
+
+    async def connected_source_systems(self) -> list[str]:
+        """Return the name of the configured GitHub source system."""
+        return [self.github_instance.source_system]
 
 
 def run() -> None:

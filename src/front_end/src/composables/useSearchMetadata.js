@@ -4,7 +4,7 @@
  * Functions are used in other files.
  */
 
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 /* Function to pick the first non-empty value from a list of candidates.*/
 const pick = (...values) => {
@@ -47,33 +47,6 @@ export const TYPE_FILTERS = {
   'Word (.docx)': ['.doc', '.docx', 'word'],
   'Excel (.xlsx)': ['.xlsx'],
   'Text / Markdown (.txt, .md)': ['.md', '.txt']
-}
-
-/* Shared security levels — fetched once, used by SearchFiltersCard and ClassificationEditor */
-export const securityLevels = ref([])
-let securityFetchPromise = null
-
-export const fetchSecurityLevels = async () => {
-  if (securityLevels.value.length > 0) return securityLevels.value
-  if (securityFetchPromise) return securityFetchPromise
-
-  const API_BASE_URL = window.__ENV__.API_BASE_URL?.replace(/\/$/, '') ?? ''
-  const token = sessionStorage.getItem('access_token')
-
-  securityFetchPromise = fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      securityLevels.value = Array.isArray(data) ? data : []
-      return securityLevels.value
-    })
-    .catch(() => {
-      securityLevels.value = ['Public', 'Internal', 'Sensitive', 'Confidential']
-      return securityLevels.value
-    })
-
-  return securityFetchPromise
 }
 
 /* Function to resolve the document type from source type and name. */

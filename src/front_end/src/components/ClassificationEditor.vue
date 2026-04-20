@@ -14,9 +14,9 @@
  * />
  */
 
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { ShieldCheck, Save, XCircle } from 'lucide-vue-next'
-import { securityLevels, fetchSecurityLevels } from '@/composables/useSearchMetadata'
+import { useSecurityFilters } from '@/composables/useFilters'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -25,9 +25,7 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel'])
 
-onMounted(() => {
-  fetchSecurityLevels()
-})
+const securityFilters = useSecurityFilters()
 
 const selectedLevel = ref('')
 const isSaving = ref(false)
@@ -75,7 +73,7 @@ defineExpose({ resetSaving })
 
           <div class="level-options">
             <button
-              v-for="level in securityLevels"
+              v-for="level in securityFilters"
               :key="level"
               :class="['level-option', { selected: selectedLevel === level }, `option-${level.toLowerCase()}`]"
               type="button"

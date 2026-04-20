@@ -1,8 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
-import { securityLevels, fetchSecurityLevels } from '@/composables/useSearchMetadata'
-
 import { TYPE_FILTERS } from '@/composables/useSearchMetadata'
 import { useSourceFilters, useSecurityFilters } from '@/composables/useFilters'
 
@@ -15,39 +13,6 @@ const props = defineProps({
   selectedFilters: Object
 })
 const emit = defineEmits(['update:filters'])
-
-
-/* API cofig*/
-const access_token = sessionStorage.getItem('access_token')
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
-
-/* (Static) filter options */
-const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
-
-/* Dynamic filter options */
-const sourceFilters = ref([])
-
-const fetchSourceFilters = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`, {
-      headers: {
-        Authorization: `Bearer ${access_token}`
-      }
-    })
-
-    if (!res.ok) {
-      console.error(`Failed to fetch source systems: ${res.statusText}`)
-      return
-    }
-    const data = await res.json()
-    sourceFilters.value = data
-  } catch (error) {
-    console.error(`Error fetching source systems: ${error}`)
-  }
-}
-
-fetchSourceFilters()
-fetchSecurityLevels()
 
 /* Local refs for filter selection */
 const localSource = ref([...props.selectedFilters.source])
@@ -146,7 +111,7 @@ const clearAllFilters = () => {
           SECURITY:
         </span>
         <button
-          v-for="item in securityLevels"
+          v-for="item in securityFilters"
           :key="item"
           :class="['chip', { active: isSelected('security', item) }]"
           @click="toggleFilter('security', item)"

@@ -7,7 +7,7 @@ import argparse
 from typing import Any
 from collections.abc import Sequence
 
-import requests
+import httpx
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.encoders import jsonable_encoder
@@ -30,6 +30,7 @@ class API:
     query_api_url: str
     connector_api_url: str
     token_verifier: TokenVerifier
+    http_client: httpx.AsyncClient
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -47,11 +48,16 @@ class API:
         self.query_api_url = query_api_url.rstrip("/")
         self.connector_api_url = connector_api_url.rstrip("/")
         self.token_verifier = token_verifier
+        self.http_client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0))
 
         self.app.add_exception_handler(
             RequestValidationError,
             self.validation_exception_handler,
         )
+
+        @self.app.on_event("shutdown")
+        async def _shutdown() -> None:
+            await self.close_http_client()
 
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
@@ -85,6 +91,10 @@ class API:
         )
         return claims
 
+    async def close_http_client(self) -> None:
+        """Close reusable HTTP client"""
+        await self.http_client.aclose()
+
     async def execute_get_request(self, url: str, request: Request) -> JSONResponse:
         """Execute GET request."""
         try:
@@ -94,17 +104,16 @@ class API:
             return JSONResponse(status_code=400)
 
         try:
-            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = await self.http_client.get(
                 url,
                 params=params,
-                timeout=120,
             )
             response.raise_for_status()
             response_data = response.json()
-        except requests.JSONDecodeError as exc:
+        except ValueError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except requests.RequestException as exc:
+        except httpx.HTTPError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
@@ -118,22 +127,21 @@ class API:
         except TypeError:
             params = None
         except JSONDecodeError:
-            dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {request.body()}")
+            dms_info(f"API retrieved a POST request ({url}) with incorrect body format.")
             return JSONResponse(status_code=400, content={})
 
         try:
-            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = await self.http_client.post(
                 url,
                 params=params,
                 json=body,
-                timeout=120,
             )
             response.raise_for_status()
             response_data = response.json()
-        except requests.JSONDecodeError as exc:
+        except ValueError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except requests.RequestException as exc:
+        except httpx.HTTPError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 

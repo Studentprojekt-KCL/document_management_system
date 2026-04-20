@@ -14,7 +14,9 @@ export const API_PATHS = {
   search: `${API_BASE_URL}/search_engine/search`,
   summarize: `${API_BASE_URL}/stochastic-analyzer/summarize`,
   classifications: `${API_BASE_URL}/stochastic-analyzer/classifications`,
-  connectedSourceSystems: `${API_BASE_URL}/connector/connected_source_systems`
+  connectedSourceSystems: `${API_BASE_URL}/connector/connected_source_systems`,
+  documentsOnly: `${API_BASE_URL}/search_engine/search/file_types_documents_only`,
+  allFileTypes: `${API_BASE_URL}/search_engine/search/file_types`
 }
 
 /**

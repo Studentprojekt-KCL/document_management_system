@@ -53,10 +53,12 @@ onMounted(async () => {
     return
   }
 
+  /** check to make sureo only happens one tab */
   if (alreadyProcessed) return
   alreadyProcessed = true
 
-  // token exchange
+  /* Redirection URL */
+  /** token exchange */
   const redirectUri = `${window.location.origin}/auth/callback`
 
   try {
@@ -73,6 +75,7 @@ onMounted(async () => {
       body: body.toString()
     })
 
+    /* Response from token API */
     const data = await resp.json()
 
     if (!resp.ok) {
@@ -96,9 +99,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section>
+  <section class="auth-callback-view">
     <h2>Signing you in…</h2>
-    <p v-if="errorMsg">{{ errorMsg }}</p>
+    <p class="error-message" v-if="errorMsg"><b>Error:</b> {{ errorMsg }}</p>
   </section>
 </template>
 <style scoped>

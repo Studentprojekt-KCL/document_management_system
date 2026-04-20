@@ -34,7 +34,7 @@ IP_LOG_DB=<IP address for log-database container>
 IP_SEARCH_ENGINE=<IP address for search-engine container>
 IP_DMIS_API=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
-IP_CONNECTOR_GITLABS=<IP address for connector-gitlabs container>
+IP_CONNECTOR_GITLAB=<IP address for connector-gitlab container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
@@ -67,7 +67,7 @@ KEYCLOAK_REALM=<keycloak realm>
 KEYCLOAK_CLIENT_ID=<keycloak id>
 API_BASE_URL=<api endpoint>
 
-# connector-gitlabs
+# connector-gitlab
 GITLAB_CONNECTOR_PORT=<port number>
 GITLAB_ADDRESS=<GitLab instance URL>
 MINIO_ACCESS_ADDRESS=<MinIO access URL>

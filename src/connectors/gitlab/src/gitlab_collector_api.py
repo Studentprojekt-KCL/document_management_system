@@ -10,14 +10,14 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
-from interfacer import GitLabs
+from interfacer import GitLab
 
 from shared_functions.boto_tools import upload_file
 from shared_functions.initialisation_tools import read_port, read_env_variable
 
 
 class API:
-    """Management class for Gitlabs connector API."""
+    """Management class for Gitlab connector API."""
 
     app = FastAPI()
 
@@ -25,7 +25,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.gitlabs_instance = GitLabs()
+        self.gitlab_instance = GitLab()
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
@@ -47,7 +47,7 @@ class API:
 
     async def index_needed_bool(self, subdata: str | None = None) -> Any:
         """Endpoint returning status if new index is needed."""
-        return self.gitlabs_instance.check_index_needed(subdata)
+        return self.gitlab_instance.check_index_needed(subdata)
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -62,13 +62,13 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        return self.gitlabs_instance.get_files(file_pointers.get("file_pointers", []), include_content, include_last_edit_date)
+        return self.gitlab_instance.get_files(file_pointers.get("file_pointers", []), include_content, include_last_edit_date)
 
     async def files_to_index(self, subdata: str | None = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
         OBS; this method will be depricated."""
-        content = self.gitlabs_instance.files_to_index(subdata)
-        url = upload_file(content, "gitlabs_content.json")
+        content = self.gitlab_instance.files_to_index(subdata)
+        url = upload_file(content, "gitlab_content.json")
         return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
 
     async def connected_source_systems(self) -> list:
@@ -77,7 +77,7 @@ class API:
 
     async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
-        return StreamingResponse(self.gitlabs_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
+        return StreamingResponse(self.gitlab_instance.stream_files_to_index(subdata), media_type="application/octet-stream")
 
 
 def run() -> None:

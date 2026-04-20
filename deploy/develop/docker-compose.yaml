@@ -83,13 +83,13 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
       API_BASE_URL: ${API_BASE_URL}
 
-  connector-gitlabs:
-    image: registry.dms-lookup.com/connector-gitlabs:latest
-    container_name: connector-gitlabs
+  connector-gitlab:
+    image: registry.dms-lookup.com/connector-gitlab:latest
+    container_name: connector-gitlab
     restart: always
     networks:
       dev_net:
-        ipv4_address: ${IP_CONNECTOR_GITLABS}
+        ipv4_address: ${IP_CONNECTOR_GITLAB}
     environment:
       GITLAB_CONNECTOR_PORT: ${GITLAB_CONNECTOR_PORT}
       GITLAB_ADDRESS: ${GITLAB_ADDRESS}

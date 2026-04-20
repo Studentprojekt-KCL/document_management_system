@@ -53,9 +53,9 @@ MYSQL_PASSWORD=<database password>
 MYSQL_RANDOM_ROOT_PASSWORD=<true or false>
 
 # search-engine
-SE_API_PORT=<port number>
+SEARCHENG_BIND_PORT=<port number>
 DMISAPI_CONGATEWAY_URL=<connector service URL>
-SE_API_HOST=<bind address>
+SEARCHENG_BIND_ADDR=<bind address>
 
 # dmis-api
 DMIS_SEARCH_API_URL=<search engine URL>

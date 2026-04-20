@@ -51,10 +51,10 @@ services:
       dev_net:
         ipv4_address: ${IP_SEARCH_ENGINE}
     environment:
-      SE_API_PORT: ${SE_API_PORT}
-      SE_API_CONNECTOR_ADDRESS: ${SE_API_CONNECTOR_ADDRESS}
-      SE_API_HOST: ${SE_API_HOST}
-      SE_API_QUERY_ADDRESS: ${SE_API_QUERY_ADDRESS}
+      SEARCHENG_BIND_PORT: ${SEARCHENG_BIND_PORT}
+      SEARCHENG_CONGATEWAY_URL: ${SEARCHENG_CONGATEWAY_URL}
+      SEARCHENG_BIND_ADDR: ${SEARCHENG_BIND_ADDR}
+      SEARCHENG_STOCHAN_URL: ${SEARCHENG_STOCHAN_URL}
 
   dmis-api:
     image: registry.dms-lookup.com/dmis-api:latest

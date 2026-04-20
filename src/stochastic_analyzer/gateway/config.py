@@ -2,25 +2,38 @@
 
 from os import environ
 import argparse
+from dataclasses import dataclass
 
 from dmis_logger import dms_error
 from initialisation_tools import read_env_variable
 
 
+@dataclass
 class LanguageConfig:
     """Language detection configuration.
 
     Attributes:
-        min_doc_length: minimum document length to attempt language detection.
-        sample_size: number of characters to sample from the document.
+        sample_size: number of characters to sample from the document for language detection.
         swedish_char_threshold: number of Swedish characters to trigger Swedish detection.
-        swedish_stopword_threshold: number of Swedish stopwords to trigger Swedish detection.
     """
 
-    min_doc_length: int
     sample_size: int
     swedish_char_threshold: int
-    swedish_stopword_threshold: int
+
+
+@dataclass
+class MinistralConfig:
+    """Ministral LLM connection configuration.
+
+    Attributes:
+        url: URL for the Ministral LLM container.
+        model: model identifier for Ministral.
+        timeout: request timeout in seconds.
+    """
+
+    url: str
+    model: str
+    timeout: int
 
 
 class ServiceConfig:
@@ -29,18 +42,15 @@ class ServiceConfig:
     Attributes:
         tei_url: URL for the TEI reranker container.
         classifier_url: URL for the TEI classifier container.
-        ministral_url: URL for the Ministral LLM container.
-        ministral_model: model identifier for Ministral.
-        connector_url: connector url
+        ministral: Ministral LLM configuration.
+        connector_url: connector url.
         escalation_threshold: score gap threshold for security-first classification escalation.
         language: language detection configuration.
     """
 
     tei_url: str
     classifier_url: str
-    ministral_url: str
-    ministral_model: str
-    ministral_timeout: int
+    ministral: MinistralConfig
     connector_url: str
     escalation_threshold: float
     language: LanguageConfig
@@ -110,11 +120,27 @@ class APIConfiguration:
 
         self.port = int(port)
 
+    def _validate_required_env_vars(self, required_vars: dict) -> bool:
+        """Validate required environment variables.
+
+        Args:
+            required_vars: Dictionary mapping variable names to their values
+
+        Returns:
+            True if all required variables are present, False otherwise
+        """
+        for var_name, var_value in required_vars.items():
+            if var_value is None:
+                dms_error(f"{var_name} is not defined.")
+                return False
+        return True
+
     def _load_service_config(self) -> None:
         """Load external service configuration."""
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
 
+        # Load all environment variables
         tei_url: str = read_env_variable("TEI_URL")
         classifier_url: str = read_env_variable("CLASSIFIER_URL")
         ministral_url: str = read_env_variable("MINISTRAL_URL")
@@ -122,60 +148,35 @@ class APIConfiguration:
         ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
         address: str = read_env_variable("CONNECTOR_ADDRESS")
         escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
-
-        # --- new language detection vars ---
-        min_doc_length: str = read_env_variable("MIN_DOC_LENGTH")
         sample_size: str = read_env_variable("SAMPLE_SIZE")
         swedish_char_threshold: str = read_env_variable("SWEDISH_CHAR_THRESHOLD")
-        swedish_stopword_threshold: str = read_env_variable("SWEDISH_STOPWORD_THRESHOLD")
 
-        # --- existing guards ---
-        if tei_url is None:
-            dms_error("TEI_URL is not defined.")
-            return
-        if classifier_url is None:
-            dms_error("CLASSIFIER_URL is not defined.")
-            return
-        if ministral_url is None:
-            dms_error("MINISTRAL_URL is not defined.")
-            return
-        if ministral_model is None:
-            dms_error("MINISTRAL_MODEL is not defined.")
-            return
-        if address is None:
-            dms_error("CONNECTOR_ADDRESS is not defined.")
-            return
-        if escalation_threshold is None:
-            dms_error("ESCALATION_THRESHOLD is not defined.")
+        # Validate required variables
+        required_vars = {
+            "TEI_URL": tei_url,
+            "CLASSIFIER_URL": classifier_url,
+            "MINISTRAL_URL": ministral_url,
+            "MINISTRAL_MODEL": ministral_model,
+            "CONNECTOR_ADDRESS": address,
+            "ESCALATION_THRESHOLD": escalation_threshold,
+            "SAMPLE_SIZE": sample_size,
+            "SWEDISH_CHAR_THRESHOLD": swedish_char_threshold,
+        }
+
+        if not self._validate_required_env_vars(required_vars):
             return
 
-        # --- new guards ---
-        if min_doc_length is None:
-            dms_error("LANG_MIN_DOC_LENGTH is not defined.")
-            return
-        if sample_size is None:
-            dms_error("LANG_SAMPLE_SIZE is not defined.")
-            return
-        if swedish_char_threshold is None:
-            dms_error("LANG_SWEDISH_CHAR_THRESHOLD is not defined.")
-            return
-        if swedish_stopword_threshold is None:
-            dms_error("LANG_SWEDISH_STOPWORD_THRESHOLD is not defined.")
-            return
-
-        # --- existing assignments ---
+        # Assign service configurations
         self.services.tei_url = tei_url
         self.services.classifier_url = classifier_url
-        self.services.ministral_url = ministral_url
-        self.services.ministral_model = ministral_model
-        self.services.ministral_timeout = int(ministral_timeout)
+        self.services.ministral = MinistralConfig(
+            url=ministral_url,
+            model=ministral_model,
+            timeout=int(ministral_timeout),
+        )
         self.services.connector_url = address
         self.services.escalation_threshold = float(escalation_threshold)
-
-        # --- new assignments ---
-        lang = LanguageConfig()
-        lang.min_doc_length = int(min_doc_length)
-        lang.sample_size = int(sample_size)
-        lang.swedish_char_threshold = int(swedish_char_threshold)
-        lang.swedish_stopword_threshold = int(swedish_stopword_threshold)
-        self.services.language = lang
+        self.services.language = LanguageConfig(
+            sample_size=int(sample_size),
+            swedish_char_threshold=int(swedish_char_threshold),
+        )

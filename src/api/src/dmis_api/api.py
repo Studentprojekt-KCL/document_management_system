@@ -5,7 +5,9 @@ from __future__ import annotations
 from json.decoder import JSONDecodeError
 import argparse
 from typing import Any
+from collections.abc import AsyncIterator
 from collections.abc import Sequence
+from contextlib import asynccontextmanager
 
 import httpx
 import uvicorn
@@ -55,16 +57,20 @@ class API:
             self.validation_exception_handler,
         )
 
-        @self.app.on_event("shutdown")
-        async def _shutdown() -> None:
-            await self.close_http_client()
-
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
+
+    @asynccontextmanager
+    async def lifespan(self) -> AsyncIterator[None]:
+        """Manage teardown."""
+        try:
+            yield
+        finally:
+            await self.http_client.aclose()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -90,10 +96,6 @@ class API:
             f"azp={claims.get('azp')}"
         )
         return claims
-
-    async def close_http_client(self) -> None:
-        """Close reusable HTTP client"""
-        await self.http_client.aclose()
 
     async def execute_get_request(self, url: str, request: Request) -> JSONResponse:
         """Execute GET request."""
@@ -127,7 +129,7 @@ class API:
         except TypeError:
             params = None
         except JSONDecodeError:
-            dms_info(f"API retrieved a POST request ({url}) with incorrect body format.")
+            dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {request.body()}")
             return JSONResponse(status_code=400, content={})
 
         try:

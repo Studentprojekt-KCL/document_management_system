@@ -10,7 +10,6 @@ import {
   TYPE_FILTERS,
   useSearchMetadata
 } from '../useSearchMetadata'
-import { ref } from 'vue'
 
 /* ── resolveFilename ── */
 describe('resolveFilename', () => {

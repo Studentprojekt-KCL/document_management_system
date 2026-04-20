@@ -32,7 +32,57 @@ Describtion of the frotend code (`./front_end/src/`) structure
 - New app-wide frame/layout -> `layouts/`
 - New route mapping -> update `router/index.js`
 
+## Testing
 
+### Setup
+
+Tests use **Vitest** + **Vue Test Utils** with `jsdom` as the DOM environment.
+
+Install dependencies:
+```bash
+npm install -D vitest @vue/test-utils jsdom
+```
+
+Run all tests:
+```bash
+npm run test
+```
+
+Run tests in watch mode:
+```bash
+npm run test:watch
+```
+
+### Test file locations
+
+Test files live in `__tests__/` folders next to the code they test:
+
+### Writing new tests
+
+- Place test files in the `__tests__/` folder next to the source file.
+- Name test files `ComponentName.test.js` (matching the source file name).
+- Mock `window.__ENV__` values in `test-setup.js` — they apply to all tests automatically.
+- Mock composables and child components using `vi.mock()` to isolate the unit under test.
+- Use `flushPromises()` from `@vue/test-utils` for async operations.
+- Use `vi.hoisted()` when a mock variable is referenced inside a `vi.mock()` factory.
+
+### Current coverage
+
+|     Area    |           File                | Tests |
+|-------------|-------------------------------|-------|
+| Utils       | `auth.test.js`                |   18  |
+| Composables | `useSearchMetadata.test.js`   |   51  |
+| Composables | `useFilters.test.js`          |   14  |
+| Components  | `SearchBar.test.js`           |   16  |
+| Components  | `SearchMatches.test.js`       |   18  |
+| Components  | `ClassificationEditor.test.js`|   19  |
+| Components  | `SearchPreviewDrawer.test.js` |   27  |
+| Views       | `SearchView.test.js`          |   29  |
+| **Total**   | |         **192**                     |
+
+### If questions
+
+- Ask frontend team :D
 ### If questions 
 
 - Ask frontend team :D

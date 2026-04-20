@@ -155,10 +155,7 @@ describe('SearchView', () => {
       searchBar.vm.$emit('search', 'hello world')
       await flushPromises()
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('hello%20world'),
-        expect.any(Object)
-      )
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('hello%20world'), expect.any(Object))
     })
 
     it('passes results to SearchMatches after successful search', async () => {

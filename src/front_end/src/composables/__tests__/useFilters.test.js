@@ -146,9 +146,7 @@ describe('useSecurityFilters', () => {
     useSecurityFilters()
 
     await vi.waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to fetch security classifications')
-      )
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to fetch security classifications'))
     })
     consoleSpy.mockRestore()
   })
@@ -160,9 +158,7 @@ describe('useSecurityFilters', () => {
     useSecurityFilters()
 
     await vi.waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error fetching security classifications')
-      )
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Error fetching security classifications'))
     })
     consoleSpy.mockRestore()
   })

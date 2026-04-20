@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
@@ -67,8 +67,8 @@ describe('ClassificationEditor', () => {
   /* ── Level selection ── */
   describe('level selection', () => {
     it('pre-selects the current level when modal opens', async () => {
-      const wrapper = mountEditor({ visible : false,currentLevel: 'Sensitive' })
-      await wrapper .setProps({ visible: true }) // Simulate opening the modal
+      const wrapper = mountEditor({ visible: false, currentLevel: 'Sensitive' })
+      await wrapper.setProps({ visible: true }) // Simulate opening the modal
       await nextTick()
 
       const selected = wrapper.find('.level-option.selected')
@@ -112,8 +112,8 @@ describe('ClassificationEditor', () => {
   /* ── Save ── */
   describe('save', () => {
     it('emits save with the selected level when Save is clicked', async () => {
-      const wrapper = mountEditor({ visible : false, currentLevel: 'Internal' })
-      await wrapper .setProps({ visible: true }) // Simulate opening the modal
+      const wrapper = mountEditor({ visible: false, currentLevel: 'Internal' })
+      await wrapper.setProps({ visible: true }) // Simulate opening the modal
       await nextTick()
 
       await wrapper.find('.save-btn').trigger('click')
@@ -140,7 +140,7 @@ describe('ClassificationEditor', () => {
     })
 
     it('enables the save button when a level is selected', async () => {
-      const wrapper = mountEditor({ visible : false, currentLevel: 'Public' })
+      const wrapper = mountEditor({ visible: false, currentLevel: 'Public' })
       await wrapper.setProps({ visible: true }) // Simulate opening the modal
       await nextTick()
 

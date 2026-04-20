@@ -1,4 +1,6 @@
-# SearchView.test.js — 24 tests:
+# Search Tests
+
+## SearchView.test
 
 - Renders all four child components
 - Initial state (loading false, empty matches, drawer closed)

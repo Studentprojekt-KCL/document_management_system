@@ -1,12 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
 
 /* Mock useSearchMetadata */
 vi.mock('@/composables/useSearchMetadata', () => {
-  const { computed } = require('vue')
   return {
-    useSearchMetadata: (props) => ({
+    useSearchMetadata: () => ({
       normalizeMatches: (matches = []) =>
         matches.map((entry, index) => ({
           rawMatch: entry,
@@ -192,10 +190,7 @@ describe('SearchMatches', () => {
   /* ── Edge cases ── */
   describe('edge cases', () => {
     it('handles matches with missing fields gracefully', () => {
-      const sparseMatches = [
-        { name: 'file.txt' },
-        {}
-      ]
+      const sparseMatches = [{ name: 'file.txt' }, {}]
 
       const wrapper = mountMatches({ matches: sparseMatches, query: 'test' })
       const items = wrapper.findAll('.result-item')

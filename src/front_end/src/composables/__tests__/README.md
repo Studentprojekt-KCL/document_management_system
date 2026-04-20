@@ -1,4 +1,6 @@
-# useSearchMetadata
+# Composables Tests
+
+## useSearchMetadata
 
 * resolveFilename
   * Extracts filename from different structures (metadata.name, direct name)
@@ -28,9 +30,9 @@
   * Extracts document classification (e.g., Public, Confidential)
   * Handles missing values safely
 
-# useFilters
+## useFilters
 
-## useSourceFilters
+### useSourceFilters
 
 * Starts as empty array
 * Calls the correct endpoint
@@ -39,7 +41,7 @@
 * Stays empty on network error
 * Creates a new ref per call (not shared)
 
-## useSecurityFilters
+### useSecurityFilters
 
 * Same six scenarios as above
 * Plus: verifies the exact error messages logged on failure

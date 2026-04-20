@@ -1,34 +1,6 @@
-# 1. Install
+# Component Test
 
-npm install -D vitest @vue/test-utils jsdom
-
-# 2. Add to vite.config.js
-
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { fileURLToPath } from 'node:url'
-
-export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true
-  }
-})
-
-# 3. Add test script to package.json
-
-json"scripts": {
-  "test": "vitest run",
-  "test:watch": "vitest"
-}
-
-# ClassificationEditor.test.js — 16 tests
+## ClassificationEditor.test.js — 16 tests
 
 - Renders/hides modal based on visible prop
 - Renders all four security levels
@@ -42,7 +14,7 @@ json"scripts": {
 - resetSaving() exposed method works
 - Re-syncs to new level when re-opened
 
-# SearchPreviewDrawer.test.js — 22 tests
+## SearchPreviewDrawer.test.js — 22 tests
 
 - Drawer open/close rendering and backdrop
 - Title, type tag, header text
@@ -56,7 +28,7 @@ json"scripts": {
 - Editor closes after successful save
 - State resets on document change and drawer close
 
-# SearchBar.test.js — 16 tests
+## SearchBar.test.js — 16 tests
 
 - Renders input, button, icon
 - Placeholder changes when loading
@@ -69,7 +41,7 @@ json"scripts": {
 - Clears input after successful search
 - Can emit multiple searches in sequence
 
-# SearchMatches.test.js — 18 tests
+## SearchMatches.test.js — 18 tests
 
 - Loading state shows "Searching…"
 - No results message with query text

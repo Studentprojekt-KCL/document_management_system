@@ -82,11 +82,11 @@ services:
       dev_net:
         ipv4_address: ${IP_FRONTEND}
     environment:
-      API_HOST: ${API_HOST}
-      KEYCLOAK_BASE_URL: ${KEYCLOAK_BASE_URL}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-      API_BASE_URL: ${API_BASE_URL}
+      FRONTEND_DMISAPI_URL: ${FRONTEND_DMISAPI_URL}
+      FRONTEND_AD_URL: ${FRONTEND_AD_URL}
+      FRONTEND_AD_REALM: ${FRONTEND_AD_REALM}
+      FRONTEND_AD_CLIENT_ID: ${FRONTEND_AD_CLIENT_ID}
+      FRONTEND_DMISAPI_BASE_URL: ${FRONTEND_DMISAPI_BASE_URL}
 
   connector-gitlab:
     image: registry.dms-lookup.com/connector-gitlab:latest

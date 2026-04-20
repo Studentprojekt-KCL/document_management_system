@@ -61,11 +61,11 @@ SE_API_HOST=<bind address>
 DMIS_SEARCH_API_URL=<search engine URL>
 
 # front-end
-API_HOST=<API endpoint URL>
-KEYCLOAK_BASE_URL=<keycloak base URL>
-KEYCLOAK_REALM=<keycloak realm>
-KEYCLOAK_CLIENT_ID=<keycloak id>
-API_BASE_URL=<api endpoint>
+FRONTEND_DMISAPI_URL=<API endpoint URL>
+FRONTEND_AD_URL=<keycloak base URL>
+FRONTEND_AD_REALM=<keycloak realm>
+FRONTEND_AD_CLIENT_ID=<keycloak id>
+FRONTEND_DMISAPI_BASE_URL=<api endpoint>
 
 # connector-gitlab
 CONGITLAB_BIND_PORT=<port number>

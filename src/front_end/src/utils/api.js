@@ -7,14 +7,14 @@
 import { SESSION_KEY_ACCESS_TOKEN } from '@/utils/config'
 
 /* Base URL for all backend API calls, trailing slash stripped. */
-export const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+export const FRONTEND_DMISAPI_BASE_URL = window.__ENV__.FRONTEND_DMISAPI_BASE_URL.replace(/\/$/, '')
 
 /* API path */
 export const API_PATHS = {
-  search: `${API_BASE_URL}/search_engine/search`,
-  summarize: `${API_BASE_URL}/stochastic-analyzer/summarize`,
-  classifications: `${API_BASE_URL}/stochastic-analyzer/classifications`,
-  connectedSourceSystems: `${API_BASE_URL}/connector/connected_source_systems`
+  search: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/search`,
+  summarize: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/summarize`,
+  classifications: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/classifications`,
+  connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`
 }
 
 /**

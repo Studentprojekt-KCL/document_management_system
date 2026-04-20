@@ -11,7 +11,7 @@
 
 import { Bell, LogOut } from 'lucide-vue-next'
 import {
-  KEYCLOAK_CLIENT_ID,
+  FRONTEND_AD_CLIENT_ID,
   keycloakLogoutUrl,
   SESSION_KEY_ACCESS_TOKEN,
   SESSION_KEY_ID_TOKEN,
@@ -42,7 +42,7 @@ const handleLogout = () => {
       keycloakLogoutUrl() +
       `?id_token_hint=${encodeURIComponent(idToken)}` +
       `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-      `&client_id=${encodeURIComponent(KEYCLOAK_CLIENT_ID)}`
+      `&client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}`
 
     window.location.assign(logoutUrl)
     return

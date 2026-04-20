@@ -10,6 +10,7 @@
     DMISAPI_AD_URL=<URL pointing to AD including realm>
     DMISAPI_AD_JWKS_URL=<JWT public keys endpoint for signature verification>
     DMISAPI_AD_AUTHORIZED_PARTY=<Expected azp claim identifying authorized client application>
+    LOGAPI_URL=<URL pointing to the log API>
 
 ## In python venv
 

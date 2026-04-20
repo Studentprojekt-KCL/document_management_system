@@ -1,23 +1,26 @@
-"""Confluence connector MVP with GitLab-like output format.
+"""Confluence Cloud REST client: spaces, page listing, full page fetch, incremental index.
 
-Authentication (aligned with GitHub connector pattern):
-- Prefer per-request ``email`` + ``api_token`` (Atlassian Cloud: Basic auth).
-- If either is omitted, falls back to ``CONFLUENCE_EMAIL`` and ``CONFLUENCE_API_TOKEN``
-  in the environment (useful for local scripts / single-tenant containers).
-- HTTP API in ``collector_api`` requires ``X-Confluence-Email`` and
-  ``X-Confluence-Token`` headers (same idea as ``X-GitHub-Token`` for GitHub).
+HTTP is done with ``httpx.AsyncClient`` (async). Calls use Basic auth (email + API token).
+Pass credentials as method arguments, or set ``CONFLUENCE_EMAIL`` and
+``CONFLUENCE_API_TOKEN`` for scripts. The HTTP service in ``collector_api`` reads
+``X-Confluence-Email`` and ``X-Confluence-Token``.
+
+Set ``CONFLUENCE_ADDRESS`` to the site root (e.g. ``https://tenant.atlassian.net``).
 """
 
 import base64
 import binascii
+import json
 import os
 import re
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from html import unescape
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
+import httpx
+
 
 PROJECT = "project"
 SOURCE_FILE = "source_file"
@@ -27,7 +30,7 @@ class ConfluenceInterfacer:
     """Confluence methods exposed for connector APIs."""
 
     def __init__(self) -> None:
-        self.session = requests.session()
+        self.session = httpx.AsyncClient(timeout=120.0)
         self.address = os.environ.get("CONFLUENCE_ADDRESS", "").rstrip("/")
         self.base = self._api_base(self.address)
 
@@ -58,7 +61,7 @@ class ConfluenceInterfacer:
         except (binascii.Error, ValueError, UnicodeDecodeError):
             return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(
+    async def _execute_request(
         self,
         endpoint: str,
         params: dict[str, Any] | None,
@@ -73,13 +76,13 @@ class ConfluenceInterfacer:
         user, token = creds
         url = urljoin(self.base, endpoint)
         try:
-            response = self.session.get(url, params=params, timeout=120, auth=(user, token))
+            response = await self.session.get(url, params=params, auth=(user, token))
             response.raise_for_status()
             payload = response.json()
             if isinstance(payload, dict):
                 return payload
             return {}
-        except (requests.RequestException, ValueError):
+        except (httpx.HTTPError, ValueError):
             return {}
 
     @staticmethod
@@ -102,9 +105,9 @@ class ConfluenceInterfacer:
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
-    def get_spaces(self, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
+    async def get_spaces(self, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
         """Return Confluence spaces as connector-shaped entries (key, name, URL)."""
-        payload = self._execute_request("space", {"limit": 250}, email, api_token)
+        payload = await self._execute_request("space", {"limit": 250}, email, api_token)
         results = payload.get("results", [])
         if not isinstance(results, list):
             return []
@@ -127,8 +130,13 @@ class ConfluenceInterfacer:
             )
         return spaces
 
-    def _pages_in_space(self, space_key: str, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
-        payload = self._execute_request(
+    async def _pages_in_space(
+        self,
+        space_key: str,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> list[dict[str, Any]]:
+        payload = await self._execute_request(
             "content",
             {"spaceKey": space_key, "type": "page", "limit": 1000, "expand": "version"},
             email,
@@ -139,14 +147,14 @@ class ConfluenceInterfacer:
             return [p for p in results if isinstance(p, dict)]
         return []
 
-    def get_page_ids(self, email: str | None = None, api_token: str | None = None) -> dict[str, str]:
+    async def get_page_ids(self, email: str | None = None, api_token: str | None = None) -> dict[str, str]:
         """Return the latest page edit time per space key (ISO strings)."""
         ids: dict[str, str] = {}
-        for space in self.get_spaces(email, api_token):
+        for space in await self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
                 continue
-            pages = self._pages_in_space(key, email, api_token)
+            pages = await self._pages_in_space(key, email, api_token)
             latest = datetime.min.replace(tzinfo=timezone.utc)
             for page in pages:
                 when = self._safe_when(page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None)
@@ -154,9 +162,14 @@ class ConfluenceInterfacer:
             ids[key] = latest.isoformat()
         return ids
 
-    def get_pages_in_space(self, space_key: str, email: str | None = None, api_token: str | None = None) -> list[str]:
+    async def get_pages_in_space(
+        self,
+        space_key: str,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> list[str]:
         """Return page pointers for one space."""
-        pages = self._pages_in_space(space_key, email, api_token)
+        pages = await self._pages_in_space(space_key, email, api_token)
         pointers: list[str] = []
         for page in pages:
             page_id = page.get("id")
@@ -164,7 +177,65 @@ class ConfluenceInterfacer:
                 pointers.append(self._pointer(page_id))
         return pointers
 
-    def get_page(
+    async def get_files(
+        self,
+        file_pointers: list[str],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Batch fetch by pointer; same shape as :meth:`get_page` per item (DMS ``get_files``)."""
+        out: list[dict[str, Any]] = []
+        for ptr in file_pointers:
+            if not isinstance(ptr, str):
+                continue
+            page = await self.get_page(ptr, include_content=include_content, email=email, api_token=api_token)
+            if not include_last_edit_date and isinstance(page.get("metadata"), dict):
+                page = dict(page)
+                meta = dict(page["metadata"])
+                meta.pop("last_edit_date", None)
+                page["metadata"] = meta
+            out.append(page)
+        return out
+
+    async def check_index_needed(
+        self,
+        subdata: str | None = None,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> dict[str, Any]:
+        """Return whether new content should be indexed (DMS ``index_needed_bool``)."""
+        if self._resolve_auth(email, api_token) is None:
+            return {"index_needed": False}
+        payload = await self.pointers_to_all_files_to_index(subdata, email, api_token)
+        pointers = payload.get("file_pointers", [])
+        n = len(pointers) if isinstance(pointers, list) else 0
+        return {"index_needed": n > 0}
+
+    async def stream_files_to_index(
+        self,
+        subdata: str | None = None,
+        email: str | None = None,
+        api_token: str | None = None,
+    ) -> AsyncIterator[bytes]:
+        """Yield NDJSON-style chunks: first object has ``subdata``; then one page object per line (DMS stream)."""
+        if self._resolve_auth(email, api_token) is None:
+            yield json.dumps({"subdata": subdata}).encode("utf-8")
+            return
+        pointer_payload = await self.pointers_to_all_files_to_index(subdata, email, api_token)
+        new_subdata = pointer_payload.get("subdata")
+        yield json.dumps({"subdata": new_subdata}).encode("utf-8")
+        pointers = pointer_payload.get("file_pointers", [])
+        if not isinstance(pointers, list):
+            return
+        for pointer in pointers:
+            if not isinstance(pointer, str):
+                continue
+            page = await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
+            yield json.dumps(page).encode("utf-8")
+
+    async def get_page(
         self,
         file_pointer: str,
         include_content: bool = True,
@@ -173,7 +244,7 @@ class ConfluenceInterfacer:
     ) -> dict[str, Any]:
         """Fetch one page by pointer; metadata plus optional base64-encoded plain text."""
         page_id = file_pointer.split("://", 1)[1] if "://" in file_pointer else file_pointer
-        payload = self._execute_request(
+        payload = await self._execute_request(
             f"content/{page_id}",
             {"expand": "body.storage,version,space"},
             email,
@@ -211,24 +282,26 @@ class ConfluenceInterfacer:
             out["content"] = base64.b64encode(text.encode("utf-8")).decode("utf-8")
         return out
 
-    def _space_latest_and_page_ids(
+    async def _space_latest_and_page_ids(
         self,
         space_key: str,
         email: str | None,
         api_token: str | None,
     ) -> tuple[datetime, list[str]]:
-        pages = self._pages_in_space(space_key, email, api_token)
+        pages = await self._pages_in_space(space_key, email, api_token)
         space_latest = datetime.min.replace(tzinfo=timezone.utc)
         page_ids: list[str] = []
         for page in pages:
             page_id = page.get("id")
             if isinstance(page_id, str):
                 page_ids.append(page_id)
-            when = self._safe_when(page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None)
+            when = self._safe_when(
+                page.get("version", {}).get("when") if isinstance(page.get("version"), dict) else None
+            )
             space_latest = max(space_latest, when)
         return space_latest, page_ids
 
-    def pointers_to_all_files_to_index(
+    async def pointers_to_all_files_to_index(
         self,
         subdata: str | None,
         email: str | None = None,
@@ -242,11 +315,11 @@ class ConfluenceInterfacer:
         latest = datetime.min.replace(tzinfo=timezone.utc)
         pointers: list[str] = []
 
-        for space in self.get_spaces(email, api_token):
+        for space in await self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
                 continue
-            space_latest, page_ids = self._space_latest_and_page_ids(key, email, api_token)
+            space_latest, page_ids = await self._space_latest_and_page_ids(key, email, api_token)
             latest = max(latest, space_latest)
             if space_latest > provided:
                 pointers.extend([self._pointer(pid) for pid in page_ids])
@@ -254,7 +327,7 @@ class ConfluenceInterfacer:
         token = base64.b64encode(latest.isoformat().encode("utf-8")).decode("utf-8")
         return {"subdata": token, "file_pointers": pointers}
 
-    def files_to_index(
+    async def files_to_index(
         self,
         subdata: str | None = None,
         email: str | None = None,
@@ -262,13 +335,18 @@ class ConfluenceInterfacer:
     ) -> dict[str, Any]:
         """Expand changed pointers into full ``get_page`` payloads for indexing."""
         if self._resolve_auth(email, api_token) is None:
-            return {"subdata": subdata, "files": [], "deleted": []}
+            return {"subdata": subdata, "files": [], "deleted": [], "index_needed": False}
 
-        pointer_payload = self.pointers_to_all_files_to_index(subdata, email, api_token)
+        pointer_payload = await self.pointers_to_all_files_to_index(subdata, email, api_token)
         pointers = pointer_payload.get("file_pointers", [])
         files: list[dict[str, Any]] = []
         if isinstance(pointers, list):
             for pointer in pointers:
                 if isinstance(pointer, str):
-                    files.append(self.get_page(pointer, include_content=True, email=email, api_token=api_token))
-        return {"subdata": pointer_payload.get("subdata"), "files": files, "deleted": []}
+                    files.append(await self.get_page(pointer, include_content=True, email=email, api_token=api_token))
+        return {
+            "subdata": pointer_payload.get("subdata"),
+            "files": files,
+            "deleted": [],
+            "index_needed": bool(files),
+        }

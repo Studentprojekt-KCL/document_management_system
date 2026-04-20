@@ -110,7 +110,7 @@ class API:
             )
             response.raise_for_status()
             response_data = response.json()
-        except ValueError as exc:
+        except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except httpx.HTTPError as exc:
@@ -138,7 +138,7 @@ class API:
             )
             response.raise_for_status()
             response_data = response.json()
-        except ValueError as exc:
+        except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except httpx.HTTPError as exc:

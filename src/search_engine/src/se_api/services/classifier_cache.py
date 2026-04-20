@@ -5,8 +5,8 @@ import dbm
 from os import path, remove
 import shelve
 
-from dmis_logger import dms_error, dms_info
-from initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error, dms_info
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class ClassifierCache:

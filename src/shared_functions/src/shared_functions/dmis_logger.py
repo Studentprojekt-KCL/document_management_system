@@ -24,9 +24,9 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):
         warning("Log service not set, export 'LOG_SERVICE'.")
         os.environ["SERVICE_NOT_SET_SENT"] = "true"
-        return
+        os._exit(1)
     if not isinstance(log_service, str):
-        return
+        os._exit(1)
     _res = requests.post(
         log_service,
         json={

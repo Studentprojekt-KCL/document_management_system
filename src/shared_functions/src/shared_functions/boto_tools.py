@@ -7,7 +7,7 @@ from contextlib import suppress
 
 import boto3
 from botocore.exceptions import ClientError
-from dmis_logger import dms_error
+from shared_functions.dmis_logger import dms_error
 
 
 def upload_file(content: dict | list, file_name: str, bucket: str = "slask") -> str:

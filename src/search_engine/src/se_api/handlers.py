@@ -1,10 +1,11 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from dmis_logger import dms_info, dms_warning
 from fastapi import HTTPException
 from se_api.services.connector import Connector
 from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
+
+from shared_functions.dmis_logger import dms_info, dms_warning
 
 
 class Handler:

@@ -1,11 +1,27 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-from os import environ
 import argparse
 from dataclasses import dataclass
+from os import environ
 
-from dmis_logger import dms_error
-from initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error
+from shared_functions.initialisation_tools import read_env_variable
+
+
+class VectorConfig:
+    """Vector search service configuration.
+
+    Attributes:
+        embedding_url: URL for the TEI embedding container.
+        qdrant_url: URL for the Qdrant vector database.
+        batch_size: Number of documents per batch.
+        max_chars: Maximum characters per documents sent for embedding.
+    """
+
+    embedding_url: str
+    qdrant_url: str
+    batch_size: int
+    max_chars: int
 
 
 @dataclass
@@ -40,27 +56,27 @@ class ServiceConfig:
     """External service connection configuration.
 
     Attributes:
-        tei_url: URL for the TEI reranker container.
         classifier_url: URL for the TEI classifier container.
         ministral: Ministral LLM configuration.
         connector_url: connector url.
         escalation_threshold: score gap threshold for security-first classification escalation.
         language: language detection configuration.
+        vector: vector search service configuration.
     """
 
-    tei_url: str
     classifier_url: str
-    ministral: MinistralConfig
     connector_url: str
     escalation_threshold: float
+    ministral: MinistralConfig
     language: LanguageConfig
+    vector: VectorConfig
 
 
 class APIConfiguration:
     """API Configuration.
 
     Attributes:
-        BIND: which address to bind to.
+        bind: which address to bind to.
         port: port to bind on.
         log_level: log level.
         device: compute device identifier.
@@ -139,44 +155,39 @@ class APIConfiguration:
         """Load external service configuration."""
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
+        self.services.vector = VectorConfig()
 
         # Load all environment variables
-        tei_url: str = read_env_variable("TEI_URL")
-        classifier_url: str = read_env_variable("CLASSIFIER_URL")
-        ministral_url: str = read_env_variable("MINISTRAL_URL")
-        ministral_model: str = read_env_variable("MINISTRAL_MODEL")
-        ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
-        address: str = read_env_variable("CONNECTOR_ADDRESS")
-        escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
-        sample_size: str = read_env_variable("SAMPLE_SIZE")
-        swedish_char_threshold: str = read_env_variable("SWEDISH_CHAR_THRESHOLD")
-
-        # Validate required variables
         required_vars = {
-            "TEI_URL": tei_url,
-            "CLASSIFIER_URL": classifier_url,
-            "MINISTRAL_URL": ministral_url,
-            "MINISTRAL_MODEL": ministral_model,
-            "CONNECTOR_ADDRESS": address,
-            "ESCALATION_THRESHOLD": escalation_threshold,
-            "SAMPLE_SIZE": sample_size,
-            "SWEDISH_CHAR_THRESHOLD": swedish_char_threshold,
+            "CLASSIFIER_URL": read_env_variable("CLASSIFIER_URL"),
+            "MINISTRAL_URL": read_env_variable("MINISTRAL_URL"),
+            "MINISTRAL_MODEL": read_env_variable("MINISTRAL_MODEL"),
+            "MINISTRAL_TIMEOUT": read_env_variable("MINISTRAL_TIMEOUT"),
+            "CONNECTOR_ADDRESS": read_env_variable("CONNECTOR_ADDRESS"),
+            "ESCALATION_THRESHOLD": read_env_variable("ESCALATION_THRESHOLD"),
+            "EMBEDDING_URL": read_env_variable("EMBEDDING_URL"),
+            "QDRANT_URL": read_env_variable("QDRANT_URL"),
+            "SAMPLE_SIZE": read_env_variable("SAMPLE_SIZE"),
+            "SWEDISH_CHAR_THRESHOLD": read_env_variable("SWEDISH_CHAR_THRESHOLD"),
         }
 
         if not self._validate_required_env_vars(required_vars):
             return
 
         # Assign service configurations
-        self.services.tei_url = tei_url
-        self.services.classifier_url = classifier_url
+        self.services.classifier_url = required_vars["CLASSIFIER_URL"]
+        self.services.connector_url = required_vars["CONNECTOR_ADDRESS"]
+        self.services.escalation_threshold = float(required_vars["ESCALATION_THRESHOLD"])
         self.services.ministral = MinistralConfig(
-            url=ministral_url,
-            model=ministral_model,
-            timeout=int(ministral_timeout),
+            url=required_vars["MINISTRAL_URL"],
+            model=required_vars["MINISTRAL_MODEL"],
+            timeout=int(required_vars["MINISTRAL_TIMEOUT"]),
         )
-        self.services.connector_url = address
-        self.services.escalation_threshold = float(escalation_threshold)
+        self.services.vector.embedding_url = required_vars["EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required_vars["QDRANT_URL"]
+        self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
+        self.services.vector.max_chars = int(environ.get("INDEX_MAX_CHARS", "2000"))
         self.services.language = LanguageConfig(
-            sample_size=int(sample_size),
-            swedish_char_threshold=int(swedish_char_threshold),
+            sample_size=int(required_vars["SAMPLE_SIZE"]),
+            swedish_char_threshold=int(required_vars["SWEDISH_CHAR_THRESHOLD"]),
         )

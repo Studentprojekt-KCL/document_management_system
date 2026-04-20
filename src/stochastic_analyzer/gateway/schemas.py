@@ -59,13 +59,6 @@ class PointerRequest(BaseModel):
     pointers: list[StrictStr] = Field(..., min_length=1)
 
 
-class RerankRequest(BaseModel):
-    """Request schema for pointer-based reranking."""
-
-    reference: StrictStr = Field(...)
-    pointers: list[StrictStr] = Field(..., min_length=1)
-
-
 class SummaryResult(BaseModel):
     """Output schema for a summarized document."""
 

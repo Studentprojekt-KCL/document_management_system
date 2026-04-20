@@ -68,6 +68,7 @@ class API:
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
         """FastAPI lifespan"""
         self.handler = Handler()
+        await self.handler.init()
         yield
         await self.handler.close()
 
@@ -94,7 +95,7 @@ class API:
             List of found files or None.
         """
 
-        return self.handler.preform_search(query, count, offset)
+        return await self.handler.preform_search(query, count, offset)
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""

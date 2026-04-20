@@ -26,9 +26,13 @@ class Handler:
         self.search_engine = SearchEngine()
         self.query = Query()
 
+    async def init(self) -> None:
+        await self.query.init()
+
     async def close(self) -> None:
         """Clean up"""
         await self.query.close()
+        await self.connector.close()
 
     def reset(self) -> None:
         """Reset the connector."""
@@ -70,7 +74,7 @@ class Handler:
             self.search_engine.remove_file(match)
             self.query.cache.remove_classification(match)
 
-    def preform_search(self, request: str, count: int, offset: int) -> list:
+    async def preform_search(self, request: str, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
@@ -87,19 +91,19 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        if self.connector.reindex_needed():  # This endpoint is approx 3x faster
-            new_files: list[dict] = self.connector.get_files()
+        if await self.connector.reindex_needed():  # This endpoint is approx 3x faster
+            new_files: list[dict] = await self.connector.get_files()
             if new_files:
                 if self.search_engine.have_new_category(new_files[0]):
                     self.search_engine.rebuild()
                     self.connector.reset()
-                    new_files = self.connector.get_files()
+                    new_files = await self.connector.get_files()
                 self.search_engine.add_files(new_files)
                 self.query.cache.remove_classifications(new_files)
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
-        files: list[dict] = self.connector.fetch_files(matches)
+        files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
-        classifications: dict = self.query.classify(files)
+        classifications: dict = await self.query.classify(files)
         for file in files:
             unique_pointer: str = file.get("unique_pointer", "")
             classification: str = classifications.get(unique_pointer, "")

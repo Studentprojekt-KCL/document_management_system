@@ -1,11 +1,12 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from os import environ
+from json import JSONDecodeError
 from typing import Any
-from requests import Session, get
-from requests import exceptions
+from httpx import AsyncClient
 
-from shared_functions.dmis_logger import dms_error, dms_warning
+import httpx
+from shared_functions.dmis_logger import dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class Connector:
@@ -20,53 +21,52 @@ class Connector:
 
     TIMEOUT: int = 120
 
-    address: str
+    INDEX_NEEDED_ENDPOINT: str = "/index_needed_bool"
+    FILES_TO_INDEX_ENDPOINT: str = "/files_to_index"
+    GET_FILE_ENDPOINT: str = "/get_files"
+
     subdata: str | None
 
     index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
 
+    client: AsyncClient
+
     def __init__(self) -> None:
-        address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
-        if address is None:
-            dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
-            return
-        self.address = address.rstrip("/")
+        address = read_env_variable("SE_API_CONNECTOR_ADDRESS")
+        self.client = AsyncClient(base_url=address)
         self.subdata = None
-        self.index_needed_bool = f"{self.address}/index_needed_bool"
-        self.url_files_to_index = f"{self.address}/files_to_index"
-        self.url_get_files = f"{self.address}/get_files"
+
+    async def close(self) -> None:
+        await self.client.aclose()
 
     def reset(self) -> None:
         """Resets the subdata, getting all files."""
         self.subdata = None
 
-    def reindex_needed(self) -> bool:
+    async def reindex_needed(self) -> bool:
         """Check if new reindex is required."""
         try:
-            response = get(
-                self.index_needed_bool,
+            response = await self.client.get(
+                self.INDEX_NEEDED_ENDPOINT,
                 timeout=Connector.TIMEOUT,
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
-            ).json()
-            if not isinstance(response, dict):
+            )
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict):
                 return True
-
-            return not response.get("index_needed") is False
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.index_needed_bool}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.index_needed_bool}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.index_needed_bool}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.index_needed_bool}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.index_needed_bool}.")
+            return not data.get("index_needed") is False
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
         return True
 
-    def fetch_files(self, pointers: list[str]) -> list[dict]:
+    async def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.
 
         Args:
@@ -78,25 +78,23 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        with Session() as client:
-            response: Any | None = self._get_file_from_pointer(pointers, client)
+        response: Any | None = await self._get_file_from_pointers(pointers)
         if not isinstance(response, list):
             return []
-
         return response
 
-    def get_files(self) -> list:
+    async def get_files(self) -> list:
         """Grab all new files pointers from connectors.
 
         Returns:
             A list of files.
         """
 
-        file_url = self._files_to_index()
+        file_url = await self._files_to_index()
         if file_url is None:
             return []
 
-        response: Any | None = self._get_files_from_url(file_url)
+        response: Any | None = await self._get_files_from_url(file_url)
         if response is None:
             return []
         if not isinstance(response, dict):
@@ -115,10 +113,10 @@ class Connector:
         self.subdata = subdata
         return data
 
-    def _files_to_index(self) -> str | None:
+    async def _files_to_index(self) -> str | None:
         """Get the url for the file containing all new files."""
 
-        response: Any | None = self._get_file_to_index()
+        response: Any | None = await self._get_file_to_index()
         if response is None or not isinstance(response, dict) or response.get("index_needed") is False:
             return None
 
@@ -134,65 +132,52 @@ class Connector:
 
         return file_url
 
-    def _get_file_from_pointer(self, pointers: list[str], client: Session) -> Any | None:
+    async def _get_file_from_pointers(self, pointers: list[str]) -> Any | None:
         """Get file from pointer"""
         try:
-            resp = client.post(
-                self.url_get_files,
+            response = await self.client.post(
+                self.GET_FILE_ENDPOINT,
                 params=[("include_content", False), ("include_last_edit_date", True)],
                 json={"file_pointers": pointers},
                 timeout=Connector.TIMEOUT,
             )
-            resp.raise_for_status()
-            return resp.json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_get_files}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_get_files}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_get_files}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_get_files}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_get_files}.")
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
         return None
 
-    def _get_files_from_url(self, url: str) -> Any | None:
+    async def _get_files_from_url(self, url: str) -> Any | None:
         """Get files from url"""
         try:
-            resp = get(url, timeout=Connector.TIMEOUT)
-            resp.raise_for_status()
-            return resp.json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {url}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {url}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {url}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {url}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {url}.")
+            response = await self.client.get(url, timeout=Connector.TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
         return None
 
-    def _get_file_to_index(self) -> Any | None:
+    async def _get_file_to_index(self) -> Any | None:
         """Get file to index"""
         try:
-            resp = get(
-                self.url_files_to_index,
+            response = await self.client.get(
+                self.FILES_TO_INDEX_ENDPOINT, 
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                timeout=Connector.TIMEOUT,
+                timeout=self.TIMEOUT
             )
-            resp.raise_for_status()
-            return resp.json()
-        except exceptions.ConnectionError:
-            dms_warning(f"Failed to connect, url: {self.url_files_to_index}.")
-        except exceptions.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.url_files_to_index}.")
-        except exceptions.Timeout:
-            dms_warning(f"Request timed out, url: {self.url_files_to_index}")
-        except exceptions.JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.url_files_to_index}.")
-        except exceptions.RequestException:
-            dms_warning(f"Something went wrong, url: {self.url_files_to_index}.")
+            return response.json()
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
         return None

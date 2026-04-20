@@ -10,6 +10,7 @@ setup(
         "fastapi[standard]>=0.128",
         "requests>=2.32",
         "tantivy>=0.25",
+        "httpx>=0.28",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

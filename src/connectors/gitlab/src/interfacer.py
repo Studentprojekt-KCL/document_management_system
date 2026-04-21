@@ -31,6 +31,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     NUM_WORKERS: int = 10
+    REQUEST_TIMEOUT: int = 120
     session: requests.Session
     source_system: str
     project_information: dict | None = None
@@ -44,7 +45,6 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
         address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
-        self.request_timeout = int(read_env_variable("CONGITLAB_REQUEST_TIMEOUT"))
         self.shared_client = read_env_variable("CONGITLAB_SHARED_CLIENT").lower() == "true"
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
@@ -291,7 +291,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
     async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
         """Yield a shared AsyncClient when CONGITLAB_SHARED_CLIENT=true, else yield None."""
         if self.shared_client:
-            async with httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=True) as client:
                 yield client
         else:
             yield None
@@ -302,7 +302,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         """Download all artifacts from task_queue and put in zip_queue."""
         owned = client is None
         if owned:
-            client = httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True)
+            client = httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=True)
         assert client is not None
         try:
             while True:

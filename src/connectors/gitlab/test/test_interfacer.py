@@ -147,7 +147,6 @@ class TestGitLabStreaming(TestCase):
     @mock.patch("interfacer.GitLab.__init__", return_value=None)
     def setUp(self, _):
         self.instance = GitLab()
-        self.instance.request_timeout = 30
         self.instance.shared_client = True
         self.instance.base = "http://gitlab.test/api/v4/"
         self.instance.file_extensions = [".py"]

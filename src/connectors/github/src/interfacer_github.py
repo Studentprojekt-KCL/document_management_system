@@ -27,6 +27,7 @@ from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
+REQUEST_TIMEOUT = 120
 
 
 class GitHub:  # pylint: disable=too-many-instance-attributes
@@ -45,7 +46,6 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
-        self.request_timeout = int(read_env_variable("CONGITHUB_REQUEST_TIMEOUT"))
         self.num_workers = int(read_env_variable("CONGITHUB_NUM_WORKERS"))
         self.shared_client = read_env_variable("CONGITHUB_SHARED_CLIENT").lower() == "true"
         self._binary_skip_logs = 0
@@ -55,7 +55,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": read_env_variable("CONGITHUB_GITHUB_API_VERSION"),
             },
-            timeout=self.request_timeout,
+            timeout=REQUEST_TIMEOUT,
         )
 
     def _get_repos(self, token: str | None = None) -> list:
@@ -255,7 +255,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
     async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
         """Yield a shared AsyncClient when CONGITHUB_SHARED_CLIENT=true, else yield None."""
         if self.shared_client:
-            async with httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
                 yield client
         else:
             yield None
@@ -267,7 +267,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         owned = client is None
         if owned:
-            client = httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True)
+            client = httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True)
         assert client is not None
         try:
             while True:

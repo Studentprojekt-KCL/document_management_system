@@ -94,7 +94,6 @@ const closePreview = () => {
 /* Handle changes to search filters  */
 const handleFilterChange = (filters) => {
   selectedFilters.value = filters
-  console.log('Filter changed:', filters)
   // If no filters → show everything
   if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
     matches.value = allMatches.value

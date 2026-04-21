@@ -16,7 +16,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveFilename, resolveSecurityClass, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
 /* Reactive state variables for search results and UI state */
@@ -83,8 +83,6 @@ const selectMatch = (match) => {
   if (!match) return
 
   selectedMatch.value = match
-  selectedFile.value = resolveFilename(match)
-
   isPreviewOpen.value = true
 }
 
@@ -94,7 +92,6 @@ const closePreview = () => {
 }
 
 /* Handle changes to search filters  */
-// TODO: add source & security filtering.
 const handleFilterChange = (filters) => {
   selectedFilters.value = filters
   console.log('Filter changed:', filters)
@@ -104,34 +101,28 @@ const handleFilterChange = (filters) => {
     return
   }
   matches.value = allMatches.value.filter((match) => {
-    const filename = (match.filename || match.name || '').toLowerCase()
+    const filetype = resolveDocumentExtension(match).toLowerCase()
     const securityClass = resolveSecurityClass(match).toLowerCase()
     // const source = (match.source || '').toLowerCase()
 
     // TYPE FILTER
     const typeMatch =
       filters.type.length === 0 ||
-      filters.type.some((filterLabel) => {
-        // Find the TYPE_KEYWORDS entry that matches the selected filter
-        const keywordsEntry = Object.entries(TYPE_FILTERS).find(([docType]) => docType === filterLabel)
-
-        if (!keywordsEntry) return false
-
-        const [, keywords] = keywordsEntry
-
-        // Only match filename against the keywords for this filter
-        return keywords.some((kw) => filename.endsWith(kw))
+      filters.type.some((selected) => {
+        // Split the group string from json file (e.g., ".docx|.doc|.odt") and check if filetype is in it
+        const extensions = selected.split('|')
+        return extensions.some((ext) => filetype === ext.toLowerCase())
       })
 
     // SOURCE FILTER
-    // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
+    //const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
     const securityMatch =
       filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
-    // add sourceMatch and secuirtyMatch later
-    // return typeMatch && sourceMatch && secuirtyMatch
+    // add sourceMatch later
+    // return typeMatch && sourceMatch && securityMatch
     return typeMatch && securityMatch
   })
 }

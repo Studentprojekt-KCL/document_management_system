@@ -6,7 +6,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  KEYCLOAK_CLIENT_ID,
+  FRONTEND_AD_CLIENT_ID,
   keycloakTokenUrl,
   SESSION_KEY_ACCESS_TOKEN,
   SESSION_KEY_ID_TOKEN,
@@ -55,7 +55,7 @@ onMounted(async () => {
   try {
     const body = new URLSearchParams()
     body.set('grant_type', 'authorization_code')
-    body.set('client_id', KEYCLOAK_CLIENT_ID)
+    body.set('client_id', FRONTEND_AD_CLIENT_ID)
     body.set('code', String(code))
     body.set('redirect_uri', redirectUri)
     body.set('code_verifier', verifier)

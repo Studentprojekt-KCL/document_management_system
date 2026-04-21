@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
+from dmis_logger import dms_warning
 from gateway.schemas import (
     RankResponse,
-    ScoredPointer,
+    FileMetadata,
     HealthCheck,
     ClassificationResult,
     PointerRequest,
@@ -19,8 +20,6 @@ from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
-
-from shared_functions.dmis_logger import dms_warning
 
 
 @dataclass
@@ -71,7 +70,13 @@ def create_router(services: Services, device: str) -> APIRouter:
 
     @router.post("/rerank", response_model=RankResponse)
     async def rerank_documents(payload: PointerRequest) -> dict:
-        """Endpoint for semantic document similarity search using vector retrieval."""
+        """Endpoint for semantic document similarity search using vector retrieval.
+
+        Returns file metadata enriched with similarity scores, ordered by
+        descending similarity. The connector applies authorization filtering,
+        so the response may contain fewer items than requested if some files
+        are not visible to the requesting user.
+        """
         if len(payload.pointers) != 1:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
 
@@ -83,13 +88,24 @@ def create_router(services: Services, device: str) -> APIRouter:
 
         query = reference_items[0].content
 
-        results = await services.indexer.search_similar(query)
-        results = [(p, s) for p, s in results if p != query_pointer]
+        # Fetch one extra to compensate for filtering out the query document itself.
+        results = await services.indexer.search_similar(query, limit=6)
+        results = [(p, s) for p, s in results if p != query_pointer][:5]
         if not results:
             return {"ranked_results": []}
 
-        scored = [ScoredPointer(score=float(score), pointer=pointer) for pointer, score in results]
-        return {"ranked_results": scored}
+        # Join scores with connector-provided metadata by unique_pointer.
+        pointer_to_score = dict(results)
+        metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
+
+        enriched = [
+            FileMetadata(score=pointer_to_score[meta["unique_pointer"]], **meta)
+            for meta in metadata_list
+            if meta.get("unique_pointer") in pointer_to_score
+        ]
+        enriched.sort(key=lambda x: x.score, reverse=True)
+
+        return {"ranked_results": enriched}
 
     @router.post("/index")
     async def trigger_index() -> dict:

@@ -5,9 +5,8 @@ from base64 import b64decode
 
 import httpx
 
-from gateway.schemas import InputItem, MetadataTemplate
-
 from shared_functions.dmis_logger import dms_warning
+from gateway.schemas import InputItem, MetadataTemplate
 
 
 class Connector:
@@ -74,3 +73,36 @@ class Connector:
         """
         async with httpx.AsyncClient() as client:
             return await self._get_content(pointers, client)
+
+    async def get_file_metadata(self, pointers: list[str]) -> list[dict]:
+        """Fetch file metadata from the connector without content payloads.
+
+        The connector applies authorization filtering: files the requesting
+        user is not permitted to view are omitted from the response, so the
+        returned list may be shorter than the input pointers list.
+
+        Args:
+            pointers: List of unique file pointers.
+
+        Returns:
+            List of metadata dicts as provided by the connector, or an
+            empty list if the request fails.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.url.rstrip('/')}/get_files",
+                    params=[("include_content", False), ("include_last_edit_date", True)],
+                    json={"file_pointers": pointers},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                return response.json()
+            except (
+                httpx.HTTPStatusError,
+                httpx.TimeoutException,
+                ValueError,
+                httpx.ConnectError,
+            ) as err:
+                dms_warning(f"Connector metadata request failed: {err}")
+                return []

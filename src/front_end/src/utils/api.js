@@ -14,7 +14,9 @@ export const API_PATHS = {
   search: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/search`,
   summarize: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/summarize`,
   classifications: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/classifications`,
-  connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`
+  connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
+  documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
+  allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`
 }
 
 /**

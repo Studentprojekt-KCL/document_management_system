@@ -13,6 +13,7 @@ import json
 import os
 import zipfile
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,13 +27,11 @@ from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
-REQUEST_TIMEOUT = 120
 
 
-class GitHub:
+class GitHub:  # pylint: disable=too-many-instance-attributes
     """GitHub connector."""
 
-    NUM_WORKERS: int = 10
     client: httpx.Client
     api_base: str
     _binary_skip_logs: int
@@ -46,6 +45,9 @@ class GitHub:
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
+        self.request_timeout = int(read_env_variable("CONGITHUB_REQUEST_TIMEOUT"))
+        self.num_workers = int(read_env_variable("CONGITHUB_NUM_WORKERS"))
+        self.shared_client = read_env_variable("CONGITHUB_SHARED_CLIENT").lower() == "true"
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self.client = httpx.Client(
@@ -53,7 +55,7 @@ class GitHub:
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": read_env_variable("CONGITHUB_GITHUB_API_VERSION"),
             },
-            timeout=REQUEST_TIMEOUT,
+            timeout=self.request_timeout,
         )
 
     def _get_repos(self, token: str | None = None) -> list:
@@ -249,27 +251,45 @@ class GitHub:
                 )
         return files_data
 
+    @asynccontextmanager
+    async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
+        """Yield a shared AsyncClient when CONGITHUB_SHARED_CLIENT=true, else yield None."""
+        if self.shared_client:
+            async with httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True) as client:
+                yield client
+        else:
+            yield None
+
     async def _download_files(
-        self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue, client: httpx.AsyncClient, token: str | None
+        self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue, client: httpx.AsyncClient | None, token: str | None
     ) -> None:
         """Download repo archives from task_queue and put raw bytes into zip_queue."""
         headers = {"Authorization": f"Bearer {token}"} if token else {}
-        while True:
-            task_data = await task_queue.get()
-            if task_data is None:
-                break
-            zip_url, full_name, branch = task_data
-            try:
-                async with client.stream("GET", zip_url, headers=headers) as response:
-                    if response.status_code != HTTP_OK:
-                        dms_info(f"GitHub archive fetch {zip_url} returned {response.status_code}; skipping repo {full_name}.")
-                    else:
-                        data = await response.aread()
-                        await zip_queue.put({"data": data, "full_name": full_name, "branch": branch})
-            except httpx.HTTPError as err:
-                dms_warning(f"GitHub archive download failed for {full_name}: {err}")
-            finally:
-                task_queue.task_done()
+        owned = client is None
+        if owned:
+            client = httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True)
+        assert client is not None
+        try:
+            while True:
+                task_data = await task_queue.get()
+                if task_data is None:
+                    task_queue.task_done()
+                    break
+                zip_url, full_name, branch = task_data
+                try:
+                    async with client.stream("GET", zip_url, headers=headers) as response:
+                        if response.status_code != HTTP_OK:
+                            dms_info(f"GitHub archive fetch {zip_url} returned {response.status_code}; skipping repo {full_name}.")
+                        else:
+                            data = await response.aread()
+                            await zip_queue.put({"data": data, "full_name": full_name, "branch": branch})
+                except httpx.HTTPError as err:
+                    dms_warning(f"GitHub archive download failed for {full_name}: {err}")
+                finally:
+                    task_queue.task_done()
+        finally:
+            if owned:
+                await client.aclose()
 
     async def _unzip_files(self, zip_queue: asyncio.Queue, output_queue: asyncio.Queue) -> None:
         """Unzip archives from zip_queue and put unpacked file lists into output_queue."""
@@ -302,7 +322,7 @@ class GitHub:
             if not isinstance(branch, str):
                 branch = self._default_branch_for_repo(fn, token)
             owner, _, name = fn.partition("/")
-            zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
+            zip_url = urljoin(self.api_base, f"repos/{owner}/{name}/zipball/refs/heads/{branch}")
             await task_queue.put((zip_url, fn, branch))
         return latest_update
 
@@ -312,15 +332,15 @@ class GitHub:
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        repos = self._get_repos(token)
+        repos = await asyncio.to_thread(self._get_repos, token)
         latest_update = await self._enqueue_repos(repos, self._provided_date(subdata), token, task_queue)
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        async with self._http_client() as client:  # pylint: disable=contextmanager-generator-missing-cleanup
             download_tasks = [
-                asyncio.create_task(self._download_files(task_queue, zip_queue, client, token)) for _ in range(self.NUM_WORKERS)
+                asyncio.create_task(self._download_files(task_queue, zip_queue, client, token)) for _ in range(self.num_workers)
             ]
-            unzip_tasks = [asyncio.create_task(self._unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
+            unzip_tasks = [asyncio.create_task(self._unzip_files(zip_queue, output_queue)) for _ in range(self.num_workers)]
 
             async def producer() -> None:
                 await task_queue.join()

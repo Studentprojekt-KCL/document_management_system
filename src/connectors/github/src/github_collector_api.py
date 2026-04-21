@@ -4,6 +4,7 @@ GitHub connector API following the same route contract as the GitLab connector.
 """
 
 import argparse
+import warnings
 from typing import Any
 
 import uvicorn
@@ -31,7 +32,7 @@ class API:
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"], deprecated=True)
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
@@ -73,7 +74,11 @@ class API:
         subdata: str | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
     ) -> dict[str, Any]:
-        """Bulk payload of all files to index; uploads to storage and returns file_url."""
+        """Bulk payload of all files to index; uploads to storage and returns file_url.
+
+        Deprecated: use /stream_files_to_index instead. Kept until the connector gateway is in place.
+        """
+        warnings.warn("/files_to_index is deprecated; use /stream_files_to_index instead.", DeprecationWarning, stacklevel=2)
         token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
         content = self.github_instance.files_to_index(subdata, token)
         url = upload_file(content, "github_content.json")

@@ -5,6 +5,9 @@ The following must be exported in the local environment:
     CONGITHUB_GITHUB_API_URL=<GITHUB_API_BASE_URL>        # e.g. https://api.github.com/
     CONGITHUB_GITHUB_SYSTEM_NAME=<SOURCE_SYSTEM_NAME>
     CONGITHUB_GITHUB_API_VERSION=<API_VERSION>            # e.g. 2022-11-28
+    CONGITHUB_REQUEST_TIMEOUT=<SECONDS>                   # e.g. 120
+    CONGITHUB_NUM_WORKERS=<COUNT>                         # e.g. 10
+    CONGITHUB_SHARED_CLIENT=<true|false>                  # true: one shared AsyncClient across all download workers; false: each worker owns its own
 
 Optional:
 
@@ -20,3 +23,13 @@ personal access token (or OAuth token) in the `X-GitHub-Token` request header:
 
 If the header is absent the connector returns an empty result for that request — no GitHub API
 calls are made. There is no service-level fallback token.
+
+## Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/index_needed_bool` | GET | Returns whether any repo has new content since the last index |
+| `/stream_files_to_index` | GET | Streams NDJSON — subdata header followed by one file per line |
+| `/get_files` | POST | Fetches specific files by pointer |
+| `/connected_source_systems` | GET | Returns the configured source system name |
+| `/files_to_index` | GET | **Deprecated** — use `/stream_files_to_index` instead |

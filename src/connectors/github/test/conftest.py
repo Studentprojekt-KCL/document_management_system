@@ -9,3 +9,6 @@ def github_env(monkeypatch):
     monkeypatch.setenv("CONGITHUB_GITHUB_API_URL", "https://api.github.test/")
     monkeypatch.setenv("CONGITHUB_GITHUB_SYSTEM_NAME", "test")
     monkeypatch.setenv("CONGITHUB_GITHUB_API_VERSION", "2022-11-28")
+    monkeypatch.setenv("CONGITHUB_REQUEST_TIMEOUT", "30")
+    monkeypatch.setenv("CONGITHUB_NUM_WORKERS", "2")
+    monkeypatch.setenv("CONGITHUB_SHARED_CLIENT", "true")

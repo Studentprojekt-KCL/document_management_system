@@ -24,6 +24,7 @@ import {
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
 import { hasRole } from '@/utils/auth'
+import { authFetch, API_PATHS } from '@/utils/api'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 
 /* Props received from parent component (SearchView) */
@@ -40,42 +41,28 @@ const emit = defineEmits(['close'])
 /* Use custom composable to extract metadata for the selected file */
 const {
   previewTitle,
-  previewType,
-  sourceSystem,
   previewFileDescription,
+  sourceSystem,
   previewCreatedAt,
   previewSize,
   previewLink,
-  previewSecurityClass
+  previewSecurityClass,
+  uniquePointer
 } = useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
-
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
 
-/* Local override for optimistic updates */
-const localSecurityLevel = ref('')
-
-/* Sync initial value */
-watch(
-  () => previewSecurityClass.value,
-  (val) => {
-    localSecurityLevel.value = val || ''
-  },
-  { immediate: true }
-)
-
 /* Final value used in UI */
-const currentSecurityLevel = computed(() => localSecurityLevel.value)
+const currentSecurityLevel = computed(() => previewSecurityClass.value || '')
 
 /* Permissions */
 const canEdit = computed(() => hasRole('admin'))
 
-/* Toast */
+/* Status notification — briefly shown after save/cancel to confirm the result */
 const toast = ref({ visible: false, success: true, message: '' })
 let toastTimer = null
 
@@ -90,9 +77,9 @@ const showToast = (success, message) => {
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/search_engine/classification`, {
+    const res = await authFetch(API_PATHS.classification, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('access_token')} ` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         unique_pointer: uniquePointer.value,
         classification: level
@@ -100,9 +87,6 @@ const handleClassificationSave = async (level) => {
     })
 
     if (!res.ok) throw new Error(`Server responded with ${res.status}`)
-
-    /* Optimistic UI update */
-    localSecurityLevel.value = level
 
     showToast(true, 'Security classification updated successfully.')
     isEditingClassification.value = false
@@ -150,7 +134,7 @@ watch(
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
       <div class="tag-row">
-        <span class="tag">{{ previewType }}</span>
+        <span class="tag">{{ previewFileDescription }}</span>
       </div>
 
       <!-- SECURITY CLASSIFICATION -->

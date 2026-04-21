@@ -1,7 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from json import JSONDecodeError
-from typing import Any, AsyncGenerator
+from typing import Any
+from collections.abc import AsyncGenerator
 from httpx import AsyncClient
 import httpx
 
@@ -49,35 +50,25 @@ class Connector:
         self.subdata = None
 
     async def streaming_fetch(self) -> AsyncGenerator:
+        """Grab file stream from connector.
+
+        Returns: response chunks as an async generator.
+        """
         async with self.client.stream(
             "GET",
             self.STREAM_ENDPOINT,
-            timeout=120,
-            params=[("subdata", self.subdata)] if self.subdata is not None else None
+            timeout=self.TIMEOUT,
+            params=[("subdata", self.subdata)] if self.subdata is not None else None,
         ) as stream:
             async for chunk in stream.aiter_text():
                 yield chunk
 
     async def reindex_needed(self) -> bool:
         """Check if new reindex is required."""
-        try:
-            response = await self.client.get(
-                self.INDEX_NEEDED_ENDPOINT,
-                timeout=Connector.TIMEOUT,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-            )
-            response.raise_for_status()
-            data = response.json()
-            if not isinstance(data, dict):
-                return True
-            return not data.get("index_needed") is False
-        except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
-        except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
-        except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
-        return True
+        data = await self._get_reindex_needed()
+        if not isinstance(data, dict):
+            return True
+        return data.get("index_needed", True)
 
     async def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.
@@ -125,6 +116,24 @@ class Connector:
 
         self.subdata = subdata
         return data
+
+    async def _get_reindex_needed(self) -> Any:
+        try:
+            response = await self.client.get(
+                self.INDEX_NEEDED_ENDPOINT,
+                timeout=Connector.TIMEOUT,
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.FILES_TO_INDEX_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.FILES_TO_INDEX_ENDPOINT}.")
+        return None
 
     async def _files_to_index(self) -> str | None:
         """Get the url for the file containing all new files."""
@@ -182,9 +191,9 @@ class Connector:
         """Get file to index"""
         try:
             response = await self.client.get(
-                self.FILES_TO_INDEX_ENDPOINT, 
+                self.FILES_TO_INDEX_ENDPOINT,
                 params=[("subdata", self.subdata)] if self.subdata is not None else None,
-                timeout=self.TIMEOUT
+                timeout=self.TIMEOUT,
             )
             return response.json()
         except httpx.TimeoutException:

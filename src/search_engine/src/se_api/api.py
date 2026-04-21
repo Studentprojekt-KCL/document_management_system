@@ -32,7 +32,6 @@ class API:
     port: int
     host: str
     log_level: str
-    MAX_PORT: int = 65536
     file_resource_var: list
     documents_only_var: list
 

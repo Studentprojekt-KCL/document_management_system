@@ -20,16 +20,14 @@ class Query:
     classifications_url: str
     cache: ClassifierCache
     classifications: list[str]
-    clinet: httpx.AsyncClient
 
     def __init__(self) -> None:
         """Constructor."""
-        address: str = read_env_variable("SEARCHENG_STOCHAN_URL")
-        query_url = address.rstrip("/")
-        self.clinet = httpx.AsyncClient(base_url=query_url)
+        address: str = read_env_variable("SEARCHENG_STOCHAN_URL").rstrip("/")
+        self.clinet = httpx.AsyncClient(base_url=address)
         self.cache = ClassifierCache()
-           
-    async def init(self):
+
+    async def init(self) -> None:
         """Init query clients"""
         classifications = await self._classifications_call()
         if classifications is None:

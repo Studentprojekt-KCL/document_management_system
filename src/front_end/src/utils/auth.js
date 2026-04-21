@@ -5,9 +5,9 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 import {
-  KEYCLOAK_CLIENT_ID,
-  KEYCLOAK_BASE,
-  KEYCLOAK_REALM,
+  FRONTEND_AD_CLIENT_ID,
+  FRONTEND_AD_URL,
+  FRONTEND_AD_REALM,
   keycloakLogoutUrl,
   SESSION_KEY_ACCESS_TOKEN,
   SESSION_KEY_ID_TOKEN,
@@ -80,11 +80,11 @@ export function isTokenExpired(token) {
 export async function refreshToken() {
   const refresh_token = getRefreshToken()
 
-  const url = `${KEYCLOAK_BASE}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
+  const url = `${FRONTEND_AD_URL}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/token`
 
   const params = new URLSearchParams()
   params.append('grant_type', 'refresh_token')
-  params.append('client_id', KEYCLOAK_CLIENT_ID)
+  params.append('client_id', FRONTEND_AD_CLIENT_ID)
   params.append('refresh_token', refresh_token)
 
   const response = await fetch(url, {
@@ -119,7 +119,7 @@ export function logout() {
       keycloakLogoutUrl() +
       `?id_token_hint=${encodeURIComponent(idToken)}` +
       `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-      `&client_id=${encodeURIComponent(KEYCLOAK_CLIENT_ID)}`
+      `&client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}`
 
     window.location.assign(logoutUrl)
     return

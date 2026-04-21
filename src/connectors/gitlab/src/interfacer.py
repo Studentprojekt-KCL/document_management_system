@@ -127,9 +127,9 @@ class GitLab:
             file_name_str = content.get("x-gitlab-file-name")
             file_path_str = content.get("x-gitlab-file-path")
             if isinstance(file_name_str, str):
-                file_name_str = file_name_str.encode('iso-8859-1').decode('utf-8')
+                file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
             if isinstance(file_path_str, str):
-                file_path_str = file_path_str.encode('iso-8859-1').decode('utf-8')
+                file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
             file = {
                 "file_name": file_name_str,
                 "size": content.get("x-gitlab-size"),

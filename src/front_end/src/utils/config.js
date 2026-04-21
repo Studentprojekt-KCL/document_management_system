@@ -4,14 +4,14 @@
  */
 
 /* Keycloak / OIDC config from runtime environment */
-export const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-export const KEYCLOAK_REALM = window.__ENV__.KEYCLOAK_REALM
-export const KEYCLOAK_CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+export const KEYCLOAK_BASE = window.__ENV__.FRONTEND_AD_URL
+export const FRONTEND_AD_REALM = window.__ENV__.FRONTEND_AD_REALM
+export const FRONTEND_AD_CLIENT_ID = window.__ENV__.FRONTEND_AD_CLIENT_ID
 
 /* Keycloak OIDC endpoint builders */
-export const keycloakAuthUrl = () => `${KEYCLOAK_BASE}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`
-export const keycloakTokenUrl = () => `${KEYCLOAK_BASE}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
-export const keycloakLogoutUrl = () => `${KEYCLOAK_BASE}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`
+export const keycloakAuthUrl = () => `${KEYCLOAK_BASE}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/auth`
+export const keycloakTokenUrl = () => `${KEYCLOAK_BASE}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/token`
+export const keycloakLogoutUrl = () => `${KEYCLOAK_BASE}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/logout`
 
 /* SessionStorage key names */
 export const SESSION_KEY_ACCESS_TOKEN = 'access_token'

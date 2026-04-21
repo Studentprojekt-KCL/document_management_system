@@ -51,8 +51,8 @@ class API:
             logging.getLogger().setLevel(logging.INFO)
             self.log_level = "info"
 
-        self.port: int = read_port("SE_API_PORT")
-        self.host: str = read_env_variable("SE_API_HOST")
+        self.port: int = read_port("SEARCHENG_BIND_PORT")
+        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR")
 
         self.app = FastAPI(lifespan=self.lifespan)
 

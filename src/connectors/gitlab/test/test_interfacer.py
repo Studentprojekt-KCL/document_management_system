@@ -2,11 +2,11 @@
 
 from unittest import TestCase, mock
 
-from interfacer import GitLabs
+from interfacer import GitLab
 
 
-class TestGitLabs(TestCase):
-    """Unittests for the GitLabs class instance in Gitlabs connector."""
+class TestGitLab(TestCase):
+    """Unittests for the GitLab class instance in Gitlab connector."""
 
     CORRECT_DATA = [
         {
@@ -57,9 +57,9 @@ class TestGitLabs(TestCase):
             response_mock.json.return_value = self.CORRECT_DATA
         return response_mock
 
-    @mock.patch("interfacer.GitLabs.__init__", return_value=None)
+    @mock.patch("interfacer.GitLab.__init__", return_value=None)
     def setUp(self, _):
-        self.instance = GitLabs()
+        self.instance = GitLab()
         mock_session = mock.Mock()
         mock_session.get.side_effect = self.get_side_effect
         self.instance.base = ""

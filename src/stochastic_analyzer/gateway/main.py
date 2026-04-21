@@ -15,8 +15,8 @@ from gateway.routes import Services, create_router
 from gateway.services.classifier import Classifier
 from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
-from gateway.services.ranker import Ranker
 from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
 
 
 class API:
@@ -44,16 +44,21 @@ class API:
         services = Services(
             connector=Connector(url=self.config.services.connector_url),
             summarizer=Summarizer(
-                url=self.config.services.ministral_url,
-                model=self.config.services.ministral_model,
-                timeout=self.config.services.ministral_timeout,
+                url=self.config.services.any_llm.url,
+                model=self.config.services.any_llm.model,
+                timeout=self.config.services.any_llm.timeout,
             ),
             classifier=Classifier(
                 url=self.config.services.classifier_url,
                 escalation_threshold=self.config.services.escalation_threshold,
             ),
-            ranker=Ranker(url=self.config.services.tei_url),
             pdf_converter=PdfConverter(),
+            indexer=Indexer(
+                embedding_url=self.config.services.vector.embedding_url,
+                qdrant_url=self.config.services.vector.qdrant_url,
+                batch_size=self.config.services.vector.batch_size,
+                max_chars=self.config.services.vector.max_chars,
+            ),
         )
 
         self.app.include_router(create_router(services, self.config.device))

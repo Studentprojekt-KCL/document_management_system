@@ -77,10 +77,6 @@ class Connector:
     async def get_file_metadata(self, pointers: list[str]) -> list[dict]:
         """Fetch file metadata from the connector without content payloads.
 
-        The connector applies authorization filtering: files the requesting
-        user is not permitted to view are omitted from the response, so the
-        returned list may be shorter than the input pointers list.
-
         Args:
             pointers: List of unique file pointers.
 

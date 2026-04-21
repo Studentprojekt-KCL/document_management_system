@@ -75,9 +75,7 @@ def create_router(services: Services, device: str) -> APIRouter:
         """Endpoint for semantic document similarity search using vector retrieval.
 
         Returns file metadata enriched with similarity scores, ordered by
-        descending similarity. The connector applies authorization filtering,
-        so the response may contain fewer items than requested if some files
-        are not visible to the requesting user.
+        descending similarity.
         """
         if len(payload.pointers) != 1:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
@@ -90,7 +88,6 @@ def create_router(services: Services, device: str) -> APIRouter:
 
         query = reference_items[0].content
 
-        # Fetch one extra to compensate for filtering out the query document itself.
         results = await services.indexer.search_similar(query, limit=6)
         results = [(p, s) for p, s in results if p != query_pointer][:5]
         if not results:

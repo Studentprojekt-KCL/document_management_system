@@ -99,9 +99,9 @@ Before running the service, you must create a `.env` file in the /front_end/ dir
 Create `.env` file following this structure:
 
 ```
-KEYCLOAK_BASE_URL= Keycloak Base URL
-KEYCLOAK_REALM=master
-KEYCLOAK_CLIENT_ID= Keyloak Client ID
-API_BASE_URL=/api/
-API_HOST= The develop API URL for frontend
+FRONTEND_AD_URL= Keycloak Base URL
+FRONTEND_AD_REALM=master
+FRONTEND_AD_CLIENT_ID= Keyloak Client ID
+FRONTEND_DMISAPI_BASE_URL=/api/
+FRONTEND_DMISAPI_URL= The develop API URL for frontend
 ```

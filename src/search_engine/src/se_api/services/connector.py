@@ -36,7 +36,7 @@ class Connector:
 
     def __init__(self) -> None:
         """Constructor"""
-        address = read_env_variable("SE_API_CONNECTOR_ADDRESS")
+        address = read_env_variable("SEARCHENG_CONGATEWAY_URL")
         self.client = AsyncClient(base_url=address)
         self.subdata = None
 

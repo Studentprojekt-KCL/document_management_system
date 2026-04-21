@@ -4,9 +4,9 @@ WORKDIR /app
 
 COPY src/shared_functions ./shared_functions
 
-COPY src/connectors/gitlabs ./connectors/gitlabs
+COPY src/connectors/gitlab ./connectors/gitlab
 
-WORKDIR /app/connectors/gitlabs
+WORKDIR /app/connectors/gitlab
 
 RUN pip install --upgrade pip
 RUN pip install .

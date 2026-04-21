@@ -24,7 +24,7 @@ class Query:
 
     def __init__(self) -> None:
         """Constructor."""
-        address: str = read_env_variable("SE_API_QUERY_ADDRESS")
+        address: str = read_env_variable("SEARCHENG_STOCHAN_URL")
         query_url = address.rstrip("/")
         self.clinet = httpx.AsyncClient(base_url=query_url)
         self.cache = ClassifierCache()

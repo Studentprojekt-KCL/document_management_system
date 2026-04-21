@@ -47,10 +47,16 @@ class GitLab:
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
         self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
 
-    def _get_projects(self) -> dict | list:
+    @staticmethod
+    def _construct_request_headers(bearer_token: str | None = None):
+        if isinstance(bearer_token, str):
+            return {"Authorization": f"Bearer {bearer_token}"}
+        return {}
+
+    def _get_projects(self, bearer_token: str | None) -> dict | list:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        projects = self._execute_request(url)
+        projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
         self.project_information = {
             str(project.get("id")): {
                 "web_url": project.get("web_url"),
@@ -61,7 +67,7 @@ class GitLab:
 
         return projects
 
-    def get_project_ids(self) -> dict[int, str]:
+    def get_project_ids(self, bearer_token: str | None) -> dict[int, str]:
         """Retrieve a dictionary of IDs for all available projects.
 
         Returns:
@@ -69,7 +75,7 @@ class GitLab:
             Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
         """
         ids: dict[int, str] = {}
-        for project in self._get_projects():
+        for project in self._get_projects(bearer_token):
             last_activity = project.get("last_activity_at")
             if not last_activity:
                 continue  # Entails there was no activity for this project
@@ -109,7 +115,7 @@ class GitLab:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
+    def get_file(self, url: str, bearer_token: str, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
         """Retrieve information about file.
 
         Args:
@@ -121,21 +127,22 @@ class GitLab:
         """
         file: dict | list = {}
         if include_content:
-            file = self._execute_request(urljoin(url, self.GIT_HEAD))
+            file = self._execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
         else:
-            content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
+            content: dict = self._execute_head_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
             file_name_str = content.get("x-gitlab-file-name")
             file_path_str = content.get("x-gitlab-file-path")
             if isinstance(file_name_str, str):
                 file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
             if isinstance(file_path_str, str):
                 file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
+
             file = {
                 "file_name": file_name_str,
                 "size": content.get("x-gitlab-size"),
                 "file_path": file_path_str,
             }
-
+            print(f"file: {file}")
         if isinstance(file, list):
             file = {}
 
@@ -152,7 +159,7 @@ class GitLab:
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
-                self.blame_cache[url] = self._execute_request(url)
+                self.blame_cache[url] = self._execute_get_request(url, self._construct_request_headers(bearer_token))
             blame = self.blame_cache.get(url)
             if isinstance(blame, list):
                 base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
@@ -165,7 +172,7 @@ class GitLab:
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(self, urls: list, include_content: bool = False, include_last_edit_date: bool = False) -> list:
+    def get_files(self, urls: list, bearer_token: str, include_content: bool = False, include_last_edit_date: bool = False) -> list:
         """Retrieve wanted information about each file in a list of files.
 
         Args:
@@ -178,7 +185,7 @@ class GitLab:
         """
         files: list = []
         for url in urls:
-            files.append(self.get_file(url, include_content, include_last_edit_date))
+            files.append(self.get_file(url, bearer_token, include_content, include_last_edit_date))
 
         return files
 
@@ -336,7 +343,7 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
+    def check_index_needed(self, subdata: str | None, bearer_token: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.
 
         Args:
@@ -348,7 +355,7 @@ class GitLab:
             Dict structure {"index_needed": <BOOL>}
         """
         provided_date = self._provided_date(subdata)
-        project_ids = self.get_project_ids()
+        project_ids = self.get_project_ids(bearer_token)
 
         for change_time in project_ids.values():
             if not isinstance(change_time, str):
@@ -375,10 +382,10 @@ class GitLab:
                 dms_error("Gitlab connector could not interpret subdata: %s", subdata)
         return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(self, url: str) -> dict | list:
-        """Execute request to supplied URL, JSON content in response expected."""
+    def _execute_get_request(self, url: str, headers: dict) -> dict | list:
+        """Execute GET request to supplied URL, JSON content in response expected."""
         try:
-            response = self.session.get(url, timeout=120)
+            response = self.session.get(url, timeout=120, headers=headers)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
@@ -388,3 +395,15 @@ class GitLab:
         if response.status_code != 200:  # noqa: PLR2004
             dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
         return content
+
+    def _execute_head_request(self, url: str, headers: dict) -> dict:
+        """Execute HEAD request to supplied URL."""
+        try:
+            content = self.session.head(url, headers=headers)
+            print(content.status_code)
+        except requests.exceptions.MissingSchema as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        if content.status_code != 200:
+            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {content.status_code})")
+            return {}
+        return dict(content.headers)

@@ -27,7 +27,7 @@ export const API_PATHS = {
  * @returns {Promise<Response>}
  */
 export function authFetch(url, options = {}) {
-  const token = sessionStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
+  const token = localStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
   return fetch(url, {
     ...options,
     headers: {

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
-from dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_warning
 from gateway.schemas import (
     RankResponse,
     FileMetadata,
@@ -99,7 +99,7 @@ def create_router(services: Services, device: str) -> APIRouter:
         metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
 
         enriched = [
-            FileMetadata(score=pointer_to_score[meta["unique_pointer"]], **meta)
+            FileMetadata(**{**meta, "score": pointer_to_score[meta["unique_pointer"]]})
             for meta in metadata_list
             if meta.get("unique_pointer") in pointer_to_score
         ]

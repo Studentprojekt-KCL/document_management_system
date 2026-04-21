@@ -15,6 +15,7 @@ from interfacer import GitLab
 from shared_functions.boto_tools import upload_file
 from shared_functions.initialisation_tools import read_port, read_env_variable
 
+
 class API:
     """Management class for Gitlab connector API."""
 
@@ -49,7 +50,11 @@ class API:
         return self.gitlab_instance.check_index_needed(subdata, x_gitlab_token)
 
     async def get_files(
-        self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True, x_gitlab_token: Annotated[str | None, Header()] = None
+        self,
+        file_pointers: dict[str, list],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
+        x_gitlab_token: Annotated[str | None, Header()] = None,
     ) -> Any:
         """Endpoint for retrieving specific file.
         Example request:
@@ -61,7 +66,9 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        return self.gitlab_instance.get_files(file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date)
+        return self.gitlab_instance.get_files(
+            file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date
+        )
 
     async def files_to_index(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> dict:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
@@ -74,9 +81,13 @@ class API:
         """NOT; THIS IS A TEMPORARY ENDPOINT WHICH WILL BE MIGRATED TO SHARED CONNECTOR."""
         return ["GitLab"]
 
-    async def stream_files_to_index(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> StreamingResponse:
+    async def stream_files_to_index(
+        self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
+    ) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
-        return StreamingResponse(self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream")
+        return StreamingResponse(
+            self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
+        )
 
 
 def run() -> None:

@@ -48,7 +48,7 @@ class GitLab:
         self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
 
     @staticmethod
-    def _construct_request_headers(bearer_token: str | None = None):
+    def _construct_request_headers(bearer_token: str | None = None) -> dict:
         if isinstance(bearer_token, str):
             return {"Authorization": f"Bearer {bearer_token}"}
         return {}
@@ -116,7 +116,9 @@ class GitLab:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
+    def get_file(
+        self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True
+    ) -> dict:
         """Retrieve information about file.
 
         Args:
@@ -173,7 +175,9 @@ class GitLab:
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False) -> list:
+    def get_files(
+        self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False
+    ) -> list:
         """Retrieve wanted information about each file in a list of files.
 
         Args:
@@ -405,9 +409,10 @@ class GitLab:
         """Execute HEAD request to supplied URL."""
         try:
             content = self.session.head(url, headers=headers)
+            content.raise_for_status()
         except requests.exceptions.MissingSchema as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-        if content.status_code != 200:
+        except requests.HTTPError:
             dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {content.status_code})")
             return {}
         return dict(content.headers)

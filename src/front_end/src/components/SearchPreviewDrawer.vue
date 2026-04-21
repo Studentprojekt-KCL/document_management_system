@@ -70,7 +70,7 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           </div>
           <div class="meta-cell">
             <span>File Size</span>
-            <p><HardDrive :size="13" /> {{ previewSize }}</p>
+            <p><HardDrive :size="13" /> {{ previewSize }} B</p>
           </div>
           <div class="meta-cell">
             <span>Format</span>

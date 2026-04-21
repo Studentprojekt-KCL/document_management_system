@@ -40,7 +40,7 @@ const {
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
 /* AI rerank composable */
-const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -111,9 +111,9 @@ const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRer
       <!-- Rerank (similarity) section -->
       <section class="panel-section">
         <p class="section-title">SIMILARITY</p>
-        <div v-if="aiRerankResults.length" class="meta-cell meta-cell-summary">
+        <div v-if="aiRerankResultsComputed.length" class="meta-cell meta-cell-summary">
           <ul>
-            <li v-for="result in aiRerankResults" :key="result.pointer">
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer">
               {{ result.rank }}. {{ result.pointer }} Score: {{ result.scorePercent }}
             </li>
           </ul>

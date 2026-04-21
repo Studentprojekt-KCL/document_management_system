@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
@@ -24,10 +24,14 @@ export function useAIRerank(props) {
       }
     })
 
+  /* Rerank results for specific file and disappears when new file is selected */
+  const aiRerankResultsComputed = computed(() => (rerankPointer.value === uniquePointer.value ? aiRerankResults.value : []))
+
   /* When clicking button Rerank */
   const generateAIRerank = async () => {
     if (!uniquePointer.value) {
       aiRerankResults.value = []
+
       rerankError.value = ''
       return
     }
@@ -51,6 +55,7 @@ export function useAIRerank(props) {
       const data = await response.json()
       const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
       aiRerankResults.value = mapRankedResults(rankedResults)
+      rerankPointer.value = uniquePointer.value
     } catch (error) {
       rerankError.value = error.message || 'An error occurred while generating AI rerank.'
     } finally {
@@ -59,7 +64,7 @@ export function useAIRerank(props) {
   }
 
   return {
-    aiRerankResults,
+    aiRerankResultsComputed,
     isReranking,
     rerankError,
     generateAIRerank

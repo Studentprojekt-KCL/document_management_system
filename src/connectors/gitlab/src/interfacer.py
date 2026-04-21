@@ -53,7 +53,7 @@ class GitLab:
             return {"Authorization": f"Bearer {bearer_token}"}
         return {}
 
-    def _get_projects(self, bearer_token: str | None) -> dict | list:
+    def _get_projects(self, bearer_token: str | None = None) -> dict | list:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
         projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
@@ -67,7 +67,7 @@ class GitLab:
 
         return projects
 
-    def get_project_ids(self, bearer_token: str | None) -> dict[int, str]:
+    def get_project_ids(self, bearer_token: str | None = None) -> dict[int, str]:
         """Retrieve a dictionary of IDs for all available projects.
 
         Returns:
@@ -92,7 +92,7 @@ class GitLab:
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str) -> str:
+    def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -102,10 +102,11 @@ class GitLab:
         ----
             url: API URL pointing at a specific file.
             file_path: Precise path to file in project.
+            bearer_token: A valid bearer GitLab token or None.
         """
         project_id = self._get_project_id(url)
         if self.project_information is None or project_id not in self.project_information:
-            self._get_projects()
+            self._get_projects(bearer_token)
 
         project_information = self.project_information.get(project_id)  # type: ignore
         if not isinstance(project_information, dict):
@@ -115,7 +116,7 @@ class GitLab:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, bearer_token: str, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
+    def get_file(self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
         """Retrieve information about file.
 
         Args:
@@ -123,6 +124,7 @@ class GitLab:
             url: The URL should be given formatted like:
               https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
+            bearer_token: A valid bearer GitLab token or None.
 
         """
         file: dict | list = {}
@@ -130,19 +132,18 @@ class GitLab:
             file = self._execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
         else:
             content: dict = self._execute_head_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
-            file_name_str = content.get("x-gitlab-file-name")
-            file_path_str = content.get("x-gitlab-file-path")
+            lower_content = {key.lower(): value for key, value in content.items()}
+            file_name_str = lower_content.get("x-gitlab-file-name")
+            file_path_str = lower_content.get("x-gitlab-file-path")
             if isinstance(file_name_str, str):
                 file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
             if isinstance(file_path_str, str):
                 file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
-
             file = {
                 "file_name": file_name_str,
-                "size": content.get("x-gitlab-size"),
+                "size": lower_content.get("x-gitlab-size"),
                 "file_path": file_path_str,
             }
-            print(f"file: {file}")
         if isinstance(file, list):
             file = {}
 
@@ -172,7 +173,7 @@ class GitLab:
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(self, urls: list, bearer_token: str, include_content: bool = False, include_last_edit_date: bool = False) -> list:
+    def get_files(self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False) -> list:
         """Retrieve wanted information about each file in a list of files.
 
         Args:
@@ -181,6 +182,7 @@ class GitLab:
               https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
             include_last_edit_date: Include last edit date of file.
+            bearer_token: A valid bearer GitLab token or None.
 
         """
         files: list = []
@@ -228,12 +230,12 @@ class GitLab:
 
         return self._provided_date(subdata)
 
-    def _project_urls(self, subdata: str | None = None) -> tuple[list, str]:
+    def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
         """Retrieve a structure of files to index."""
 
         subdata_date = self._subdata_setup(subdata)
         current_subdata = self.get_project_ids()
-        projects = self._get_projects()
+        projects = self._get_projects(bearer_token)
         new_date = subdata_date
 
         project_data: list[tuple] = []
@@ -255,12 +257,13 @@ class GitLab:
 
         return project_data, generated_subdata
 
-    def files_to_index(self, subdata: str | None = None) -> dict:
+    def files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> dict:
         """Retrieve a structure of files to index.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
 
         Returns:
         -------
@@ -268,7 +271,7 @@ class GitLab:
               <BOOL INDICATIANG IF REINDEX IS NEEED>}
         """
         files_data: list = []
-        pointers_to_projects, generated_subdata = self._project_urls(subdata)
+        pointers_to_projects, generated_subdata = self._project_urls(subdata, bearer_token)
 
         for project_pointers in pointers_to_projects:
             url, project_id = project_pointers
@@ -302,18 +305,19 @@ class GitLab:
             await output_queue.put(unpacked_content)
             input_queue.task_done()
 
-    async def stream_files_to_index(self, subdata: str | None = None) -> AsyncGenerator[bytes]:
+    async def stream_files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> AsyncGenerator[bytes]:
         """Streaming for files to index.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
         """
         task_queue: asyncio.Queue = asyncio.Queue()
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        pointers_to_projects, new_subdata = self._project_urls(subdata)
+        pointers_to_projects, new_subdata = self._project_urls(subdata, bearer_token)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 
@@ -343,12 +347,13 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    def check_index_needed(self, subdata: str | None, bearer_token: str | None) -> dict[str, Any]:
+    def check_index_needed(self, subdata: str | None, bearer_token: str | None = None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
 
         Returns:
         --------
@@ -400,7 +405,6 @@ class GitLab:
         """Execute HEAD request to supplied URL."""
         try:
             content = self.session.head(url, headers=headers)
-            print(content.status_code)
         except requests.exceptions.MissingSchema as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         if content.status_code != 200:

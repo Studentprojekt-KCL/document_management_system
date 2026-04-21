@@ -16,8 +16,6 @@ class Query:
     CLASSIFICATIONS_ENDPOINT: str = "/classifications"
     CLASSIFY_ENDPOINT: str = "/classify"
 
-    classify_url: str
-    classifications_url: str
     cache: ClassifierCache
     classifications: list[str]
 
@@ -31,7 +29,7 @@ class Query:
         """Init query clients"""
         classifications = await self._classifications_call()
         if classifications is None:
-            dms_error(f"Failed to grab classification categories from: {self.classifications_url}.")
+            dms_error(f"Failed to grab classification categories from: {self.CLASSIFICATIONS_ENDPOINT}.")
             return
         self.classifications = classifications
 
@@ -115,11 +113,11 @@ class Query:
             response = await self.clinet.post(self.CLASSIFY_ENDPOINT, json={"pointers": pointers})
             return response.json()
         except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.classify_url}")
+            dms_warning(f"Request timed out, url: {self.CLASSIFY_ENDPOINT}")
         except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.classify_url}.")
+            dms_warning(f"Failed to parse JSON, url: {self.CLASSIFY_ENDPOINT}.")
         except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.classify_url}.")
+            dms_warning(f"Invalid HTTP response, url: {self.CLASSIFY_ENDPOINT}.")
         return None
 
     async def _classifications_call(self) -> list[str] | None:
@@ -127,9 +125,9 @@ class Query:
             response = await self.clinet.get(self.CLASSIFICATIONS_ENDPOINT, timeout=120)
             return response.json()
         except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.classify_url}")
+            dms_warning(f"Request timed out, url: {self.CLASSIFICATIONS_ENDPOINT}")
         except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.classify_url}.")
+            dms_warning(f"Failed to parse JSON, url: {self.CLASSIFICATIONS_ENDPOINT}.")
         except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.classify_url}.")
+            dms_warning(f"Invalid HTTP response, url: {self.CLASSIFICATIONS_ENDPOINT}.")
         return None

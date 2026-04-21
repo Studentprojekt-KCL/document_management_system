@@ -1,6 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Lock, Queue, create_task, get_event_loop
+import base64
+from threading import Thread
+import queue
+
+from asyncio import AbstractEventLoop, Lock, Queue, create_task, get_event_loop
 from datetime import datetime
 import json
 from fastapi import HTTPException
@@ -118,18 +122,28 @@ class Handler:
     async def _handle_new(self) -> None:
         """Grab connector stream output and pipe it into search engine."""
         await self.indexing.acquire()
-        start = datetime.now()
-        task_queue: Queue = Queue()
+        index_queue: queue.Queue = queue.Queue()
+        transfer_queue: Queue = Queue()
+
+        indexer_thread: Thread = Thread(target=self._add_file, args=(index_queue,))
+
         raw: str = ""
         data: dict
         subdata: str | None = None
 
-        index_tasks: list = [create_task(self._add_file(task_queue)) for _ in range(self.WORKERS)]
+        indexer_thread.start()
+        loop = get_event_loop()
+
+        transfer_tasks: list = [create_task(self._transfer_file(index_queue, transfer_queue, loop)) for _ in range(self.WORKERS)]
 
         self.search_engine.init()
+
+        start = datetime.now()
         async for chunk in self.connector.streaming_fetch():
             raw += chunk
             try:
+                if not raw.endswith("}"):
+                    continue
                 data = json.loads(raw)
                 raw = ""
             except json.JSONDecodeError:
@@ -137,26 +151,74 @@ class Handler:
             if subdata is None and data.get("subdata") is not None:
                 subdata = data.get("subdata")
                 continue
-            await task_queue.put(data)
+            await transfer_queue.put(data)
+        dms_info(f"Fetch done: {datetime.now() - start}")
         self.connector.subdata = subdata
 
-        await task_queue.join()
-        for _ in index_tasks:
-            await task_queue.put(None)
+        
+        await transfer_queue.join()
+        for _ in transfer_tasks:
+            await transfer_queue.put(None)
+        dms_info(f"Transfer to indexer done: {datetime.now() - start}")
+        await loop.run_in_executor(None, index_queue.join)
+        await loop.run_in_executor(None, index_queue.put, None)
+        await loop.run_in_executor(None, indexer_thread.join)
         self.search_engine.close()
+        dms_info(f"Indexer Done: {datetime.now() - start}")
         self.indexing.release()
         dms_info(f"Total handle time: {datetime.now() - start}")
 
-    async def _add_file(self, task_queue: Queue) -> None:
+    async def _transfer_file(self, index_queue: queue.Queue, transger_queue: Queue, loop: AbstractEventLoop):
+        to_index: list[dict] = []
+        while True:
+            file: dict | None = await transger_queue.get()
+            if file is None:
+                break
+            flat_file: dict | None = await loop.run_in_executor(None, self._decode, file)
+            if flat_file is not None:
+                to_index.append(flat_file)
+            if len(to_index) >= 1000:
+                await loop.run_in_executor(None, index_queue.put, to_index)
+                to_index = []
+
+            transger_queue.task_done()
+        await loop.run_in_executor(None, index_queue.put, to_index)
+
+    def _decode(self, file: dict) -> dict | None:
+        flat_file = self._flatten_dict(file)
+        content: str | None = flat_file.get("content")
+
+        if content is None:
+            dms_warning("File is missing content.")
+            return
+        content_bytes: bytes = base64.b64decode(content)
+        content = content_bytes.decode("utf-8")
+        flat_file["content"] = content
+
+        return flat_file
+
+    def _add_file(self, index_queue: queue.Queue) -> None:
         """Wait for formatted file and add it to the search engine.
 
         Args:
             task_queue: queue containing all the files to add.
         """
-
         while True:
-            file: dict | None = await task_queue.get()
-            if file is None:
+            files: list[dict] | None = index_queue.get()
+            if files is None:
                 break
-            self.search_engine.add_file(file)
-            task_queue.task_done()
+            for file in files:
+                self.search_engine.add_file(file)
+            self.search_engine.commit()
+            index_queue.task_done()
+
+    def _flatten_dict(self, d: dict) -> dict:
+        flat: dict = {}
+
+        for key, val in d.items():
+            if isinstance(val, dict):
+                flat.update(self._flatten_dict(val))
+            else:
+                flat.update({key: str(val)})
+
+        return flat

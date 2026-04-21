@@ -16,7 +16,6 @@ from se_api.handlers import Handler
 from shared_functions.initialisation_tools import read_env_variable, read_port
 from shared_functions.file_type_logic import get_file_resource, get_documents_only_rescource
 
-
 class API:
     """API object, holds all endpoints and configuration.
 
@@ -140,3 +139,6 @@ def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     api: API = API()
     api.start()
+
+if __name__ == "__main__":
+    run()

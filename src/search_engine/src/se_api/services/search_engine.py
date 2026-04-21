@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import base64
+from datetime import date, datetime
 import json
 from tantivy import (
     Document,
@@ -106,10 +107,16 @@ class SearchEngine:
         """Close the writer."""
         if self.writer is None:
             return
+        start = datetime.now()
         self.writer.commit()
         self.writer.wait_merging_threads()
         self.writer = None
-        dms_info("Closed writer.")
+        dms_info(f"Closed writer. {datetime.now() - start}")
+
+    def commit(self) -> None:
+        if self.writer is None:
+            return
+        self.writer.commit()
 
     def add_file(self, file: dict) -> None:
         """Add file to index.
@@ -122,57 +129,46 @@ class SearchEngine:
 
         if self.writer is None:
             return
-        flat_file: dict = self._flatten_dict(file)
-        content: str | None = flat_file.get("content")
-        unique_pointer: str | None = flat_file.get("unique_pointer")
-
-        if content is None:
-            dms_warning("File is missing content.")
-            return
+        unique_pointer: str | None = file.get("unique_pointer")
         if unique_pointer is None:
             dms_warning("File is missing unique pointer.")
             return
-
         self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
 
-        content_bytes: bytes = base64.b64decode(content)
-        content = content_bytes.decode("utf-8")
-        flat_file["content"] = content
+        self.writer.add_json(json.dumps(file))
 
-        self.writer.add_json(json.dumps(flat_file))
-
-    def add_files(self, files: list) -> None:
-        """Add a list of files to the index.
-
-        Args:
-            files: list of files.
-        """
-
-        writer: IndexWriter = self.index.writer()
-        for file in files:
-            flat_file = self._flatten_dict(file)
-            content = flat_file.get("content")
-            unique_pointer = flat_file.get("unique_pointer")
-
-            if content is None:
-                dms_warning("File is missing content.")
-                continue
-            if unique_pointer is None:
-                dms_warning("File is missing unique pointer.")
-                continue
-
-            writer.delete_documents("unique_pointer", unique_pointer)
-
-            content_bytes: bytes = base64.b64decode(content)
-            content = content_bytes.decode("utf-8")
-            flat_file["content"] = content
-
-            writer.add_json(json.dumps(flat_file))
-
-        writer.commit()
-        writer.wait_merging_threads()
-
-        self.index.reload()
+    # def add_files(self, files: list) -> None:
+    #     """Add a list of files to the index.
+    #
+    #     Args:
+    #         files: list of files.
+    #     """
+    #
+    #     writer: IndexWriter = self.index.writer()
+    #     for file in files:
+    #         flat_file = self._flatten_dict(file)
+    #         content = flat_file.get("content")
+    #         unique_pointer = flat_file.get("unique_pointer")
+    #
+    #         if content is None:
+    #             dms_warning("File is missing content.")
+    #             continue
+    #         if unique_pointer is None:
+    #             dms_warning("File is missing unique pointer.")
+    #             continue
+    #
+    #         writer.delete_documents("unique_pointer", unique_pointer)
+    #
+    #         content_bytes: bytes = base64.b64decode(content)
+    #         content = content_bytes.decode("utf-8")
+    #         flat_file["content"] = content
+    #
+    #         writer.add_json(json.dumps(flat_file))
+    #
+    #     writer.commit()
+    #     writer.wait_merging_threads()
+    #
+    #     self.index.reload()
 
     def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
@@ -188,13 +184,4 @@ class SearchEngine:
         dms_info(f"Removed {pointer} from index.")
         self.index.reload()
 
-    def _flatten_dict(self, d: dict) -> dict:
-        flat: dict = {}
 
-        for key, val in d.items():
-            if isinstance(val, dict):
-                flat.update(self._flatten_dict(val))
-            else:
-                flat.update({key: str(val)})
-
-        return flat

@@ -38,10 +38,6 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-<<<<<<< HEAD
-const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass, uniquePointer } =
-  useSearchMetadata(props)
-=======
 const {
   previewTitle,
   previewType,
@@ -52,7 +48,6 @@ const {
   previewLink,
   previewSecurityClass
 } = useSearchMetadata(props)
->>>>>>> origin/develop
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)

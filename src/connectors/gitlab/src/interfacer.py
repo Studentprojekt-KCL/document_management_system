@@ -347,7 +347,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        pointers_to_projects, new_subdata = await asyncio.to_thread(self._project_urls, subdata)
+        pointers_to_projects, new_subdata = await asyncio.to_thread(self._project_urls, subdata, bearer_token)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 

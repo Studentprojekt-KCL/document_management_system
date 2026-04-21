@@ -29,8 +29,8 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.port = read_port("LOGGER_PORT")
-        self.bind = read_env_variable("LOGGER_BIND_ADDRESS")
+        self.port = read_port("LOGAPI_BIND_PORT")
+        self.bind = read_env_variable("LOGAPI_BIND_ADDR")
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--dev", action="store_true")

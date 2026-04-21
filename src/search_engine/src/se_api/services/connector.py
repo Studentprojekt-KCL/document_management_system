@@ -28,9 +28,9 @@ class Connector:
     url_get_files: str
 
     def __init__(self) -> None:
-        address = environ.get("SE_API_CONNECTOR_ADDRESS", None)
+        address = environ.get("SEARCHENG_CONGATEWAY_URL", None)
         if address is None:
-            dms_error("SE_API_CONNECTOR_ADDRESS is not set.")
+            dms_error("SEARCHENG_CONGATEWAY_URL is not set.")
             return
         self.address = address.rstrip("/")
         self.subdata = None

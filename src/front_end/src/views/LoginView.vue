@@ -6,7 +6,7 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import { KEYCLOAK_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
+import { FRONTEND_AD_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
 
 const isLoading = ref(false)
 
@@ -14,16 +14,16 @@ const isLoading = ref(false)
 const handleEntraIdLogin = async () => {
   const { verifier, challenge } = await createPkcePair()
 
-  sessionStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
+  localStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
 
   const state = generateState()
-  sessionStorage.setItem(SESSION_KEY_OIDC_STATE, state)
+  localStorage.setItem(SESSION_KEY_OIDC_STATE, state)
 
   const redirectUri = `${window.location.origin}/auth/callback`
 
   const authUrl =
     keycloakAuthUrl() +
-    `?client_id=${encodeURIComponent(KEYCLOAK_CLIENT_ID)}` +
+    `?client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
     `&scope=openid` +

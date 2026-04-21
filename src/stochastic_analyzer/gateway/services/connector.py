@@ -18,14 +18,22 @@ class Connector:
         timeout: Request timeout in seconds.
     """
 
-    def __init__(self, url: str, timeout: int = 120) -> None:
+    def __init__(self, url: str, client: httpx.AsyncClient, timeout: int = 120) -> None:
         self.url = url
+        self.client = client
         self.timeout = timeout
 
-    async def _get_content(self, pointers: list[str], client: httpx.AsyncClient) -> list[InputItem]:
-        """Fetch and decode files from the connector."""
+    async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
+        """Fetch contents for all file pointers from the connector.
+
+        Args:
+            pointers: List of unique file pointers.
+
+        Returns:
+            List of successfully retrieved InputItems.
+        """
         try:
-            response = await client.post(
+            response = await self.client.post(
                 f"{self.url.rstrip('/')}/get_files",
                 params=[("include_content", True), ("include_last_edit_date", False)],
                 json={"file_pointers": pointers},
@@ -62,15 +70,3 @@ class Connector:
             )
 
         return items
-
-    async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
-        """Fetch contents for all file pointers from the connector.
-
-        Args:
-            pointers: List of unique file pointers.
-
-        Returns:
-            List of successfully retrieved InputItems.
-        """
-        async with httpx.AsyncClient() as client:
-            return await self._get_content(pointers, client)

@@ -4,6 +4,7 @@ import hashlib
 from base64 import b64decode
 from http import HTTPStatus
 
+from dataclasses import dataclass
 import httpx
 
 from shared_functions.dmis_logger import dms_warning
@@ -16,27 +17,37 @@ def _to_uuid(pointer: str) -> str:
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
 
 
+@dataclass
+class IndexerConfig:
+    """Configuration settings for the Indexer service."""
+
+    embedding_url: str
+    qdrant_url: str
+    batch_size: int = 8
+    max_chars: int = 2000
+
+
 class Indexer:
     """Document indexer and vector search using Qdrant and TEI embeddings.
 
     Attributes:
         embedding_url: URL for the TEI embedding container.
         qdrant_url: URL for the Qdrant vector database.
+        client: Shared async HTTP client.
         batch_size: Number of documents embedded per batch.
         max_chars: Maximum characters per document sent for embedding.
     """
 
     def __init__(
         self,
-        embedding_url: str,
-        qdrant_url: str,
-        batch_size: int = 8,
-        max_chars: int = 2000,
+        config: IndexerConfig,
+        client: httpx.AsyncClient,
     ) -> None:
-        self.embedding_url = embedding_url
-        self.qdrant_url = qdrant_url
-        self.batch_size = batch_size
-        self.max_chars = max_chars
+        self.embedding_url = config.embedding_url
+        self.qdrant_url = config.qdrant_url
+        self.batch_size = config.batch_size
+        self.max_chars = config.max_chars
+        self.client = client
 
     async def index(self, connector_url: str) -> dict:
         """Run the full indexing pipeline.
@@ -44,12 +55,11 @@ class Indexer:
         Returns:
             Status dict with total file count and indexed count.
         """
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            files = await self._fetch_files(connector_url, client)
-            if not files:
-                return {"status": "skipped", "reason": "no files or index not needed"}
+        files = await self._fetch_files(connector_url)
+        if not files:
+            return {"status": "skipped", "reason": "no files or index not needed"}
 
-            indexed = await self._embed_and_upsert(files, client)
+        indexed = await self._embed_and_upsert(files)
 
         return {"status": "complete", "total": len(files), "indexed": indexed}
 
@@ -63,37 +73,36 @@ class Indexer:
         Returns:
             List of (unique_pointer, score) tuples for the top matches.
         """
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{self.embedding_url}/embed",
-                json={"inputs": [text[: self.max_chars]]},
-            )
-            resp.raise_for_status()
-            vector = resp.json()[0]
+        resp = await self.client.post(
+            f"{self.embedding_url}/embed",
+            son={"inputs": [text[: self.max_chars]]},
+        )
+        resp.raise_for_status()
+        vector = resp.json()[0]
 
-            resp = await client.post(
-                f"{self.qdrant_url}/collections/documents/points/query",
-                json={
-                    "query": vector,
-                    "limit": limit,
-                    "with_payload": True,
-                },
-            )
-            resp.raise_for_status()
-            points = resp.json().get("result", {}).get("points", [])
+        resp = await self.client.post(
+            f"{self.qdrant_url}/collections/documents/points/query",
+            json={
+                "query": vector,
+                "limit": limit,
+                "with_payload": True,
+            },
+        )
+        resp.raise_for_status()
+        points = resp.json().get("result", {}).get("points", [])
 
         return [(p["payload"]["unique_pointer"], p["score"]) for p in points if p.get("payload", {}).get("unique_pointer")]
 
-    async def _fetch_files(self, connector_url: str, client: httpx.AsyncClient) -> list[dict]:
+    async def _fetch_files(self, connector_url: str) -> list[dict]:
         """Get the file list from the connector's indexing endpoint."""
-        resp = await client.get(f"{connector_url.rstrip('/')}/files_to_index")
+        resp = await self.client.get(f"{connector_url.rstrip('/')}/files_to_index")
         resp.raise_for_status()
         manifest = resp.json()
 
         if not manifest.get("index_needed", False):
             return []
 
-        resp = await client.get(manifest["file_url"])
+        resp = await self.client.get(manifest["file_url"])
         resp.raise_for_status()
         return resp.json().get("files", [])
 
@@ -116,24 +125,24 @@ class Indexer:
             )
         return points
 
-    async def _ensure_collection(self, client: httpx.AsyncClient) -> None:
+    async def _ensure_collection(self) -> None:
         """Create the Qdrant collection if missing, probing for vector dimension."""
-        check = await client.get(f"{self.qdrant_url}/collections/documents")
+        check = await self.client.get(f"{self.qdrant_url}/collections/documents")
         if check.status_code == HTTPStatus.OK:
             return
 
-        probe = await client.post(f"{self.embedding_url}/embed", json={"inputs": ["x"]})
+        probe = await self.client.post(f"{self.embedding_url}/embed", json={"inputs": ["x"]})
         probe.raise_for_status()
         size = len(probe.json()[0])
 
-        await client.put(
+        await self.client.put(
             f"{self.qdrant_url}/collections/documents",
             json={"vectors": {"size": size, "distance": "Cosine"}},
         )
 
-    async def _embed_and_upsert(self, files: list[dict], client: httpx.AsyncClient) -> int:
+    async def _embed_and_upsert(self, files: list[dict]) -> int:
         """Embed documents and upsert them into Qdrant in batches."""
-        await self._ensure_collection(client)
+        await self._ensure_collection()
 
         indexed = 0
         for i in range(0, len(files), self.batch_size):
@@ -154,13 +163,13 @@ class Indexer:
             if not texts:
                 continue
 
-            resp = await client.post(f"{self.embedding_url}/embed", json={"inputs": texts})
+            resp = await self.client.post(f"{self.embedding_url}/embed", json={"inputs": texts})
             resp.raise_for_status()
             vectors = resp.json()
 
             points = self._build_points(valid, vectors)
 
-            await client.put(
+            await self.client.put(
                 f"{self.qdrant_url}/collections/documents/points",
                 json={"points": points},
             )

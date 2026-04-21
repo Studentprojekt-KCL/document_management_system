@@ -75,7 +75,7 @@ class Indexer:
         """
         resp = await self.client.post(
             f"{self.embedding_url}/embed",
-            son={"inputs": [text[: self.max_chars]]},
+            json={"inputs": [text[: self.max_chars]]},
         )
         resp.raise_for_status()
         vector = resp.json()[0]

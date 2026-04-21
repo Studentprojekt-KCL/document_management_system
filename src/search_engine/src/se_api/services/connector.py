@@ -1,10 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from json import JSONDecodeError
-from typing import Any
+from typing import Any, AsyncGenerator
 from httpx import AsyncClient
-
 import httpx
+
 from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -24,6 +24,7 @@ class Connector:
     INDEX_NEEDED_ENDPOINT: str = "/index_needed_bool"
     FILES_TO_INDEX_ENDPOINT: str = "/files_to_index"
     GET_FILE_ENDPOINT: str = "/get_files"
+    STREAM_ENDPOINT: str = "/stream_files_to_index"
 
     subdata: str | None
 
@@ -34,16 +35,28 @@ class Connector:
     client: AsyncClient
 
     def __init__(self) -> None:
+        """Constructor"""
         address = read_env_variable("SE_API_CONNECTOR_ADDRESS")
         self.client = AsyncClient(base_url=address)
         self.subdata = None
 
     async def close(self) -> None:
+        """Close clients"""
         await self.client.aclose()
 
     def reset(self) -> None:
         """Resets the subdata, getting all files."""
         self.subdata = None
+
+    async def streaming_fetch(self) -> AsyncGenerator:
+        async with self.client.stream(
+            "GET",
+            self.STREAM_ENDPOINT,
+            timeout=120,
+            params=[("subdata", self.subdata)] if self.subdata is not None else None
+        ) as stream:
+            async for chunk in stream.aiter_text():
+                yield chunk
 
     async def reindex_needed(self) -> bool:
         """Check if new reindex is required."""

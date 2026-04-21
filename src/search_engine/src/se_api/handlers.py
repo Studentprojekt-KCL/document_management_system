@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import json
 from fastapi import HTTPException
 from se_api.services.connector import Connector
 from se_api.services.query import Query
@@ -27,6 +28,7 @@ class Handler:
         self.query = Query()
 
     async def init(self) -> None:
+        """Init handler"""
         await self.query.init()
 
     async def close(self) -> None:
@@ -92,14 +94,24 @@ class Handler:
             return []
 
         if await self.connector.reindex_needed():  # This endpoint is approx 3x faster
-            new_files: list[dict] = await self.connector.get_files()
-            if new_files:
-                if self.search_engine.have_new_category(new_files[0]):
-                    self.search_engine.rebuild()
-                    self.connector.reset()
-                    new_files = await self.connector.get_files()
-                self.search_engine.add_files(new_files)
-                self.query.cache.remove_classifications(new_files)
+            self.search_engine.init()
+            raw: str = ""
+            data: dict
+            subdata: str | None = None
+            async for chunk in self.connector.streaming_fetch():
+                raw += chunk
+                try:
+                    data: dict = json.loads(raw)
+                    raw = ""
+                except json.JSONDecodeError:
+                    continue
+
+                if subdata is None and data.get("subdata") is not None:
+                        subdata = data.get("subdata")
+                self.search_engine.add_file(data)
+            self.search_engine.commit()
+            self.connector.subdata = subdata
+
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)

@@ -1,7 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import base64
+from collections.abc import AsyncGenerator
 import json
+from re import sub
 from tantivy import (
     Document,
     Index,
@@ -11,7 +13,7 @@ from tantivy import (
     Searcher,
 )
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class SearchEngine:
@@ -23,9 +25,11 @@ class SearchEngine:
 
     index: Index
     categories: list[str]
+    writer: IndexWriter | None
 
     def __init__(self) -> None:
         self.categories = ["unique_pointer", "content"]
+        self.writer = None
         self.rebuild()
 
     def rebuild(self) -> None:
@@ -61,6 +65,48 @@ class SearchEngine:
 
         return new
 
+    async def add_stream(self, stream: AsyncGenerator) -> str | None:
+        subdata: str | None = None
+        writer: IndexWriter = self.index.writer()
+        data: str = ""
+        resp: dict
+        async for s in stream:
+            data += bytes(s).decode("utf-8")
+            try:
+                resp = json.loads(data)
+                data = ""
+            except json.JSONDecodeError:
+                continue
+            if subdata is not None or resp.get("subdata"):
+                subdata = resp.get("subdata")
+                continue
+
+
+            flat_file = self._flatten_dict(resp)
+            if flat_file.get("subdata") is not None:
+                subdata = flat_file.get("subdata")
+                continue
+            content = flat_file.get("content")
+            unique_pointer = flat_file.get("unique_pointer")
+
+            if content is None:
+                dms_warning("File is missing content.")
+                continue
+            if unique_pointer is None:
+                dms_warning("File is missing unique pointer.")
+                continue
+
+            writer.delete_documents("unique_pointer", unique_pointer)
+
+            content_bytes: bytes = base64.b64decode(content)
+            content = content_bytes.decode("utf-8")
+            flat_file["content"] = content
+            writer.add_json(json.dumps(flat_file))
+
+        writer.commit()
+        writer.wait_merging_threads()
+        return subdata
+
     def query_files(self, q: str, k: int) -> list[str]:
         """Query through the files in the index.
 
@@ -86,6 +132,53 @@ class SearchEngine:
             pointers.append(unique_poinet)
 
         return pointers
+
+    def init(self):
+        """Init index writer."""
+        if self.writer is not None:
+            return
+        self.writer = self.index.writer()
+        dms_info("Created writer.")
+
+    def commit(self):
+        """Commit writer changes."""
+        if self.writer is None:
+            return
+        self.writer.commit()
+        self.writer.wait_merging_threads()
+        self.writer = None
+        dms_info("Closed writer.")
+
+    def add_file(self, file: dict):
+        """Add file to index.
+
+        Requiers init call before and after.
+
+        Args:
+            file: file dict
+        """
+
+        if self.writer is None:
+            return
+        flat_file = self._flatten_dict(file)
+        content = flat_file.get("content")
+        unique_pointer = flat_file.get("unique_pointer")
+
+        if content is None:
+            dms_warning("File is missing content.")
+            return
+        if unique_pointer is None:
+            dms_warning("File is missing unique pointer.")
+            return
+
+
+        self.writer.delete_documents("unique_pointer", unique_pointer)
+
+        content_bytes: bytes = base64.b64decode(content)
+        content = content_bytes.decode("utf-8")
+        flat_file["content"] = content
+
+        self.writer.add_json(json.dumps(flat_file))
 
     def add_files(self, files: list) -> None:
         """Add a list of files to the index.

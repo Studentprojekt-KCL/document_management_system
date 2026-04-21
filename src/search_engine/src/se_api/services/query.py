@@ -3,10 +3,10 @@
 from json import JSONDecodeError
 from typing import Any
 
-from se_api.services.classifier_cache import ClassifierCache
-from shared_functions.initialisation_tools import read_env_variable
 import httpx
 
+from se_api.services.classifier_cache import ClassifierCache
+from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_error, dms_warning
 
 
@@ -30,6 +30,7 @@ class Query:
         self.cache = ClassifierCache()
            
     async def init(self):
+        """Init query clients"""
         classifications = await self._classifications_call()
         if classifications is None:
             dms_error(f"Failed to grab classification categories from: {self.classifications_url}.")

@@ -50,10 +50,16 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
         self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
 
-    def _get_projects(self) -> dict | list:
+    @staticmethod
+    def _construct_request_headers(bearer_token: str | None = None) -> dict:
+        if isinstance(bearer_token, str):
+            return {"Authorization": f"Bearer {bearer_token}"}
+        return {}
+
+    def _get_projects(self, bearer_token: str | None = None) -> dict | list:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        projects = self._execute_request(url)
+        projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
         self.project_information = {
             str(project.get("id")): {
                 "web_url": project.get("web_url"),
@@ -64,7 +70,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
 
         return projects
 
-    def get_project_ids(self) -> dict[int, str]:
+    def get_project_ids(self, bearer_token: str | None = None) -> dict[int, str]:
         """Retrieve a dictionary of IDs for all available projects.
 
         Returns:
@@ -72,7 +78,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
             Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
         """
         ids: dict[int, str] = {}
-        for project in self._get_projects():
+        for project in self._get_projects(bearer_token):
             last_activity = project.get("last_activity_at")
             if not last_activity:
                 continue  # Entails there was no activity for this project
@@ -89,7 +95,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str) -> str:
+    def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -99,10 +105,11 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         ----
             url: API URL pointing at a specific file.
             file_path: Precise path to file in project.
+            bearer_token: A valid bearer GitLab token or None.
         """
         project_id = self._get_project_id(url)
         if self.project_information is None or project_id not in self.project_information:
-            self._get_projects()
+            self._get_projects(bearer_token)
 
         project_information = self.project_information.get(project_id)  # type: ignore
         if not isinstance(project_information, dict):
@@ -112,7 +119,9 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(self, url: str, include_content: bool = False, include_last_edit_date: bool = True) -> dict:
+    def get_file(
+        self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True
+    ) -> dict:
         """Retrieve information about file.
 
         Args:
@@ -120,17 +129,25 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
             url: The URL should be given formatted like:
               https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
+            bearer_token: A valid bearer GitLab token or None.
 
         """
         file: dict | list = {}
         if include_content:
-            file = self._execute_request(urljoin(url, self.GIT_HEAD))
+            file = self._execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
         else:
-            content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
+            content: dict = self._execute_head_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
+            lower_content = {key.lower(): value for key, value in content.items()}
+            file_name_str = lower_content.get("x-gitlab-file-name")
+            file_path_str = lower_content.get("x-gitlab-file-path")
+            if isinstance(file_name_str, str):
+                file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
+            if isinstance(file_path_str, str):
+                file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
             file = {
-                "file_name": content.get("x-gitlab-file-name"),
-                "size": content.get("x-gitlab-size"),
-                "file_path": content.get("x-gitlab-file-path"),
+                "file_name": file_name_str,
+                "size": lower_content.get("x-gitlab-size"),
+                "file_path": file_path_str,
             }
         if isinstance(file, list):
             file = {}
@@ -148,7 +165,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
-                self.blame_cache[url] = self._execute_request(url)
+                self.blame_cache[url] = self._execute_get_request(url, self._construct_request_headers(bearer_token))
             blame = self.blame_cache.get(url)
             if isinstance(blame, list):
                 base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
@@ -161,7 +178,9 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(self, urls: list, include_content: bool = False, include_last_edit_date: bool = False) -> list:
+    def get_files(
+        self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False
+    ) -> list:
         """Retrieve wanted information about each file in a list of files.
 
         Args:
@@ -170,11 +189,12 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
               https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
             include_last_edit_date: Include last edit date of file.
+            bearer_token: A valid bearer GitLab token or None.
 
         """
         files: list = []
         for url in urls:
-            files.append(self.get_file(url, include_content, include_last_edit_date))
+            files.append(self.get_file(url, bearer_token, include_content, include_last_edit_date))
 
         return files
 
@@ -217,12 +237,12 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
 
         return self._provided_date(subdata)
 
-    def _project_urls(self, subdata: str | None = None) -> tuple[list, str]:
+    def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
         """Retrieve a structure of files to index."""
 
         subdata_date = self._subdata_setup(subdata)
         current_subdata = self.get_project_ids()
-        projects = self._get_projects()
+        projects = self._get_projects(bearer_token)
         new_date = subdata_date
 
         project_data: list[tuple] = []
@@ -244,12 +264,13 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
 
         return project_data, generated_subdata
 
-    def files_to_index(self, subdata: str | None = None) -> dict:
+    def files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> dict:
         """Retrieve a structure of files to index.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
 
         Returns:
         -------
@@ -257,7 +278,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
               <BOOL INDICATIANG IF REINDEX IS NEEED>}
         """
         files_data: list = []
-        pointers_to_projects, generated_subdata = self._project_urls(subdata)
+        pointers_to_projects, generated_subdata = self._project_urls(subdata, bearer_token)
 
         for project_pointers in pointers_to_projects:
             url, project_id = project_pointers
@@ -314,12 +335,13 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
             await output_queue.put(unpacked_content)
             input_queue.task_done()
 
-    async def stream_files_to_index(self, subdata: str | None = None) -> AsyncGenerator[bytes]:
+    async def stream_files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> AsyncGenerator[bytes]:
         """Streaming for files to index.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
         """
         task_queue: asyncio.Queue = asyncio.Queue()
         zip_queue: asyncio.Queue = asyncio.Queue()
@@ -358,19 +380,20 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
                 for file in chunk:
                     yield json.dumps(file).encode("utf-8")
 
-    def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
+    def check_index_needed(self, subdata: str | None, bearer_token: str | None = None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.
 
         Args:
         ----
             subdata: Base64 encoded isostructured timestamp.
+            bearer_token: A valid bearer GitLab token or None.
 
         Returns:
         --------
             Dict structure {"index_needed": <BOOL>}
         """
         provided_date = self._provided_date(subdata)
-        project_ids = self.get_project_ids()
+        project_ids = self.get_project_ids(bearer_token)
 
         for change_time in project_ids.values():
             if not isinstance(change_time, str):
@@ -397,10 +420,10 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
                 dms_error("Gitlab connector could not interpret subdata: %s", subdata)
         return datetime.min.replace(tzinfo=timezone.utc)
 
-    def _execute_request(self, url: str) -> dict | list:
-        """Execute request to supplied URL, JSON content in response expected."""
+    def _execute_get_request(self, url: str, headers: dict) -> dict | list:
+        """Execute GET request to supplied URL, JSON content in response expected."""
         try:
-            response = self.session.get(url, timeout=120)
+            response = self.session.get(url, timeout=120, headers=headers)
             content = response.json()
         except requests.exceptions.JSONDecodeError:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
@@ -410,3 +433,15 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         if response.status_code != 200:  # noqa: PLR2004
             dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
         return content
+
+    def _execute_head_request(self, url: str, headers: dict) -> dict:
+        """Execute HEAD request to supplied URL."""
+        try:
+            content = self.session.head(url, headers=headers)
+            content.raise_for_status()
+        except requests.exceptions.MissingSchema as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except requests.HTTPError:
+            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {content.status_code})")
+            return {}
+        return dict(content.headers)

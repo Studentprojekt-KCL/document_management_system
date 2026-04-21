@@ -111,9 +111,9 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
       <!-- Rerank (similarity) section -->
       <section class="panel-section">
         <p class="section-title">SIMILARITY</p>
-        <div v-if="aiRerankResultsComputed.length" class="meta-cell meta-cell-summary">
+        <div v-if="aiRerankResultsComputed.length">
           <ul>
-            <li v-for="result in aiRerankResultsComputed" :key="result.pointer">
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
               {{ result.rank }}. {{ result.pointer }} Score: {{ result.scorePercent }}
             </li>
           </ul>
@@ -270,6 +270,12 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 .meta-cell-summary {
   grid-column: 1 / -1;
   overflow: hidden;
+}
+
+.meta-cell-rerank {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
 }
 
 .summary-markdown {

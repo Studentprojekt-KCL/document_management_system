@@ -5,56 +5,25 @@
  */
 
 import { ref } from 'vue'
+import { createPkcePair, generateState } from '@/utils/pkce'
+import { FRONTEND_AD_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
 
 const isLoading = ref(false)
-
-/* Keycloak configuration from environment variables. */
-const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
-
-/* Used for getting the token */
-function base64UrlEncode(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
-}
-
-/* SHA-256 hashing function for PKCE challenge generation. */
-async function sha256(input) {
-  const data = new TextEncoder().encode(input)
-  return await crypto.subtle.digest('SHA-256', data)
-}
-
-/* Generates a random string of specified byte length, used for PKCE verifier and state. */
-function randomString(bytesLen = 32) {
-  const bytes = new Uint8Array(bytesLen)
-  crypto.getRandomValues(bytes)
-  return base64UrlEncode(bytes)
-}
-
-/* Creates a PKCE pair (verifier and challenge) for secure OAuth authentication. */
-async function createPkcePair() {
-  const verifier = randomString(64)
-  const challenge = base64UrlEncode(await sha256(verifier))
-  return { verifier, challenge }
-}
 
 /* Initiates the Microsoft Entra ID login flow using PKCE. */
 const handleEntraIdLogin = async () => {
   const { verifier, challenge } = await createPkcePair()
 
-  sessionStorage.setItem('pkce_verifier', verifier)
+  sessionStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
 
-  const state = randomString(32)
-  sessionStorage.setItem('oidc_state', state)
+  const state = generateState()
+  sessionStorage.setItem(SESSION_KEY_OIDC_STATE, state)
 
   const redirectUri = `${window.location.origin}/auth/callback`
 
   const authUrl =
-    `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/auth` +
-    `?client_id=${encodeURIComponent(CLIENT_ID)}` +
+    keycloakAuthUrl() +
+    `?client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
     `&scope=openid` +

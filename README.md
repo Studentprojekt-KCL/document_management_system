@@ -17,7 +17,9 @@ DMS
     │   ├── smb_collector
     │   └── gitlab_collector
     ├── search_engine
-    └── shared_functions
+    ├── shared_functions
+    └── stochastic_analyzer
+    
 ```
 ## Developer instructions
 

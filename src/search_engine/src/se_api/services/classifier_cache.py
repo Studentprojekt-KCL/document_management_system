@@ -21,7 +21,7 @@ class ClassifierCache:
 
     def __init__(self) -> None:
         """Constructor"""
-        cache_directory: str = read_env_variable("SE_API_CACHE_DIRECTORY")
+        cache_directory: str = read_env_variable("SEARCHENG_CACHE_DIRECTORY")
         self.cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
         try:
             with shelve.open(self.cache_file) as f:

@@ -3,29 +3,33 @@
 import re
 from urllib.parse import urljoin
 import base64
+import json
 import io
 from pathlib import Path
 import zipfile
 from typing import Any
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import binascii
+import asyncio
 
 import requests
+import httpx
 
-from shared_functions.variables import PROJECT, SOURCE_FILE
-
+from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_file_resource, determine_file_type
 
 
-class GitLabs:
-    """Gitlabs connector methods."""
+class GitLab:
+    """Gitlab connector methods."""
 
     API_URL: str = "api/v4/"
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
+    NUM_WORKERS: int = 10
     session: requests.Session
     source_system: str
     project_information: dict | None = None
@@ -36,8 +40,8 @@ class GitLabs:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
-        address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
+        address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
@@ -73,40 +77,6 @@ class GitLabs:
 
         return ids
 
-    def get_projects_as_units(self) -> dict:
-        """Retrieve information about available projects."""
-        content = self._get_projects()
-
-        projects: dict = {}
-        for project in content:
-            projects[project.get("web_url")] = {
-                "name": unpack_values(project, ("name",)),
-                "creator": unpack_values(project, ("namespace", "name")),
-                "created_date": unpack_values(project, ("created_at",)),
-                "last_edit_date": unpack_values(project, ("last_activity_at",)),
-                "type": PROJECT,
-            }
-
-        return projects
-
-    def get_files_in_project(self, project_id: int) -> list:
-        """Retrieve URLs for all available files in a project.
-
-        Args:
-        ----
-            project_id: Gitlabs integer value for a specific project.
-        """
-        tree_args: str = f"projects/{project_id}/repository/tree?recursive=true&per_page=1000&pagination=none"
-        url = urljoin(self.base, tree_args)
-        content = self._execute_request(url)
-        base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
-        files: list = []
-        for file in content:
-            if file.get("type") == "tree":
-                continue
-            files.append(urljoin(base_path, file.get("path").replace("/", "%2F")))
-        return files
-
     @staticmethod
     def _get_project_id(url: str) -> None | str:
         """Unsafe parse of API URL to retrieve projectID"""
@@ -120,7 +90,7 @@ class GitLabs:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
-            This URL is not directly retrieved from Gitlabs, but rather synthetically constructed.
+            This URL is not directly retrieved from Gitlab, but rather synthetically constructed.
 
         Args:
         ----
@@ -145,7 +115,7 @@ class GitLabs:
         Args:
         ----
             url: The URL should be given formatted like:
-              https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
+              https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
 
         """
@@ -194,7 +164,7 @@ class GitLabs:
         Args:
         ----
             urls: The URL should be given formatted like:
-              https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
+              https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
             include_last_edit_date: Include last edit date of file.
 
@@ -208,7 +178,6 @@ class GitLabs:
     def _unpack_zip(self, content: bytes, project_id: int) -> list:
         """Unpack .zip content and return a list containing all the files."""
         base_path = urljoin(self.base, f"projects/{project_id}/repository/files/")
-
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
             for file in zip_file.namelist():
@@ -238,49 +207,127 @@ class GitLabs:
 
         return files_data
 
-    def files_to_index(self, subdata: str | None = None) -> dict:
-        """Retrieve a structure of files to index.
+    def _subdata_setup(self, subdata: str | None = None) -> datetime:
+        """Set up subdata, either by parsind data, or if None, return datatime.min data."""
+        if subdata is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
 
-        Args:
-        ----
-            subdata: Data structured: {<Project_ID>: md5(timestamp)} (this data should not be of concern at other layers
-                 of the system, but should always be supplied).
+        return self._provided_date(subdata)
 
-        Returns:
-        -------
-            Dict structure {"subdata": generated_subdata, "files": file_data}, where generated_subdata
-                contains is a base64 encoded string of the following {'project_id': 'unique_version_hash'}
-                (this should always be passed back by client from previous request).
-        """
-        provided_date: datetime = self._provided_date(subdata)
-        files_data: list = []
+    def _project_urls(self, subdata: str | None = None) -> tuple[list, str]:
+        """Retrieve a structure of files to index."""
 
+        subdata_date = self._subdata_setup(subdata)
         current_subdata = self.get_project_ids()
         projects = self._get_projects()
+        new_date = subdata_date
 
-        if subdata is None:
-            latest_update = datetime.min.replace(tzinfo=timezone.utc)
-        else:
-            latest_update = provided_date
-
+        project_data: list[tuple] = []
         for project in projects:
             project_id = project.get("id")
             new_timestamp = current_subdata.get(project_id)
             if not isinstance(new_timestamp, str):
                 continue
             new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object <= provided_date:
+            if new_timestamp_object <= subdata_date:
                 continue
-            latest_update = max(latest_update, new_timestamp_object)
-
+            new_date = max(new_date, new_timestamp_object)
             branch = project.get("default_branch")
-            url = f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads"
+            project_data.append(
+                (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+            )
+
+        generated_subdata = base64.urlsafe_b64encode(new_date.isoformat().encode()).decode()
+
+        return project_data, generated_subdata
+
+    def files_to_index(self, subdata: str | None = None) -> dict:
+        """Retrieve a structure of files to index.
+
+        Args:
+        ----
+            subdata: Base64 encoded isostructured timestamp.
+
+        Returns:
+        -------
+            Dict structure {"subdata": generated_subdata, "files": file_data, "index_needed":
+              <BOOL INDICATIANG IF REINDEX IS NEEED>}
+        """
+        files_data: list = []
+        pointers_to_projects, generated_subdata = self._project_urls(subdata)
+
+        for project_pointers in pointers_to_projects:
+            url, project_id = project_pointers
             content = requests.get(url, timeout=120).content
             files_data.extend(self._unpack_zip(content, project_id))
 
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-
         return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
+
+    async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
+        """Download all artifacts from tast_queue and put in zip_queue."""
+        async with httpx.AsyncClient() as client:
+            while True:
+                task_data = await task_queue.get()
+                if task_data is None:
+                    break
+                url, project_id = task_data
+                async with client.stream("GET", url) as response:
+                    data = await response.aread()
+                    await zip_queue.put({"data": data, "project_id": project_id})
+                task_queue.task_done()
+
+    async def unzip_files(self, input_queue: asyncio.Queue, output_queue: asyncio.Queue) -> None:
+        """Unzip all files in input queue and put content in output queue."""
+        while True:
+            input_content = await input_queue.get()
+            if input_content is None:
+                break
+            content = input_content.get("data")
+            project_id = input_content.get("project_id")
+            unpacked_content = self._unpack_zip(content, project_id)
+            await output_queue.put(unpacked_content)
+            input_queue.task_done()
+
+    async def stream_files_to_index(self, subdata: str | None = None) -> AsyncGenerator[bytes]:
+        """Streaming for files to index.
+
+        Args:
+        ----
+            subdata: Base64 encoded isostructured timestamp.
+        """
+        task_queue: asyncio.Queue = asyncio.Queue()
+        zip_queue: asyncio.Queue = asyncio.Queue()
+        output_queue: asyncio.Queue = asyncio.Queue()
+
+        pointers_to_projects, new_subdata = self._project_urls(subdata)
+        for project_pointers in pointers_to_projects:
+            await task_queue.put(project_pointers)
+
+        download_tasks: list = [asyncio.create_task(self._download_files(task_queue, zip_queue)) for _ in range(self.NUM_WORKERS)]
+        unzip_tasks: list = [asyncio.create_task(self.unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
+
+        async def producer() -> None:
+            """Shutdown signaling to each worker defined in stream_files_to_index."""
+            await task_queue.join()
+            for _ in download_tasks:
+                await task_queue.put(None)
+
+            await zip_queue.join()
+            for _ in unzip_tasks:
+                await zip_queue.put(None)
+
+            await output_queue.put(None)
+
+        asyncio.create_task(producer())
+
+        yield json.dumps({"subdata": new_subdata}).encode("utf-8")
+
+        while True:
+            chunk = await output_queue.get()
+            if chunk is None:
+                break
+            for file in chunk:
+                yield json.dumps(file).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.
@@ -330,7 +377,7 @@ class GitLabs:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}
         except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         if response.status_code != 200:  # noqa: PLR2004
-            dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
+            dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
         return content

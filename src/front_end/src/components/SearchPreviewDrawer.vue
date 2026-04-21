@@ -25,8 +25,16 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
-  useSearchMetadata(props)
+const {
+  previewTitle,
+  previewType,
+  sourceSystem,
+  previewFileDescription,
+  previewCreatedAt,
+  previewSize,
+  previewLink,
+  previewSecurityClass
+} = useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
@@ -70,7 +78,7 @@ const { aiRerankResults, isReranking, rerankError, generateAIRerank } = useAIRer
           </div>
           <div class="meta-cell">
             <span>Format</span>
-            <p><FileType2 :size="13" /> {{ previewType }}</p>
+            <p><FileType2 :size="13" /> {{ previewFileDescription }}</p>
           </div>
           <div class="meta-cell">
             <span>Security Class</span>

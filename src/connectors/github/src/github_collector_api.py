@@ -96,7 +96,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = read_port("GITHUB_CONNECTOR_PORT")
-    host = read_env_variable("GITHUB_CONNECTOR_HOST")
+    port = read_port("CONGITHUB_BIND_PORT")
+    host = read_env_variable("CONGITHUB_BIND_ADDR")
 
     uvicorn.run(api.app, host=host, log_level=api.log_level, port=port)

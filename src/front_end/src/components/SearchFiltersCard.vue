@@ -1,13 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
-import { TYPE_FILTERS } from '@/composables/useSearchMetadata'
-import { useSourceFilters, useSecurityFilters } from '@/composables/useFilters'
+import { useSourceFilters, useDocumentsOnlyFilters, useSecurityFilters } from '@/composables/useFilters'
 
-/* Type filter labels derived from the canonical TYPE_FILTERS map. */
-const typeFilters = Object.keys(TYPE_FILTERS) // WIll be changed soon
 const sourceFilters = useSourceFilters()
+const documentsOnlyFilters = useDocumentsOnlyFilters()
 const securityFilters = useSecurityFilters()
+
+const typeFilters = computed(() =>
+  documentsOnlyFilters.value.map((item) => ({
+    label: `${item.description} (${item.extension.join(', ')})`,
+    value: item.extension.join('|')
+  }))
+)
 
 const props = defineProps({
   selectedFilters: Object
@@ -94,11 +99,11 @@ const clearAllFilters = () => {
         </span>
         <button
           v-for="item in typeFilters"
-          :key="item"
-          :class="['chip', { active: isSelected('type', item) }]"
-          @click="toggleFilter('type', item)"
+          :key="item.value"
+          :class="['chip', { active: isSelected('type', item.value) }]"
+          @click="toggleFilter('type', item.value)"
         >
-          {{ item }}
+          {{ item.label }}
         </button>
       </div>
 

@@ -5,21 +5,21 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
+from gateway.services.classifier import Classifier, LABELS
+from gateway.services.connector import Connector
+from gateway.services.summarizer import Summarizer
+from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
+
 from gateway.schemas import (
-    RerankRequest,
     RankResponse,
-    ScoredPointer,
+    FileMetadata,
     HealthCheck,
     ClassificationResult,
     PointerRequest,
     SummaryResult,
     InputItem,
 )
-from gateway.services.classifier import Classifier, LABELS
-from gateway.services.connector import Connector
-from gateway.services.summarizer import Summarizer
-from gateway.services.ranker import Ranker
-from gateway.services.summarizer_pdf import PdfConverter
 
 from shared_functions.dmis_logger import dms_warning
 
@@ -31,8 +31,8 @@ class Services:
     connector: Connector
     summarizer: Summarizer
     classifier: Classifier
-    ranker: Ranker
     pdf_converter: PdfConverter
+    indexer: Indexer
 
 
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
@@ -71,28 +71,45 @@ def create_router(services: Services, device: str) -> APIRouter:
         return {"status": "active", "model_loaded": True, "device": device}
 
     @router.post("/rerank", response_model=RankResponse)
-    async def rerank_documents(payload: RerankRequest) -> dict:
-        """Endpoint for pointer-based semantic reranking."""
-        reference_items = await services.connector.get_file_contents([payload.reference])
+    async def rerank_documents(payload: PointerRequest) -> dict:
+        """Endpoint for semantic document similarity search using vector retrieval.
+
+        Returns file metadata enriched with similarity scores, ordered by
+        descending similarity.
+        """
+        if len(payload.pointers) != 1:
+            raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
+
+        query_pointer = payload.pointers[0]
+        reference_items = await services.connector.get_file_contents([query_pointer])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
-        compare_items = await services.connector.get_file_contents(payload.pointers)
-        if not compare_items:
-            dms_warning("Failed to retrieve comparison documents from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
-
         query = reference_items[0].content
-        texts = [item.content for item in compare_items]
-        scores = await services.ranker.rank(query, texts)
 
-        scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
-            key=lambda x: x.score,
-            reverse=True,
-        )
-        return {"ranked_results": scored}
+        results = await services.indexer.search_similar(query, limit=6)
+        results = [(p, s) for p, s in results if p != query_pointer][:5]
+        if not results:
+            return {"ranked_results": []}
+
+        # Join scores with connector-provided metadata by unique_pointer.
+        pointer_to_score = dict(results)
+        metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
+
+        enriched = [
+            FileMetadata(**{**meta, "score": pointer_to_score[meta["unique_pointer"]]})
+            for meta in metadata_list
+            if meta.get("unique_pointer") in pointer_to_score
+        ]
+        enriched.sort(key=lambda x: x.score, reverse=True)
+
+        return {"ranked_results": enriched}
+
+    @router.post("/index")
+    async def trigger_index() -> dict:
+        """Trigger document indexing into Qdrant."""
+        return await services.indexer.index(services.connector.url)
 
     @router.post("/classify", response_model=list[ClassificationResult])
     async def classify_endpoint(payload: PointerRequest) -> list[dict]:

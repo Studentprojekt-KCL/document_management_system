@@ -32,19 +32,19 @@ touch .env
 IP_LOG_API=<IP address for log-api container>
 IP_LOG_DB=<IP address for log-database container>
 IP_SEARCH_ENGINE=<IP address for search-engine container>
-IP_DMIS_API=<IP address for dmis-api container>
+IP_DMISAPI=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
-IP_CONNECTOR_GITLABS=<IP address for connector-gitlabs container>
+IP_CONGITLAB=<IP address for connector-gitlab container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
 # log-api
-LOGGER_BIND_ADDRESS=<bind address>
-LOGGER_PORT=<port number>
-LOGGER_DB_HOST=<database host>
-LOGGER_DB_USER=<database username>
-LOGGER_DB_PASS=<database password>
-LOGGER_DB_DATABASE=<database name>
+LOGAPI_BIND_ADDR=<bind address>
+LOGAPI_BIND_PORT=<port number>
+LOGAPI_LOGDB_URL=<database host>
+LOGAPI_LOGDB_USER=<database username>
+LOGAPI_LOGDB_PASSW=<database password>
+LOGAPI_LOGDB_DATABASE=<database name>
 
 # log-database
 MYSQL_DATABASE=<database name>
@@ -53,28 +53,28 @@ MYSQL_PASSWORD=<database password>
 MYSQL_RANDOM_ROOT_PASSWORD=<true or false>
 
 # search-engine
-SE_API_PORT=<port number>
-SE_API_CONNECTOR_ADDRESS=<connector service URL>
-SE_API_HOST=<bind address>
+SEARCHENG_BIND_PORT=<port number>
+DMISAPI_CONGATEWAY_URL=<connector service URL>
+SEARCHENG_BIND_ADDR=<bind address>
 
 # dmis-api
 DMIS_SEARCH_API_URL=<search engine URL>
 
 # front-end
-API_HOST=<API endpoint URL>
-KEYCLOAK_BASE_URL=<keycloak base URL>
-KEYCLOAK_REALM=<keycloak realm>
-KEYCLOAK_CLIENT_ID=<keycloak id>
-API_BASE_URL=<api endpoint>
+FRONTEND_DMISAPI_URL=<API endpoint URL>
+FRONTEND_AD_URL=<keycloak base URL>
+FRONTEND_AD_REALM=<keycloak realm>
+FRONTEND_AD_CLIENT_ID=<keycloak id>
+FRONTEND_DMISAPI_BASE_URL=<api endpoint>
 
-# connector-gitlabs
-GITLAB_CONNECTOR_PORT=<port number>
-GITLAB_ADDRESS=<GitLab instance URL>
-MINIO_ACCESS_ADDRESS=<MinIO access URL>
-MINIO_USERNAME=<username>
-MINIO_PASSWORD=<password>
-GITLAB_CONNECTOR_BIND_ADDR=<bind address>
-GITLAB_SYSTEM_NAME:<system name>
+# connector-gitlab
+CONGITLAB_BIND_PORT=<port number>
+CONGITLAB_GITLAB_URL=<GitLab instance URL>
+CONGITLAB_MINIO_ACCESS_ADDRESS=<MinIO access URL>
+CONGITLAB_MINIO_USERNAME=<username>
+CONGITLAB_MINIO_PASSWORD=<password>
+CONGITLAB_BIND_ADDR=<bind address>
+CONGITLAB_SYSTEM_NAME:<system name>
 
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>
@@ -84,13 +84,13 @@ MINIO_USERNAME=<username>
 MINIO_PASSWORD=<password>
 
 # stochastic-analyzer
-BIND=<bind address>
-PORT=<port number>
-TEI_URL=<rerank endpoint URL>
-CLASSIFIER_URL=<classifier endpoint URL>
-MINISTRAL_URL=<LLM endpoint URL>
-MINISTRAL_MODEL=<model name>
-CONNECTOR_ADDRESS=<connector file endpoint URL>
+STOCHAN_BIND_ADDR=<bind address>
+STOCHAN_BIND_PORT=<port number>
+STOCHAN_TEI_URL=<rerank endpoint URL>
+STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
+STOCHAN_LLM_URL=<LLM endpoint URL>
+STOCHAN_LLM_MODEL=<model name>
+STOCHAN_CONGATEWAY_URL=<connector file endpoint URL>
  ``` 
  
  4. Create .env file for Caddy reverse proxy (HTTPS for front-end container)

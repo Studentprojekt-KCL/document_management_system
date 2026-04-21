@@ -57,7 +57,7 @@ class ServiceConfig:
 
     Attributes:
         classifier_url: URL for the TEI classifier container.
-        ministral: Ministral LLM configuration.
+        any_llm: Ministral LLM configuration.
         connector_url: connector url.
         escalation_threshold: score gap threshold for security-first classification escalation.
         language: language detection configuration.
@@ -67,7 +67,7 @@ class ServiceConfig:
     classifier_url: str
     connector_url: str
     escalation_threshold: float
-    ministral: MinistralConfig
+    any_llm: MinistralConfig
     language: LanguageConfig
     vector: VectorConfig
 
@@ -109,7 +109,7 @@ class APIConfiguration:
 
     def _load_bind(self) -> None:
         """Load bind configuration."""
-        bind: str | None = environ.get("BIND")
+        bind: str | None = environ.get("STOCHAN_BIND_ADDR")
 
         if bind is None:
             dms_error("BIND is not defined.")
@@ -120,7 +120,7 @@ class APIConfiguration:
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
         # Note: This will be migrated to a shared solution
-        port: str | None = environ.get("PORT")
+        port: str | None = environ.get("STOCHAN_BIND_PORT")
 
         if port is None:
             dms_error("PORT is not defined.")
@@ -156,38 +156,42 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
+        # self.services.any_llm = MinistralConfig()
 
         # Load all environment variables
         required_vars = {
-            "CLASSIFIER_URL": read_env_variable("CLASSIFIER_URL"),
-            "MINISTRAL_URL": read_env_variable("MINISTRAL_URL"),
-            "MINISTRAL_MODEL": read_env_variable("MINISTRAL_MODEL"),
-            "MINISTRAL_TIMEOUT": read_env_variable("MINISTRAL_TIMEOUT"),
-            "CONNECTOR_ADDRESS": read_env_variable("CONNECTOR_ADDRESS"),
-            "ESCALATION_THRESHOLD": read_env_variable("ESCALATION_THRESHOLD"),
-            "EMBEDDING_URL": read_env_variable("EMBEDDING_URL"),
-            "QDRANT_URL": read_env_variable("QDRANT_URL"),
-            "SAMPLE_SIZE": read_env_variable("SAMPLE_SIZE"),
-            "SWEDISH_CHAR_THRESHOLD": read_env_variable("SWEDISH_CHAR_THRESHOLD"),
+            "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
+            "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),
+            "STOCHAN_LLM_MODEL": read_env_variable("STOCHAN_LLM_MODEL"),
+            "STOCHAN_LLM_TIMEOUT": read_env_variable("STOCHAN_LLM_TIMEOUT"),
+            "STOCHAN_CONGATEWAY_URL": read_env_variable("STOCHAN_CONGATEWAY_URL"),
+            "STOCHAN_ESCALATION_THRESHOLD": read_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
+            "STOCHAN_EMBEDDING_URL": read_env_variable("STOCHAN_EMBEDDING_URL"),
+            "STOCHAN_QDRANT_URL": read_env_variable("STOCHAN_QDRANT_URL"),
+            "STOCHAN_SAMPLE_SIZE": read_env_variable("STOCHAN_SAMPLE_SIZE"),
+            "STOCHAN_SWEDISH_CHAR_THRESHOLD": read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD"),
         }
 
         if not self._validate_required_env_vars(required_vars):
             return
 
         # Assign service configurations
-        self.services.classifier_url = required_vars["CLASSIFIER_URL"]
-        self.services.connector_url = required_vars["CONNECTOR_ADDRESS"]
-        self.services.escalation_threshold = float(required_vars["ESCALATION_THRESHOLD"])
-        self.services.ministral = MinistralConfig(
-            url=required_vars["MINISTRAL_URL"],
-            model=required_vars["MINISTRAL_MODEL"],
-            timeout=int(required_vars["MINISTRAL_TIMEOUT"]),
+        self.services.classifier_url = required_vars["STOCHAN_CLASSIFIER_URL"]
+        self.services.connector_url = required_vars["STOCHAN_CONGATEWAY_URL"]
+        self.services.escalation_threshold = float(required_vars["STOCHAN_ESCALATION_THRESHOLD"])
+        # self.services.any_llm.url = required_vars["STOCHAN_LLM_URL"]
+        # self.services.any_llm.model = required_vars["STOCHAN_LLM_MODEL"]
+        # self.services.any_llm.timeout = int(required_vars["STOCHAN_LLM_TIMEOUT"])
+        self.services.any_llm = MinistralConfig(
+            url=required_vars["STOCHAN_LLM_URL"],
+            model=required_vars["STOCHAN_LLM_MODEL"],
+            timeout=int(required_vars["STOCHAN_LLM_TIMEOUT"]),
         )
-        self.services.vector.embedding_url = required_vars["EMBEDDING_URL"]
-        self.services.vector.qdrant_url = required_vars["QDRANT_URL"]
+        self.services.vector.embedding_url = required_vars["STOCHAN_EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required_vars["STOCHAN_QDRANT_URL"]
         self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
-        self.services.vector.max_chars = int(environ.get("INDEX_MAX_CHARS", "2000"))
+        self.services.vector.max_chars = int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000"))
         self.services.language = LanguageConfig(
-            sample_size=int(required_vars["SAMPLE_SIZE"]),
-            swedish_char_threshold=int(required_vars["SWEDISH_CHAR_THRESHOLD"]),
+            sample_size=int(required_vars["STOCHAN_SAMPLE_SIZE"]),
+            swedish_char_threshold=int(required_vars["STOCHAN_SWEDISH_CHAR_THRESHOLD"]),
         )

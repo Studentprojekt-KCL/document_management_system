@@ -23,8 +23,8 @@ from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_file_resource, determine_file_type
 
 
-class GitLabs:
-    """Gitlabs connector methods."""
+class GitLab:
+    """Gitlab connector methods."""
 
     API_URL: str = "api/v4/"
     GIT_BLAME: str = "blame?ref=HEAD"
@@ -40,8 +40,8 @@ class GitLabs:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.session()
-        self.source_system = read_env_variable("GITLAB_SYSTEM_NAME")
-        address = read_env_variable("GITLAB_ADDRESS")
+        self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
+        address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
@@ -90,7 +90,7 @@ class GitLabs:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
-            This URL is not directly retrieved from Gitlabs, but rather synthetically constructed.
+            This URL is not directly retrieved from Gitlab, but rather synthetically constructed.
 
         Args:
         ----
@@ -115,7 +115,7 @@ class GitLabs:
         Args:
         ----
             url: The URL should be given formatted like:
-              https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
+              https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
 
         """
@@ -124,11 +124,18 @@ class GitLabs:
             file = self._execute_request(urljoin(url, self.GIT_HEAD))
         else:
             content = self.session.head(urljoin(url, self.GIT_HEAD)).headers
+            file_name_str = content.get("x-gitlab-file-name")
+            file_path_str = content.get("x-gitlab-file-path")
+            if isinstance(file_name_str, str):
+                file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
+            if isinstance(file_path_str, str):
+                file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
             file = {
-                "file_name": content.get("x-gitlab-file-name"),
+                "file_name": file_name_str,
                 "size": content.get("x-gitlab-size"),
-                "file_path": content.get("x-gitlab-file-path"),
+                "file_path": file_path_str,
             }
+
         if isinstance(file, list):
             file = {}
 
@@ -164,7 +171,7 @@ class GitLabs:
         Args:
         ----
             urls: The URL should be given formatted like:
-              https://<GITLABS_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
+              https://<GITLAB_DOMAIN>/api/v4/projects/<PROJECT_ID>/repository/files/<FILE_PATH>
             include_content: Determine if actual file content should be included or not.
             include_last_edit_date: Include last edit date of file.
 
@@ -326,7 +333,8 @@ class GitLabs:
             chunk = await output_queue.get()
             if chunk is None:
                 break
-            yield json.dumps({"data": chunk}).encode("utf-8")
+            for file in chunk:
+                yield json.dumps(file).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.
@@ -376,7 +384,7 @@ class GitLabs:
             dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
             return {}
         except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'GITLAB_ADDRESS'. (From error: {err})")
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         if response.status_code != 200:  # noqa: PLR2004
-            dms_info(f"Request to {url} was made. However, Gitlabs provided a {response.status_code} response.")
+            dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
         return content

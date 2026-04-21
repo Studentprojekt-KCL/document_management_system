@@ -5,7 +5,7 @@
  * @returns {Object|null} The decoded payload, or null if decoding fails.
  */
 
-import { KEYCLOAK_CLIENT_ID, SESSION_KEY_ACCESS_TOKEN } from '@/utils/config'
+import { FRONTEND_AD_CLIENT_ID, SESSION_KEY_ACCESS_TOKEN } from '@/utils/config'
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {
@@ -32,7 +32,7 @@ export function hasRole(role) {
   const payload = decodeJwtPayload(token)
   if (!payload) return false
 
-  const clientRoles = payload?.resource_access?.[KEYCLOAK_CLIENT_ID]?.roles ?? []
+  const clientRoles = payload?.resource_access?.[FRONTEND_AD_CLIENT_ID]?.roles ?? []
   const realmRoles = payload?.realm_access?.roles ?? []
 
   return clientRoles.includes(role) || realmRoles.includes(role)

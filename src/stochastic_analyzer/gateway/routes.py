@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
-from shared_functions.dmis_logger import dms_warning
+from gateway.services.classifier import Classifier, LABELS
+from gateway.services.connector import Connector
+from gateway.services.summarizer import Summarizer
+from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
+
 from gateway.schemas import (
     RankResponse,
     FileMetadata,
@@ -15,11 +20,8 @@ from gateway.schemas import (
     SummaryResult,
     InputItem,
 )
-from gateway.services.classifier import Classifier, LABELS
-from gateway.services.connector import Connector
-from gateway.services.summarizer import Summarizer
-from gateway.services.summarizer_pdf import PdfConverter
-from gateway.services.indexer import Indexer
+
+from shared_functions.dmis_logger import dms_warning
 
 
 @dataclass

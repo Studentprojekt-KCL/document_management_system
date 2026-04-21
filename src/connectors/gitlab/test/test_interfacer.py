@@ -162,7 +162,7 @@ class TestGitLabStreaming(TestCase):
     def test_stream_yields_subdata_then_files(self):
         """First chunk is the subdata header; subsequent chunks are file objects."""
         zip_bytes = _make_zip({"repo-main/src/file.py": "print('hello')"})
-        self.instance._project_urls = lambda _=None: self._PROJECT_URLS_RESULT
+        self.instance._project_urls = lambda *_: self._PROJECT_URLS_RESULT
         with mock.patch("interfacer.httpx.AsyncClient", return_value=_fake_stream_client(zip_bytes)):
             chunks = self._collect(self.instance.stream_files_to_index())
         self.assertIn("subdata", chunks[0])
@@ -172,7 +172,7 @@ class TestGitLabStreaming(TestCase):
 
     def test_stream_filters_old_projects(self):
         """Projects with activity before subdata timestamp produce no file chunks."""
-        self.instance._project_urls = lambda _=None: self._EMPTY_PROJECT_URLS_RESULT
+        self.instance._project_urls = lambda *_: self._EMPTY_PROJECT_URLS_RESULT
         chunks = self._collect(self.instance.stream_files_to_index(subdata=self._SUBDATA_OLD))
         self.assertEqual(len(chunks), 1)
         self.assertIn("subdata", chunks[0])
@@ -181,7 +181,7 @@ class TestGitLabStreaming(TestCase):
         """With shared_client=False workers each create their own client and streaming still works."""
         self.instance.shared_client = False
         zip_bytes = _make_zip({"repo-main/file.py": "x"})
-        self.instance._project_urls = lambda _=None: self._PROJECT_URLS_RESULT
+        self.instance._project_urls = lambda *_: self._PROJECT_URLS_RESULT
         with mock.patch("interfacer.httpx.AsyncClient", return_value=_fake_stream_client(zip_bytes)):
             chunks = self._collect(self.instance.stream_files_to_index())
         self.assertIn("subdata", chunks[0])
@@ -241,7 +241,7 @@ class TestGitLabStreaming(TestCase):
 
     def test_project_urls_called_via_to_thread(self):
         """stream_files_to_index delegates _project_urls to asyncio.to_thread."""
-        self.instance._project_urls = lambda _=None: self._EMPTY_PROJECT_URLS_RESULT
+        self.instance._project_urls = lambda *_: self._EMPTY_PROJECT_URLS_RESULT
 
         async def passthrough(fn, *args):
             return fn(*args)

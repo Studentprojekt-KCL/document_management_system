@@ -9,9 +9,6 @@ from tantivy import (
     SchemaBuilder,
     SearchResult,
     Searcher,
-    TextAnalyzer,
-    TextAnalyzerBuilder,
-    Tokenizer,
 )
 
 from shared_functions.dmis_logger import dms_info, dms_warning
@@ -44,9 +41,6 @@ class SearchEngine:
                 schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
         self.index = Index(schema)
-
-        rag: TextAnalyzer = TextAnalyzerBuilder(Tokenizer.regex(r"([A-Z][a-z][0-9])+")).build()
-        self.index.register_tokenizer("se-rag", rag)
 
     def have_new_category(self, categories: dict) -> bool:
         """Check if there is an apsent category.
@@ -122,7 +116,7 @@ class SearchEngine:
             return
         unique_pointer: str | None = file.get("unique_pointer")
         if unique_pointer is None:
-            dms_warning("File is missing unique pointer.")
+            dms_warning(f"File is missing unique pointer, {unique_pointer}.")
             return
         self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
 

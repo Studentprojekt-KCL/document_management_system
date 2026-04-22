@@ -27,8 +27,7 @@ class Handler:
     query: Query
     search_engine: SearchEngine
 
-    WORKERS: int = 8  # Format and send workers
-    BATCH_SIZE: int = 1000  # How many files to collect before next index.
+    WORKERS: int = 16  # Format and send workers
     indexing: Lock
 
     def __init__(self) -> None:
@@ -173,22 +172,17 @@ class Handler:
         index_queue: queue containing all the ready files to index.
         transfer_queue: queue of raw dicts with file data.
         loop: global event loop.
-
         """
-        to_index: list[dict] = []
+
         while True:
             file: dict | None = await transfer_queue.get()
             if file is None:
                 break
-            flat_file: dict | None = await loop.run_in_executor(None, self._decode, file)
-            if flat_file is not None:
-                to_index.append(flat_file)
-            if len(to_index) >= self.BATCH_SIZE:
-                await loop.run_in_executor(None, index_queue.put, to_index)
-                to_index = []
-
+            flat_file: dict | None = self._decode(file)
+            if flat_file is None:
+                continue
+            await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
-        await loop.run_in_executor(None, index_queue.put, to_index)
 
     def _decode(self, file: dict) -> dict | None:
         """Decode file content.
@@ -215,14 +209,14 @@ class Handler:
         Args:
             task_queue: queue containing all the files to add.
         """
-        while True:
-            files: list[dict] | None = index_queue.get()
-            if files is None:
-                break
-            with self.search_engine:
-                for file in files:
-                    self.search_engine.add_file(file)
-            index_queue.task_done()
+
+        with self.search_engine:
+            while True:
+                file: dict | None = index_queue.get()
+                if file is None:
+                    break
+                self.search_engine.add_file(file)
+                index_queue.task_done()
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

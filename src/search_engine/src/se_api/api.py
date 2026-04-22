@@ -140,7 +140,3 @@ def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     api: API = API()
     api.start()
-
-
-if __name__ == "__main__":
-    run()

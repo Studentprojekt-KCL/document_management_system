@@ -16,8 +16,7 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Error message.
     """
-    # error(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
-    error(f"[{datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}] {msg}")
+    error(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
 
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOGAPI_URL")
@@ -47,7 +46,7 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Warning message.
     """
-    warning(f"[{datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}] {msg}")
+    warning(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOGAPI_URL")
     if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):
@@ -75,7 +74,7 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     ----
         msg: Info message.
     """
-    info(f"[{datetime.now().strftime('%Y-%m-%d:%H:%M:%S')}] {msg}")
+    info(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOGAPI_URL")
     if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):

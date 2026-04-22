@@ -155,12 +155,12 @@ class Handler:
                 continue
             await transfer_queue.put(data)
         self.connector.subdata = subdata
-        dms_info("Finished fetching new files.")
+        dms_info(f"Finished fetching new files, time: {(datetime.now() - start).total_seconds()}s.")
 
         await transfer_queue.join()
         for _ in transfer_tasks:
             await transfer_queue.put(None)
-        dms_info("Formatted and transferred files to indexer.")
+        dms_info(f"Formatted and transferred files to indexer, time: {(datetime.now() - start).total_seconds()}s.")
         await loop.run_in_executor(None, index_queue.join)
         await loop.run_in_executor(None, index_queue.put, None)
         await loop.run_in_executor(None, indexer_thread.join)

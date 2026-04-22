@@ -86,7 +86,9 @@ class API:
 
     def authorize(self, authorization: str | None, host: str | None) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host):  # NOTE; THIS MUST BE REMOVED
+        if (
+            authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
+        ):  # NOTE; THIS MUST BE REMOVED
             return {}
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
@@ -97,7 +99,7 @@ class API:
         )
         return claims
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str) -> JSONResponse:
+    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -106,11 +108,7 @@ class API:
             return JSONResponse(status_code=400)
 
         try:
-            response = await self.http_client.get(
-                url,
-                params=params,
-                headers={"Authorization": authorization}
-            )
+            response = await self.http_client.get(url, params=params, headers={"Authorization": authorization})
             response.raise_for_status()
             response_data = response.json()
         except JSONDecodeError as exc:
@@ -122,7 +120,7 @@ class API:
 
         return JSONResponse(status_code=200, content=response_data)
 
-    async def execute_post_request(self, url: str, request: Request, authorization: str) -> JSONResponse:
+    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -134,12 +132,7 @@ class API:
             return JSONResponse(status_code=400, content={})
 
         try:
-            response = await self.http_client.post(
-                url,
-                params=params,
-                json=body,
-                headers={"Authorization": authorization}
-            )
+            response = await self.http_client.post(url, params=params, json=body, headers={"Authorization": authorization})
             response.raise_for_status()
             response_data = response.json()
         except JSONDecodeError as exc:

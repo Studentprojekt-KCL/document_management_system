@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { useSearchMetadata, resolveFilename } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
 export function useAIRerank(props) {
@@ -19,6 +19,7 @@ export function useAIRerank(props) {
 
       return {
         rank: index + 1,
+        name: resolveFilename(item, index),
         pointer,
         scorePercent
       }

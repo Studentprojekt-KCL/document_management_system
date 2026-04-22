@@ -25,16 +25,8 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const {
-  previewTitle,
-  previewType,
-  sourceSystem,
-  previewFileDescription,
-  previewCreatedAt,
-  previewSize,
-  previewLink,
-  previewSecurityClass
-} = useSearchMetadata(props)
+const { previewTitle, sourceSystem, previewFileDescription, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
+  useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
@@ -59,10 +51,6 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
       <h3 class="preview-title">{{ previewTitle }}</h3>
-
-      <div class="tag-row">
-        <span class="tag">{{ previewType }}</span>
-      </div>
 
       <!-- Technical Metadata section -->
       <section class="panel-section">
@@ -114,7 +102,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
         <div v-if="aiRerankResultsComputed.length">
           <ul>
             <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
-              {{ result.rank }}. {{ result.pointer }} Score: {{ result.scorePercent }}
+              <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
             </li>
           </ul>
         </div>
@@ -211,6 +199,9 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
   margin-top: 2rem;
   text-align: center;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .tag-row {
@@ -276,6 +267,13 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
   grid-column: 1 / -1;
   overflow: hidden;
   margin-bottom: 0.5rem;
+}
+
+.meta-cell-rerank p {
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
 }
 
 .summary-markdown {

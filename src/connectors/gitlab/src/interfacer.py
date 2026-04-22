@@ -37,11 +37,10 @@ class GitLab:
     file_extensions: list = []
     extension_descriptions: dict = {}
 
-    def __init__(self) -> None:
+    def __init__(self, address: str) -> None:
         """Constructor."""
         self.session = requests.session()
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
-        address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
@@ -208,9 +207,8 @@ class GitLab:
                     continue
                 try:
                     file_content = zip_file.read(file).decode("utf-8")
-                except UnicodeDecodeError as err:
+                except UnicodeDecodeError:
                     file_content = ""
-                    dms_info(f"Could not decode file: {file}. {err}")
                 file_name = file_path.name
                 extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
                 files_data.append(

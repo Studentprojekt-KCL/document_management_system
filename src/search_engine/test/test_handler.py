@@ -16,5 +16,3 @@ class TestHandler(TestCase):
             {"category1": "", "metadata": {"category2": ""}, "subcategory": {"subsubcategory": {"category3": "", "category4": ""}}}
         )
         assert result == {"category1": "", "category2": "", "category3": "", "category4": ""}
-
-

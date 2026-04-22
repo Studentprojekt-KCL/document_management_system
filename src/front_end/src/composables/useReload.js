@@ -7,21 +7,21 @@ import { ref, computed } from 'vue'
  */
 export function useReload(key, defaultValue) {
   const stored = localStorage.getItem(key)
-  const internal = ref(stored? JSON.parse(stored) : defaultValue)
+  const internal = ref(stored ? JSON.parse(stored) : defaultValue)
 
   // Load from localStorage on init
   const state = computed({
     get: () => internal.value,
     set: (val) => {
-        internal.value = val
-        localStorage.setItem(key, JSON.stringify(val))
+      internal.value = val
+      localStorage.setItem(key, JSON.stringify(val))
     }
   })
   const clear = () => {
     internal.value = defaultValue
     localStorage.removeItem(key)
   }
-  return {state, clear}
+  return { state, clear }
 }
 // function to clear  search state
 export function clearAllSearchState() {
@@ -31,7 +31,13 @@ export function clearAllSearchState() {
     'selectedFile',
     'selectedMatch',
     'lastQuery',
-    'isPreviewOpen'
+    'isPreviewOpen',
+    // Add AI summary keys
+    'aiSummary',
+    'aiSummaryHtmlRaw',
+    'summaryPointer',
+    'summaryError',
+    'isGeneratingSummary'
   ]
 
   keys.forEach((key) => localStorage.removeItem(key))

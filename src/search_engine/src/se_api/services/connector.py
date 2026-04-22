@@ -22,7 +22,6 @@ class Connector:
 
     TIMEOUT: int = 120
 
-    INDEX_NEEDED_ENDPOINT: str = "/index_needed_bool"
     GET_FILE_ENDPOINT: str = "/get_files"
     STREAM_ENDPOINT: str = "/stream_files_to_index"
 
@@ -65,13 +64,6 @@ class Connector:
         except httpx.HTTPError:
             dms_warning("Failed to connect to connector.")
 
-    async def reindex_needed(self) -> bool:
-        """Check if new reindex is required."""
-        data = await self._get_reindex_needed()
-        if not isinstance(data, dict):
-            return True
-        return data.get("index_needed", True)
-
     async def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.
 
@@ -88,24 +80,6 @@ class Connector:
         if not isinstance(response, list):
             return []
         return response
-
-    async def _get_reindex_needed(self) -> Any:
-        try:
-            response = await self.client.get(
-                self.INDEX_NEEDED_ENDPOINT,
-                timeout=Connector.TIMEOUT,
-                params=[("subdata", self.subdata)] if self.subdata is not None else None,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data
-        except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.INDEX_NEEDED_ENDPOINT}")
-        except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.INDEX_NEEDED_ENDPOINT}.")
-        except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.INDEX_NEEDED_ENDPOINT}.")
-        return None
 
     async def _get_file_from_pointers(self, pointers: list[str]) -> Any | None:
         """Get file from pointer"""

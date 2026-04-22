@@ -104,7 +104,7 @@ class Handler:
             return []
 
         dms_info(f"Preforming search: {request}")
-        if await self.connector.reindex_needed() and not self.indexing.locked():  # This endpoint is approx 3x faster
+        if not self.indexing.locked():  # This endpoint is approx 3x faster
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 

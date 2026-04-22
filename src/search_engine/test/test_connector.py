@@ -17,20 +17,6 @@ class TestConnector(IsolatedAsyncioTestCase):
         self.instance.reset()
         assert self.instance.subdata is None
 
-    # ==== GET_FILE_POINTERS ====
-
-    @mock.patch("se_api.services.connector.Connector._get_reindex_needed")
-    async def test_reindex_needed(self, mock_get):
-        mock_get.return_value = {"index_needed": True}
-        result = await self.instance.reindex_needed()
-        assert result == True
-
-    @mock.patch("se_api.services.connector.Connector._get_reindex_needed")
-    async def test_reindex_not_needed(self, mock_get):
-        mock_get.return_value = {"index_needed": False}
-        result = await self.instance.reindex_needed()
-        assert result == False
-
     # ==== FETCH_FILES_FROM_POINTERS ====
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointers")

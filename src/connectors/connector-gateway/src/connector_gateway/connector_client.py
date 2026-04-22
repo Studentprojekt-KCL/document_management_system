@@ -105,10 +105,16 @@ class ConnectorClient:
             responses = await asyncio.gather(*tasks) 
             return [item for r in responses for item in r.json()]
             
-    async def fetch_start_of_streams(self) -> list[str]: 
+    def fetch_start_of_streams(self) -> list[str]: 
         stream_urls: list[str] = []
         for source_system in self.source_systems:
             proto_host_url = source_system["connector_url"] 
             stream_url = f"{proto_host_url}/stream_files_to_index"
             stream_urls.append(stream_url)
         return stream_urls
+        
+    def get_source_system_names(self) -> list[str]: 
+        names_of_source_systems: list[str] = []
+        for source_system in self.source_systems:
+            names_of_source_systems.append(source_system["name"])
+        return names_of_source_systems

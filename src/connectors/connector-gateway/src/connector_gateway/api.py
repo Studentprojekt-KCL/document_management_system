@@ -46,12 +46,13 @@ class API:
         )
         return files_meta_data
         
-    async def stream_files_to_index(self):
-        stream_urls: list[str] = await self.down_stream_client.fetch_start_of_streams()
+    def stream_files_to_index(self) -> list[str]:
+        stream_urls: list[str] = self.down_stream_client.fetch_start_of_streams()
         return stream_urls
        
-    async def connected_source_systems(self):
-        pass
+    async def connected_source_systems(self) -> list[str]:
+        names_of_source_systems: list[str] = self.down_stream_client.get_source_system_names()
+        return names_of_source_systems
  
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

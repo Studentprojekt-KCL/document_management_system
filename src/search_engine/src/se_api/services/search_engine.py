@@ -1,7 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import json
-from types import TracebackType
 from tantivy import (
     Document,
     Index,
@@ -116,7 +115,7 @@ class SearchEngine:
             return
         unique_pointer: str | None = file.get("unique_pointer")
         if unique_pointer is None:
-            dms_warning(f"File is missing unique pointer, {unique_pointer}.")
+            dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
             return
         self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
 

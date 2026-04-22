@@ -104,7 +104,7 @@ class Handler:
             return []
 
         dms_info(f"Preforming search: {request}")
-        if not self.indexing.locked():  # This endpoint is approx 3x faster
+        if not self.indexing.locked():
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
@@ -210,13 +210,14 @@ class Handler:
             task_queue: queue containing all the files to add.
         """
 
-        with self.search_engine:
-            while True:
-                file: dict | None = index_queue.get()
-                if file is None:
-                    break
-                self.search_engine.add_file(file)
-                index_queue.task_done()
+        self.search_engine.init()
+        while True:
+            file: dict | None = index_queue.get()
+            if file is None:
+                break
+            self.search_engine.add_file(file)
+            index_queue.task_done()
+        self.search_engine.close()
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

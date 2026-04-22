@@ -89,13 +89,13 @@ class SearchEngine:
 
         return pointers
 
-    def __enter__(self) -> None:
+    def init(self) -> None:
         """Init index writer."""
         if self.writer is not None:
             return
         self.writer = self.index.writer()
 
-    def __exit__(self, _exception_type: BaseException, _exception_value: BaseException, _traceback: TracebackType) -> None:
+    def close(self) -> None:
         """Close the writer."""
         if self.writer is None:
             return

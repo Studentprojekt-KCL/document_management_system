@@ -48,16 +48,10 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
+        self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
-        self._client = httpx.Client(
-            headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": read_env_variable("CONGITHUB_GITHUB_API_VERSION"),
-            },
-            timeout=REQUEST_TIMEOUT,
-            cookies=None,
-        )
+        self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
 
     def _get_repos(self, token: str | None = None) -> list:
         """Retrieve all repositories the token can access (user or org)."""
@@ -368,8 +362,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         """Download archive for a repo branch; return file entries or [] on failure."""
         owner, _, name = full_name.partition("/")
         zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
-        headers = {"Authorization": f"Bearer {token}"} if token else None
-        resp = self._client.get(zip_url, headers=headers)
+        resp = self._request(zip_url, token)
         if resp.status_code != HTTP_OK:
             dms_info(f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}.")
             return []
@@ -417,10 +410,19 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
             dms_error("GitHub connector could not interpret subdata: %s", subdata)
             return datetime.min.replace(tzinfo=timezone.utc)
 
+    def _request(self, url: str, token: str | None = None) -> httpx.Response:
+        """Build a clean, stateless GET request — all headers explicit, no cookie carry-over."""
+        headers: dict[str, str] = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": self._api_version,
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return self._client.get(url, headers=headers, cookies={})
+
     def _execute_request(self, url: str, token: str | None = None) -> dict | list:
-        headers = {"Authorization": f"Bearer {token}"} if token else None
         try:
-            response = self._client.get(url, headers=headers)
+            response = self._request(url, token)
             content = response.json()
         except json.JSONDecodeError:
             dms_warning(f"GitHub request to {url} could not be decoded.\nExpected JSON\nGot {response.text[:500]}")

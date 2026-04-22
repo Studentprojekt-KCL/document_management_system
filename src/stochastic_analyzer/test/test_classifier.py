@@ -15,7 +15,6 @@ import httpx
 from gateway.schemas import ClassificationResult, InputItem, MetadataTemplate
 from gateway.services.classifier import LABELS, Classifier
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

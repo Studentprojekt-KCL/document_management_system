@@ -6,19 +6,14 @@
 
 import { computed, ref } from 'vue'
 import { ShieldCheck, Wifi } from 'lucide-vue-next'
+import { authFetch, API_PATHS } from '@/utils/api'
 
-const access_token = sessionStorage.getItem('access_token')
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
 const sources = ref([])
 const connectedSources = ref([])
 
 const fetchSources = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`, {
-      headers: {
-        Authorization: `Bearer ${access_token}`
-      }
-    })
+    const res = await authFetch(API_PATHS.connectedSourceSystems)
 
     if (!res.ok) {
       console.error(`Failed to fetch source systems: ${res.statusText}`)

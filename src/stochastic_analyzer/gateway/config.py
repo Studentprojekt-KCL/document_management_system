@@ -58,8 +58,8 @@ class ServiceConfig:
     Attributes:
         classifier_url: URL for the TEI classifier container.
         any_llm: Ministral LLM configuration.
-        connector_url: connector url.
         escalation_threshold: score gap threshold for security-first classification escalation.
+        language: language detection configuration.
         language: language detection configuration.
         vector: vector search service configuration.
     """
@@ -136,21 +136,6 @@ class APIConfiguration:
 
         self.port = int(port)
 
-    def _validate_required_env_vars(self, required: dict) -> bool:
-        """Validate required environment variables.
-
-        Args:
-            required: Dictionary mapping variable names to their values
-
-        Returns:
-            True if all required variables are present, False otherwise
-        """
-        for var_name, var_value in required.items():
-            if var_value is None:
-                dms_error(f"{var_name} is not defined.")
-                return False
-        return True
-
     def _load_service_config(self) -> None:
         """Load external service configuration."""
         self.device = environ.get("DEVICE", "external")
@@ -171,10 +156,11 @@ class APIConfiguration:
             "STOCHAN_SWEDISH_CHAR_THRESHOLD": read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD"),
         }
 
-        if not self._validate_required_env_vars(required):
-            return
+        for name, value in required.items():
+            if value is None:
+                dms_error(f"{name} is not defined.")
+                return
 
-        # Assign service configurations
         self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
         self.services.connector_url = required["STOCHAN_CONGATEWAY_URL"]
         self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])

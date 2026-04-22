@@ -13,9 +13,9 @@ from gateway.preprompts import (
     SUMMARIZER_SYSTEM_PROMPT,
 )
 from gateway.schemas import InputItem, SummaryResult
+
 from shared_functions.dmis_logger import dms_warning
 
-# Language detection constants
 SWEDISH_CHARS = set("åäö")
 
 

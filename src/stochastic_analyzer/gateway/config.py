@@ -39,12 +39,12 @@ class LanguageConfig:
 
 @dataclass
 class MinistralConfig:
-    """Ministral LLM connection configuration.
+    """Ministral LLM configuration.
 
     Attributes:
         url: URL for the Ministral LLM container.
         model: model identifier for Ministral.
-        timeout: request timeout in seconds.
+        timeout: timeout for Ministral requests.
     """
 
     url: str
@@ -136,16 +136,16 @@ class APIConfiguration:
 
         self.port = int(port)
 
-    def _validate_required_env_vars(self, required_vars: dict) -> bool:
+    def _validate_required_env_vars(self, required: dict) -> bool:
         """Validate required environment variables.
 
         Args:
-            required_vars: Dictionary mapping variable names to their values
+            required: Dictionary mapping variable names to their values
 
         Returns:
             True if all required variables are present, False otherwise
         """
-        for var_name, var_value in required_vars.items():
+        for var_name, var_value in required.items():
             if var_value is None:
                 dms_error(f"{var_name} is not defined.")
                 return False
@@ -158,7 +158,7 @@ class APIConfiguration:
         self.services.vector = VectorConfig()
 
         # Load all environment variables
-        required_vars = {
+        required = {
             "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
             "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),
             "STOCHAN_LLM_MODEL": read_env_variable("STOCHAN_LLM_MODEL"),
@@ -171,23 +171,23 @@ class APIConfiguration:
             "STOCHAN_SWEDISH_CHAR_THRESHOLD": read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD"),
         }
 
-        if not self._validate_required_env_vars(required_vars):
+        if not self._validate_required_env_vars(required):
             return
 
         # Assign service configurations
-        self.services.classifier_url = required_vars["STOCHAN_CLASSIFIER_URL"]
-        self.services.connector_url = required_vars["STOCHAN_CONGATEWAY_URL"]
-        self.services.escalation_threshold = float(required_vars["STOCHAN_ESCALATION_THRESHOLD"])
+        self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
+        self.services.connector_url = required["STOCHAN_CONGATEWAY_URL"]
+        self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])
         self.services.any_llm = MinistralConfig(
-            url=required_vars["STOCHAN_LLM_URL"],
-            model=required_vars["STOCHAN_LLM_MODEL"],
-            timeout=int(required_vars["STOCHAN_LLM_TIMEOUT"]),
+            url=required["STOCHAN_LLM_URL"],
+            model=required["STOCHAN_LLM_MODEL"],
+            timeout=int(required["STOCHAN_LLM_TIMEOUT"]),
         )
-        self.services.vector.embedding_url = required_vars["STOCHAN_EMBEDDING_URL"]
-        self.services.vector.qdrant_url = required_vars["STOCHAN_QDRANT_URL"]
+        self.services.vector.embedding_url = required["STOCHAN_EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required["STOCHAN_QDRANT_URL"]
         self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
         self.services.vector.max_chars = int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000"))
         self.services.language = LanguageConfig(
-            sample_size=int(required_vars["STOCHAN_SAMPLE_SIZE"]),
-            swedish_char_threshold=int(required_vars["STOCHAN_SWEDISH_CHAR_THRESHOLD"]),
+            sample_size=int(required["STOCHAN_SAMPLE_SIZE"]),
+            swedish_char_threshold=int(required["STOCHAN_SWEDISH_CHAR_THRESHOLD"]),
         )

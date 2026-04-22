@@ -296,6 +296,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         while True:
             item = await zip_queue.get()
             if item is None:
+                zip_queue.task_done()
                 break
             data = item.get("data")
             full_name = item.get("full_name")

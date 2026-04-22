@@ -9,7 +9,7 @@
  */
 
 import { computed, ref } from 'vue'
-import { Search as SearchIcon } from 'lucide-vue-next'
+import { Search } from 'lucide-vue-next'
 
 /* Props received from SearchView */
 const props = defineProps({
@@ -40,7 +40,7 @@ const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loadi
 <template>
   <!-- Search Bar Form -->
   <form class="search-input-wrap" @submit.prevent="handleSearch">
-    <SearchIcon class="search-icon" :size="28" />
+    <Search class="search-icon" />
     <input
       v-model="searchQuery"
       class="search-input"
@@ -69,7 +69,9 @@ const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loadi
 
 .search-icon {
   color: #97a3b6;
-  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
 }
 
 .search-input {

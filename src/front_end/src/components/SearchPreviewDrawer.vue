@@ -51,8 +51,7 @@ const {
 } = useSearchMetadata(props)
 
 /* AI */
-const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } =
-  useAISummary(props)
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
 /* State */
 const isEditingClassification = ref(false)
@@ -135,7 +134,10 @@ watch(
     <div class="preview-body">
       <!-- notification -->
       <Transition name="notification-fade">
-        <div v-if="notification.visible" :class="['notification', notification.success ? 'notification-success' : 'notification-error']">
+        <div
+          v-if="notification.visible"
+          :class="['notification', notification.success ? 'notification-success' : 'notification-error']"
+        >
           <CheckCircle v-if="notification.success" :size="16" />
           <AlertCircle v-else :size="16" />
           <span>{{ notification.message }}</span>

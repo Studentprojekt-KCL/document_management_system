@@ -25,13 +25,8 @@ class TokenVerifier:
         """Initialize token verifier with Keycloak settings."""
         self.issuer = issuer.rstrip("/")
         self.jwks_client = PyJWKClient(jwks_url)
-
-        if isinstance(expected_audience, str):
-            self.expected_audience = [expected_audience]
-        else:
-            self.expected_audience = list(expected_audience)
-
-        self.allowed_azp = set(allowed_azp) if allowed_azp is not None else None
+        self.expected_audience = list(expected_audience)
+        self.allowed_azp = set(allowed_azp) if allowed_azp else None
 
     def verify_access_token(
         self,

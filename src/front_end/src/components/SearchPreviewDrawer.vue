@@ -21,13 +21,14 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-vue-next'
+
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
 import { hasRole } from '@/utils/auth'
-import { authFetch, API_PATHS } from '@/utils/api'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
+import { saveClassification } from '@/utils/api'
 
-/* Props received from parent component (SearchView) */
+/* Props */
 const props = defineProps({
   open: { type: Boolean, default: false },
   selectedFile: { type: String, default: '' },
@@ -35,10 +36,9 @@ const props = defineProps({
   matches: { type: Array, default: () => [] }
 })
 
-/* Emit event to parent component to signal closing the preview drawer */
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'update-security'])
 
-/* Use custom composable to extract metadata for the selected file */
+/* Metadata */
 const {
   previewTitle,
   previewFileDescription,
@@ -50,59 +50,70 @@ const {
   uniquePointer
 } = useSearchMetadata(props)
 
-/* AI summary composable */
-const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+/* AI */
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } =
+  useAISummary(props)
 
+/* State */
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
+const localSecurityLevel = ref('')
 
-/* Final value used in UI */
-const currentSecurityLevel = computed(() => previewSecurityClass.value || '')
+/* Sync from metadata */
+watch(
+  () => previewSecurityClass.value,
+  (val) => {
+    localSecurityLevel.value = val || ''
+  },
+  { immediate: true }
+)
+
+/* Computed */
+const currentSecurityLevel = computed(() => localSecurityLevel.value)
 
 /* Permissions */
 const canEdit = computed(() => hasRole('admin'))
 
-/* Status notification — briefly shown after save/cancel to confirm the result */
-const toast = ref({ visible: false, success: true, message: '' })
-let toastTimer = null
+/* notification */
+const notification = ref({ visible: false, success: true, message: '' })
+let notificationTimer = null
 
-const showToast = (success, message) => {
-  if (toastTimer) clearTimeout(toastTimer)
-  toast.value = { visible: true, success, message }
-  toastTimer = setTimeout(() => {
-    toast.value.visible = false
+const showNotification = (success, message) => {
+  if (notificationTimer) clearTimeout(notificationTimer)
+
+  notification.value = { visible: true, success, message }
+
+  notificationTimer = setTimeout(() => {
+    notification.value.visible = false
   }, 4000)
 }
 
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
-    const res = await authFetch(API_PATHS.classification, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        unique_pointer: uniquePointer.value,
-        classification: level
-      })
+    await saveClassification(uniquePointer.value, level)
+    emit('update-security', {
+      uniquePointer: uniquePointer.value,
+      level
     })
 
-    if (!res.ok) throw new Error(`Server responded with ${res.status}`)
+    localSecurityLevel.value = level
 
-    showToast(true, 'Security classification updated successfully.')
+    showNotification(true, 'Security classification updated successfully.')
     isEditingClassification.value = false
   } catch (err) {
-    showToast(false, `Update failed: ${err.message}`)
+    showNotification(false, `Update failed: ${err.message}`)
   } finally {
     classificationEditorRef.value?.resetSaving()
   }
 }
 
-/* Reset UI on change */
+/* Reset UI */
 watch(
   () => [props.selectedFile, props.open],
   () => {
     isEditingClassification.value = false
-    toast.value.visible = false
+    notification.value.visible = false
   }
 )
 </script>
@@ -122,12 +133,12 @@ watch(
 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
-      <!-- Toast -->
-      <Transition name="toast-fade">
-        <div v-if="toast.visible" :class="['toast', toast.success ? 'toast-success' : 'toast-error']">
-          <CheckCircle v-if="toast.success" :size="16" />
+      <!-- notification -->
+      <Transition name="notification-fade">
+        <div v-if="notification.visible" :class="['notification', notification.success ? 'notification-success' : 'notification-error']">
+          <CheckCircle v-if="notification.success" :size="16" />
           <AlertCircle v-else :size="16" />
-          <span>{{ toast.message }}</span>
+          <span>{{ notification.message }}</span>
         </div>
       </Transition>
 
@@ -466,7 +477,7 @@ watch(
   border: 1px solid #e5e7eb;
 }
 
-.toast {
+.notification {
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -477,26 +488,26 @@ watch(
   margin-bottom: 0.75rem;
 }
 
-.toast-success {
+.notification-success {
   background: #ecfdf5;
   color: #065f46;
   border: 1px solid #a7f3d0;
 }
-.toast-error {
+.notification-error {
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
 }
 
-.toast-fade-enter-active,
-.toast-fade-leave-active {
+.notification-fade-enter-active,
+.notification-fade-leave-active {
   transition:
     opacity 0.3s ease,
     transform 0.3s ease;
 }
 
-.toast-fade-enter-from,
-.toast-fade-leave-to {
+.notification-fade-enter-from,
+.notification-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
 }

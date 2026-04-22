@@ -37,3 +37,19 @@ export function authFetch(url, options = {}) {
     }
   })
 }
+
+/* send to classification get answer */
+export async function saveClassification(uniquePointer, level) {
+  const res = await authFetch(API_PATHS.classification, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      unique_pointer: uniquePointer,
+      classification: level
+    })
+  })
+
+  if (!res.ok) throw new Error(`Server responded with ${res.status}`)
+
+  return res.json().catch(() => ({}))
+}

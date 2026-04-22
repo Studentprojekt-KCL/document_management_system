@@ -1,21 +1,20 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-import asyncio
-import base64
-import binascii
-import io
-import json
 import re
-import zipfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 from urllib.parse import urljoin
+import base64
+import json
+import io
+from pathlib import Path
+import zipfile
+from typing import Any
+from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
+import binascii
+import asyncio
 
-import httpx
 import requests
+import httpx
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
@@ -24,14 +23,13 @@ from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_file_resource, determine_file_type
 
 
-class GitLab:  # pylint: disable=too-many-instance-attributes
+class GitLab:
     """Gitlab connector methods."""
 
     API_URL: str = "api/v4/"
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     NUM_WORKERS: int = 10
-    REQUEST_TIMEOUT: int = 120
     session: requests.Session
     source_system: str
     project_information: dict | None = None
@@ -45,7 +43,6 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
         address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
-        self.shared_client = read_env_variable("CONGITLAB_SHARED_CLIENT").lower() == "true"
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
         self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
@@ -287,41 +284,18 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
 
         return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
 
-    @asynccontextmanager
-    async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
-        """Yield a shared AsyncClient when CONGITLAB_SHARED_CLIENT=true, else yield None."""
-        if self.shared_client:
-            async with httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=True) as client:
-                yield client
-        else:
-            yield None
-
-    async def _download_files(
-        self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue, client: httpx.AsyncClient | None = None
-    ) -> None:
-        """Download all artifacts from task_queue and put in zip_queue."""
-        owned = client is None
-        if owned:
-            client = httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=True)
-        assert client is not None
-        try:
+    async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
+        """Download all artifacts from tast_queue and put in zip_queue."""
+        async with httpx.AsyncClient() as client:
             while True:
                 task_data = await task_queue.get()
                 if task_data is None:
-                    task_queue.task_done()
                     break
                 url, project_id = task_data
-                try:
-                    async with client.stream("GET", url) as response:
-                        data = await response.aread()
-                        await zip_queue.put({"data": data, "project_id": project_id})
-                except httpx.HTTPError as err:
-                    dms_warning(f"GitLab archive download failed for {project_id}: {err}")
-                finally:
-                    task_queue.task_done()
-        finally:
-            if owned:
-                await client.aclose()
+                async with client.stream("GET", url) as response:
+                    data = await response.aread()
+                    await zip_queue.put({"data": data, "project_id": project_id})
+                task_queue.task_done()
 
     async def unzip_files(self, input_queue: asyncio.Queue, output_queue: asyncio.Queue) -> None:
         """Unzip all files in input queue and put content in output queue."""
@@ -331,7 +305,7 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
                 break
             content = input_content.get("data")
             project_id = input_content.get("project_id")
-            unpacked_content = await asyncio.to_thread(self._unpack_zip, content, project_id)
+            unpacked_content = self._unpack_zip(content, project_id)
             await output_queue.put(unpacked_content)
             input_queue.task_done()
 
@@ -347,38 +321,35 @@ class GitLab:  # pylint: disable=too-many-instance-attributes
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        pointers_to_projects, new_subdata = await asyncio.to_thread(self._project_urls, subdata, bearer_token)
+        pointers_to_projects, new_subdata = self._project_urls(subdata, bearer_token)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 
-        async with self._http_client() as client:  # pylint: disable=contextmanager-generator-missing-cleanup
-            download_tasks: list = [
-                asyncio.create_task(self._download_files(task_queue, zip_queue, client)) for _ in range(self.NUM_WORKERS)
-            ]
-            unzip_tasks: list = [asyncio.create_task(self.unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
+        download_tasks: list = [asyncio.create_task(self._download_files(task_queue, zip_queue)) for _ in range(self.NUM_WORKERS)]
+        unzip_tasks: list = [asyncio.create_task(self.unzip_files(zip_queue, output_queue)) for _ in range(self.NUM_WORKERS)]
 
-            async def producer() -> None:
-                """Shutdown signaling to each worker defined in stream_files_to_index."""
-                await task_queue.join()
-                for _ in download_tasks:
-                    await task_queue.put(None)
+        async def producer() -> None:
+            """Shutdown signaling to each worker defined in stream_files_to_index."""
+            await task_queue.join()
+            for _ in download_tasks:
+                await task_queue.put(None)
 
-                await zip_queue.join()
-                for _ in unzip_tasks:
-                    await zip_queue.put(None)
+            await zip_queue.join()
+            for _ in unzip_tasks:
+                await zip_queue.put(None)
 
-                await output_queue.put(None)
+            await output_queue.put(None)
 
-            asyncio.create_task(producer())
+        asyncio.create_task(producer())
 
-            yield json.dumps({"subdata": new_subdata}).encode("utf-8")
+        yield json.dumps({"subdata": new_subdata}).encode("utf-8")
 
-            while True:
-                chunk = await output_queue.get()
-                if chunk is None:
-                    break
-                for file in chunk:
-                    yield json.dumps(file).encode("utf-8")
+        while True:
+            chunk = await output_queue.get()
+            if chunk is None:
+                break
+            for file in chunk:
+                yield json.dumps(file).encode("utf-8")
 
     def check_index_needed(self, subdata: str | None, bearer_token: str | None = None) -> dict[str, Any]:
         """Simple check if reindex is needed based on subdata.

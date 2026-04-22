@@ -2,12 +2,7 @@ from typing import Any
 import argparse
 
 import uvicorn
-import httpx
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import StreamingResponse
+import fastapi
 
 from connector_client import ConnectorClient
 
@@ -17,24 +12,20 @@ from shared_functions.file_type_logic import get_file_resource, get_documents_on
 class API:
     """Gateway interface for Search engine"""
     
-    app = FastAPI()
+    app = fastapi.FastAPI()
     
     log_level: str | None = None
     
     def __init__(self) -> None:
-        # Clients
         self.down_stream_client = ConnectorClient()
-        # self.gitHubClient = GithubClient()
-        # self.smbClient = SmbClient()
         
         # Endpints 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        # self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        # self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
-        # self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         
-    async def get_files(
-        self, file_pointers: dict[str, list], 
+    async def get_files(self, 
+        file_pointers: dict[str, list], 
         include_content: bool = False, 
         include_last_edit_date: bool = True
     ) -> Any:
@@ -48,16 +39,19 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        print(include_content)
-        print(include_last_edit_date)
-        
         files_meta_data = await self.down_stream_client.fetch_files_metadata(
             file_pointers["file_pointers"], 
             include_content,
             include_last_edit_date
         )
-        print(files_meta_data)
         return files_meta_data
+        
+    async def stream_files_to_index(self):
+        stream_urls: list[str] = await self.down_stream_client.fetch_start_of_streams()
+        return stream_urls
+       
+    async def connected_source_systems(self):
+        pass
  
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

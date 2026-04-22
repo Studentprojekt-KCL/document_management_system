@@ -20,9 +20,17 @@ class ConnectorClient:
                 "name":"Gitlab", 
                 "connector_url":"http://connector-gitlab.dev.dms-lookup.com", 
                 "source_system_url":"https://gitlab.dms-lookup.com"
+            },
+            {
+                "name":"Github", 
+                "connector_url":"http://connector-github.dev.dms-lookup.com",
+                "source_system_url":"https://github.com"
+            },
+            {
+                "name":"Confluence", 
+                "connector_url": "http://connector-confluence.dev.dms-lookup.com",
+                "source_system_url":"https://confluence.com"
             }
-            # {"name":"Github", "connector_url":"http://connector-github.dev.dms-lookup.com"},
-            # {"name":"Confluence", "connector_url": "http://connector-confluence.dev.dms-lookup.com"}
         ]
         self.subdata = None
         if self.source_systems == [{}]:
@@ -77,7 +85,6 @@ class ConnectorClient:
         include_content, 
         include_last_edit_date 
     ) -> Any | None:
-        
         # Get hostnames for connectors according to pointers
         source_system_host_list = []
         for grouped_pointers in sorted_pointers:
@@ -97,3 +104,11 @@ class ConnectorClient:
             ) for grouped_pointers in sorted_pointers]
             responses = await asyncio.gather(*tasks) 
             return [item for r in responses for item in r.json()]
+            
+    async def fetch_start_of_streams(self) -> list[str]: 
+        stream_urls: list[str] = []
+        for source_system in self.source_systems:
+            proto_host_url = source_system["connector_url"] 
+            stream_url = f"{proto_host_url}/stream_files_to_index"
+            stream_urls.append(stream_url)
+        return stream_urls

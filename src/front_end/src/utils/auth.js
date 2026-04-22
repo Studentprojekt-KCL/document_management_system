@@ -114,6 +114,7 @@ export function logout() {
   localStorage.removeItem(SESSION_KEY_OIDC_STATE)
 
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
+  // clears search State
   clearAllSearchState()
 
   if (idToken) {

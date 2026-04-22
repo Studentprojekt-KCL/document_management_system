@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, computed } from 'vue'
 
 /**
  * Persist a reactive state in localStorage and restore on reload.
@@ -6,37 +6,24 @@ import { ref, watch } from 'vue'
  * @param {*} defaultValue - initial value if nothing in localStorage
  */
 export function useReload(key, defaultValue) {
-  const state = ref(defaultValue)
+  const stored = localStorage.getItem(key)
+  const internal = ref(stored? JSON.parse(stored) : defaultValue)
 
   // Load from localStorage on init
-  try {
-    const stored = localStorage.getItem(key)
-    if (stored) state.value = JSON.parse(stored)
-  } catch (err) {
-    console.warn(`Failed to load ${key} from localStorage:`, err)
-  }
-
-  // Saves to localStorage whenever it changes
-  watch(
-    state,
-    (val) => {
-      try {
+  const state = computed({
+    get: () => internal.value,
+    set: (val) => {
+        internal.value = val
         localStorage.setItem(key, JSON.stringify(val))
-      } catch (err) {
-        console.warn(`Failed to save ${key} to localStorage:`, err)
-      }
-    },
-    { deep: true }
-  )
-
+    }
+  })
   const clear = () => {
-    state.value = defaultValue
+    internal.value = defaultValue
     localStorage.removeItem(key)
   }
-
-  return { state, clear }
+  return {state, clear}
 }
-// clears state
+// function to clear  search state
 export function clearAllSearchState() {
   const keys = [
     'searchMatches',
@@ -46,5 +33,6 @@ export function clearAllSearchState() {
     'lastQuery',
     'isPreviewOpen'
   ]
-  keys.forEach(key => localStorage.removeItem(key))
+
+  keys.forEach((key) => localStorage.removeItem(key))
 }

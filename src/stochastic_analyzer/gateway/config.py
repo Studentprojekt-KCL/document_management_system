@@ -57,9 +57,9 @@ class ServiceConfig:
 
     Attributes:
         classifier_url: URL for the TEI classifier container.
+        connector_url: connector url.
+        escalation_threshold: score gap threshold for classification escalation.
         any_llm: Ministral LLM configuration.
-        escalation_threshold: score gap threshold for security-first classification escalation.
-        language: language detection configuration.
         language: language detection configuration.
         vector: vector search service configuration.
     """
@@ -142,7 +142,6 @@ class APIConfiguration:
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
 
-        # Load all environment variables
         required = {
             "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
             "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),

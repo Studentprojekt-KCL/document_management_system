@@ -9,11 +9,9 @@ from gateway.config import LanguageConfig
 from gateway.preprompts import (
     INDIVIDUAL_SUMMARY_PROMPT,
     SYNTHESIS_PROMPT,
-    HEADERS,
     SUMMARIZER_SYSTEM_PROMPT,
 )
 from gateway.schemas import InputItem, SummaryResult
-
 from shared_functions.dmis_logger import dms_warning
 
 SWEDISH_CHARS = set("åäö")
@@ -76,64 +74,43 @@ class Summarizer:
             dms_warning(f"Connection to {self.url} timed out, {err}")
         return None
 
-    def _build_stage1_tasks(
-        self,
-        client: httpx.AsyncClient,
-        items: list[InputItem],
-        language: str,
-        headers: dict,
-    ) -> tuple[list, list[str]]:
-        """Build per-document summarization tasks for Stage 1.
-
-        Args:
-            client: The shared HTTP client.
-            items: List of input documents.
-            language: Detected language string.
-            headers: Localized section headers.
-
-        Returns:
-            A tuple of (coroutine tasks, document name list).
-        """
-        tasks = []
-        doc_names = []
-        for i, item in enumerate(items, 1):
-            name = item.metadata.name or f"Document {i}"
-            doc_names.append(name)
-            prompt = INDIVIDUAL_SUMMARY_PROMPT.format(
-                doc_name=name,
-                content=item.content,
-                language=language,
-                highlights_header=headers["highlights"],
-                summary_header=headers["summary"],
-            )
-            tasks.append(self._call_llm(client, prompt))
-        return tasks, doc_names
-
-    async def summarize(self, items: list[InputItem]) -> SummaryResult | None:
-        """Synthesize multiple documents into a single summary via a two-stage approach."""
-
-        # Detect language per document and take the majority vote
-        detected_languages = [
+    def _detect_majority_language(self, items: list[InputItem]) -> str:
+        """Detect the majority language across all documents."""
+        swedish_count = sum(
             detect_language(
                 item.content,
                 self.lang_config.sample_size,
                 self.lang_config.swedish_char_threshold,
             )
+            == "swedish"
             for item in items
-        ]
-        swedish_count = detected_languages.count("swedish")
-        language = "swedish" if swedish_count > len(detected_languages) / 2 else "english"
-        headers = HEADERS[language]
+        )
+        return "swedish" if swedish_count > len(items) / 2 else "english"
+
+    async def summarize(self, items: list[InputItem]) -> SummaryResult | None:
+        """Synthesize multiple documents into a single summary via a two-stage approach."""
+
+        language = self._detect_majority_language(items)
 
         async with httpx.AsyncClient() as client:
             # Stage 1: Summarize each document individually (in parallel)
-            tasks, doc_names = self._build_stage1_tasks(client, items, language, headers)
+            tasks = []
+            doc_names = []
+            for i, item in enumerate(items, 1):
+                name = item.metadata.name or f"Document {i}"
+                doc_names.append(name)
+                prompt = INDIVIDUAL_SUMMARY_PROMPT[language].format(
+                    doc_name=name,
+                    content=item.content,
+                )
+                tasks.append(self._call_llm(client, prompt))
             individual_summaries = await asyncio.gather(*tasks)
 
             # Build context from successful summaries only
-            per_doc_blocks = [
-                f"--- {name} ---\n{summary}" for name, summary in zip(doc_names, individual_summaries, strict=True) if summary
-            ]
+            per_doc_blocks = []
+            for name, summary in zip(doc_names, individual_summaries, strict=True):
+                if summary:
+                    per_doc_blocks.append(f"--- {name} ---\n{summary}")
 
             if not per_doc_blocks:
                 return None
@@ -144,12 +121,9 @@ class Summarizer:
 
             # Stage 2: Synthesize individual summaries into a final output
             combined = "\n\n".join(per_doc_blocks)
-            prompt = SYNTHESIS_PROMPT.format(
+            prompt = SYNTHESIS_PROMPT[language].format(
                 doc_count=len(per_doc_blocks),
                 combined_summaries=combined,
-                language=language,
-                highlights_header=headers["highlights"],
-                summary_header=headers["summary"],
             )
             result = await self._call_llm(client, prompt)
 

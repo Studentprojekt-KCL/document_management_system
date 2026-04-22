@@ -17,7 +17,6 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
         msg: Error message.
     """
     error(f"[{datetime.now().strftime("%Y-%m-%d:%H:%M:%S")}] {msg}")
-
     timestamp: datetime = datetime.now()
     log_service = os.environ.get("LOGAPI_URL")
     if not isinstance(log_service, str) and not os.environ.get("SERVICE_NOT_SET_SENT"):

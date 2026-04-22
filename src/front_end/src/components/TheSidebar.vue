@@ -19,7 +19,7 @@ const router = useRouter()
 const route = useRoute()
 
 /* State for sidebar collapse/expand */
-const isOpen = ref(true)
+const isOpen = ref(false)
 
 /* Define all possible menu items with their respective icons and paths */
 const menuItems = [

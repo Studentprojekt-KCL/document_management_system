@@ -2,28 +2,53 @@
 
 from typing import Any
 
-from dmis_logger import dms_warning
-from requests import exceptions, post
-from initialisation_tools import read_env_variable
+from requests import exceptions, get, post
 from se_api.services.classifier_cache import ClassifierCache
+from shared_functions.initialisation_tools import read_env_variable
+
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class Query:
     """Class handling query connections."""
 
     classify_url: str
+    classifications_url: str
     cache: ClassifierCache
+    classifications: list[str]
 
     def __init__(self) -> None:
         """Constructor."""
-        address: str = read_env_variable("SE_API_QUERY_ADDRESS")
+        address: str = read_env_variable("SEARCHENG_STOCHAN_URL")
 
         self.classify_url = address.rstrip("/") + "/classify"
+        self.classifications_url = address.rstrip("/") + "/classifications"
         self.cache = ClassifierCache()
+        classifications = self._classifications_call()
+        if classifications is None:
+            dms_error(f"Failed to grab classification categories from: {self.classifications_url}.")
+            return
+        self.classifications = classifications
+
+    def reset(self) -> None:
+        """Reset query service"""
+        self.cache.delete_cache_file()
 
     async def close(self) -> None:
         """Clean up"""
         await self.cache.close()
+
+    def set_classification(self, pointer: str, classification: str) -> dict | None:
+        """Set classification of a file.
+
+        Args:
+            pointer: file unique pointer.
+            classification: new classification
+        Return: None on failure otherwise CacheModel
+        """
+        if classification in self.classifications:
+            return self.cache.set_classification(pointer, classification)
+        return None
 
     def classify(self, files: list[dict]) -> dict[str, str]:
         """Classify the files at the pointers.
@@ -53,7 +78,7 @@ class Query:
         if not not_cached:
             return classifications
 
-        response: Any | None = self._get_classification(not_cached)
+        response: Any | None = self._classify_call(not_cached)
 
         if not isinstance(response, list):
             dms_warning("Returned invalid response from classifier, expected list.")
@@ -73,7 +98,7 @@ class Query:
 
         return classifications
 
-    def _get_classification(self, pointers: list[str]) -> Any | None:
+    def _classify_call(self, pointers: list[str]) -> Any | None:
         """Grab the classification from the classifier.
 
         Args:
@@ -82,6 +107,22 @@ class Query:
         """
         try:
             response = post(self.classify_url, json={"pointers": pointers}, timeout=120).json()
+            return response
+        except exceptions.ConnectionError:
+            dms_warning(f"Failed to connect, url: {self.classify_url}.")
+        except exceptions.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.classify_url}.")
+        except exceptions.Timeout:
+            dms_warning(f"Request timed out, url: {self.classify_url}")
+        except exceptions.JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.classify_url}.")
+        except exceptions.RequestException:
+            dms_warning(f"Something went wrong, url: {self.classify_url}.")
+        return None
+
+    def _classifications_call(self) -> list[str] | None:
+        try:
+            response = get(self.classifications_url, timeout=120).json()
             return response
         except exceptions.ConnectionError:
             dms_warning(f"Failed to connect, url: {self.classify_url}.")

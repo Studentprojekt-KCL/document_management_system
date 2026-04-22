@@ -25,7 +25,7 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 /* Custom composable to normalize matches, resolve match dates, and resolve sources for display */
-const { normalizeMatches, resolveDateOnly, resolveSource, resolveSecurityClass } = useSearchMetadata(props)
+const { normalizeMatches, resolveDateOnly, resolveSource, resolveDocumentType, resolveSecurityClass } = useSearchMetadata(props)
 
 /* Computed property to normalize matches for consistent display */
 const normalizedMatches = computed(() => normalizeMatches(props.matches))
@@ -55,7 +55,7 @@ const resultsLabel = computed(() => {
               <h3 class="result-title">{{ item.title }}</h3>
 
               <div class="meta-row">
-                <span><FileText :size="13" /> {{ item.type }}</span>
+                <span><FileText :size="13" /> {{ resolveDocumentType(item.rawMatch) }}</span>
                 <span><Calendar :size="13" /> {{ resolveDateOnly(item.rawMatch) }}</span>
                 <span><ExternalLink :size="13" /> {{ resolveSource(item.rawMatch) }}</span>
               </div>

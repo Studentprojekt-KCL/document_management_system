@@ -11,7 +11,12 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from gateway.config import APIConfiguration
-from gateway.routes import create_router
+from gateway.routes import Services, create_router
+from gateway.services.classifier import Classifier
+from gateway.services.connector import Connector
+from gateway.services.summarizer import Summarizer
+from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
 
 
 class API:
@@ -36,12 +41,37 @@ class API:
 
         self.app = FastAPI(title="stochastic analyzer gateway", version="1.0.0")
 
-        self.app.include_router(create_router(self.config))
+        services = Services(
+            connector=Connector(url=self.config.services.connector_url),
+            summarizer=Summarizer(
+                url=self.config.services.any_llm.url,
+                model=self.config.services.any_llm.model,
+                timeout=self.config.services.any_llm.timeout,
+            ),
+            classifier=Classifier(
+                url=self.config.services.classifier_url,
+                escalation_threshold=self.config.services.escalation_threshold,
+            ),
+            pdf_converter=PdfConverter(),
+            indexer=Indexer(
+                embedding_url=self.config.services.vector.embedding_url,
+                qdrant_url=self.config.services.vector.qdrant_url,
+                batch_size=self.config.services.vector.batch_size,
+                max_chars=self.config.services.vector.max_chars,
+            ),
+        )
+
+        self.app.include_router(create_router(services, self.config.device))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     def start(self) -> None:
         """Start the API."""
-        uvicorn.run(self.app, host=self.config.bind, port=self.config.port, log_level=self.config.log_level)
+        uvicorn.run(
+            self.app,
+            host=self.config.bind,
+            port=self.config.port,
+            log_level=self.config.log_level,
+        )
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""

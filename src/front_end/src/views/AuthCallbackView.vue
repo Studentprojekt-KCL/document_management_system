@@ -5,11 +5,15 @@
  */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-
-/* Keycloak attributes */
-const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+import {
+  FRONTEND_AD_CLIENT_ID,
+  keycloakTokenUrl,
+  SESSION_KEY_ACCESS_TOKEN,
+  SESSION_KEY_ID_TOKEN,
+  SESSION_KEY_PKCE_VERIFIER,
+  SESSION_KEY_OIDC_STATE,
+  SESSION_KEY_REFRESH_TOKEN
+} from '@/utils/config'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,6 +24,8 @@ const errorMsg = ref('')
  * Different errors can occur during the authentication process.
  */
 onMounted(async () => {
+  let alreadyProcessed = false
+
   if (route.query.error) {
     errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`
     return
@@ -28,38 +34,43 @@ onMounted(async () => {
   /* Authorization code returned by Keycloak */
   const code = route.query.code
   const returnedState = route.query.state
+
   if (!code) {
-    errorMsg.value = 'No authorization code found in callback URL.'
+    errorMsg.value = 'No authorization code found.'
     return
   }
 
   /* Check state to prevent CSRF attacks */
-  const expectedState = sessionStorage.getItem('oidc_state')
+  const expectedState = localStorage.getItem(SESSION_KEY_OIDC_STATE)
   if (expectedState && returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
     return
   }
 
   /* Verifier that is exchanged for tokens */
-  const verifier = sessionStorage.getItem('pkce_verifier')
+  const verifier = localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
     return
   }
+
+  /** check to make sureo only happens one tab */
+  if (alreadyProcessed) return
+  alreadyProcessed = true
+
   /* Redirection URL */
+  /** token exchange */
   const redirectUri = `${window.location.origin}/auth/callback`
-  /* API address to get tokens */
-  const tokenUrl = `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/token`
 
   try {
     const body = new URLSearchParams()
     body.set('grant_type', 'authorization_code')
-    body.set('client_id', CLIENT_ID)
+    body.set('client_id', FRONTEND_AD_CLIENT_ID)
     body.set('code', String(code))
     body.set('redirect_uri', redirectUri)
     body.set('code_verifier', verifier)
 
-    const resp = await fetch(tokenUrl, {
+    const resp = await fetch(keycloakTokenUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
@@ -69,17 +80,18 @@ onMounted(async () => {
     const data = await resp.json()
 
     if (!resp.ok) {
-      errorMsg.value = `Token exchange failed: ${data.error || resp.status} ${data.error_description || ''}`
+      errorMsg.value = `Token exchange failed: ${data.error}`
       return
     }
 
     /* Store token(s) and data in sessionStorage */
-    if (data.access_token) sessionStorage.setItem('access_token', data.access_token)
-    if (data.id_token) sessionStorage.setItem('id_token', data.id_token)
+    if (data.access_token) localStorage.setItem(SESSION_KEY_ACCESS_TOKEN, data.access_token)
+    if (data.id_token) localStorage.setItem(SESSION_KEY_ID_TOKEN, data.id_token)
+    if (data.refresh_token) localStorage.setItem(SESSION_KEY_REFRESH_TOKEN, data.refresh_token)
 
     /* Cleanup old items */
-    sessionStorage.removeItem('pkce_verifier')
-    sessionStorage.removeItem('oidc_state')
+    localStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+    localStorage.removeItem(SESSION_KEY_OIDC_STATE)
 
     router.replace('/search')
   } catch (e) {
@@ -94,7 +106,6 @@ onMounted(async () => {
     <p class="error-message" v-if="errorMsg"><b>Error:</b> {{ errorMsg }}</p>
   </section>
 </template>
-
 <style scoped>
 .auth-callback-view {
   padding: 2rem;

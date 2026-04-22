@@ -10,34 +10,11 @@
  */
 
 import { Bell, LogOut } from 'lucide-vue-next'
+import { logout } from '@/utils/auth'
 
-/* Keycloak attributes */
-const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
-
-/* Handles user logout by clearing session storage and redirecting to login page. */
+/* Handles user logout by clearing local storage and redirecting to login page. */
 const handleLogout = () => {
-  const idToken = sessionStorage.getItem('id_token')
-  const postLogoutRedirectUri = `${window.location.origin}/`
-
-  sessionStorage.removeItem('access_token')
-  sessionStorage.removeItem('id_token')
-  sessionStorage.removeItem('pkce_verifier')
-  sessionStorage.removeItem('oidc_state')
-
-  localStorage.setItem('logout-event', Date.now().toString())
-
-  if (idToken) {
-    const logoutUrl =
-      `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
-      `?id_token_hint=${encodeURIComponent(idToken)}` +
-      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-      `&client_id=${encodeURIComponent(CLIENT_ID)}`
-
-    window.location.assign(logoutUrl)
-    return
-  }
+  logout()
 }
 </script>
 

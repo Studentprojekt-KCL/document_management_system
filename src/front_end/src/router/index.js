@@ -23,6 +23,7 @@ import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { hasRole } from '@/utils/auth'
+import { SESSION_KEY_ACCESS_TOKEN, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
 
 const routes = [
   /* Public */
@@ -121,13 +122,13 @@ const router = createRouter({
 
 /* router guard so that you can't go to protected pages without logging in */
 router.beforeEach((to) => {
-  const token = sessionStorage.getItem('access_token')
+  const token = localStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
   const isAuthed = !!token
 
   if (to.name === 'AuthCallback') {
     const hasCode = typeof to.query?.code === 'string' && to.query.code.length > 0
     const hasError = typeof to.query?.error === 'string' && to.query.error.length > 0
-    const hasPkceVerifier = !!sessionStorage.getItem('pkce_verifier')
+    const hasPkceVerifier = !!localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
 
     if (!hasError && (!hasCode || !hasPkceVerifier)) {
       return { path: '/401' }

@@ -26,13 +26,14 @@ export function useReload(key, defaultValue) {
 // function to clear  search state
 export function clearAllSearchState() {
   const keys = [
+    // search Keys
     'searchMatches',
     'searchAllMatches',
     'selectedFile',
     'selectedMatch',
     'lastQuery',
     'isPreviewOpen',
-    // Add AI summary keys
+    // AI summary keys
     'aiSummary',
     'aiSummaryHtmlRaw',
     'summaryPointer',

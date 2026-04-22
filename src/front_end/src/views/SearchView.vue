@@ -18,16 +18,18 @@ import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
+import { useReload } from '@/composables/useReload'
 
 /* Reactive state variables for search results and UI state */
-const matches = ref([])
-const allMatches = ref([])
-const selectedFile = ref('')
-const selectedMatch = ref(null)
 const error = ref('')
 const isSearching = ref(false)
-const lastQuery = ref('')
-const isPreviewOpen = ref(false)
+/* Persistant across reloads */
+const { state: matches } = useReload('searchMatches', [])
+const { state: allMatches } = useReload('searchAllMatches', [])
+const { state: selectedFile } = useReload('selectedFile', '')
+const { state: selectedMatch } = useReload('selectedMatch', null)
+const { state: lastQuery } = useReload('lastQuery', '')
+const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({

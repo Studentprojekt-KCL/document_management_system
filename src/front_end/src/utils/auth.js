@@ -15,6 +15,7 @@ import {
   SESSION_KEY_OIDC_STATE,
   LOCAL_KEY_LOGOUT_EVENT
 } from '@/utils/config'
+import { clearAllSearchState } from '@/composables/useReload'
 
 /* Read the JSON Web Token */
 function decodeJwtPayload(token) {
@@ -113,6 +114,7 @@ export function logout() {
   localStorage.removeItem(SESSION_KEY_OIDC_STATE)
 
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
+  clearAllSearchState()
 
   if (idToken) {
     const logoutUrl =

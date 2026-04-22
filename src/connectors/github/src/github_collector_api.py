@@ -33,7 +33,6 @@ class API:
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"], deprecated=True)
-        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
@@ -95,10 +94,6 @@ class API:
             self.github_instance.stream_files_to_index(subdata, token),
             media_type="application/octet-stream",
         )
-
-    async def connected_source_systems(self) -> list[str]:
-        """Return the name of the configured GitHub source system."""
-        return [self.github_instance.source_system]
 
 
 def run() -> None:

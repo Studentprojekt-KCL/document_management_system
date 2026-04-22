@@ -69,7 +69,7 @@ class TestGitLab(TestCase):
 
     def test_execute_request(self):
         """Test _execute_request method."""
-        assert self.instance._execute_request(url="") == self.CORRECT_DATA
+        assert self.instance._execute_get_request(url="", headers={}) == self.CORRECT_DATA
 
     def test_check_index_needed_no_sudata(self):
         """Test check_index_needed method without current subdata."""
@@ -90,8 +90,7 @@ class TestGitLab(TestCase):
     def test_get_file(self):
         """Test get_file method."""
         self.instance.source_system = "system"
-        print(self.instance.get_file("test_url", True))
-        assert self.instance.get_file("test_url", True) == {
+        assert self.instance.get_file("test_url", include_content=True) == {
             "unique_pointer": "test_url",
             "name": "test_file.txt",
             "size": 0,

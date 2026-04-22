@@ -31,6 +31,38 @@ export function useSourceFilters() {
 }
 
 /**
+ * Fetches the file types for "documents only" filter
+ *
+ * @returns {Ref<Array<{description: string, extension: string[], type: string}>>}
+ */
+export function useDocumentsOnlyFilters() {
+  const documentsOnlyFilters = ref([])
+
+  authFetch(API_PATHS.documentsOnly)
+    .then((res) => {
+      if (!res.ok) {
+        console.error(`Failed to fetch documents only filters: ${res.statusText}`)
+        return
+      }
+      return res.json()
+    })
+    .then((data) => {
+      if (!Array.isArray(data)) return
+
+      documentsOnlyFilters.value = data
+        .map((item) => ({
+          description: item?.description || '',
+          extension: (item?.extension || []).map((ext) => String(ext)),
+          type: item?.type || ''
+        }))
+        .filter((item) => item.description && item.extension.length > 0)
+    })
+    .catch((error) => console.error(`Error fetching documents only filters: ${error}`))
+
+  return documentsOnlyFilters
+}
+
+/**
  * Fetches the available security classifications.
  *
  * @returns {Ref<string[]>}

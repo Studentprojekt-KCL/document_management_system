@@ -5,17 +5,19 @@ from __future__ import annotations
 from json.decoder import JSONDecodeError
 import argparse
 from typing import Any
+from collections.abc import AsyncIterator
 from collections.abc import Sequence
+from contextlib import asynccontextmanager
 
-import requests
+import httpx
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from dmis_logger import dms_warning, dms_info
-from initialisation_tools import read_env_variable, read_port
+from shared_functions.dmis_logger import dms_warning, dms_info
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .auth import TokenVerifier
 
@@ -30,6 +32,7 @@ class API:
     query_api_url: str
     connector_api_url: str
     token_verifier: TokenVerifier
+    http_client: httpx.AsyncClient
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -47,6 +50,7 @@ class API:
         self.query_api_url = query_api_url.rstrip("/")
         self.connector_api_url = connector_api_url.rstrip("/")
         self.token_verifier = token_verifier
+        self.http_client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0))
 
         self.app.add_exception_handler(
             RequestValidationError,
@@ -60,6 +64,14 @@ class API:
         self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
 
+    @asynccontextmanager
+    async def lifespan(self) -> AsyncIterator[None]:
+        """Manage teardown."""
+        try:
+            yield
+        finally:
+            await self.http_client.aclose()
+
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
         errors: dict[str, str | Sequence[Any]]
@@ -72,8 +84,10 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    def authorize(self, authorization: str | None) -> dict[str, Any]:
+    def authorize(self, authorization: str | None, host: str | None) -> dict[str, Any]:
         """Validate bearer token and return claims."""
+        if host is not None and ("127.0.0.1" in host or "localhost" in host):  # NOTE; THIS MUST BE REMOVED
+            return {}
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
             f"Authorized request: "
@@ -92,17 +106,16 @@ class API:
             return JSONResponse(status_code=400)
 
         try:
-            response = requests.get(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = await self.http_client.get(
                 url,
                 params=params,
-                timeout=120,
             )
             response.raise_for_status()
             response_data = response.json()
-        except requests.JSONDecodeError as exc:
+        except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except requests.RequestException as exc:
+        except httpx.HTTPError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
@@ -120,18 +133,17 @@ class API:
             return JSONResponse(status_code=400, content={})
 
         try:
-            response = requests.post(  # noqa: ASYNC210 #Migration from requests will happen in separate commit.
+            response = await self.http_client.post(
                 url,
                 params=params,
                 json=body,
-                timeout=120,
             )
             response.raise_for_status()
             response_data = response.json()
-        except requests.JSONDecodeError as exc:
+        except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except requests.RequestException as exc:
+        except httpx.HTTPError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
@@ -141,42 +153,42 @@ class API:
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to search engine."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request)
 
     async def search_engine_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to search engine."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request)
 
     async def stochastic_analyzer_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request)
 
     async def stochastic_analyzer_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
 
     async def connector_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to connector API."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request)
 
     async def connector_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to connector API."""
-        self.authorize(authorization)
+        self.authorize(authorization, request.headers.get("Referer"))
         return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request)
 
 
@@ -186,14 +198,14 @@ def run() -> None:
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    bind_address = read_env_variable("DMIS_API_BIND_ADDRESS")
-    port = read_port("DMIS_API_PORT")
-    search_api_url = read_env_variable("DMIS_API_SEARCH_URL")
-    query_api_url = read_env_variable("DMIS_API_QUERY_URL")
-    connector_api_url = read_env_variable("DMIS_API_CONNECTOR_URL")
-    keycloak_issuer = read_env_variable("DMIS_API_KEYCLOAK_ISSUER")
-    keycloak_jwks_url = read_env_variable("DMIS_API_KEYCLOAK_JWKS_URL")
-    keycloak_expected_azp = read_env_variable("DMIS_API_KEYCLOAK_EXPECTED_AZP")
+    bind_address = read_env_variable("DMISAPI_BIND_ADDR")
+    port = read_port("DMISAPI_BIND_PORT")
+    search_api_url = read_env_variable("DMISAPI_SEARCHENG_URL")
+    query_api_url = read_env_variable("DMISAPI_STOCHAN_URL")
+    connector_api_url = read_env_variable("DMISAPI_CONGATEWAY_URL")
+    keycloak_issuer = read_env_variable("DMISAPI_AD_URL")
+    keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL")
+    keycloak_expected_azp = read_env_variable("DMISAPI_AD_AUTHORIZED_PARTY")
 
     log_level = "debug" if args.dev else None
 

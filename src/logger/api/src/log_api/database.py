@@ -7,7 +7,7 @@ from mysql.connector.pooling import PooledMySQLConnection
 from mysql.connector.types import RowItemType, RowType
 from log_api.models import Log
 
-from initialisation_tools import read_env_variable
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class Database:
@@ -19,10 +19,10 @@ class Database:
     database: str
 
     def __init__(self) -> None:
-        self.host = read_env_variable("LOGGER_DB_HOST")
-        self.user = read_env_variable("LOGGER_DB_USER")
-        self.password = read_env_variable("LOGGER_DB_PASS")
-        self.database = read_env_variable("LOGGER_DB_DATABASE")
+        self.host = read_env_variable("LOGAPI_LOGDB_URL")
+        self.user = read_env_variable("LOGAPI_LOGDB_USER")
+        self.password = read_env_variable("LOGAPI_LOGDB_PASSW")
+        self.database = read_env_variable("LOGAPI_LOGDB_DATABASE")
 
     def connect(self) -> PooledMySQLConnection | MySQLConnectionAbstract:
         """Return database connection."""

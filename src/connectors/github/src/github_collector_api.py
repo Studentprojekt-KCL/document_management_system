@@ -16,10 +16,10 @@ from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-
-from boto_tools import upload_file
 from interfacer_github import GitHub
-from initialisation_tools import read_env_variable, read_port
+
+from shared_functions.boto_tools import upload_file
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -96,7 +96,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = read_port("GITHUB_CONNECTOR_PORT")
-    host = read_env_variable("GITHUB_CONNECTOR_HOST")
+    port = read_port("CONGITHUB_BIND_PORT")
+    host = read_env_variable("CONGITHUB_BIND_ADDR")
 
     uvicorn.run(api.app, host=host, log_level=api.log_level, port=port)

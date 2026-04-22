@@ -17,16 +17,16 @@ from urllib.parse import quote, unquote, urljoin
 
 import requests
 
-from variables import SOURCE_FILE
-from unpacker import unpack_values
-from dmis_logger import dms_error, dms_info, dms_warning
-from initialisation_tools import read_env_variable
+from shared_functions.variables import SOURCE_FILE
+from shared_functions.unpacker import unpack_values
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
 
 
 class GitHub:
-    """GitHub connector methods (parity with GitLabs)."""
+    """GitHub connector."""
 
     session: requests.Session
     api_base: str
@@ -36,18 +36,18 @@ class GitHub:
     def __init__(self) -> None:
         """Constructor."""
         self.session = requests.Session()
-        raw = read_env_variable("GITHUB_API_URL")
+        raw = read_env_variable("CONGITHUB_GITHUB_API_URL")
         if not raw:
-            raise ValueError("Missing GITHUB_API_URL")
-        self.source_system = read_env_variable("GITHUB_SYSTEM_NAME")
+            raise ValueError("Missing CONGITHUB_GITHUB_API_URL")
+        self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
-        self.org = os.environ.get("GITHUB_ORG")
+        self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
         self._set_default_headers()
 
     def _set_default_headers(self) -> None:
-        api_version = read_env_variable("GITHUB_API_VERSION")
+        api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github+json",
@@ -225,7 +225,7 @@ class GitHub:
         return base_structure
 
     def _unpack_zip(self, content: bytes, full_name: str, branch: str) -> list:
-        """Unpack GitHub archive zip into the same list shape as GitLabs._unpack_zip."""
+        """Unpack GitHub archive zip into the same list shape as GitLab._unpack_zip."""
         base_pointer_prefix = f"{self.api_base}repos/{full_name}/contents/"
         files_data: list = []
         with zipfile.ZipFile(io.BytesIO(content)) as zip_file:
@@ -274,7 +274,7 @@ class GitHub:
         return self._unpack_zip(resp.content, full_name, branch)
 
     def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
-        """Same contract as GitLabs.files_to_index: {"files", "subdata"}."""
+        """Same contract as GitLab.files_to_index: {"files", "subdata"}."""
         provided_date = self._provided_date(subdata)
         files_data: list = []
         current = self.get_repo_ids(token)
@@ -301,7 +301,7 @@ class GitHub:
         return {"files": files_data, "subdata": generated_subdata}
 
     def pointers_to_all_files_to_index(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
-        """Same contract as GitLabs.pointers_to_all_files_to_index: {"subdata", "file_pointers"}."""
+        """Same contract as GitLab.pointers_to_all_files_to_index: {"subdata", "file_pointers"}."""
         provided_date = self._provided_date(subdata)
         file_pointers: list = []
         repo_ids = self.get_repo_ids(token)

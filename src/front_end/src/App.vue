@@ -4,31 +4,15 @@
  * Handles global layout and synchronization of logout events across tabs.
  */
 
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
-import router from './router'
+import { useAuthSession } from '@/composables/useAuthSession'
 
 /* Determine if the current route is a public or error page. */
 const route = useRoute()
 const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
-
-/* Synchronize logout across multiple tabs for storage events. */
-const syncLogout = (event) => {
-  if (event.key === 'logout-event') {
-    sessionStorage.clear()
-    router.push('/')
-  }
-}
-
-/* Event listeners for storage events to handle logout synchronization. */
-onMounted(() => {
-  window.addEventListener('storage', syncLogout)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('storage', syncLogout)
-})
+useAuthSession()
 </script>
 
 <template>

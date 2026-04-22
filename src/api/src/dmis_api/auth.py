@@ -8,7 +8,7 @@ import jwt
 from fastapi import HTTPException
 from jwt import PyJWKClient
 
-from dmis_logger import dms_info
+from shared_functions.dmis_logger import dms_info
 
 
 class TokenVerifier:

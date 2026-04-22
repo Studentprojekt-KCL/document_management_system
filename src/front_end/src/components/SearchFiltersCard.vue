@@ -1,45 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
+import { useSourceFilters, useDocumentsOnlyFilters, useSecurityFilters } from '@/composables/useFilters'
 
-// Will eventually fetch these filter options from the backend or something??
-const typeFilters = ['PDF (.pdf)', 'Word (.docx)', 'Excel (.xlsx)', 'Text / Markdown (.txt, .md)']
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
-const sourceFilters = ref([])
-const securityFilters = ref([])
+const sourceFilters = useSourceFilters()
+const documentsOnlyFilters = useDocumentsOnlyFilters()
+const securityFilters = useSecurityFilters()
 
-const fetchSourceFilters = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/connector/connected_source_systems`)
-
-    if (!res.ok) {
-      console.error(`Failed to fetch source systems: ${res.statusText}`)
-      return
-    }
-    const data = await res.json()
-    sourceFilters.value = data
-  } catch (error) {
-    console.error(`Error fetching source systems: ${error}`)
-  }
-}
-
-const fetchSecurityFilters = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/stochastic-analyzer/classifications`)
-
-    if (!res.ok) {
-      console.error(`Failed to fetch security classifications: ${res.statusText}`)
-      return
-    }
-    const data = await res.json()
-    securityFilters.value = data
-  } catch (error) {
-    console.error(`Error fetching security classifications: ${error}`)
-  }
-}
-
-fetchSourceFilters()
-fetchSecurityFilters()
+const typeFilters = computed(() =>
+  documentsOnlyFilters.value.map((item) => ({
+    label: `${item.description} (${item.extension.join(', ')})`,
+    value: item.extension.join('|')
+  }))
+)
 
 const props = defineProps({
   selectedFilters: Object
@@ -97,10 +70,6 @@ const clearAllFilters = () => {
 }
 </script>
 
-// This component is a placeholder for the search filters UI. It currently displays static filter options for demonstration
-purposes. // Later on these filter section needs to be more dynamic and interactive, allowing users to select and apply them to
-their search queries.
-
 <template>
   <div class="filters-card">
     <div class="filters-row">
@@ -130,11 +99,11 @@ their search queries.
         </span>
         <button
           v-for="item in typeFilters"
-          :key="item"
-          :class="['chip', { active: isSelected('type', item) }]"
-          @click="toggleFilter('type', item)"
+          :key="item.value"
+          :class="['chip', { active: isSelected('type', item.value) }]"
+          @click="toggleFilter('type', item.value)"
         >
-          {{ item }}
+          {{ item.label }}
         </button>
       </div>
 

@@ -1,31 +1,64 @@
 """Define API and routes."""
 
+from dataclasses import dataclass
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
-from dmis_logger import dms_warning
-from gateway.config import APIConfiguration
+from gateway.services.classifier import Classifier, LABELS
+from gateway.services.connector import Connector
+from gateway.services.summarizer import Summarizer
+from gateway.services.summarizer_pdf import PdfConverter
+from gateway.services.indexer import Indexer
+
 from gateway.schemas import (
-    RerankRequest,
     RankResponse,
-    ScoredPointer,
+    FileMetadata,
     HealthCheck,
     ClassificationResult,
     PointerRequest,
     SummaryResult,
+    InputItem,
 )
-from gateway.services.classifier import classify_documents, LABELS
-from gateway.services.connector import get_file_contents
-from gateway.services.summarizer import summarize_documents
-from gateway.services.ranker import rank_documents
-from gateway.services.summarizer_pdf import md_to_pdf
+
+from shared_functions.dmis_logger import dms_warning
 
 
-def create_router(config: APIConfiguration) -> APIRouter:
-    """Create router with configuration bound via closure.
+@dataclass
+class Services:
+    """Pre-configured service dependencies."""
+
+    connector: Connector
+    summarizer: Summarizer
+    classifier: Classifier
+    pdf_converter: PdfConverter
+    indexer: Indexer
+
+
+async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
+    """Fetch documents from connector or raise 502."""
+    items = await connector.get_file_contents(pointers)
+    if not items:
+        dms_warning("No documents could be retrieved from connector.")
+        raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
+    return items
+
+
+async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> SummaryResult:
+    """Summarize documents or raise 500."""
+    result = await summarizer.summarize(items)
+    if result is None:
+        dms_warning("Summarization returned no result.")
+        raise HTTPException(status_code=500, detail="Summarization failed.")
+    return result
+
+
+def create_router(services: Services, device: str) -> APIRouter:
+    """Create router with pre-constructed service dependencies.
 
     Args:
-        config: API configuration.
+        services: Pre-configured service instances.
+        device: Device identifier for health checks.
 
     Returns:
         Configured APIRouter with all endpoints.
@@ -35,93 +68,74 @@ def create_router(config: APIConfiguration) -> APIRouter:
     @router.get("/health", response_model=HealthCheck)
     async def health_check() -> dict:
         """Health checks."""
-        return {"status": "active", "model_loaded": True, "device": config.device}
+        return {"status": "active", "model_loaded": True, "device": device}
 
     @router.post("/rerank", response_model=RankResponse)
-    async def rerank_documents(payload: RerankRequest) -> dict:
-        """Endpoint for pointer-based semantic reranking."""
-        reference_items = await get_file_contents(config.services.connector_url, [payload.reference])
+    async def rerank_documents(payload: PointerRequest) -> dict:
+        """Endpoint for semantic document similarity search using vector retrieval.
+
+        Returns file metadata enriched with similarity scores, ordered by
+        descending similarity.
+        """
+        if len(payload.pointers) != 1:
+            raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
+
+        query_pointer = payload.pointers[0]
+        reference_items = await services.connector.get_file_contents([query_pointer])
         if not reference_items:
             dms_warning("Failed to retrieve reference document from connector.")
             raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
-        compare_items = await get_file_contents(config.services.connector_url, payload.pointers)
-        if not compare_items:
-            dms_warning("Failed to retrieve comparison documents from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve comparison documents.")
-
         query = reference_items[0].content
-        texts = [item.content for item in compare_items]
-        scores = await rank_documents(query, texts, config.services.tei_url)
 
-        scored = sorted(
-            [ScoredPointer(score=float(s), pointer=p) for s, p in zip(scores, payload.pointers, strict=False)],
-            key=lambda x: x.score,
-            reverse=True,
-        )
+        results = await services.indexer.search_similar(query, limit=6)
+        results = [(p, s) for p, s in results if p != query_pointer][:5]
+        if not results:
+            return {"ranked_results": []}
 
-        return {"ranked_results": scored}
+        # Join scores with connector-provided metadata by unique_pointer.
+        pointer_to_score = dict(results)
+        metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
+
+        enriched = [
+            FileMetadata(**{**meta, "score": pointer_to_score[meta["unique_pointer"]]})
+            for meta in metadata_list
+            if meta.get("unique_pointer") in pointer_to_score
+        ]
+        enriched.sort(key=lambda x: x.score, reverse=True)
+
+        return {"ranked_results": enriched}
+
+    @router.post("/index")
+    async def trigger_index() -> dict:
+        """Trigger document indexing into Qdrant."""
+        return await services.indexer.index(services.connector.url)
 
     @router.post("/classify", response_model=list[ClassificationResult])
     async def classify_endpoint(payload: PointerRequest) -> list[dict]:
         """Endpoint to classify documents via batched NLI inference."""
-        items = await get_file_contents(config.services.connector_url, payload.pointers)
-
-        if not items:
-            dms_warning("No documents could be retrieved from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
-
-        results = await classify_documents(items, config.services.classifier_url, config.services.escalation_threshold)
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        results = await services.classifier.classify(items)
         return [r.model_dump(by_alias=True) for r in results]
 
     @router.post("/summarize", response_model=SummaryResult)
     async def summarize_batch(payload: PointerRequest) -> dict:
         """Endpoint to summarize documents by fetching content via file pointers."""
-        items = await get_file_contents(config.services.connector_url, payload.pointers)
-
-        if not items:
-            dms_warning("No documents could be retrieved from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
-
-        result = await summarize_documents(
-            items,
-            config.services.ministral_url,
-            config.services.ministral_model,
-            config.services.ministral_timeout,
-        )
-
-        if result is None:
-            dms_warning("Summarization returned no result.")
-            raise HTTPException(status_code=500, detail="Summarization failed.")
-
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        result = await _generate_summary(services.summarizer, items)
         return result.model_dump()
 
     @router.get("/classifications")
     def classifications() -> Response:
-        """Enpoint for retrieving existing classifications."""
+        """Endpoint for retrieving existing classifications."""
         return JSONResponse(content=LABELS, status_code=200)
 
     @router.post("/md-to-pdf")
     async def md_pdf_converter(payload: PointerRequest) -> Response:
         """Endpoint to summarize documents and return result as PDF."""
-        items = await get_file_contents(config.services.connector_url, payload.pointers)
-
-        if not items:
-            dms_warning("No documents could be retrieved from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
-
-        result = await summarize_documents(
-            items,
-            config.services.ministral_url,
-            config.services.ministral_model,
-            config.services.ministral_timeout,
-        )
-
-        if result is None:
-            dms_warning("Summarization returned no result.")
-            raise HTTPException(status_code=500, detail="Summarization failed.")
-
-        pdf: bytes = md_to_pdf(result.summary)
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        result = await _generate_summary(services.summarizer, items)
+        pdf: bytes = services.pdf_converter.convert(result.summary)
         return Response(
             content=pdf,
             status_code=200,

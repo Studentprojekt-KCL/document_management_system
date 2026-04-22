@@ -1,38 +1,65 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
-from os import environ
 import argparse
+from os import environ
 
-from dmis_logger import dms_error
-from initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error
+from shared_functions.initialisation_tools import read_env_variable
+
+
+class VectorConfig:
+    """Vector search service configuration.
+
+    Attributes:
+        embedding_url: URL for the TEI embedding container.
+        qdrant_url: URL for the Qdrant vector database.
+        batch_size: Number of documents per batch.
+        max_chars: Maximum characters per documents sent for embedding.
+    """
+
+    embedding_url: str
+    qdrant_url: str
+    batch_size: int
+    max_chars: int
+
+
+class MinistralConfig:
+    """Ministral LLM configuration.
+
+    Attributes:
+        url: URL for the Ministral LLM container.
+        model: model identifier for Ministral.
+        timeout: timeout for Ministral requests.
+    """
+
+    url: str
+    model: str
+    timeout: int
 
 
 class ServiceConfig:
     """External service connection configuration.
 
     Attributes:
-        tei_url: URL for the TEI reranker container.
         classifier_url: URL for the TEI classifier container.
-        ministral_url: URL for the Ministral LLM container.
-        ministral_model: model identifier for Ministral.
-        connector_url: connector url
-        escalation_threshold: score gap threshold for security-first classification escalation.
+        connector_url: connector url.
+        escalation_threshold: score gap threshold for classification escalation.
+        ministral: Ministral LLM configuration.
+        vector: vector search service configuration.
     """
 
-    tei_url: str
     classifier_url: str
-    ministral_url: str
-    ministral_model: str
-    ministral_timeout: int
     connector_url: str
     escalation_threshold: float
+    any_llm: MinistralConfig
+    vector: VectorConfig
 
 
 class APIConfiguration:
     """API Configuration.
 
     Attributes:
-        BIND: which address to bind to.
+        bind: which address to bind to.
         port: port to bind on.
         log_level: log level.
         device: compute device identifier.
@@ -65,7 +92,7 @@ class APIConfiguration:
 
     def _load_bind(self) -> None:
         """Load bind configuration."""
-        bind: str | None = environ.get("BIND")
+        bind: str | None = environ.get("STOCHAN_BIND_ADDR")
 
         if bind is None:
             dms_error("BIND is not defined.")
@@ -76,7 +103,7 @@ class APIConfiguration:
     def _load_port(self) -> None:
         """Load and verify port environment variable."""
         # Note: This will be migrated to a shared solution
-        port: str | None = environ.get("PORT")
+        port: str | None = environ.get("STOCHAN_BIND_PORT")
 
         if port is None:
             dms_error("PORT is not defined.")
@@ -96,43 +123,32 @@ class APIConfiguration:
         """Load external service configuration."""
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
+        self.services.vector = VectorConfig()
+        self.services.any_llm = MinistralConfig()
 
-        tei_url: str | None = read_env_variable("TEI_URL")
-        classifier_url: str | None = read_env_variable("CLASSIFIER_URL")
-        ministral_url: str | None = read_env_variable("MINISTRAL_URL")
-        ministral_model: str | None = read_env_variable("MINISTRAL_MODEL")
-        ministral_timeout: str = read_env_variable("MINISTRAL_TIMEOUT")
-        address: str | None = read_env_variable("CONNECTOR_ADDRESS")
-        escalation_threshold: str = read_env_variable("ESCALATION_THRESHOLD")
+        required = {
+            "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
+            "STOCHAN_LLM_URL": read_env_variable("STOCHAN_LLM_URL"),
+            "STOCHAN_LLM_MODEL": read_env_variable("STOCHAN_LLM_MODEL"),
+            "STOCHAN_LLM_TIMEOUT": read_env_variable("STOCHAN_LLM_TIMEOUT"),
+            "STOCHAN_CONGATEWAY_URL": read_env_variable("STOCHAN_CONGATEWAY_URL"),
+            "STOCHAN_ESCALATION_THRESHOLD": read_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
+            "STOCHAN_EMBEDDING_URL": read_env_variable("STOCHAN_EMBEDDING_URL"),
+            "STOCHAN_QDRANT_URL": read_env_variable("STOCHAN_QDRANT_URL"),
+        }
 
-        if tei_url is None:
-            dms_error("TEI_URL is not defined.")
-            return
+        for name, value in required.items():
+            if value is None:
+                dms_error(f"{name} is not defined.")
+                return
 
-        if classifier_url is None:
-            dms_error("CLASSIFIER_URL is not defined.")
-            return
-
-        if ministral_url is None:
-            dms_error("MINISTRAL_URL is not defined.")
-            return
-
-        if ministral_model is None:
-            dms_error("MINISTRAL_MODEL is not defined.")
-            return
-
-        if address is None:
-            dms_error("CONNECTOR_ADDRESS is not defined.")
-            return
-
-        if escalation_threshold is None:
-            dms_error("ESCALATION_THRESHOLD is not defined.")
-            return
-
-        self.services.tei_url = tei_url
-        self.services.classifier_url = classifier_url
-        self.services.ministral_url = ministral_url
-        self.services.ministral_model = ministral_model
-        self.services.ministral_timeout = int(ministral_timeout)
-        self.services.connector_url = address
-        self.services.escalation_threshold = float(escalation_threshold)
+        self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
+        self.services.connector_url = required["STOCHAN_CONGATEWAY_URL"]
+        self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])
+        self.services.any_llm.url = required["STOCHAN_LLM_URL"]
+        self.services.any_llm.model = required["STOCHAN_LLM_MODEL"]
+        self.services.any_llm.timeout = int(required["STOCHAN_LLM_TIMEOUT"])
+        self.services.vector.embedding_url = required["STOCHAN_EMBEDDING_URL"]
+        self.services.vector.qdrant_url = required["STOCHAN_QDRANT_URL"]
+        self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
+        self.services.vector.max_chars = int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000"))

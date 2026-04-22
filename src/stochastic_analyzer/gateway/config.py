@@ -156,7 +156,6 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
-        # self.services.any_llm = MinistralConfig()
 
         # Load all environment variables
         required_vars = {
@@ -179,14 +178,11 @@ class APIConfiguration:
         self.services.classifier_url = required_vars["STOCHAN_CLASSIFIER_URL"]
         self.services.connector_url = required_vars["STOCHAN_CONGATEWAY_URL"]
         self.services.escalation_threshold = float(required_vars["STOCHAN_ESCALATION_THRESHOLD"])
-        # self.services.any_llm.url = required_vars["STOCHAN_LLM_URL"]
-        # self.services.any_llm.model = required_vars["STOCHAN_LLM_MODEL"]
-        # self.services.any_llm.timeout = int(required_vars["STOCHAN_LLM_TIMEOUT"])
         self.services.any_llm = MinistralConfig(
-            url=required_vars["STOCHAN_LLM_URL"],
-            model=required_vars["STOCHAN_LLM_MODEL"],
-            timeout=int(required_vars["STOCHAN_LLM_TIMEOUT"]),
-        )
+                    url=required_vars["STOCHAN_LLM_URL"],
+                    model=required_vars["STOCHAN_LLM_MODEL"],
+                    timeout=int(required_vars["STOCHAN_LLM_TIMEOUT"]),
+                )
         self.services.vector.embedding_url = required_vars["STOCHAN_EMBEDDING_URL"]
         self.services.vector.qdrant_url = required_vars["STOCHAN_QDRANT_URL"]
         self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))

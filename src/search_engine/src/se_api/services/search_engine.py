@@ -1,8 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import base64
-from datetime import date, datetime
 import json
+from types import TracebackType
 from tantivy import (
     Document,
     Index,
@@ -96,27 +95,20 @@ class SearchEngine:
 
         return pointers
 
-    def init(self) -> None:
+    def __enter__(self) -> SearchEngine:
         """Init index writer."""
         if self.writer is not None:
-            return
+            return self
         self.writer = self.index.writer()
-        dms_info("Created writer.")
+        return self
 
-    def close(self) -> None:
+    def __exit__(self, _exception_type: BaseException, _exception_value: BaseException, _traceback: TracebackType) -> None:
         """Close the writer."""
         if self.writer is None:
             return
-        start = datetime.now()
         self.writer.commit()
         self.writer.wait_merging_threads()
         self.writer = None
-        dms_info(f"Closed writer. {datetime.now() - start}")
-
-    def commit(self) -> None:
-        if self.writer is None:
-            return
-        self.writer.commit()
 
     def add_file(self, file: dict) -> None:
         """Add file to index.
@@ -137,39 +129,6 @@ class SearchEngine:
 
         self.writer.add_json(json.dumps(file))
 
-    # def add_files(self, files: list) -> None:
-    #     """Add a list of files to the index.
-    #
-    #     Args:
-    #         files: list of files.
-    #     """
-    #
-    #     writer: IndexWriter = self.index.writer()
-    #     for file in files:
-    #         flat_file = self._flatten_dict(file)
-    #         content = flat_file.get("content")
-    #         unique_pointer = flat_file.get("unique_pointer")
-    #
-    #         if content is None:
-    #             dms_warning("File is missing content.")
-    #             continue
-    #         if unique_pointer is None:
-    #             dms_warning("File is missing unique pointer.")
-    #             continue
-    #
-    #         writer.delete_documents("unique_pointer", unique_pointer)
-    #
-    #         content_bytes: bytes = base64.b64decode(content)
-    #         content = content_bytes.decode("utf-8")
-    #         flat_file["content"] = content
-    #
-    #         writer.add_json(json.dumps(flat_file))
-    #
-    #     writer.commit()
-    #     writer.wait_merging_threads()
-    #
-    #     self.index.reload()
-
     def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
 
@@ -183,5 +142,3 @@ class SearchEngine:
         writer.wait_merging_threads()
         dms_info(f"Removed {pointer} from index.")
         self.index.reload()
-
-

@@ -27,7 +27,8 @@ class Handler:
     query: Query
     search_engine: SearchEngine
 
-    WORKERS: int = 8
+    WORKERS: int = 8  # Format and send workers
+    BATCH_SIZE: int = 1000  # How many files to collect before next index.
     indexing: Lock
 
     def __init__(self) -> None:
@@ -86,14 +87,14 @@ class Handler:
             self.search_engine.remove_file(match)
             self.query.cache.remove_classification(match)
 
-    async def preform_search(self, request: str, count: int, offset: int) -> list:
+    async def preform_search(self, request: str | None, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
             request: Query to perform.
-
-        Returns:
-            Returns matching files or None.
+            count: how many results.
+            offset: how deep in to grab the results.
+        Returns: matching files or None.
         """
 
         if count <= 0:
@@ -108,6 +109,8 @@ class Handler:
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
+        if request is None:
+            return []
         matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
         files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
@@ -122,6 +125,8 @@ class Handler:
     async def _handle_new(self) -> None:
         """Grab connector stream output and pipe it into search engine."""
         await self.indexing.acquire()
+        dms_info("Starting indexing of new files.")
+        start = datetime.now()
         index_queue: queue.Queue = queue.Queue()
         transfer_queue: Queue = Queue()
 
@@ -136,9 +141,6 @@ class Handler:
 
         transfer_tasks: list = [create_task(self._transfer_file(index_queue, transfer_queue, loop)) for _ in range(self.WORKERS)]
 
-        self.search_engine.init()
-
-        start = datetime.now()
         async for chunk in self.connector.streaming_fetch():
             raw += chunk
             try:
@@ -152,45 +154,55 @@ class Handler:
                 subdata = data.get("subdata")
                 continue
             await transfer_queue.put(data)
-        dms_info(f"Fetch done: {datetime.now() - start}")
         self.connector.subdata = subdata
+        dms_info("Finished fetching new files.")
 
-        
         await transfer_queue.join()
         for _ in transfer_tasks:
             await transfer_queue.put(None)
-        dms_info(f"Transfer to indexer done: {datetime.now() - start}")
+        dms_info("Formatted and transferred files to indexer.")
         await loop.run_in_executor(None, index_queue.join)
         await loop.run_in_executor(None, index_queue.put, None)
         await loop.run_in_executor(None, indexer_thread.join)
-        self.search_engine.close()
-        dms_info(f"Indexer Done: {datetime.now() - start}")
         self.indexing.release()
-        dms_info(f"Total handle time: {datetime.now() - start}")
+        dms_info(f"Finished indexing of new files, time: {(datetime.now() - start).total_seconds()}s.")
 
-    async def _transfer_file(self, index_queue: queue.Queue, transger_queue: Queue, loop: AbstractEventLoop):
+    async def _transfer_file(self, index_queue: queue.Queue, transfer_queue: Queue, loop: AbstractEventLoop) -> None:
+        """Format and transfer file to search engine indexing queue.
+
+        index_queue: queue containing all the ready files to index.
+        transfer_queue: queue of raw dicts with file data.
+        loop: global event loop.
+
+        """
         to_index: list[dict] = []
         while True:
-            file: dict | None = await transger_queue.get()
+            file: dict | None = await transfer_queue.get()
             if file is None:
                 break
             flat_file: dict | None = await loop.run_in_executor(None, self._decode, file)
             if flat_file is not None:
                 to_index.append(flat_file)
-            if len(to_index) >= 1000:
+            if len(to_index) >= self.BATCH_SIZE:
                 await loop.run_in_executor(None, index_queue.put, to_index)
                 to_index = []
 
-            transger_queue.task_done()
+            transfer_queue.task_done()
         await loop.run_in_executor(None, index_queue.put, to_index)
 
     def _decode(self, file: dict) -> dict | None:
+        """Decode file content.
+
+        Args:
+            file: dict containing the content in base64.
+        Returns: dict with decoded file content, or none on failure.
+        """
         flat_file = self._flatten_dict(file)
         content: str | None = flat_file.get("content")
 
         if content is None:
             dms_warning("File is missing content.")
-            return
+            return None
         content_bytes: bytes = base64.b64decode(content)
         content = content_bytes.decode("utf-8")
         flat_file["content"] = content
@@ -207,12 +219,19 @@ class Handler:
             files: list[dict] | None = index_queue.get()
             if files is None:
                 break
-            for file in files:
-                self.search_engine.add_file(file)
-            self.search_engine.commit()
+            with self.search_engine:
+                for file in files:
+                    self.search_engine.add_file(file)
             index_queue.task_done()
 
     def _flatten_dict(self, d: dict) -> dict:
+        """Flatten the dict.
+
+        Args:
+            d: dict to flatten.
+        Return: a flat dict.
+        """
+
         flat: dict = {}
 
         for key, val in d.items():

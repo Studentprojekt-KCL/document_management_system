@@ -54,14 +54,17 @@ class Connector:
 
         Returns: response chunks as an async generator.
         """
-        async with self.client.stream(
-            "GET",
-            self.STREAM_ENDPOINT,
-            timeout=self.TIMEOUT,
-            params=[("subdata", self.subdata)] if self.subdata is not None else None,
-        ) as stream:
-            async for chunk in stream.aiter_text():
-                yield chunk
+        try:
+            async with self.client.stream(
+                "GET",
+                self.STREAM_ENDPOINT,
+                timeout=self.TIMEOUT,
+                params=[("subdata", self.subdata)] if self.subdata is not None else None,
+            ) as stream:
+                async for chunk in stream.aiter_text():
+                    yield chunk
+        except httpx.HTTPError:
+            dms_warning("Failed to connect to connector.")
 
     async def reindex_needed(self) -> bool:
         """Check if new reindex is required."""

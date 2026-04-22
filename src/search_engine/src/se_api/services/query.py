@@ -121,6 +121,11 @@ class Query:
         return None
 
     async def _classifications_call(self) -> list[str] | None:
+        """Grab classifications from the classification endpoint.
+
+        Return: list of classifications.
+        """
+
         try:
             response = await self.clinet.get(self.CLASSIFICATIONS_ENDPOINT, timeout=120)
             return response.json()

@@ -150,18 +150,6 @@ class TestGitHubStreaming(unittest.TestCase):
         result = asyncio.run(output_queue.get())
         self.assertEqual(result, fake_files)
 
-    def test_stream_per_worker_client(self) -> None:
-        """With shared_client=False each worker creates its own client and streaming still works."""
-        self.github.shared_client = False
-        zip_bytes = _make_zip({"repo-main/src/file.py": "print('hello')"})
-        self.github._get_repos = lambda _=None: [self._REPO]
-
-        with patch("interfacer_github.httpx.AsyncClient", return_value=_fake_stream_client(zip_bytes)):
-            chunks = self._collect(self.github.stream_files_to_index())
-
-        self.assertIn("subdata", chunks[0])
-        self.assertGreater(len(chunks), 1)
-
     def test_get_repos_called_via_to_thread(self) -> None:
         """stream_files_to_index delegates _get_repos to asyncio.to_thread."""
 

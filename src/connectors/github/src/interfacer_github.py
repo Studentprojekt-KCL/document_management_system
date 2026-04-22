@@ -28,12 +28,14 @@ from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
 REQUEST_TIMEOUT = 120
+NUM_WORKERS = 10
+SHARED_CLIENT = True
 
 
 class GitHub:  # pylint: disable=too-many-instance-attributes
     """GitHub connector."""
 
-    client: httpx.Client
+    _client: httpx.Client
     api_base: str
     _binary_skip_logs: int
     _binary_skip_log_limit: int
@@ -46,16 +48,15 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
-        self.num_workers = int(read_env_variable("CONGITHUB_NUM_WORKERS"))
-        self.shared_client = read_env_variable("CONGITHUB_SHARED_CLIENT").lower() == "true"
         self._binary_skip_logs = 0
         self._binary_skip_log_limit = 10
-        self.client = httpx.Client(
+        self._client = httpx.Client(
             headers={
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": read_env_variable("CONGITHUB_GITHUB_API_VERSION"),
             },
             timeout=REQUEST_TIMEOUT,
+            cookies=None,
         )
 
     def _get_repos(self, token: str | None = None) -> list:
@@ -253,8 +254,8 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
 
     @asynccontextmanager
     async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
-        """Yield a shared AsyncClient when CONGITHUB_SHARED_CLIENT=true, else yield None."""
-        if self.shared_client:
+        """Yield a shared AsyncClient when SHARED_CLIENT=True, else yield None per worker."""
+        if SHARED_CLIENT:
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
                 yield client
         else:
@@ -339,9 +340,9 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
 
         async with self._http_client() as client:  # pylint: disable=contextmanager-generator-missing-cleanup
             download_tasks = [
-                asyncio.create_task(self._download_files(task_queue, zip_queue, client, token)) for _ in range(self.num_workers)
+                asyncio.create_task(self._download_files(task_queue, zip_queue, client, token)) for _ in range(NUM_WORKERS)
             ]
-            unzip_tasks = [asyncio.create_task(self._unzip_files(zip_queue, output_queue)) for _ in range(self.num_workers)]
+            unzip_tasks = [asyncio.create_task(self._unzip_files(zip_queue, output_queue)) for _ in range(NUM_WORKERS)]
 
             async def producer() -> None:
                 await task_queue.join()
@@ -368,7 +369,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         owner, _, name = full_name.partition("/")
         zip_url = f"https://codeload.github.com/{owner}/{name}/zip/refs/heads/{branch}"
         headers = {"Authorization": f"Bearer {token}"} if token else None
-        resp = self.client.get(zip_url, headers=headers)
+        resp = self._client.get(zip_url, headers=headers)
         if resp.status_code != HTTP_OK:
             dms_info(f"GitHub archive fetch {zip_url} returned {resp.status_code}; skipping repo {full_name}.")
             return []
@@ -419,7 +420,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
     def _execute_request(self, url: str, token: str | None = None) -> dict | list:
         headers = {"Authorization": f"Bearer {token}"} if token else None
         try:
-            response = self.client.get(url, headers=headers)
+            response = self._client.get(url, headers=headers)
             content = response.json()
         except json.JSONDecodeError:
             dms_warning(f"GitHub request to {url} could not be decoded.\nExpected JSON\nGot {response.text[:500]}")

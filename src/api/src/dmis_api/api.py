@@ -86,7 +86,7 @@ class API:
 
     def authorize(self, authorization: str | None, host: str | None) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if host is not None and ("127.0.0.1" in host or "localhost" in host):  # NOTE; THIS MUST BE REMOVED
+        if authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host):  # NOTE; THIS MUST BE REMOVED
             return {}
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
@@ -97,7 +97,7 @@ class API:
         )
         return claims
 
-    async def execute_get_request(self, url: str, request: Request) -> JSONResponse:
+    async def execute_get_request(self, url: str, request: Request, authorization: str) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -109,6 +109,7 @@ class API:
             response = await self.http_client.get(
                 url,
                 params=params,
+                headers={"Authorization": authorization}
             )
             response.raise_for_status()
             response_data = response.json()
@@ -121,7 +122,7 @@ class API:
 
         return JSONResponse(status_code=200, content=response_data)
 
-    async def execute_post_request(self, url: str, request: Request) -> JSONResponse:
+    async def execute_post_request(self, url: str, request: Request, authorization: str) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -137,6 +138,7 @@ class API:
                 url,
                 params=params,
                 json=body,
+                headers={"Authorization": authorization}
             )
             response.raise_for_status()
             response_data = response.json()
@@ -154,42 +156,42 @@ class API:
     ) -> JSONResponse:
         """GET request to search engine."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request)
+        return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
     async def search_engine_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to search engine."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request)
+        return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request)
+        return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request)
+        return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
     async def connector_get(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """GET request to connector API."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request)
+        return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
 
     async def connector_post(
         self, endpoint: str, request: Request, authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """POST request to connector API."""
         self.authorize(authorization, request.headers.get("Referer"))
-        return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request)
+        return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
 
 
 def run() -> None:

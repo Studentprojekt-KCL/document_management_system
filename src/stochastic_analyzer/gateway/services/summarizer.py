@@ -12,6 +12,7 @@ from gateway.preprompts import (
     SUMMARIZER_SYSTEM_PROMPT,
 )
 from gateway.schemas import InputItem, SummaryResult
+
 from shared_functions.dmis_logger import dms_warning
 
 SWEDISH_CHARS = set("åäö")
@@ -104,6 +105,7 @@ class Summarizer:
                     content=item.content,
                 )
                 tasks.append(self._call_llm(client, prompt))
+
             individual_summaries = await asyncio.gather(*tasks)
 
             # Build context from successful summaries only

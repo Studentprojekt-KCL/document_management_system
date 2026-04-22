@@ -35,12 +35,12 @@ An automated API documentation is constructed when the API service is initiaded,
 
 Configuration is done through environment variables.
 
-- `LOGGER_BIND_ADDRESS` Bind address.
-- `LOGGER_PORT` Port to use.
-- `LOGGER_DB_HOST` Database host.
-- `LOGGER_DB_USER` Database user.
-- `LOGGER_DB_PASS` User password for database.
-- `LOGGER_DB_DATABASE` Database name.
+- `LOGAPI_BIND_ADDR` Bind address.
+- `LOGAPI_BIND_PORT` Port to use.
+- `LOGAPI_LOGDB_URL` Database host.
+- `LOGAPI_LOGDB_USER` Database user.
+- `LOGAPI_LOGDB_PASSW` User password for database.
+- `LOGAPI_LOGDB_DATABASE` Database name.
 
 Optional flags:
 

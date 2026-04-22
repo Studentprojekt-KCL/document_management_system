@@ -18,4 +18,4 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-shared_functions = ["data/file_types.json"]
+shared_functions = ["data/file_types.json", "data/documents_only_types.json"]

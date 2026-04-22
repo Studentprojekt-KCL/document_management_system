@@ -2,11 +2,11 @@
 
 from unittest import TestCase, mock
 
-from interfacer import GitLabs
+from interfacer import GitLab
 
 
-class TestGitLabs(TestCase):
-    """Unittests for the GitLabs class instance in Gitlabs connector."""
+class TestGitLab(TestCase):
+    """Unittests for the GitLab class instance in Gitlab connector."""
 
     CORRECT_DATA = [
         {
@@ -57,9 +57,9 @@ class TestGitLabs(TestCase):
             response_mock.json.return_value = self.CORRECT_DATA
         return response_mock
 
-    @mock.patch("interfacer.GitLabs.__init__", return_value=None)
+    @mock.patch("interfacer.GitLab.__init__", return_value=None)
     def setUp(self, _):
-        self.instance = GitLabs()
+        self.instance = GitLab()
         mock_session = mock.Mock()
         mock_session.get.side_effect = self.get_side_effect
         self.instance.base = ""
@@ -69,7 +69,7 @@ class TestGitLabs(TestCase):
 
     def test_execute_request(self):
         """Test _execute_request method."""
-        assert self.instance._execute_request(url="") == self.CORRECT_DATA
+        assert self.instance._execute_get_request(url="", headers={}) == self.CORRECT_DATA
 
     def test_check_index_needed_no_sudata(self):
         """Test check_index_needed method without current subdata."""
@@ -90,8 +90,7 @@ class TestGitLabs(TestCase):
     def test_get_file(self):
         """Test get_file method."""
         self.instance.source_system = "system"
-        print(self.instance.get_file("test_url", True))
-        assert self.instance.get_file("test_url", True) == {
+        assert self.instance.get_file("test_url", include_content=True) == {
             "unique_pointer": "test_url",
             "name": "test_file.txt",
             "size": 0,

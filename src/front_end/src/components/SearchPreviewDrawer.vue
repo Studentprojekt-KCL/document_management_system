@@ -11,6 +11,7 @@
 import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { useAIRerank } from '@/composables/aiRerank'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -24,11 +25,14 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, sourceSystem, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
+const { previewTitle, sourceSystem, previewFileDescription, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
   useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+
+/* AI rerank composable */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -48,10 +52,6 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
     <div class="preview-body">
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
-      <div class="tag-row">
-        <span class="tag">{{ previewType }}</span>
-      </div>
-
       <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
@@ -62,11 +62,11 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           </div>
           <div class="meta-cell">
             <span>File Size</span>
-            <p><HardDrive :size="13" /> {{ previewSize }}</p>
+            <p><HardDrive :size="13" /> {{ previewSize }} B</p>
           </div>
           <div class="meta-cell">
             <span>Format</span>
-            <p><FileType2 :size="13" /> {{ previewType }}</p>
+            <p><FileType2 :size="13" /> {{ previewFileDescription }}</p>
           </div>
           <div class="meta-cell">
             <span>Security Class</span>
@@ -93,6 +93,31 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
             {{ isGeneratingSummary ? 'Generating summary...' : 'Generate AI Summary' }}
           </p>
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
+        </button>
+      </section>
+
+      <!-- Rerank (similarity) section -->
+      <section class="panel-section">
+        <p class="section-title">SIMILARITY</p>
+        <div v-if="aiRerankResultsComputed.length">
+          <ul>
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
+              <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
+            </li>
+          </ul>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isReranking"
+          @click="generateAIRerank"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isReranking ? 'Finding matches...' : 'Find Similar Files' }}
+          </p>
+          <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
         </button>
       </section>
     </div>
@@ -174,6 +199,9 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   margin-top: 2rem;
   text-align: center;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .tag-row {
@@ -233,6 +261,19 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 .meta-cell-summary {
   grid-column: 1 / -1;
   overflow: hidden;
+}
+
+.meta-cell-rerank {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.meta-cell-rerank p {
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
 }
 
 .summary-markdown {

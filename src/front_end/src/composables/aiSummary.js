@@ -1,18 +1,18 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { authFetch, API_PATHS } from '@/utils/api'
+import { useReload } from '@/composables/useReload'
 
 export function useAISummary(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
-  const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
-
   /* Summary state */
-  const aiSummary = ref('')
-  const aiSummaryHtmlRaw = ref('')
-  const summaryPointer = ref('')
-  const summaryError = ref('')
-  const isGeneratingSummary = ref(false)
+  const { state: aiSummary } = useReload('aiSummary', '')
+  const { state: aiSummaryHtmlRaw } = useReload('aiSummaryHtmlRaw', '')
+  const { state: summaryPointer } = useReload('summaryPointer', '')
+  const { state: summaryError } = useReload('summaryError', '')
+  const { state: isGeneratingSummary } = useReload('isGeneratingSummary', false)
 
   /* Summary for specific file and disappears when new file is selected */
   const aiSummaryHtml = computed(() => (summaryPointer.value === uniquePointer.value ? aiSummaryHtmlRaw.value : ''))
@@ -32,15 +32,10 @@ export function useAISummary(props) {
     aiSummary.value = ''
     aiSummaryHtmlRaw.value = ''
     summaryPointer.value = ''
-    const access_token = sessionStorage.getItem('access_token')
-
     try {
-      const response = await globalThis.fetch(`${API_BASE_URL}/stochastic-analyzer/summarize`, {
+      const response = await authFetch(API_PATHS.summarize, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pointers: [uniquePointer.value] })
       })
 

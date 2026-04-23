@@ -122,7 +122,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
           class="meta-cell meta-cell-summary summary-cell-button"
           type="button"
           :disabled="isReranking"
-          @click="generateAIRerank"
+          @click="generateAIRerank(previewTitle)"
         >
           <p>
             <StarsIcon :size="13" />

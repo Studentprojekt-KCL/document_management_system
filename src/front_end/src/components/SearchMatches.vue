@@ -11,7 +11,7 @@
 
 import { computed } from 'vue'
 import { Calendar, FileText, ExternalLink } from 'lucide-vue-next'
-import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { useSearchMetadata, resolveLink } from '@/composables/useSearchMetadata'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -74,7 +74,12 @@ const resolveBadgeClass = (match) => {
               <div class="meta-row">
                 <span><FileText :size="13" /> {{ resolveDocumentType(item.rawMatch) }}</span>
                 <span><Calendar :size="13" /> {{ resolveDateOnly(item.rawMatch) }}</span>
-                <span><ExternalLink :size="13" /> {{ resolveSource(item.rawMatch) }}</span>
+                <span
+                  ><ExternalLink :size="13" />
+                  <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer">{{
+                    resolveSource(item.rawMatch)
+                  }}</a></span
+                >
               </div>
             </div>
             <span class="security-badge" :class="resolveBadgeClass(item.rawMatch)">{{ resolveBadgeText(item.rawMatch) }}</span>

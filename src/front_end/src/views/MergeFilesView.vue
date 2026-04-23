@@ -7,15 +7,15 @@
 import { useAIRerank } from '@/composables/aiRerank'
 import SearchMatches from '@/components/SearchMatches.vue'
 
-const { aiRerankResults } = useAIRerank()
+const { aiRerankResults, rerankFilename } = useAIRerank()
 </script>
 
 <template>
   <div class="merge-files-view">
-    <h1>Merge Files</h1>
-    <p class="text-secondary">Functionality to merge and summarize files coming soon...woop</p>
+    <h1>Merge/Summarize reranked files</h1>
     <div v-if="aiRerankResults.length">
-      <h2>Similar Files</h2>
+      <h3>Similar to: {{ rerankFilename }}</h3>
+      <p class="text-secondary">Select one or more files to merge and summarize their content together with the reranked file.</p>
       <SearchMatches :matches="aiRerankResults" badge-mode="score" />
     </div>
   </div>

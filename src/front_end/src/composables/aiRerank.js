@@ -10,6 +10,7 @@ export function useAIRerank(props) {
   /* Rerank state */
   const { state: aiRerankResults } = useReload('aiRerankResults', [])
   const { state: rerankPointer } = useReload('rerankPointer', '')
+  const { state: rerankFilename } = useReload('rerankFilename', '')
   const { state: isReranking } = useReload('isReranking', false)
   const { state: rerankError } = useReload('rerankError', '')
 
@@ -24,10 +25,10 @@ export function useAIRerank(props) {
   const aiRerankResultsComputed = computed(() => (rerankPointer.value === uniquePointer.value ? aiRerankResults.value : []))
 
   /* When clicking button Rerank */
-  const generateAIRerank = async () => {
+  const generateAIRerank = async (filename = '') => {
     if (!uniquePointer.value) {
       aiRerankResults.value = []
-
+      rerankFilename.value = ''
       rerankError.value = ''
       return
     }
@@ -52,6 +53,7 @@ export function useAIRerank(props) {
       const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
       aiRerankResults.value = mapRankedResults(rankedResults)
       rerankPointer.value = uniquePointer.value
+      rerankFilename.value = filename
     } catch (error) {
       rerankError.value = error.message || 'An error occurred while generating AI rerank.'
     } finally {
@@ -62,6 +64,7 @@ export function useAIRerank(props) {
   return {
     aiRerankResults,
     aiRerankResultsComputed,
+    rerankFilename,
     isReranking,
     rerankError,
     generateAIRerank

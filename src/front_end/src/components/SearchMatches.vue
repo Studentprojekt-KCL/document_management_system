@@ -18,7 +18,8 @@ const props = defineProps({
   matches: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   selected: { type: String, default: '' },
-  query: { type: String, default: '' }
+  query: { type: String, default: '' },
+  badgeMode: { type: String, default: 'security' }
 })
 
 /* Emit to parent (SearchView) component when a match is selected */
@@ -38,6 +39,22 @@ const resultsLabel = computed(() => {
   }
   return `Found ${count} result${count === 1 ? '' : 's'} for "${props.query}"`
 })
+
+const resolveBadgeText = (match) => {
+  if (props.badgeMode === 'score') {
+    return match?.scorePercent || 'N/A'
+  }
+
+  return resolveSecurityClass(match) || 'Unknown'
+}
+
+const resolveBadgeClass = (match) => {
+  if (props.badgeMode === 'score') {
+    return 'score-badge'
+  }
+
+  return `security-${(resolveSecurityClass(match) || 'unknown').toLowerCase()}`
+}
 </script>
 
 <template>
@@ -60,9 +77,7 @@ const resultsLabel = computed(() => {
                 <span><ExternalLink :size="13" /> {{ resolveSource(item.rawMatch) }}</span>
               </div>
             </div>
-            <span class="security-badge" :class="`security-${(resolveSecurityClass(item.rawMatch) || 'unknown').toLowerCase()}`">{{
-              resolveSecurityClass(item.rawMatch) || 'Unknown'
-            }}</span>
+            <span class="security-badge" :class="resolveBadgeClass(item.rawMatch)">{{ resolveBadgeText(item.rawMatch) }}</span>
           </div>
         </button>
       </li>
@@ -148,13 +163,13 @@ const resultsLabel = computed(() => {
 }
 
 .security-badge {
+  align-self: center;
   flex-shrink: 0;
-  align-self: flex-start;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.2rem 0.55rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 6px;
   border: 1px solid;
 }
@@ -181,5 +196,11 @@ const resultsLabel = computed(() => {
   color: #dc2626;
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+.score-badge {
+  color: #7c2d12;
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 </style>

@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useSearchMetadata, resolveFilename } from '@/composables/useSearchMetadata'
+import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useReload } from '@/composables/useReload'
 
@@ -14,17 +14,11 @@ export function useAIRerank(props) {
   const { state: rerankError } = useReload('rerankError', '')
 
   const mapRankedResults = (results = []) =>
-    results.map((item, index) => {
-      const pointer = item?.pointer ?? ''
-      const scorePercent = `${(Number(item?.score ?? 0) * 100).toFixed(1)}%`
-
-      return {
-        rank: index + 1,
-        name: resolveFilename(item, index),
-        pointer,
-        scorePercent
-      }
-    })
+    results.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      scorePercent: `${(Number(item?.score ?? 0) * 100).toFixed(1)}%`
+    }))
 
   /* Rerank results for specific file and disappears when new file is selected */
   const aiRerankResultsComputed = computed(() => (rerankPointer.value === uniquePointer.value ? aiRerankResults.value : []))

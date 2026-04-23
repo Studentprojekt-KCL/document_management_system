@@ -1,8 +1,11 @@
 <script setup>
 /**
  * MergeFilesView.vue - Possibility to merge/summarize files received from the ranker.
+ * Metadata displaying and so is fetched from SearchMatches.vue
+ * Similar files and the scores are fetched from useAIRerank :)
  */
 import { useAIRerank } from '@/composables/aiRerank'
+import SearchMatches from '@/components/SearchMatches.vue'
 
 const { aiRerankResults } = useAIRerank()
 </script>
@@ -13,11 +16,7 @@ const { aiRerankResults } = useAIRerank()
     <p class="text-secondary">Functionality to merge and summarize files coming soon...woop</p>
     <div v-if="aiRerankResults.length">
       <h2>Similar Files</h2>
-      <ul>
-        <li v-for="result in aiRerankResults" :key="result.pointer">
-          {{ result.rank }}. {{ result.name }} - Score: {{ result.scorePercent }}
-        </li>
-      </ul>
+      <SearchMatches :matches="aiRerankResults" badge-mode="score" />
     </div>
   </div>
 </template>

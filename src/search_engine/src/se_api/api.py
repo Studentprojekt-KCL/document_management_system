@@ -32,7 +32,6 @@ class API:
     port: int
     host: str
     log_level: str
-    MAX_PORT: int = 65536
     file_resource_var: list
     documents_only_var: list
 
@@ -73,6 +72,7 @@ class API:
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
         """FastAPI lifespan"""
         self.handler = Handler()
+        await self.handler.init()
         yield
         await self.handler.close()
 
@@ -103,7 +103,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, query: str, count: int = 10, offset: int = 0) -> list:
+    async def query(self, query: str | None = None, count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -113,7 +113,7 @@ class API:
             List of found files or None.
         """
 
-        return self.handler.preform_search(query, count, offset)
+        return await self.handler.preform_search(query, count, offset)
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""

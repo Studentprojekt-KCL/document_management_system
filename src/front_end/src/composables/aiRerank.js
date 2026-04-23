@@ -3,7 +3,7 @@ import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useReload } from '@/composables/useReload'
 
-export function useAIRerank(props) {
+export function useAIRerank(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
@@ -64,6 +64,7 @@ export function useAIRerank(props) {
   return {
     aiRerankResults,
     aiRerankResultsComputed,
+    rerankPointer,
     rerankFilename,
     isReranking,
     rerankError,

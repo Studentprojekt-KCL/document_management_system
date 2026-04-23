@@ -77,7 +77,7 @@ export const resolveSecurityClass = (entry) => {
  * @param {Object} props - The props object containing the selected match to preview.
  * @returns {Object} An object containing computed properties and utility functions for search metadata.
  */
-export const useSearchMetadata = (props) => {
+export const useSearchMetadata = (props = {}) => {
   const metadata = computed(() => getMetadata(props.selectedMatch))
 
   const uniquePointer = computed(() => pick(metadata.value.unique_pointer, props.selectedMatch?.unique_pointer))

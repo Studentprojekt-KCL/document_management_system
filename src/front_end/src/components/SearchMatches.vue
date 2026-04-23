@@ -19,11 +19,31 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   selected: { type: String, default: '' },
   query: { type: String, default: '' },
-  badgeMode: { type: String, default: 'security' }
+  badgeMode: { type: String, default: 'security' },
+  selectable: { type: Boolean, default: false },
+  selectedPointers: { type: Array, default: () => [] }
 })
 
-/* Emit to parent (SearchView) component when a match is selected */
-const emit = defineEmits(['select'])
+/* Emit to parent component when a match is selected or selection is toggled */
+const emit = defineEmits(['select', 'update:selectedPointers'])
+
+const getPointer = (match) => match?.unique_pointer || match?.metadata?.unique_pointer || match?.pointer || ''
+
+const isSelectedPointer = (pointer) => props.selectedPointers.includes(pointer)
+
+const isSelected = (match) => isSelectedPointer(getPointer(match))
+
+const onCardClick = (match) => {
+  if (!props.selectable) return emit('select', match)
+
+  const pointer = getPointer(match)
+  if (!pointer) return
+
+  emit(
+    'update:selectedPointers',
+    isSelectedPointer(pointer) ? props.selectedPointers.filter((p) => p !== pointer) : [...props.selectedPointers, pointer]
+  )
+}
 
 /* Custom composable to normalize matches, resolve match dates, and resolve sources for display */
 const { normalizeMatches, resolveDateOnly, resolveSource, resolveDocumentType, resolveSecurityClass } = useSearchMetadata(props)
@@ -66,7 +86,11 @@ const resolveBadgeClass = (match) => {
     <!-- List of search result matches with titles, types, dates and source -->
     <ul class="results-list">
       <li v-for="item in normalizedMatches" :key="item.filename" class="result-item">
-        <button class="result-card" :class="{ active: selected === item.filename }" @click="emit('select', item.rawMatch)">
+        <button
+          class="result-card"
+          :class="{ active: selected === item.filename, selected: selectable && isSelected(item.rawMatch) }"
+          @click="onCardClick(item.rawMatch)"
+        >
           <div class="result-main">
             <div class="result-content">
               <h3 class="result-title">{{ item.title }}</h3>
@@ -76,7 +100,7 @@ const resolveBadgeClass = (match) => {
                 <span><Calendar :size="13" /> {{ resolveDateOnly(item.rawMatch) }}</span>
                 <span
                   ><ExternalLink :size="13" />
-                  <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer">{{
+                  <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer" @click.stop>{{
                     resolveSource(item.rawMatch)
                   }}</a></span
                 >
@@ -132,6 +156,12 @@ const resolveBadgeClass = (match) => {
 .result-card.active {
   background: #f6f8fc;
   border-color: #d7e0ec;
+}
+
+.result-card.selected {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 1px #bfdbfe;
 }
 
 .result-main {

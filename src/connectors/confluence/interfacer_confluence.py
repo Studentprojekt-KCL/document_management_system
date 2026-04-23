@@ -242,7 +242,7 @@ class ConfluenceInterfacer:
                         email=data.email,
                         api_token=data.api_token,
                     )
-                except Exception:
+                except (httpx.HTTPError, ValueError, TypeError):
                     return {"metadata": {"unique_pointer": ptr, "type": SOURCE_FILE}}
                 if not data.include_last_edit_date and isinstance(page.get("metadata"), dict):
                     page = dict(page)
@@ -295,7 +295,7 @@ class ConfluenceInterfacer:
             async with semaphore:
                 try:
                     return await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
-                except Exception:
+                except (httpx.HTTPError, ValueError, TypeError):
                     return {"metadata": {"unique_pointer": pointer, "type": SOURCE_FILE}}
 
         tasks = [asyncio.create_task(_fetch(pointer)) for pointer in valid_pointers]

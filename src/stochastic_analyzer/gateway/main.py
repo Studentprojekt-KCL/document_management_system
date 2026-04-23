@@ -22,8 +22,7 @@ from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
 
 from shared_functions.dmis_logger import dms_error
-
-MAX_PORT = 65536
+from shared_functions.initialisation_tools import read_port
 
 
 def _parse_log_level() -> str:
@@ -41,22 +40,6 @@ def _read_bind() -> str:
         dms_error("STOCHAN_BIND_ADDR is not defined.")
         raise RuntimeError("Missing env var: STOCHAN_BIND_ADDR")
     return bind
-
-
-def _read_port() -> int:
-    """Read and validate the bind port from the environment."""
-    port = environ.get("STOCHAN_BIND_PORT")
-    if port is None:
-        dms_error("STOCHAN_BIND_PORT is not defined.")
-        raise RuntimeError("Missing env var: STOCHAN_BIND_PORT")
-    if not port.isdigit():
-        dms_error("STOCHAN_BIND_PORT is expected to be an integer.")
-        raise RuntimeError("STOCHAN_BIND_PORT is not an integer")
-    value = int(port)
-    if value < 0 or value >= MAX_PORT:
-        dms_error(f"STOCHAN_BIND_PORT should be between 0 and {MAX_PORT}.")
-        raise RuntimeError(f"STOCHAN_BIND_PORT out of range: {value}")
-    return value
 
 
 class API:
@@ -80,7 +63,7 @@ class API:
         logging.basicConfig()
         self.log_level = _parse_log_level()
         self.bind = _read_bind()
-        self.port = _read_port()
+        self.port = read_port("STOCHAN_BIND_PORT")
         device = environ.get("DEVICE", "external")
 
         if self.log_level == "debug":

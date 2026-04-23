@@ -105,6 +105,17 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
               <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
             </li>
           </ul>
+          <!-- Possibility to merge files button -->
+          <button
+            class="meta-cell meta-cell-summary summary-cell-button"
+            type="button"
+            @click="$router.push({ name: 'MergeFiles' })"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              Merge Files
+            </p>
+          </button>
         </div>
         <button
           v-else

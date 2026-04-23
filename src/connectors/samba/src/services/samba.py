@@ -139,7 +139,7 @@ class Samba:
             try:
                 with open(path, encoding="utf-8") as f:
                     status = os.stat(path)
-                    name: str = path.split("/", maxsplit=1)[-1]
+                    name: str = path.rsplit("/", maxsplit=1)[-1]
                     file = {
                         "unique_pointer": pointer,
                         "name": name,

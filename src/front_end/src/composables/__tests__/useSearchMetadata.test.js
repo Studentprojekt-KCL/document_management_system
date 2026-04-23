@@ -2,12 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   resolveFilename,
   resolveDocumentType,
+  resolveDocumentExtension,
   resolveSource,
   resolveDateOnly,
   resolveLink,
   resolveSecurityClass,
-  TYPE_KEYWORDS,
-  TYPE_FILTERS,
   useSearchMetadata
 } from '../useSearchMetadata'
 
@@ -44,51 +43,58 @@ describe('resolveFilename', () => {
   })
 })
 
-/* ── resolveDocumentType ── */
+/* ── resolveDocumentType (now reads file_type_description from entry) ── */
 describe('resolveDocumentType', () => {
-  it('detects PDF from sourceName', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'report.pdf' })).toBe('PDF Document')
+  it('returns file_type_description from metadata', () => {
+    const entry = { metadata: { file_type_description: 'PDF Document' } }
+    expect(resolveDocumentType(entry)).toBe('PDF Document')
   })
 
-  it('detects Word from .docx extension', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'memo.docx' })).toBe('Word Document')
+  it('returns file_type_description from entry directly', () => {
+    const entry = { file_type_description: 'Word Document' }
+    expect(resolveDocumentType(entry)).toBe('Word Document')
   })
 
-  it('detects Word from "word" in type', () => {
-    expect(resolveDocumentType({ sourceType: 'word', sourceName: '' })).toBe('Word Document')
+  it('returns empty string when no description exists', () => {
+    expect(resolveDocumentType({})).toBe('')
   })
 
-  it('detects Excel from .xlsx extension', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'data.xlsx' })).toBe('Excel Spreadsheet')
+  it('handles null input', () => {
+    expect(resolveDocumentType(null)).toBe('')
   })
 
-  it('detects Text Document from .txt extension', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'notes.txt' })).toBe('Text Document')
+  it('handles undefined input', () => {
+    expect(resolveDocumentType(undefined)).toBe('')
   })
 
-  it('detects Markdown from .md extension', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'README.md' })).toBe('Markdown Document')
+  it('prefers metadata value over entry value', () => {
+    const entry = { metadata: { file_type_description: 'From metadata' }, file_type_description: 'From entry' }
+    expect(resolveDocumentType(entry)).toBe('From metadata')
+  })
+})
+
+/* ── resolveDocumentExtension ── */
+describe('resolveDocumentExtension', () => {
+  it('returns file_type from metadata', () => {
+    const entry = { metadata: { file_type: '.pdf' } }
+    expect(resolveDocumentExtension(entry)).toBe('.pdf')
   })
 
-  it('detects Markdown from "markdown" in type', () => {
-    expect(resolveDocumentType({ sourceType: 'markdown', sourceName: '' })).toBe('Markdown Document')
+  it('returns file_type from entry directly', () => {
+    const entry = { file_type: '.docx' }
+    expect(resolveDocumentExtension(entry)).toBe('.docx')
   })
 
-  it('falls back to sourceType when no keyword matches', () => {
-    expect(resolveDocumentType({ sourceType: 'custom_type', sourceName: 'file.xyz' })).toBe('custom_type')
+  it('returns empty string when no file_type exists', () => {
+    expect(resolveDocumentExtension({})).toBe('')
   })
 
-  it('falls back to sourceName when sourceType is empty and no keyword matches', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'file.xyz' })).toBe('file.xyz')
+  it('handles null input', () => {
+    expect(resolveDocumentExtension(null)).toBe('')
   })
 
-  it('is case-insensitive', () => {
-    expect(resolveDocumentType({ sourceType: '', sourceName: 'FILE.PDF' })).toBe('PDF Document')
-    expect(resolveDocumentType({ sourceType: 'WORD', sourceName: '' })).toBe('Word Document')
-  })
-
-  it('handles null/undefined inputs', () => {
-    expect(resolveDocumentType({ sourceType: null, sourceName: undefined })).toBe('')
+  it('handles undefined input', () => {
+    expect(resolveDocumentExtension(undefined)).toBe('')
   })
 })
 
@@ -181,37 +187,10 @@ describe('resolveSecurityClass', () => {
   })
 })
 
-/* ── TYPE_KEYWORDS & TYPE_FILTERS ── */
-describe('TYPE_KEYWORDS', () => {
-  it('has entries for all expected document types', () => {
-    expect(TYPE_KEYWORDS).toHaveProperty('PDF Document')
-    expect(TYPE_KEYWORDS).toHaveProperty('Word Document')
-    expect(TYPE_KEYWORDS).toHaveProperty('Excel Spreadsheet')
-    expect(TYPE_KEYWORDS).toHaveProperty('Text Document')
-    expect(TYPE_KEYWORDS).toHaveProperty('Markdown Document')
-  })
-})
-
-describe('TYPE_FILTERS', () => {
-  it('has entries for all filter labels', () => {
-    expect(TYPE_FILTERS).toHaveProperty('PDF (.pdf)')
-    expect(TYPE_FILTERS).toHaveProperty('Word (.docx)')
-    expect(TYPE_FILTERS).toHaveProperty('Excel (.xlsx)')
-    expect(TYPE_FILTERS).toHaveProperty('Text / Markdown (.txt, .md)')
-  })
-
-  it('each filter has at least one keyword', () => {
-    for (const [, keywords] of Object.entries(TYPE_FILTERS)) {
-      expect(keywords.length).toBeGreaterThan(0)
-    }
-  })
-})
-
 /* ── useSearchMetadata composable ── */
 describe('useSearchMetadata', () => {
-  const createProps = (selectedMatch = null, selectedFile = '') => ({
+  const createProps = (selectedMatch = null) => ({
     selectedMatch,
-    selectedFile,
     matches: []
   })
 
@@ -270,10 +249,16 @@ describe('useSearchMetadata', () => {
     expect(previewCreatedAt.value).toBe('2026-02-17')
   })
 
-  it('resolves document type from name extension', () => {
-    const props = createProps({ name: 'report.pdf', type: 'source_file' })
-    const { previewType } = useSearchMetadata(props)
-    expect(previewType.value).toBe('PDF Document')
+  it('extracts file description', () => {
+    const props = createProps({ file_type_description: 'PDF Document' })
+    const { previewFileDescription } = useSearchMetadata(props)
+    expect(previewFileDescription.value).toBe('PDF Document')
+  })
+
+  it('extracts file extension', () => {
+    const props = createProps({ file_type: '.pdf' })
+    const { previewFileExtension } = useSearchMetadata(props)
+    expect(previewFileExtension.value).toBe('.pdf')
   })
 
   /* ── normalizeMatches ── */
@@ -283,16 +268,14 @@ describe('useSearchMetadata', () => {
       const { normalizeMatches } = useSearchMetadata(props)
 
       const matches = [
-        { name: 'file1.pdf', type: 'source_file' },
-        { name: 'file2.md', type: 'source_file' }
+        { name: 'file1.pdf', file_type_description: 'PDF Document' },
+        { name: 'file2.md', file_type_description: 'Markdown Document' }
       ]
 
       const result = normalizeMatches(matches)
       expect(result).toHaveLength(2)
       expect(result[0].title).toBe('file1.pdf')
-      expect(result[0].type).toBe('PDF Document')
       expect(result[1].title).toBe('file2.md')
-      expect(result[1].type).toBe('Markdown Document')
     })
 
     it('returns empty array for empty input', () => {

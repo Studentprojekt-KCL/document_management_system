@@ -26,7 +26,6 @@ import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
 import { useAIRerank } from '@/composables/aiRerank'
 import { hasRole } from '@/utils/auth'
-import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { saveClassification } from '@/utils/api'
 
 /* Props */

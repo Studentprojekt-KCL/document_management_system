@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-/* Mock useSearchMetadata */
+/* Mock useSearchMetadata with new API */
 vi.mock('@/composables/useSearchMetadata', () => {
   return {
     useSearchMetadata: () => ({
@@ -10,11 +10,13 @@ vi.mock('@/composables/useSearchMetadata', () => {
           rawMatch: entry,
           filename: entry.name || `result-${index + 1}`,
           title: entry.name || `result-${index + 1}`,
-          type: entry.type || 'Unknown'
+          type: entry.file_type_description || 'Unknown'
         })),
       resolveDateOnly: (entry) => (entry?.last_edit_date || '').split('T')[0] || '',
       resolveSource: (entry) => entry?.source_system || '',
-      resolveSecurityClass: (entry) => entry?.security_class || ''
+      resolveSecurityClass: (entry) => entry?.security_class || '',
+      resolveDocumentType: (entry) => entry?.file_type_description || '',
+      resolveDocumentExtension: (entry) => entry?.file_type || ''
     })
   }
 })
@@ -25,21 +27,24 @@ describe('SearchMatches', () => {
   const mockMatches = [
     {
       name: 'report.pdf',
-      type: 'PDF Document',
+      file_type_description: 'PDF Document',
+      file_type: '.pdf',
       last_edit_date: '2026-04-15T14:30:00.000Z',
       source_system: 'GitLab',
       security_class: 'Public'
     },
     {
       name: 'memo.docx',
-      type: 'Word Document',
+      file_type_description: 'Word Document',
+      file_type: '.docx',
       last_edit_date: '2026-04-14T10:00:00.000Z',
       source_system: 'GitHub',
       security_class: 'Confidential'
     },
     {
       name: 'data.xlsx',
-      type: 'Excel Spreadsheet',
+      file_type_description: 'Excel Spreadsheet',
+      file_type: '.xlsx',
       last_edit_date: '2026-04-13T08:00:00.000Z',
       source_system: 'GitLab',
       security_class: 'Internal'

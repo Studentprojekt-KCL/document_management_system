@@ -1,16 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { nextTick, defineComponent } from 'vue'
 
 /* ── Mock dependencies ── */
 
-// Mock useSearchMetadata
+/* Mock api.js */
+const mockAuthFetch = vi.hoisted(() => vi.fn())
+vi.mock('@/utils/api', () => ({
+  authFetch: mockAuthFetch,
+  API_PATHS: {
+    classification: '/api/search_engine/classification',
+    summarize: '/api/stochastic-analyzer/summarize'
+  },
+  saveClassification: vi.fn()
+}))
+
+/* Mock useSearchMetadata */
 vi.mock('@/composables/useSearchMetadata', () => {
   const { computed } = require('vue')
   return {
     useSearchMetadata: () => ({
       previewTitle: computed(() => 'test-file.pdf'),
-      previewType: computed(() => 'PDF Document'),
+      previewFileDescription: computed(() => 'PDF Document'),
+      previewFileExtension: computed(() => '.pdf'),
       sourceSystem: computed(() => 'GitLab'),
       previewCreatedAt: computed(() => '2026-04-15'),
       previewSize: computed(() => '44982'),
@@ -23,7 +35,7 @@ vi.mock('@/composables/useSearchMetadata', () => {
   }
 })
 
-// Mock useAISummary
+/* Mock useAISummary */
 vi.mock('@/composables/aiSummary', () => {
   const { ref } = require('vue')
   return {
@@ -36,20 +48,29 @@ vi.mock('@/composables/aiSummary', () => {
   }
 })
 
-// Mock auth
+/* Mock auth */
 vi.mock('@/utils/auth', () => ({
-  hasRole: vi.fn(() => true)
+  hasRole: vi.fn(() => true),
+  isLoggedIn: vi.fn(() => true)
 }))
 
-// Mock ClassificationEditor as a stub
-vi.mock('@/components/ClassificationEditor.vue', () => ({
-  default: {
-    name: 'ClassificationEditor',
-    template: '<div class="mock-editor" />',
-    props: ['visible', 'currentLevel'],
-    emits: ['save', 'cancel'],
-    methods: { resetSaving() {} }
+/* Mock ClassificationEditor */
+const MockClassificationEditor = defineComponent({
+  name: 'ClassificationEditor',
+  template: '<div class="mock-classification-editor" />',
+  props: {
+    visible: { type: Boolean, default: false },
+    currentLevel: { type: String, default: '' }
+  },
+  emits: ['save', 'cancel'],
+  setup() {
+    const resetSaving = () => {}
+    return { resetSaving }
   }
+})
+
+vi.mock('@/components/ClassificationEditor.vue', () => ({
+  default: MockClassificationEditor
 }))
 
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
@@ -71,17 +92,16 @@ describe('SearchPreviewDrawer', () => {
     matches: []
   }
 
-  let fetchMock
-
   beforeEach(() => {
-    fetchMock = vi.fn()
-    global.fetch = fetchMock
+    vi.clearAllMocks()
+    localStorage.setItem('access_token', 'test-token')
     sessionStorage.setItem('access_token', 'test-token')
     vi.mocked(hasRole).mockReturnValue(true)
   })
 
   afterEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
@@ -90,7 +110,6 @@ describe('SearchPreviewDrawer', () => {
       props: { ...defaultProps, ...props },
       global: {
         stubs: {
-          /* Stub Transition to avoid JSDOM animation issues */
           Transition: {
             setup(_, { slots }) {
               return () => slots.default?.()
@@ -197,7 +216,8 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
+      expect(editor.exists()).toBe(true)
       expect(editor.props('visible')).toBe(true)
     })
   })
@@ -250,8 +270,8 @@ describe('SearchPreviewDrawer', () => {
 
   /* ── Classification save flow ── */
   describe('classification save', () => {
-    it('calls fetch with correct endpoint on save', async () => {
-      fetchMock.mockResolvedValue({
+    it('calls authFetch with correct endpoint on save', async () => {
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ edited: true })
       })
@@ -261,11 +281,11 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Confidential')
       await flushPromises()
 
-      expect(fetchMock).toHaveBeenCalledWith(
+      expect(mockAuthFetch).toHaveBeenCalledWith(
         '/api/search_engine/classification',
         expect.objectContaining({
           method: 'POST',
@@ -278,7 +298,7 @@ describe('SearchPreviewDrawer', () => {
     })
 
     it('shows success toast after successful save', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ edited: true })
       })
@@ -288,7 +308,7 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Confidential')
       await flushPromises()
 
@@ -298,7 +318,7 @@ describe('SearchPreviewDrawer', () => {
     })
 
     it('shows error toast on failed save', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: false,
         status: 500
       })
@@ -308,7 +328,7 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Confidential')
       await flushPromises()
 
@@ -318,14 +338,14 @@ describe('SearchPreviewDrawer', () => {
     })
 
     it('shows error toast on network error', async () => {
-      fetchMock.mockRejectedValue(new Error('Network error'))
+      mockAuthFetch.mockRejectedValue(new Error('Network error'))
 
       const wrapper = mountDrawer()
 
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Confidential')
       await flushPromises()
 
@@ -334,7 +354,7 @@ describe('SearchPreviewDrawer', () => {
     })
 
     it('closes editor after successful save', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ edited: true })
       })
@@ -344,7 +364,7 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Public')
       await flushPromises()
 
@@ -363,33 +383,29 @@ describe('SearchPreviewDrawer', () => {
       await wrapper.setProps({ selectedFile: 'other-file.md' })
       await nextTick()
 
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       expect(editor.props('visible')).toBe(false)
     })
 
     it('hides toast when document changes', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ edited: true })
       })
 
       const wrapper = mountDrawer()
 
-      // Trigger save to show toast
       await wrapper.find('.edit-btn').trigger('click')
       await nextTick()
-      const editor = wrapper.findComponent({ name: 'ClassificationEditor' })
+      const editor = wrapper.findComponent(MockClassificationEditor)
       editor.vm.$emit('save', 'Public')
       await flushPromises()
 
-      // Toast should be visible
       expect(wrapper.find('.toast-success').exists()).toBe(true)
 
-      // Switch to a different document
       await wrapper.setProps({ selectedFile: 'different-file.md' })
       await flushPromises()
 
-      // Toast should be gone
       expect(wrapper.find('.toast-success').exists()).toBe(false)
     })
   })

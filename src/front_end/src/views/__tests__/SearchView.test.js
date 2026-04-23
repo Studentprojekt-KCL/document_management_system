@@ -3,29 +3,37 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 /* ── Mock dependencies ── */
-beforeEach(() => {
-  window.__ENV__ = {
-    API_BASE_URL: '/api/',
-    KEYCLOAK_BASE_URL: 'https://keycloak.test',
-    KEYCLOAK_REALM: 'master',
-    KEYCLOAK_CLIENT_ID: 'dms-frontend'
-  }
-  sessionStorage.setItem('access_token', 'test-token')
-})
 
-// Mock composables
-vi.mock('@/composables/useSearchMetadata', () => ({
-  resolveFilename: (entry) => entry?.name || 'unknown',
-  resolveSecurityClass: (entry) => entry?.security_class || '',
-  TYPE_FILTERS: {
-    'PDF (.pdf)': ['.pdf'],
-    'Word (.docx)': ['.doc', '.docx', 'word'],
-    'Excel (.xlsx)': ['.xlsx'],
-    'Text / Markdown (.txt, .md)': ['.md', '.txt']
-  }
+/* Mock api.js */
+const mockAuthFetch = vi.hoisted(() => vi.fn())
+vi.mock('@/utils/api', () => ({
+  authFetch: mockAuthFetch,
+  API_PATHS: {
+    search: '/api/search_engine/search'
+  },
+  FRONTEND_DMISAPI_BASE_URL: '/api'
 }))
 
-// Stub all child components
+/* Mock composables */
+vi.mock('@/composables/useSearchMetadata', () => ({
+  resolveFilename: (entry) => entry?.name || 'unknown',
+  resolveDocumentExtension: (entry) => entry?.file_type || '',
+  resolveSecurityClass: (entry) => entry?.security_class || ''
+}))
+
+/* Mock useReload */
+vi.mock('@/composables/useReload', () => {
+  const { ref } = require('vue')
+  return {
+    useReload: (key, defaultValue) => ({
+      state: ref(defaultValue),
+      clear: vi.fn()
+    }),
+    clearAllSearchState: vi.fn()
+  }
+})
+
+/* Stub all child components */
 vi.mock('@/components/SearchBar.vue', () => ({
   default: {
     name: 'SearchBar',
@@ -65,16 +73,16 @@ vi.mock('@/components/SearchPreviewDrawer.vue', () => ({
 import SearchView from '@/views/SearchView.vue'
 
 describe('SearchView', () => {
-  let fetchMock
-
   beforeEach(() => {
-    fetchMock = vi.fn()
-    global.fetch = fetchMock
+    vi.clearAllMocks()
+    localStorage.setItem('access_token', 'test-token')
+    sessionStorage.setItem('access_token', 'test-token')
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   afterEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
@@ -84,12 +92,20 @@ describe('SearchView', () => {
 
   /* Sample search results */
   const mockResults = [
-    { name: 'report.pdf', security_class: 'Public', unique_pointer: 'ptr1' },
-    { name: 'memo.docx', security_class: 'Internal', unique_pointer: 'ptr2' },
-    { name: 'data.xlsx', security_class: 'Sensitive', unique_pointer: 'ptr3' },
-    { name: 'readme.md', security_class: 'Public', unique_pointer: 'ptr4' },
-    { name: 'notes.txt', security_class: 'Confidential', unique_pointer: 'ptr5' }
+    { name: 'report.pdf', security_class: 'Public', unique_pointer: 'ptr1', file_type: '.pdf' },
+    { name: 'memo.docx', security_class: 'Internal', unique_pointer: 'ptr2', file_type: '.docx' },
+    { name: 'data.xlsx', security_class: 'Sensitive', unique_pointer: 'ptr3', file_type: '.xlsx' },
+    { name: 'readme.md', security_class: 'Public', unique_pointer: 'ptr4', file_type: '.md' },
+    { name: 'notes.txt', security_class: 'Confidential', unique_pointer: 'ptr5', file_type: '.txt' }
   ]
+
+  const mockSuccessResponse = () => {
+    mockAuthFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockResults),
+      text: () => Promise.resolve('')
+    })
+  }
 
   /* ── Rendering ── */
   describe('rendering', () => {
@@ -120,55 +136,30 @@ describe('SearchView', () => {
   /* ── Search flow ── */
   describe('search', () => {
     it('fetches results on search event', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
-      const searchBar = wrapper.findComponent({ name: 'SearchBar' })
-
-      searchBar.vm.$emit('search', 'test query')
+      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test query')
       await flushPromises()
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('search'),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer test-token'
-          })
-        })
-      )
+      expect(mockAuthFetch).toHaveBeenCalledWith(expect.stringContaining('search'), expect.any(Object))
     })
 
     it('encodes the query parameter', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
-      const searchBar = wrapper.findComponent({ name: 'SearchBar' })
-
-      searchBar.vm.$emit('search', 'hello world')
+      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'hello world')
       await flushPromises()
 
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('hello%20world'), expect.any(Object))
+      expect(mockAuthFetch).toHaveBeenCalledWith(expect.stringContaining('hello%20world'), expect.any(Object))
     })
 
     it('passes results to SearchMatches after successful search', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
-      const searchBar = wrapper.findComponent({ name: 'SearchBar' })
-
-      searchBar.vm.$emit('search', 'test')
+      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
       await flushPromises()
 
       const matches = wrapper.findComponent({ name: 'SearchMatches' })
@@ -176,11 +167,7 @@ describe('SearchView', () => {
     })
 
     it('passes query to SearchMatches', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'my query')
@@ -194,7 +181,7 @@ describe('SearchView', () => {
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', '')
       await flushPromises()
 
-      expect(fetchMock).not.toHaveBeenCalled()
+      expect(mockAuthFetch).not.toHaveBeenCalled()
     })
 
     it('handles whitespace-only search query', async () => {
@@ -202,11 +189,11 @@ describe('SearchView', () => {
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', '   ')
       await flushPromises()
 
-      expect(fetchMock).not.toHaveBeenCalled()
+      expect(mockAuthFetch).not.toHaveBeenCalled()
     })
 
     it('handles API error response', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: false,
         status: 500,
         text: () => Promise.resolve('Internal Server Error')
@@ -220,7 +207,7 @@ describe('SearchView', () => {
     })
 
     it('handles network error', async () => {
-      fetchMock.mockRejectedValue(new Error('Network error'))
+      mockAuthFetch.mockRejectedValue(new Error('Network error'))
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
@@ -230,7 +217,7 @@ describe('SearchView', () => {
     })
 
     it('handles response with nested results property', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ results: mockResults }),
         text: () => Promise.resolve('')
@@ -244,7 +231,7 @@ describe('SearchView', () => {
     })
 
     it('handles response with nested matches property', async () => {
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ matches: mockResults }),
         text: () => Promise.resolve('')
@@ -258,19 +245,13 @@ describe('SearchView', () => {
     })
 
     it('resets state before each new search', async () => {
-      // First search
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'first')
       await flushPromises()
 
-      // Second search
-      fetchMock.mockResolvedValue({
+      mockAuthFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([]),
         text: () => Promise.resolve('')
@@ -286,11 +267,7 @@ describe('SearchView', () => {
   /* ── Match selection ── */
   describe('match selection', () => {
     it('opens the drawer when a match is selected', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
@@ -303,11 +280,7 @@ describe('SearchView', () => {
     })
 
     it('passes selected match to drawer', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
@@ -318,53 +291,21 @@ describe('SearchView', () => {
 
       expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('selectedMatch')).toEqual(mockResults[0])
     })
-
-    it('passes selected filename to drawer', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
-
-      const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
-      await flushPromises()
-
-      wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', mockResults[0])
-      await nextTick()
-
-      expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('selectedFile')).toBe('report.pdf')
-    })
-
-    it('ignores null match selection', async () => {
-      const wrapper = mountView()
-
-      wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', null)
-      await nextTick()
-
-      expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('open')).toBe(false)
-    })
   })
 
   /* ── Drawer close ── */
   describe('drawer close', () => {
     it('closes the drawer on close event', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+      mockSuccessResponse()
 
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
       await flushPromises()
 
-      // Open drawer
       wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', mockResults[0])
       await nextTick()
       expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('open')).toBe(true)
 
-      // Close drawer
       wrapper.findComponent({ name: 'SearchPreviewDrawer' }).vm.$emit('close')
       await nextTick()
       expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('open')).toBe(false)
@@ -373,12 +314,8 @@ describe('SearchView', () => {
 
   /* ── Filter logic ── */
   describe('filtering', () => {
-    beforeEach(async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResults),
-        text: () => Promise.resolve('')
-      })
+    beforeEach(() => {
+      mockSuccessResponse()
     })
 
     it('shows all results when no filters are active', async () => {
@@ -396,14 +333,14 @@ describe('SearchView', () => {
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toHaveLength(5)
     })
 
-    it('filters by type — PDF only', async () => {
+    it('filters by file type extension', async () => {
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
         source: [],
-        type: ['PDF (.pdf)'],
+        type: ['.pdf'],
         security: []
       })
       await nextTick()
@@ -411,39 +348,6 @@ describe('SearchView', () => {
       const filtered = wrapper.findComponent({ name: 'SearchMatches' }).props('matches')
       expect(filtered).toHaveLength(1)
       expect(filtered[0].name).toBe('report.pdf')
-    })
-
-    it('filters by type — Word only', async () => {
-      const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
-      await flushPromises()
-
-      wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
-        source: [],
-        type: ['Word (.docx)'],
-        security: []
-      })
-      await nextTick()
-
-      const filtered = wrapper.findComponent({ name: 'SearchMatches' }).props('matches')
-      expect(filtered).toHaveLength(1)
-      expect(filtered[0].name).toBe('memo.docx')
-    })
-
-    it('filters by type — multiple types', async () => {
-      const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
-      await flushPromises()
-
-      wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
-        source: [],
-        type: ['PDF (.pdf)', 'Excel (.xlsx)'],
-        security: []
-      })
-      await nextTick()
-
-      const filtered = wrapper.findComponent({ name: 'SearchMatches' }).props('matches')
-      expect(filtered).toHaveLength(2)
     })
 
     it('filters by security — Public only', async () => {
@@ -459,7 +363,7 @@ describe('SearchView', () => {
       await nextTick()
 
       const filtered = wrapper.findComponent({ name: 'SearchMatches' }).props('matches')
-      expect(filtered).toHaveLength(2) // report.pdf and readme.md
+      expect(filtered).toHaveLength(2)
     })
 
     it('filters by security — Confidential only', async () => {
@@ -486,7 +390,7 @@ describe('SearchView', () => {
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
         source: [],
-        type: ['Text / Markdown (.txt, .md)'],
+        type: ['.txt', '.md'],
         security: ['Public']
       })
       await nextTick()
@@ -503,7 +407,7 @@ describe('SearchView', () => {
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
         source: [],
-        type: ['PDF (.pdf)'],
+        type: ['.pdf'],
         security: ['Confidential']
       })
       await nextTick()
@@ -517,16 +421,14 @@ describe('SearchView', () => {
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
       await flushPromises()
 
-      // Apply filter
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
         source: [],
-        type: ['PDF (.pdf)'],
+        type: ['.pdf'],
         security: []
       })
       await nextTick()
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toHaveLength(1)
 
-      // Clear filters
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
         source: [],
         type: [],

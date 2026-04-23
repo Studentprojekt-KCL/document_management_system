@@ -159,7 +159,6 @@ class Handler:
         await transfer_queue.join()
         for _ in transfer_tasks:
             await transfer_queue.put(None)
-        await transfer_queue.join()
         dms_info(f"Formatted and transferred files to indexer, time: {(datetime.now() - start).total_seconds()}s.")
         index_queue.join()
         index_queue.put(None)
@@ -176,21 +175,15 @@ class Handler:
         """
 
         loop = get_event_loop()
-        batch: list[dict] = []
 
         while True:
             file: dict | None = await transfer_queue.get()
             if file is None:
-                await loop.run_in_executor(None, index_queue.put, batch)
-                transfer_queue.task_done()
                 break
             flat_file: dict | None = self._decode(file)
             if flat_file is None:
                 continue
-            batch.append(flat_file)
-            if len(batch) >= self.BATCH_SIZE:
-                await loop.run_in_executor(None, index_queue.put, batch)
-                batch = []
+            await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
 
     def _decode(self, file: dict) -> dict | None:
@@ -219,17 +212,28 @@ class Handler:
             task_queue: queue containing all the files to add.
         """
 
+        batch: list[dict] = []
+
         while True:
-            batch: list[dict] | None = index_queue.get()
-            if batch is None:
+            file: dict | None = index_queue.get()
+            if file is None:
                 break
+            batch.append(file)
+            if len(batch) >= self.BATCH_SIZE:
+                self.search_engine.init()
+                for file in batch:
+                    self.search_engine.add_file(file)
+                dms_info(f"Batch of {len(batch)} commited")
+                self.search_engine.close()
+                batch.clear()
+            index_queue.task_done()
+        if batch:
             self.search_engine.init()
             for file in batch:
                 self.search_engine.add_file(file)
-            if batch:
-                dms_info(f"Batch of {len(batch)} commited")
+            dms_info(f"Batch of {len(batch)} commited")
             self.search_engine.close()
-            index_queue.task_done()
+            batch.clear()
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

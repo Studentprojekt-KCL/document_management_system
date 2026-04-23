@@ -66,6 +66,7 @@ export function useAIRerank(props) {
   }
 
   return {
+    aiRerankResults,
     aiRerankResultsComputed,
     isReranking,
     rerankError,

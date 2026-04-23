@@ -13,7 +13,6 @@ import json
 import os
 import zipfile
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,16 +28,15 @@ from shared_functions.initialisation_tools import read_env_variable
 HTTP_OK = 200
 REQUEST_TIMEOUT = 120
 NUM_WORKERS = 10
-SHARED_CLIENT = True
+BINARY_SKIP_LOG_LIMIT = 10
 
 
-class GitHub:  # pylint: disable=too-many-instance-attributes
+class GitHub:
     """GitHub connector."""
 
     _client: httpx.Client
     api_base: str
     _binary_skip_logs: int
-    _binary_skip_log_limit: int
 
     def __init__(self) -> None:
         """Constructor."""
@@ -50,7 +48,6 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._binary_skip_logs = 0
-        self._binary_skip_log_limit = 10
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
 
     def _get_repos(self, token: str | None = None) -> list:
@@ -226,10 +223,10 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
                     file_content = zip_file.read(name).decode("utf-8")
                 except UnicodeDecodeError as err:
                     file_content = ""
-                    if self._binary_skip_logs < self._binary_skip_log_limit:
+                    if self._binary_skip_logs < BINARY_SKIP_LOG_LIMIT:
                         dms_info(f"Skipping binary/non-UTF8 file content: {name}. {err}")
                         self._binary_skip_logs += 1
-                        if self._binary_skip_logs == self._binary_skip_log_limit:
+                        if self._binary_skip_logs == BINARY_SKIP_LOG_LIMIT:
                             dms_info("Further binary/non-UTF8 file skip logs are suppressed for this run.")
                 enc = self._encode_content_path(intermediate_path)
                 unique_pointer = f"{base_pointer_prefix}{enc}?ref={quote(branch, safe='')}"
@@ -246,45 +243,28 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
                 )
         return files_data
 
-    @asynccontextmanager
-    async def _http_client(self) -> AsyncGenerator[httpx.AsyncClient | None, None]:
-        """Yield a shared AsyncClient when SHARED_CLIENT=True, else yield None per worker."""
-        if SHARED_CLIENT:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
-                yield client
-        else:
-            yield None
-
     async def _download_files(
-        self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue, client: httpx.AsyncClient | None, token: str | None
+        self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue, client: httpx.AsyncClient, token: str | None
     ) -> None:
         """Download repo archives from task_queue and put raw bytes into zip_queue."""
         headers = {"Authorization": f"Bearer {token}"} if token else {}
-        owned = client is None
-        if owned:
-            client = httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True)
-        assert client is not None
-        try:
-            while True:
-                task_data = await task_queue.get()
-                if task_data is None:
-                    task_queue.task_done()
-                    break
-                zip_url, full_name, branch = task_data
-                try:
-                    async with client.stream("GET", zip_url, headers=headers) as response:
-                        if response.status_code != HTTP_OK:
-                            dms_info(f"GitHub archive fetch {zip_url} returned {response.status_code}; skipping repo {full_name}.")
-                        else:
-                            data = await response.aread()
-                            await zip_queue.put({"data": data, "full_name": full_name, "branch": branch})
-                except httpx.HTTPError as err:
-                    dms_warning(f"GitHub archive download failed for {full_name}: {err}")
-                finally:
-                    task_queue.task_done()
-        finally:
-            if owned:
-                await client.aclose()
+        while True:
+            task_data = await task_queue.get()
+            if task_data is None:
+                task_queue.task_done()
+                break
+            zip_url, full_name, branch = task_data
+            try:
+                async with client.stream("GET", zip_url, headers=headers) as response:
+                    if response.status_code != HTTP_OK:
+                        dms_info(f"GitHub archive fetch {zip_url} returned {response.status_code}; skipping repo {full_name}.")
+                    else:
+                        data = await response.aread()
+                        await zip_queue.put({"data": data, "full_name": full_name, "branch": branch})
+            except httpx.HTTPError as err:
+                dms_warning(f"GitHub archive download failed for {full_name}: {err}")
+            finally:
+                task_queue.task_done()
 
     async def _unzip_files(self, zip_queue: asyncio.Queue, output_queue: asyncio.Queue) -> None:
         """Unzip archives from zip_queue and put unpacked file lists into output_queue."""
@@ -332,7 +312,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
         latest_update = await self._enqueue_repos(repos, self._provided_date(subdata), token, task_queue)
         generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
 
-        async with self._http_client() as client:  # pylint: disable=contextmanager-generator-missing-cleanup
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
             download_tasks = [
                 asyncio.create_task(self._download_files(task_queue, zip_queue, client, token)) for _ in range(NUM_WORKERS)
             ]
@@ -411,7 +391,7 @@ class GitHub:  # pylint: disable=too-many-instance-attributes
             return datetime.min.replace(tzinfo=timezone.utc)
 
     def _request(self, url: str, token: str | None = None) -> httpx.Response:
-        """Build a clean, stateless GET request — all headers explicit, no cookie carry-over."""
+        """Execute a clean GET request with all headers explicit and no cookie carry-over."""
         headers: dict[str, str] = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": self._api_version,

@@ -7,7 +7,8 @@ import httpx
 
 from gateway.schemas import InputItem, ClassificationResult
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
@@ -40,6 +41,34 @@ class Classifier:
         self.url = url
         self.escalation_threshold = escalation_threshold
         self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Classifier":
+        """Construct a Classifier from environment variables.
+
+        Reads:
+            STOCHAN_CLASSIFIER_URL: URL for the TEI classifier endpoint.
+            STOCHAN_ESCALATION_THRESHOLD: Score gap threshold for escalation.
+
+        Raises:
+            RuntimeError: If any required variable is missing.
+        """
+        url = read_env_variable("STOCHAN_CLASSIFIER_URL")
+        threshold = read_env_variable("STOCHAN_ESCALATION_THRESHOLD")
+
+        missing = [
+            name
+            for name, value in (
+                ("STOCHAN_CLASSIFIER_URL", url),
+                ("STOCHAN_ESCALATION_THRESHOLD", threshold),
+            )
+            if value is None
+        ]
+        if missing:
+            dms_error(f"Classifier env vars not defined: {', '.join(missing)}")
+            raise RuntimeError(f"Missing env vars: {missing}")
+
+        return cls(url=url, escalation_threshold=float(threshold), client=client)
 
     def _build_inputs(self, items: list[InputItem]) -> list[list[str]]:
         """Build NLI premise-hypothesis pairs for all documents."""

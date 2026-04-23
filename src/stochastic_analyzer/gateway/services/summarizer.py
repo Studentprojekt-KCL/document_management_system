@@ -8,7 +8,8 @@ import httpx
 from gateway.preprompts import INDIVIDUAL_SUMMARY_PROMPT, SYNTHESIS_PROMPT
 from gateway.schemas import InputItem, SummaryResult
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class Summarizer:
@@ -26,6 +27,37 @@ class Summarizer:
         self.model = model
         self.client = client
         self.timeout = timeout
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Summarizer":
+        """Construct a Summarizer from environment variables.
+
+        Reads:
+            STOCHAN_LLM_URL: URL for the LLM endpoint.
+            STOCHAN_LLM_MODEL: Model identifier.
+            STOCHAN_LLM_TIMEOUT: Request timeout in seconds.
+
+        Raises:
+            RuntimeError: If any required variable is missing.
+        """
+        url = read_env_variable("STOCHAN_LLM_URL")
+        model = read_env_variable("STOCHAN_LLM_MODEL")
+        timeout = read_env_variable("STOCHAN_LLM_TIMEOUT")
+
+        missing = [
+            name
+            for name, value in (
+                ("STOCHAN_LLM_URL", url),
+                ("STOCHAN_LLM_MODEL", model),
+                ("STOCHAN_LLM_TIMEOUT", timeout),
+            )
+            if value is None
+        ]
+        if missing:
+            dms_error(f"Summarizer env vars not defined: {', '.join(missing)}")
+            raise RuntimeError(f"Missing env vars: {missing}")
+
+        return cls(url=url, model=model, client=client, timeout=int(timeout))
 
     async def _call_llm(self, prompt: str) -> str | None:
         """Send a prompt to the LLM and return the response text."""

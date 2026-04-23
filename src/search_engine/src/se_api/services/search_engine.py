@@ -99,7 +99,7 @@ class SearchEngine:
         if self.writer is None:
             return
         self.writer.commit()
-        
+
     def close(self) -> None:
         """Close the writer."""
         if self.writer is None:

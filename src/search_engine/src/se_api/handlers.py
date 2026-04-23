@@ -4,7 +4,7 @@ import base64
 from threading import Thread
 import queue
 
-from asyncio import AbstractEventLoop, Lock, Queue, create_task, get_event_loop
+from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
 import json
 from fastapi import HTTPException

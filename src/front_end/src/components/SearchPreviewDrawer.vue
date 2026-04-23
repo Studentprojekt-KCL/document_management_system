@@ -23,8 +23,7 @@ import {
 } from 'lucide-vue-next'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
-import { hasRole } from '@/utils/auth'
-import ClassificationEditor from '@/components/ClassificationEditor.vue'
+import { useAIRerank } from '@/composables/aiRerank'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
@@ -38,89 +37,14 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 /* Use custom composable to extract metadata for the selected file */
-const {
-  previewTitle,
-  previewType,
-  sourceSystem,
-  previewFileDescription,
-  previewCreatedAt,
-  previewSize,
-  previewLink,
-  previewSecurityClass
-} = useSearchMetadata(props)
+const { previewTitle, sourceSystem, previewFileDescription, previewCreatedAt, previewSize, previewLink, previewSecurityClass } =
+  useSearchMetadata(props)
 
 /* AI summary composable */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
-
-const isEditingClassification = ref(false)
-const classificationEditorRef = ref(null)
-
-/* Local override for optimistic updates */
-const localSecurityLevel = ref('')
-
-/* Sync initial value */
-watch(
-  () => previewSecurityClass.value,
-  (val) => {
-    localSecurityLevel.value = val || ''
-  },
-  { immediate: true }
-)
-
-/* Final value used in UI */
-const currentSecurityLevel = computed(() => localSecurityLevel.value)
-
-/* Permissions */
-const canEdit = computed(() => hasRole('admin'))
-
-/* Toast */
-const toast = ref({ visible: false, success: true, message: '' })
-let toastTimer = null
-
-const showToast = (success, message) => {
-  if (toastTimer) clearTimeout(toastTimer)
-  toast.value = { visible: true, success, message }
-  toastTimer = setTimeout(() => {
-    toast.value.visible = false
-  }, 4000)
-}
-
-/* Save classification */
-const handleClassificationSave = async (level) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/search_engine/classification`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('access_token')} ` },
-      body: JSON.stringify({
-        unique_pointer: uniquePointer.value,
-        classification: level
-      })
-    })
-
-    if (!res.ok) throw new Error(`Server responded with ${res.status}`)
-
-    /* Optimistic UI update */
-    localSecurityLevel.value = level
-
-    showToast(true, 'Security classification updated successfully.')
-    isEditingClassification.value = false
-  } catch (err) {
-    showToast(false, `Update failed: ${err.message}`)
-  } finally {
-    classificationEditorRef.value?.resetSaving()
-  }
-}
-
-/* Reset UI on change */
-watch(
-  () => [props.selectedFile, props.open],
-  () => {
-    isEditingClassification.value = false
-    toast.value.visible = false
-  }
-)
+/* AI rerank composable */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -148,28 +72,6 @@ watch(
       </Transition>
 
       <h3 class="preview-title">{{ previewTitle }}</h3>
-
-      <div class="tag-row">
-        <span class="tag">{{ previewType }}</span>
-      </div>
-
-      <!-- SECURITY CLASSIFICATION -->
-      <section class="panel-section">
-        <div class="section-header">
-          <p class="section-title"><ShieldCheck :size="15" /> SECURITY CLASSIFICATION</p>
-
-          <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
-            <Pencil :size="14" />
-            Edit
-          </button>
-        </div>
-
-        <div class="classification-display">
-          <span :class="['classification-badge', `badge-${(currentSecurityLevel || 'none').toLowerCase()}`]">
-            {{ currentSecurityLevel || 'Not classified' }}
-          </span>
-        </div>
-      </section>
 
       <!-- Technical Metadata section -->
       <section class="panel-section">
@@ -214,14 +116,31 @@ watch(
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
-      <!-- MODAL -->
-      <ClassificationEditor
-        ref="classificationEditorRef"
-        :visible="isEditingClassification"
-        :current-level="currentSecurityLevel"
-        @save="handleClassificationSave"
-        @cancel="isEditingClassification = false"
-      />
+
+      <!-- Rerank (similarity) section -->
+      <section class="panel-section">
+        <p class="section-title">SIMILARITY</p>
+        <div v-if="aiRerankResultsComputed.length">
+          <ul>
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
+              <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
+            </li>
+          </ul>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isReranking"
+          @click="generateAIRerank"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isReranking ? 'Finding matches...' : 'Find Similar Files' }}
+          </p>
+          <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+        </button>
+      </section>
     </div>
 
     <div class="preview-footer">
@@ -301,6 +220,9 @@ watch(
   margin-top: 2rem;
   text-align: center;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .tag-row {
@@ -362,6 +284,19 @@ watch(
 .meta-cell-summary {
   grid-column: 1 / -1;
   overflow: hidden;
+}
+
+.meta-cell-rerank {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.meta-cell-rerank p {
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
 }
 
 .summary-markdown {

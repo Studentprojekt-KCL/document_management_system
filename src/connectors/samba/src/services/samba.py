@@ -136,8 +136,8 @@ class Samba:
         Returns: list of files.
         """
         pointers: list[str] | None = content.get("file_pointers")
-        username: str | None = content.get("username")
-        password: str | None = content.get("password")
+        username: str | None = content.get("username", self.mount_options.user) # DO NOT KEEP
+        password: str | None = content.get("password", self.mount_options.password) # DO NOT KEEP
 
         if pointers is None or username is None or password is None:
             return []
@@ -149,21 +149,24 @@ class Samba:
 
         files: list[dict] = []
         for pointer in pointers:
-            path: str = f"{self.mount_options.user_mount}/{pointer.lstrip(self.share_host.share)}"
-            with open(path, encoding="utf-8") as f:
-                status = os.stat(path)
-                metadata = {
-                    "unique_pointer": pointer,
-                    "name": path.split("/", maxsplit=1)[-1],
-                    "size": status.st_size,
-                    "source_system": self.source_system,
-                }
-                if include_last_edit_date:
-                    metadata["last_edit_date"] = datetime.fromtimestamp(status.st_mtime).isoformat()
-                file: dict = {"metadata": metadata}
-                if include_content:
-                    file["content"] = b64encode(f.read().encode("utf-8")).decode("utf-8")
-                files.append(file)
+            path: str = f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}"
+            try:
+                with open(path, encoding="utf-8") as f:
+                    status = os.stat(path)
+                    name: str = path.split("/", maxsplit=1)[-1]
+                    file = {
+                        "unique_pointer": pointer,
+                        "name": name,
+                        "size": status.st_size,
+                        "source_system": self.source_system,
+                    } | determine_file_type(name, self.file_info.file_extentions, self.file_info.extention_descriptions)
+                    if include_last_edit_date:
+                        file["last_edit_date"] = datetime.fromtimestamp(status.st_mtime).isoformat()
+                    if include_content:
+                        file["content"] = b64encode(f.read().encode("utf-8")).decode("utf-8")
+                    files.append(file)
+            except FileNotFoundError:
+                dms_warning(f"Failed to read file: {path}, {self.share_host.share}, {pointer}, {pointer[len(self.share_host.share):]}.")
         try:
             self._umount(self.mount_options.user_mount)
         except CalledProcessError:

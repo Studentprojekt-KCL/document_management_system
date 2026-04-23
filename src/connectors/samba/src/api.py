@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from initialisation_tools import read_env_variable, read_port
+from shared_functions.initialisation_tools import read_env_variable, read_port
 from starlette.responses import JSONResponse
 import uvicorn
 from services.samba import Samba

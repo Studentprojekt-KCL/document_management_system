@@ -44,6 +44,7 @@ class API:
         self.app = FastAPI()
         self.confluence_instance = ConfluenceInterfacer()
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+        self.app.add_event_handler("shutdown", self.shutdown_event)
         # Legacy (same as older GitLab connector in this repo)
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
@@ -53,6 +54,10 @@ class API:
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+
+    async def shutdown_event(self) -> None:
+        """Close connector HTTP client cleanly on app shutdown."""
+        await self.confluence_instance.session.aclose()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Return a JSON error payload for FastAPI request validation failures."""

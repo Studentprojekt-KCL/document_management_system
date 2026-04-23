@@ -10,6 +10,7 @@ Set ``CONFLUENCE_ADDRESS`` to the site root (e.g. ``https://tenant.atlassian.net
 
 import base64
 import binascii
+import asyncio
 import json
 import os
 import re
@@ -44,6 +45,7 @@ class ConfluenceInterfacer:
         self.session = httpx.AsyncClient(timeout=120.0)
         self.address = os.environ.get("CONFLUENCE_ADDRESS", "").rstrip("/")
         self.base = self._api_base(self.address)
+        self.max_concurrency = int(os.environ.get("CONFLUENCE_MAX_CONCURRENCY", "20"))
 
     @staticmethod
     def _api_base(address: str) -> str:
@@ -96,6 +98,48 @@ class ConfluenceInterfacer:
         except (httpx.HTTPError, ValueError):
             return {}
 
+    async def _execute_url_request(self, url: str, email: str | None, api_token: str | None) -> dict[str, Any]:
+        """Execute request to absolute or relative URL (used for pagination links)."""
+        if not self.base:
+            return {}
+        creds = self._resolve_auth(email, api_token)
+        if not creds:
+            return {}
+        user, token = creds
+        target_url = urljoin(self.base, url)
+        try:
+            response = await self.session.get(target_url, auth=(user, token))
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict):
+                return payload
+            return {}
+        except (httpx.HTTPError, ValueError):
+            return {}
+
+    async def _paginate(
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None,
+        email: str | None,
+        api_token: str | None,
+    ) -> list[dict[str, Any]]:
+        """Collect all paginated results by following ``_links.next``."""
+        payload = await self._execute_request(endpoint, params, email, api_token)
+        out: list[dict[str, Any]] = []
+
+        while payload:
+            results = payload.get("results", [])
+            if isinstance(results, list):
+                out.extend([item for item in results if isinstance(item, dict)])
+            links = payload.get("_links", {})
+            next_link = links.get("next") if isinstance(links, dict) else None
+            if not isinstance(next_link, str) or not next_link:
+                break
+            payload = await self._execute_url_request(next_link, email, api_token)
+
+        return out
+
     @staticmethod
     def _safe_when(value: Any) -> datetime:
         if not isinstance(value, str):
@@ -147,16 +191,12 @@ class ConfluenceInterfacer:
         email: str | None = None,
         api_token: str | None = None,
     ) -> list[dict[str, Any]]:
-        payload = await self._execute_request(
+        return await self._paginate(
             "content",
-            {"spaceKey": space_key, "type": "page", "limit": 1000, "expand": "version"},
+            {"spaceKey": space_key, "type": "page", "limit": 200, "expand": "version"},
             email,
             api_token,
         )
-        results = payload.get("results", [])
-        if isinstance(results, list):
-            return [p for p in results if isinstance(p, dict)]
-        return []
 
     async def get_page_ids(self, email: str | None = None, api_token: str | None = None) -> dict[str, str]:
         """Return the latest page edit time per space key (ISO strings)."""
@@ -190,23 +230,30 @@ class ConfluenceInterfacer:
 
     async def get_files(self, data: GetFilesInput) -> list[dict[str, Any]]:
         """Batch fetch by pointer; same shape as :meth:`get_page` per item (DMS ``get_files``)."""
-        out: list[dict[str, Any]] = []
-        for ptr in data.file_pointers:
-            if not isinstance(ptr, str):
-                continue
-            page = await self.get_page(
-                ptr,
-                include_content=data.include_content,
-                email=data.email,
-                api_token=data.api_token,
-            )
-            if not data.include_last_edit_date and isinstance(page.get("metadata"), dict):
-                page = dict(page)
-                meta = dict(page["metadata"])
-                meta.pop("last_edit_date", None)
-                page["metadata"] = meta
-            out.append(page)
-        return out
+        pointers = [ptr for ptr in data.file_pointers if isinstance(ptr, str)]
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+
+        async def _fetch(ptr: str) -> dict[str, Any]:
+            async with semaphore:
+                try:
+                    page = await self.get_page(
+                        ptr,
+                        include_content=data.include_content,
+                        email=data.email,
+                        api_token=data.api_token,
+                    )
+                except Exception:
+                    return {"metadata": {"unique_pointer": ptr, "type": SOURCE_FILE}}
+                if not data.include_last_edit_date and isinstance(page.get("metadata"), dict):
+                    page = dict(page)
+                    meta = dict(page["metadata"])
+                    meta.pop("last_edit_date", None)
+                    page["metadata"] = meta
+                return page
+
+        if not pointers:
+            return []
+        return await asyncio.gather(*[_fetch(ptr) for ptr in pointers])
 
     async def check_index_needed(
         self,
@@ -241,10 +288,19 @@ class ConfluenceInterfacer:
         pointers = pointer_payload.get("file_pointers", [])
         if not isinstance(pointers, list):
             return
-        for pointer in pointers:
-            if not isinstance(pointer, str):
-                continue
-            page = await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
+        valid_pointers = [ptr for ptr in pointers if isinstance(ptr, str)]
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+
+        async def _fetch(pointer: str) -> dict[str, Any]:
+            async with semaphore:
+                try:
+                    return await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
+                except Exception:
+                    return {"metadata": {"unique_pointer": pointer, "type": SOURCE_FILE}}
+
+        tasks = [asyncio.create_task(_fetch(pointer)) for pointer in valid_pointers]
+        for task in asyncio.as_completed(tasks):
+            page = await task
             yield json.dumps(page).encode("utf-8")
 
     async def get_page(
@@ -361,16 +417,15 @@ class ConfluenceInterfacer:
         pointers = pointer_payload.get("file_pointers", [])
         files: list[dict[str, Any]] = []
         if isinstance(pointers, list):
-            for pointer in pointers:
-                if isinstance(pointer, str):
-                    files.append(
-                        await self.get_page(
-                            pointer,
-                            include_content=True,
-                            email=email,
-                            api_token=api_token,
-                        )
-                    )
+            files = await self.get_files(
+                GetFilesInput(
+                    file_pointers=pointers,
+                    include_content=True,
+                    include_last_edit_date=True,
+                    email=email,
+                    api_token=api_token,
+                )
+            )
         return {
             "subdata": pointer_payload.get("subdata"),
             "files": files,

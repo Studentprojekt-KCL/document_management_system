@@ -63,7 +63,7 @@ class Samba:
         file_extentions = []
         extention_descriptions = {}
 
-        file_types = get_file_resource()
+        file_types: list = get_file_resource()
         for file_type in file_types:
             extension: str | None = file_type.get("extension")
             description: str | None = file_type.get("description")
@@ -84,29 +84,15 @@ class Samba:
 
         self.start = datetime.now()
 
-    def start_watch(self):
+    def start_watch(self) -> None:
         """Start notification watcher."""
         dms_info(f"Launching notification watcher for {self.share_host.share}.")
         self.watcher.start()
 
-    def stop_watch(self):
+    def stop_watch(self) -> None:
         """Stop notification watcher."""
         self.watcher.stop()
         dms_info(f"Closed notification watcher for {self.share_host.share}.")
-
-    def get_file_pointers(self) -> dict:
-        """Get new files from SMB share.
-
-        Args:
-            subdata: date and tim in iso format encoded with base64, represents the newest file date.
-        Return: Dict containting a list of file pointers and subdata.
-
-        """
-        changes = {}
-        changes["pointers"] = list(self.changes)
-        changes["subdata"] = urlsafe_b64encode(datetime.now().isoformat().encode("utf-8")).decode("utf-8")
-        self.changes.clear()
-        return changes
 
     async def check_index_needed(self, subdata: str | None) -> dict:
         """Check if an index is needed.
@@ -136,8 +122,8 @@ class Samba:
         Returns: list of files.
         """
         pointers: list[str] | None = content.get("file_pointers")
-        username: str | None = content.get("username", self.mount_options.user) # DO NOT KEEP
-        password: str | None = content.get("password", self.mount_options.password) # DO NOT KEEP
+        username: str | None = content.get("username", self.mount_options.user)  # DO NOT KEEP
+        password: str | None = content.get("password", self.mount_options.password)  # DO NOT KEEP
 
         if pointers is None or username is None or password is None:
             return []
@@ -166,7 +152,9 @@ class Samba:
                         file["content"] = b64encode(f.read().encode("utf-8")).decode("utf-8")
                     files.append(file)
             except FileNotFoundError:
-                dms_warning(f"Failed to read file: {path}, {self.share_host.share}, {pointer}, {pointer[len(self.share_host.share):]}.")
+                dms_warning(
+                    f"Failed to read file: {path}, {self.share_host.share}, {pointer}, {pointer[len(self.share_host.share):]}."
+                )
         try:
             self._umount(self.mount_options.user_mount)
         except CalledProcessError:

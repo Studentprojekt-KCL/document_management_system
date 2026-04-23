@@ -3,16 +3,19 @@
 from contextlib import asynccontextmanager
 import logging
 import argparse
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
 from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from shared_functions.initialisation_tools import read_env_variable, read_port
 from starlette.responses import JSONResponse
 import uvicorn
+
 from services.samba import Samba
+
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 
 class API:
@@ -60,7 +63,7 @@ class API:
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
 
     @asynccontextmanager
-    async def lifespan(self, _: FastAPI):
+    async def lifespan(self, _: FastAPI) -> AsyncGenerator:
         """API lifespan handler."""
         self.samba_service.start_watch()
         yield

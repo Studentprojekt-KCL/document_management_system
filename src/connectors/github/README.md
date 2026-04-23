@@ -20,3 +20,12 @@ personal access token (or OAuth token) in the `X-GitHub-Token` request header:
 
 If the header is absent the connector returns an empty result for that request — no GitHub API
 calls are made. There is no service-level fallback token.
+
+## Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/index_needed_bool` | GET | Returns whether any repo has new content since the last index |
+| `/stream_files_to_index` | GET | Streams NDJSON — subdata header followed by one file per line |
+| `/get_files` | POST | Fetches specific files by pointer |
+| `/files_to_index` | GET | **Deprecated** — use `/stream_files_to_index` instead |

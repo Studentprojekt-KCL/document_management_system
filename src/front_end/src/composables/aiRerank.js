@@ -1,39 +1,34 @@
 import { computed } from 'vue'
-import { useSearchMetadata, resolveFilename } from '@/composables/useSearchMetadata'
+import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useReload } from '@/composables/useReload'
 
-export function useAIRerank(props) {
+export function useAIRerank(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Rerank state */
   const { state: aiRerankResults } = useReload('aiRerankResults', [])
   const { state: rerankPointer } = useReload('rerankPointer', '')
+  const { state: rerankFilename } = useReload('rerankFilename', '')
   const { state: isReranking } = useReload('isReranking', false)
   const { state: rerankError } = useReload('rerankError', '')
 
   const mapRankedResults = (results = []) =>
-    results.map((item, index) => {
-      const pointer = item?.pointer ?? ''
-      const scorePercent = `${(Number(item?.score ?? 0) * 100).toFixed(1)}%`
-
-      return {
-        rank: index + 1,
-        name: resolveFilename(item, index),
-        pointer,
-        scorePercent
-      }
-    })
+    results.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      scorePercent: `${(Number(item?.score ?? 0) * 100).toFixed(1)}%`
+    }))
 
   /* Rerank results for specific file and disappears when new file is selected */
   const aiRerankResultsComputed = computed(() => (rerankPointer.value === uniquePointer.value ? aiRerankResults.value : []))
 
   /* When clicking button Rerank */
-  const generateAIRerank = async () => {
+  const generateAIRerank = async (filename = '') => {
     if (!uniquePointer.value) {
       aiRerankResults.value = []
-
+      rerankFilename.value = ''
       rerankError.value = ''
       return
     }
@@ -58,6 +53,7 @@ export function useAIRerank(props) {
       const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
       aiRerankResults.value = mapRankedResults(rankedResults)
       rerankPointer.value = uniquePointer.value
+      rerankFilename.value = filename
     } catch (error) {
       rerankError.value = error.message || 'An error occurred while generating AI rerank.'
     } finally {
@@ -66,7 +62,10 @@ export function useAIRerank(props) {
   }
 
   return {
+    aiRerankResults,
     aiRerankResultsComputed,
+    rerankPointer,
+    rerankFilename,
     isReranking,
     rerankError,
     generateAIRerank

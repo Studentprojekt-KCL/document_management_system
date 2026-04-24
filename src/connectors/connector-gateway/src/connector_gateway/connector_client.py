@@ -6,7 +6,7 @@ import asyncio
 # from shared_functions.dmis_logger import dms_error, dms_warning
 
 class ConnectorClient:
-    TIMEOUT: int = 120
+    TIMEOUT: int = 
 
     source_systems: list[dict] # List of dicts of subsytems
     source_systems_names: list[dict] | None

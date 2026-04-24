@@ -1,12 +1,22 @@
+FROM python:3.13-slim-trixie AS builder
+
+WORKDIR /build
+
+COPY src/connectors/connector-gateway /build/connectors/connector-gateway
+COPY src/shared_functions /build/shared_functions
+
+RUN python -m pip install --upgrade pip build \
+ && python -m build /build/connectors/connector-gateway
+
+# --- runtime stage ---
 FROM python:3.13-slim-trixie
 
-COPY src/connectors/connector-gateway /src/connector-gateway/
-COPY src/shared_functions /src/shared_functions
+WORKDIR /app
 
-WORKDIR /src/connector-gateway
+COPY --from=builder /build/connectors/connector-gateway/dist/*.whl /tmp/
+COPY --from=builder /build/connectors/connector-gateway/dist/*.whl /tmp/
 
-RUN python -m pip install build
-RUN python -m build
-RUN python -m pip install .
+RUN python -m pip install --no-cache-dir /tmp/*.whl \
+ && rm -rf /tmp/*.whl
 
 ENTRYPOINT ["connector_gateway"]

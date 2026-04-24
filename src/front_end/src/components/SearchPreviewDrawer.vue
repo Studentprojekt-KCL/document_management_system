@@ -168,6 +168,14 @@ watch(
             {{ currentSecurityLevel || 'Not classified' }}
           </span>
         </div>
+        <div v-if="isEditingClassification">
+          <ClassificationEditor
+            ref="classificationEditorRef"
+            :current-level="currentSecurityLevel"
+            @save="handleClassificationSave"
+            @cancel="isEditingClassification = false"
+          />
+        </div>
       </section>
 
       <!-- Technical Metadata section -->

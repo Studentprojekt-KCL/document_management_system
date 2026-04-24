@@ -137,12 +137,12 @@ describe('SearchView', () => {
   describe('search', () => {
     it('fetches results on search event', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test query')
       await flushPromises()
 
-      expect(mockAuthFetch).toHaveBeenCalledWith(expect.stringContaining('search'), expect.any(Object))
+      const [url] = mockAuthFetch.mock.calls[0]
+      expect(url).toContain('hello%20world')
     })
 
     it('encodes the query parameter', async () => {
@@ -152,7 +152,8 @@ describe('SearchView', () => {
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'hello world')
       await flushPromises()
 
-      expect(mockAuthFetch).toHaveBeenCalledWith(expect.stringContaining('hello%20world'), expect.any(Object))
+      const [url] = mockAuthFetch.mock.calls[0]
+      expect(url).toContain('hello%20world')
     })
 
     it('passes results to SearchMatches after successful search', async () => {

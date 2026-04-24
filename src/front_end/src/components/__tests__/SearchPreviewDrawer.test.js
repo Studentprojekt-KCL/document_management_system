@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { nextTick, defineComponent } from 'vue'
+import { nextTick } from 'vue'
 
 /* ── Mock dependencies ── */
 
@@ -55,19 +55,15 @@ vi.mock('@/utils/auth', () => ({
 }))
 
 /* Mock ClassificationEditor */
-const MockClassificationEditor = defineComponent({
+const MockClassificationEditor = {
   name: 'ClassificationEditor',
-  template: '<div class="mock-classification-editor" />',
-  props: {
-    visible: { type: Boolean, default: false },
-    currentLevel: { type: String, default: '' }
-  },
+  template: '<div class="mock-editor"></div>',
+  props: ['visible', 'currentLevel'],
   emits: ['save', 'cancel'],
-  setup() {
-    const resetSaving = () => {}
-    return { resetSaving }
+  methods: {
+    resetSaving() {}
   }
-})
+}
 
 vi.mock('@/components/ClassificationEditor.vue', () => ({
   default: MockClassificationEditor
@@ -107,14 +103,13 @@ describe('SearchPreviewDrawer', () => {
 
   const mountDrawer = (props = {}) => {
     return mount(SearchPreviewDrawer, {
-      props: { ...defaultProps, ...props },
+      props: {
+        ...defaultProps,
+        ...props
+      },
       global: {
         stubs: {
-          Transition: {
-            setup(_, { slots }) {
-              return () => slots.default?.()
-            }
-          }
+          ClassificationEditor: MockClassificationEditor
         }
       }
     })

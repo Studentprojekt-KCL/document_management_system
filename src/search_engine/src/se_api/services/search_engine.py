@@ -94,6 +94,12 @@ class SearchEngine:
             return
         self.writer = self.index.writer()
 
+    def commit(self) -> None:
+        """Commit added files without closing the writer."""
+        if self.writer is None:
+            return
+        self.writer.commit()
+
     def close(self) -> None:
         """Close the writer."""
         if self.writer is None:

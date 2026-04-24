@@ -119,10 +119,7 @@ describe('SearchPreviewDrawer', () => {
       editor.vm.$emit('save', 'Confidential')
       await flushPromises()
 
-      expect(saveClassification).toHaveBeenCalledWith(
-        'https://gitlab.com/api/v4/projects/1/files/test.pdf',
-        'Confidential'
-      )
+      expect(saveClassification).toHaveBeenCalledWith('https://gitlab.com/api/v4/projects/1/files/test.pdf', 'Confidential')
     })
 
     it('shows success notification after successful save', async () => {

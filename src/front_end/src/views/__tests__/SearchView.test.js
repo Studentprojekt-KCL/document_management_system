@@ -142,7 +142,8 @@ describe('SearchView', () => {
       await flushPromises()
 
       expect(mockAuthFetch).toHaveBeenCalledTimes(1)
-      expect(mockAuthFetch.mock.calls[0][0]).toContain('/search')    })
+      expect(mockAuthFetch.mock.calls[0][0]).toContain('/search')
+    })
 
     it('encodes the query parameter', async () => {
       mockSuccessResponse()

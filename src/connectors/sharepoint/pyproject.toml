@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sharepoint_service"
+description = ""
+version = "0.1.0"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+sharepoint_connector = "sharepoint_collector_api:run"

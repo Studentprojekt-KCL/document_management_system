@@ -33,6 +33,11 @@ services:
     build:
       dockerfile: src/connectors/github/Dockerfile
 
+  connector-sharepoint:
+      image: connector-sharepoint:pr
+      build:
+        dockerfile: src/connectors/sharepoint/Dockerfile
+
   connector-minio:
     image: connector-minio:pr
     build:

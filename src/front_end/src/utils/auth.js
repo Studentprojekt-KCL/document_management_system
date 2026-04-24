@@ -36,5 +36,4 @@ export async function logout() {
   window.location.assign(API_PATHS.authLogout)
   localStorage.removeItem('pkce_verifier')
   localStorage.removeItem('oidc_state')
-  
 }

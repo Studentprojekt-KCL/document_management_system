@@ -35,7 +35,7 @@ class Query:
 
     def reset(self) -> None:
         """Reset query service"""
-        self.cache.delete_cache_file()
+        self.cache.reset()
 
     async def close(self) -> None:
         """Clean up"""

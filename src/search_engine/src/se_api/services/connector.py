@@ -1,12 +1,14 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import dbm
 from json import JSONDecodeError
+import shelve
 from typing import Any
 from collections.abc import AsyncGenerator
 from httpx import AsyncClient
 import httpx
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
@@ -24,12 +26,14 @@ class Connector:
 
     GET_FILE_ENDPOINT: str = "/get_files"
     STREAM_ENDPOINT: str = "/stream_files_to_index"
+    DATA_FILE: str = "/data"
 
     subdata: str | None
 
     index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
+    data_path: str
 
     client: AsyncClient
 
@@ -37,14 +41,33 @@ class Connector:
         """Constructor"""
         address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")
         self.client = AsyncClient(base_url=address)
-        self.subdata = None
+        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"
+        try:
+            with shelve.open(self.data_path) as f:
+                self.subdata = f.get("subdata", None)
+        except OSError:
+            dms_error(f"Failed to open file: {self.data_path}.")
+        except dbm.error:
+            dms_error(f"Failed opening file: {self.data_path}")
 
     async def close(self) -> None:
         """Close clients"""
         await self.client.aclose()
 
+    def set_subdata(self, subdata: str | None) -> None:
+        """Set the subdata.
+
+        Args:
+            subdata: subdata string returned from the connectos.
+        """
+        with shelve.open(self.data_path) as f:
+            f["subdata"] = subdata
+        self.subdata = subdata
+
     def reset(self) -> None:
         """Resets the subdata, getting all files."""
+        with shelve.open(self.data_path) as f:
+            f["subdata"] = None
         self.subdata = None
 
     async def streaming_fetch(self) -> AsyncGenerator:

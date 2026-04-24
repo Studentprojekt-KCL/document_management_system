@@ -41,6 +41,7 @@ class Handler:
     async def init(self) -> None:
         """Init handler"""
         await self.query.init()
+        self.search_engine.init()
 
     async def close(self) -> None:
         """Clean up"""
@@ -49,10 +50,9 @@ class Handler:
 
     def reset(self) -> None:
         """Reset the connector."""
-        self.search_engine = SearchEngine()
-        self.connector = Connector()
+        self.search_engine.reset()
+        self.connector.reset()
         self.query.reset()
-        self.query = Query()
         dms_info("Search engine was reset.")
 
     def set_classification(self, change: dict[str, str]) -> dict[str, str]:
@@ -153,7 +153,7 @@ class Handler:
                 subdata = data.get("subdata")
                 continue
             await transfer_queue.put(data)
-        self.connector.subdata = subdata
+        self.connector.set_subdata(subdata)
         dms_info(f"Finished fetching new files, time: {(datetime.now() - start).total_seconds()}s.")
 
         await transfer_queue.join()
@@ -220,11 +220,11 @@ class Handler:
                 break
             batch.append(file)
             if len(batch) >= self.BATCH_SIZE:
-                self.search_engine.init()
+                self.search_engine.open_writer()
                 for file in batch:
                     self.search_engine.add_file(file)
                 dms_info(f"Batch of {len(batch)} commited")
-                self.search_engine.close()
+                self.search_engine.close_writer()
                 batch.clear()
             index_queue.task_done()
         if batch:
@@ -232,7 +232,7 @@ class Handler:
             for file in batch:
                 self.search_engine.add_file(file)
             dms_info(f"Batch of {len(batch)} commited")
-            self.search_engine.close()
+            self.search_engine.close_writer()
             batch.clear()
 
     def _flatten_dict(self, d: dict) -> dict:

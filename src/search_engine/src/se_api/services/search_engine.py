@@ -1,6 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import json
+from os import listdir, mkdir, path, remove
+
 from tantivy import (
     Document,
     Index,
@@ -10,7 +12,8 @@ from tantivy import (
     Searcher,
 )
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class SearchEngine:
@@ -23,15 +26,20 @@ class SearchEngine:
     index: Index
     categories: list[str]
     writer: IndexWriter | None
+    index_path: str
 
     def __init__(self) -> None:
+        """Constructor"""
+        self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/") + "/index"
         self.categories = ["unique_pointer", "content"]
         self.writer = None
-        self.rebuild()
 
-    def rebuild(self) -> None:
-        """Rebuild the index schema with the saved categories."""
-        dms_info(f"Rebuilding schema, new set: {self.categories}.")
+    def init(self) -> None:
+        """Initialize the index schema with the saved categories."""
+        if not path.exists(self.index_path):
+            mkdir(self.index_path)
+        if not path.isdir(self.index_path):
+            dms_error(f"{self.index_path} is not a directory.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
             if category == "unique_pointer":
@@ -39,7 +47,22 @@ class SearchEngine:
             else:
                 schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
-        self.index = Index(schema)
+        try:
+            self.index = Index(schema, path=self.index_path)
+        except ValueError:
+            dms_warning(f"Directory containing different schema was found in {self.index_path}, removing.")
+            for file in listdir(self.index_path):
+                remove(f"{self.index_path}/{file}")
+            try:
+                self.index = Index(schema, path=self.index_path)
+            except ValueError:
+                dms_error(f"Failed loading index directory, path: {self.index_path}.")
+
+    def reset(self) -> None:
+        """Reset the search engine."""
+        for file in listdir(self.index_path):
+            remove(f"{self.index_path}/{file}")
+        self.init()
 
     def have_new_category(self, categories: dict) -> bool:
         """Check if there is an apsent category.
@@ -88,19 +111,13 @@ class SearchEngine:
 
         return pointers
 
-    def init(self) -> None:
+    def open_writer(self) -> None:
         """Init index writer."""
         if self.writer is not None:
             return
         self.writer = self.index.writer()
 
-    def commit(self) -> None:
-        """Commit added files without closing the writer."""
-        if self.writer is None:
-            return
-        self.writer.commit()
-
-    def close(self) -> None:
+    def close_writer(self) -> None:
         """Close the writer."""
         if self.writer is None:
             return

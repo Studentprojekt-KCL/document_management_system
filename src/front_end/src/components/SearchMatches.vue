@@ -27,7 +27,7 @@ const props = defineProps({
 /* Emit to parent component when a match is selected or selection is toggled */
 const emit = defineEmits(['select', 'update:selectedPointers'])
 
-const getPointer = (match) => match?.unique_pointer || match?.metadata?.unique_pointer || match?.pointer || ''
+const getPointer = (match) => match?.unique_pointer || ''
 
 const isSelectedPointer = (pointer) => props.selectedPointers.includes(pointer)
 

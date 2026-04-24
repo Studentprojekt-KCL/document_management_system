@@ -46,7 +46,7 @@ class AuthRoutes:
             key=key,
             value=value,
             httponly=True,
-            secure=False,  # True in production with HTTPS
+            secure=True,  # True in production with HTTPS
             samesite="lax",
             max_age=max_age,
         )
@@ -199,7 +199,22 @@ class AuthRoutes:
         logout_url = f"{self.keycloak_logout_url}?{urlencode(params)}"
 
         response = RedirectResponse(url=logout_url, status_code=302)
-        response.delete_cookie("access_token")
-        response.delete_cookie("refresh_token")
-        response.delete_cookie("id_token")
+        response.delete_cookie(
+                "access_token",
+                path="/",
+                secure=True,
+                samesite="lax"
+            )
+        response.delete_cookie(
+                "refresh_token",
+                path="/",
+                secure=True,
+                samesite="lax"
+            )
+        response.delete_cookie(
+                "id_token",
+                path="/",
+                secure=True,
+                samesite="lax"
+            )
         return response

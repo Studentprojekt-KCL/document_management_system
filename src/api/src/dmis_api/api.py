@@ -14,7 +14,6 @@ from fastapi import FastAPI, Request, HTTPException, Header, Cookie
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 
 from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
@@ -48,16 +47,6 @@ class API:
     ):
         """Constructor."""
         self.app = FastAPI()
-
-        origins = ["http://localhost:8080"]
-
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
 
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
@@ -117,10 +106,8 @@ class API:
         content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    def authorize(self, authorization: str | None, host: str | None) -> dict[str, Any]:
+    def authorize(self, authorization: str | None ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host):
-            return {}
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(
             f"Authorized request: "

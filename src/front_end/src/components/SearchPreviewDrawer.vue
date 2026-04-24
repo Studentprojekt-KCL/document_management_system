@@ -118,17 +118,6 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
               <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
             </li>
           </ul>
-          <!-- Possibility to merge files button -->
-          <button
-            class="meta-cell meta-cell-summary summary-regenerate-button"
-            type="button"
-            @click="$router.push({ name: 'MergeFiles' })"
-          >
-            <p>
-              <StarsIcon :size="13" />
-              Merge Files
-            </p>
-          </button>
           <button
             class="meta-cell meta-cell-summary summary-regenerate-button"
             type="button"
@@ -140,6 +129,17 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
               {{ isReranking ? 'Finding matches...' : 'Regenerate Similar Files' }}
             </p>
             <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+          </button>
+          <!-- Possibility to merge files button -->
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            @click="$router.push({ name: 'MergeFiles' })"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              Merge Files
+            </p>
           </button>
         </div>
         <button
@@ -337,6 +337,10 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 .summary-regenerate-button {
   margin-top: 0.75rem;
   cursor: pointer;
+}
+
+.summary-regenerate-button + .summary-regenerate-button {
+  margin-left: 1rem;
 }
 
 .summary-regenerate-button:hover:not(:disabled) {

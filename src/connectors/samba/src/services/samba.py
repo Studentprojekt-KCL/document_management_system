@@ -122,8 +122,8 @@ class Samba:
         Returns: list of files.
         """
         pointers: list[str] | None = content.get("file_pointers")
-        username: str | None = content.get("username", self.mount_options.user)  # DO NOT KEEP
-        password: str | None = content.get("password", self.mount_options.password)  # DO NOT KEEP
+        username: str | None = content.get("username", self.mount_options.user)  # NOTE: DO NOT KEEP
+        password: str | None = content.get("password", self.mount_options.password)  # NOTE: DO NOT KEEP
 
         if pointers is None or username is None or password is None:
             return []

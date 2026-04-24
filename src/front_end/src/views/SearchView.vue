@@ -12,24 +12,28 @@
  */
 
 import { ref } from 'vue'
+import { useAppState } from '@/composables/useAppState'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useReload } from '@/composables/useReload'
 
 /* Reactive state variables for search results and UI state */
+const {
+  searchMatches: matches,
+  searchAllMatches: allMatches,
+  selectedFile,
+  selectedMatch,
+  lastQuery,
+  isPreviewOpen,
+  markStateChanged,
+  stateReady
+} = useAppState()
+
 const error = ref('')
 const isSearching = ref(false)
-/* Persistant across reloads */
-const { state: matches } = useReload('searchMatches', [])
-const { state: allMatches } = useReload('searchAllMatches', [])
-const { state: selectedFile } = useReload('selectedFile', '')
-const { state: selectedMatch } = useReload('selectedMatch', null)
-const { state: lastQuery } = useReload('lastQuery', '')
-const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -41,6 +45,7 @@ const selectedFilters = ref({
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {
   lastQuery.value = query
+  markStateChanged()
 
   error.value = ''
   matches.value = []
@@ -55,6 +60,7 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
+    //const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
     const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
 
     if (!res.ok) {
@@ -68,6 +74,7 @@ const handleSearch = async (query) => {
 
     allMatches.value = resultArray
     matches.value = resultArray
+    markStateChanged()
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
@@ -86,11 +93,13 @@ const selectMatch = (match) => {
 
   selectedMatch.value = match
   isPreviewOpen.value = true
+  markStateChanged()
 }
 
 /* Closes the search preview drawer */
 const closePreview = () => {
   isPreviewOpen.value = false
+  markStateChanged()
 }
 
 /* Handle changes to search filters  */
@@ -126,12 +135,13 @@ const handleFilterChange = (filters) => {
     // return typeMatch && sourceMatch && securityMatch
     return typeMatch && securityMatch
   })
+  markStateChanged()
 }
 </script>
 
 <template>
   <!-- Search View Section -->
-  <section class="search-view">
+  <section v-if="stateReady" class="search-view">
     <!-- Search Bar Component -->
     <SearchBar :loading="isSearching" @search="handleSearch" />
 
@@ -150,6 +160,7 @@ const handleFilterChange = (filters) => {
       @close="closePreview"
     />
   </section>
+  <section v-else class="search-view">Loading Search state...</section>
 </template>
 
 <style scoped>

@@ -11,16 +11,19 @@
 import { Bell, LogOut } from 'lucide-vue-next'
 import { logout } from '@/utils/auth'
 import { useRoute, useRouter } from 'vue-router'
+import { useAppState } from '@/composables/useAppState'
 
 /* Logo redirects to search page, page reloads if already on search page */
 const router = useRouter()
 const route = useRoute()
-const navigateToSearch = () => {
+const { clearBackendAndLocalState } = useAppState()
+
+const navigateToSearch = async () => {
+  await clearBackendAndLocalState()
   if (route.name === 'Search') {
     window.location.reload()
     return
   }
-
   router.push('/search')
 }
 

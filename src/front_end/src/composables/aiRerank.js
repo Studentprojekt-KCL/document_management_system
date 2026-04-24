@@ -1,17 +1,14 @@
 import { computed } from 'vue'
 import { useSearchMetadata, resolveFilename } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useReload } from '@/composables/useReload'
+import { useAppState } from '@/composables/useAppState'
 
 export function useAIRerank(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Rerank state */
-  const { state: aiRerankResults } = useReload('aiRerankResults', [])
-  const { state: rerankPointer } = useReload('rerankPointer', '')
-  const { state: isReranking } = useReload('isReranking', false)
-  const { state: rerankError } = useReload('rerankError', '')
+  const { aiRerankResults, rerankPointer, isReranking, rerankError } = useAppState()
 
   const mapRankedResults = (results = []) =>
     results.map((item, index) => {

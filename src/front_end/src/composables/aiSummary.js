@@ -1,18 +1,14 @@
 import { computed } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useReload } from '@/composables/useReload'
+import { useAppState } from '@/composables/useAppState'
 
 export function useAISummary(props) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Summary state */
-  const { state: aiSummary } = useReload('aiSummary', '')
-  const { state: aiSummaryHtmlRaw } = useReload('aiSummaryHtmlRaw', '')
-  const { state: summaryPointer } = useReload('summaryPointer', '')
-  const { state: summaryError } = useReload('summaryError', '')
-  const { state: isGeneratingSummary } = useReload('isGeneratingSummary', false)
+  const { aiSummary, aiSummaryHtmlRaw, summaryPointer, summaryError, isGeneratingSummary } = useAppState()
 
   /* Summary for specific file and disappears when new file is selected */
   const aiSummaryHtml = computed(() => (summaryPointer.value === uniquePointer.value ? aiSummaryHtmlRaw.value : ''))

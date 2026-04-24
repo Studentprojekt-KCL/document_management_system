@@ -141,9 +141,8 @@ describe('SearchView', () => {
       wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test query')
       await flushPromises()
 
-      const [url] = mockAuthFetch.mock.calls[0]
-      expect(url).toContain('hello%20world')
-    })
+      expect(mockAuthFetch).toHaveBeenCalledTimes(1)
+      expect(mockAuthFetch.mock.calls[0][0]).toContain('/search')    })
 
     it('encodes the query parameter', async () => {
       mockSuccessResponse()

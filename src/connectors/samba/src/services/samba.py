@@ -47,15 +47,15 @@ class Samba:
     def __init__(self) -> None:
         """Constructor."""
 
-        host = read_env_variable("SC_SAMBA_HOST")
-        port = read_port("SC_SAMBA_PORT")
-        user = read_env_variable("SC_SAMBA_USER")
-        password = read_env_variable("SC_SAMBA_PASS")
-        service_mount = read_env_variable("SC_SAMBA_SERVICE_MOUNT_PATH").rstrip("/")
-        user_mount = read_env_variable("SC_SAMBA_USER_MOUNT_PATH").rstrip("/")
-        self.source_system = read_env_variable("SC_SYSTEM_NAME")
+        host = read_env_variable("CONSMB_SMB_SHARE_ADDR")
+        port = read_port("CONSMB_SMB_SHARE_PORT")
+        user = read_env_variable("CONSMB_SMB_SHARE_SERVICE_USER")
+        password = read_env_variable("CONSMB_SMB_SHARE_SERVICE_PASS")
+        service_mount = read_env_variable("CONSMB_SAMBA_SERVICE_MOUNT_PATH").rstrip("/")
+        user_mount = read_env_variable("CONSMB_SAMBA_USER_MOUNT_PATH").rstrip("/")
+        self.source_system = read_env_variable("CONSMB_SYSTEM_NAME")
 
-        share = rf"//{host}/{read_env_variable("SC_SAMBA_SHARE")}"
+        share = rf"//{host}/{read_env_variable("CONSMB_SMB_SHARE_NAME")}"
 
         self.share_host = ShareHost(host, port, share)
         self.mount_options = MountOptions(user, password, service_mount, user_mount)

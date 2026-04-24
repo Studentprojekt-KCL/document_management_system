@@ -37,8 +37,8 @@ class API:
 
     def __init__(self) -> None:
         """constructor"""
-        self.host: str = read_env_variable("SC_BIND_ADDRESS")
-        self.port: int = read_port("SC_PORT")
+        self.host: str = read_env_variable("CONSMB_BIND_ADDR")
+        self.port: int = read_port("CONSMB_BIND_PORT")
 
         logging.basicConfig()
 

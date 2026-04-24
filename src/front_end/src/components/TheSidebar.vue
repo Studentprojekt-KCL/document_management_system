@@ -19,7 +19,7 @@ const router = useRouter()
 const route = useRoute()
 
 /* State for sidebar collapse/expand */
-const isOpen = ref(true)
+const isOpen = ref(false)
 
 /* Define all possible menu items with their respective icons and paths */
 const menuItems = [
@@ -85,7 +85,6 @@ const navigateTo = (path) => {
       >
         <component :is="item.icon" class="nav-icon" />
         <span v-show="isOpen" class="nav-label">{{ item.label }}</span>
-        <div v-if="activeItem === item.id && isOpen" class="nav-indicator" />
       </button>
     </nav>
   </aside>
@@ -111,24 +110,29 @@ const navigateTo = (path) => {
 .sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .hamburger-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-  color: #6b7280;
-  transition: color 0.2s;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #6b7280;
 }
 
 .hamburger-btn:hover {
+  background: #f3f4f6;
   color: #1f2937;
+}
+
+.sidebar.collapsed .hamburger-btn {
+  justify-content: center;
+  padding: 0.875rem;
 }
 
 .nav-menu {
@@ -146,7 +150,6 @@ const navigateTo = (path) => {
   background: transparent;
   cursor: pointer;
   border-radius: 8px;
-  transition: all 0.2s;
   text-align: left;
   position: relative;
 }
@@ -168,7 +171,6 @@ const navigateTo = (path) => {
 .nav-icon {
   width: 20px;
   height: 20px;
-  flex-shrink: 0;
   stroke-width: 2;
 }
 
@@ -192,12 +194,5 @@ const navigateTo = (path) => {
 
 .nav-item.active .nav-label {
   color: white;
-}
-
-.nav-indicator {
-  width: 6px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
 }
 </style>

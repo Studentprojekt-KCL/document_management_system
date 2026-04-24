@@ -1,24 +1,36 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
+import { useReload } from '@/composables/useReload'
 
-export function useAISummary(props) {
+export function useAISummary(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Summary state */
-  const aiSummary = ref('')
-  const aiSummaryHtmlRaw = ref('')
-  const summaryPointer = ref('')
-  const summaryError = ref('')
-  const isGeneratingSummary = ref(false)
+  const { state: aiSummary } = useReload('aiSummary', '')
+  const { state: aiSummaryHtmlRaw } = useReload('aiSummaryHtmlRaw', '')
+  const { state: summaryPointer } = useReload('summaryPointer', '')
+  const { state: summaryError } = useReload('summaryError', '')
+  const { state: isGeneratingSummary } = useReload('isGeneratingSummary', false)
 
-  /* Summary for specific file and disappears when new file is selected */
-  const aiSummaryHtml = computed(() => (summaryPointer.value === uniquePointer.value ? aiSummaryHtmlRaw.value : ''))
-
-  /* When clicking button Generate AI summary */
-  const generateAISummary = async () => {
+  const aiSummaryHtml = computed(() => {
     if (!uniquePointer.value) {
+      return aiSummaryHtmlRaw.value
+    }
+
+    return summaryPointer.value === uniquePointer.value ? aiSummaryHtmlRaw.value : ''
+  })
+
+  /* Generate summary for selected pointers, including a source/rerank pointer. */
+  const generateAISummary = async (pointers = [], sourcePointer = '') => {
+    // Current file if nothing selected to summarize
+    const filesToSummarize = pointers && pointers.length > 0 ? pointers : uniquePointer.value ? [uniquePointer.value] : []
+
+    // Combine selected files + rerank source pointer, filter for valid strings and removes duplicates (set part)
+    const requestPointers = [...new Set([...filesToSummarize, sourcePointer].filter((p) => p?.trim()))]
+
+    if (!requestPointers.length) {
       aiSummary.value = ''
       aiSummaryHtmlRaw.value = ''
       summaryPointer.value = ''
@@ -35,7 +47,7 @@ export function useAISummary(props) {
       const response = await authFetch(API_PATHS.summarize, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pointers: [uniquePointer.value] })
+        body: JSON.stringify({ pointers: requestPointers })
       })
 
       if (!response.ok) {
@@ -54,7 +66,7 @@ export function useAISummary(props) {
 
       aiSummary.value = summaryText
       aiSummaryHtmlRaw.value = globalThis.marked ? globalThis.marked.parse(summaryText) : summaryText
-      summaryPointer.value = uniquePointer.value
+      summaryPointer.value = requestPointers.join('|')
     } catch (error) {
       summaryError.value = error.message
     } finally {

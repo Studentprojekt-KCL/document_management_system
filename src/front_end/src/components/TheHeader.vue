@@ -8,52 +8,32 @@
  * @example usage:
  * <TheHeader />
  */
-
 import { Bell, LogOut } from 'lucide-vue-next'
-import {
-  FRONTEND_AD_CLIENT_ID,
-  keycloakLogoutUrl,
-  SESSION_KEY_ACCESS_TOKEN,
-  SESSION_KEY_ID_TOKEN,
-  SESSION_KEY_PKCE_VERIFIER,
-  SESSION_KEY_OIDC_STATE,
-  LOCAL_KEY_LOGOUT_EVENT
-} from '@/utils/config'
+import { logout } from '@/utils/auth'
+import { useRoute, useRouter } from 'vue-router'
 
-/* Placeholder for future notifications feature. */
-const handleNotification = () => {
-  console.log('Notifications not yet implemented.')
-}
-
-/* Handles user logout by clearing session storage and redirecting to login page. */
-const handleLogout = () => {
-  const idToken = sessionStorage.getItem(SESSION_KEY_ID_TOKEN)
-  const postLogoutRedirectUri = `${window.location.origin}/`
-
-  sessionStorage.removeItem(SESSION_KEY_ACCESS_TOKEN)
-  sessionStorage.removeItem(SESSION_KEY_ID_TOKEN)
-  sessionStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
-  sessionStorage.removeItem(SESSION_KEY_OIDC_STATE)
-
-  localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
-
-  if (idToken) {
-    const logoutUrl =
-      keycloakLogoutUrl() +
-      `?id_token_hint=${encodeURIComponent(idToken)}` +
-      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-      `&client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}`
-
-    window.location.assign(logoutUrl)
+/* Logo redirects to search page, page reloads if already on search page */
+const router = useRouter()
+const route = useRoute()
+const navigateToSearch = () => {
+  if (route.name === 'Search') {
+    window.location.reload()
     return
   }
+
+  router.push('/search')
+}
+
+/* Handles user logout by clearing local storage and redirecting to login page. */
+const handleLogout = () => {
+  logout()
 }
 </script>
 
 <template>
   <!--- Main Header container-->
   <header class="header">
-    <img src="@/assets/newLogo.png" alt="Logo" class="logo-image" />
+    <img src="@/assets/newLogo.png" alt="Logo" class="logo-image" @click="navigateToSearch" />
 
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
@@ -86,6 +66,7 @@ const handleLogout = () => {
   object-fit: contain;
   border-radius: 10px;
   margin-left: 1.3rem;
+  cursor: pointer;
 }
 
 .spacer {

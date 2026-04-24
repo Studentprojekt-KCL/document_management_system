@@ -1,33 +1,4 @@
 /**
- * Frontend auth client for mainAPI cookie-based authentication.
- *
- * This file does not read or store access tokens in the frontend.
- * It only communicates with mainAPI using credentials: 'include'.
- */
-
-// Temporary
-const MAIN_API_BASE_URL = 'http://localhost:8000'
-
-/**
- * Internal helper for auth-related API calls.
- *
- * @param {string} path
- * @param {RequestInit} options
- * @returns {Promise<Response>}
- */
-//import { apiFetch, API_PATHS } from '@/utils/api'
-
-async function authRequest(path, options = {}) {
-  return fetch(`${MAIN_API_BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...(options.headers || {})
-    }
-  })
-}
-
-/**
  * Exchange OAuth authorization code + PKCE verifier for backend cookies.
  *
  * mainAPI performs the token exchange with Keycloak and stores tokens
@@ -38,11 +9,11 @@ async function authRequest(path, options = {}) {
  * @param {string} params.codeVerifier
  * @returns {Promise<{ ok: true, data: any } | { ok: false, status: number, message: string }>}
  */
+import { apiFetch, API_PATHS } from '@/utils/api'
 
 export async function exchangeAuthorizationCode({ code, codeVerifier }) {
   try {
-    //const response = await apiFetch(API_PATHS.codeExchange,
-    const response = await authRequest('/auth/codeExchange', {
+    const response = await apiFetch(API_PATHS.codeExchange, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -85,8 +56,7 @@ export async function exchangeAuthorizationCode({ code, codeVerifier }) {
  */
 export async function isAuthenticated() {
   try {
-    //const response = await apiFetch(API_PATHS.authCheck,
-    const response = await authRequest('/auth/check', {
+    const response = await apiFetch(API_PATHS.authCheck, {
       method: 'GET'
     })
 
@@ -107,8 +77,7 @@ export async function isAuthenticated() {
 
 export async function getCurrentUser() {
   try {
-    //const response = await apiFetch(API_PATHS.authMe,
-    const response = await authRequest('/auth/me', {
+    const response = await apiFetch(API_PATHS.authMe, {
       method: 'GET'
     })
 

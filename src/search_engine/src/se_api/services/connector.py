@@ -64,12 +64,6 @@ class Connector:
             f["subdata"] = subdata
         self.subdata = subdata
 
-    def reset(self) -> None:
-        """Resets the subdata, getting all files."""
-        with shelve.open(self.data_path) as f:
-            f["subdata"] = None
-        self.subdata = None
-
     async def streaming_fetch(self) -> AsyncGenerator:
         """Grab file stream from connector.
 

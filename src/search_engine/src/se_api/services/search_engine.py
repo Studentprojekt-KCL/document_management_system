@@ -64,27 +64,6 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.init()
 
-    def have_new_category(self, categories: dict) -> bool:
-        """Check if there is an apsent category.
-
-        Args:
-            categories: the dict containing the categories.
-
-        Returns:
-        True if there are new ones, else False
-        """
-
-        new: bool = False
-        for key in categories:
-            category = categories.get(key)
-            if isinstance(category, dict):
-                new = new or self.have_new_category(category)
-            elif key not in self.categories:
-                new = True
-                self.categories.append(key)
-
-        return new
-
     def query_files(self, q: str, k: int) -> list[str]:
         """Query through the files in the index.
 

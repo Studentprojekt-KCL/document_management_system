@@ -51,7 +51,7 @@ class Handler:
     def reset(self) -> None:
         """Reset the connector."""
         self.search_engine.reset()
-        self.connector.reset()
+        self.connector.set_subdata(None)
         self.query.reset()
         dms_info("Search engine was reset.")
 

@@ -1,12 +1,13 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+import time
+
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_warning
 
 from mysql import connector
-from shared_functions.initialisation_tools import read_env_variable
 
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from mysql.connector.pooling import PooledMySQLConnection
-
-import time
 
 class Database:
     """Service class for the database."""
@@ -45,7 +46,7 @@ class Database:
 
         return result[0][0]
 
-    def insert_session_token(self, user: str, service: str, enc_obj: str, expiry_time: int):
+    def insert_session_token(self, user: str, service: str, enc_obj: str, expiry_time: int) -> bool:
         """Insert encrypted user tokens into database.
 
         Args:
@@ -58,14 +59,22 @@ class Database:
 
         timestamp = int(time.time()) + expiry_time
 
-        db = self.connect()
-        cursor = db.cursor()
-        sql = """
-        INSERT INTO user_sessions (user_id, service, token, expiry_time)
-        VALUES (%s, %s, %s, FROM_UNIXTIME(%s))
-        ON DUPLICATE KEY UPDATE
-            token = %s,
-            expiry_time = FROM_UNIXTIME(%s)
-        """
-        cursor.execute(sql, (user, service, enc_obj, timestamp, enc_obj, timestamp))
-        db.commit()
+        try:
+            db = self.connect()
+            cursor = db.cursor()
+            sql = """
+            INSERT INTO user_sessions (user_id, service, token, expiry_time)
+            VALUES (%s, %s, %s, FROM_UNIXTIME(%s))
+            ON DUPLICATE KEY UPDATE
+                token = %s,
+                expiry_time = FROM_UNIXTIME(%s)
+            """
+            cursor.execute(sql, (user, service, enc_obj, timestamp, enc_obj, timestamp))
+            db.commit()
+        except connector.Error as err:
+            dms_warning(f"Unable to insert session value into database: {err}")
+        finally:
+            cursor.close()
+            db.close()
+
+        return True

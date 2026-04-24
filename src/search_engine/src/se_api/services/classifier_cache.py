@@ -5,7 +5,7 @@ import dbm
 from os import path, remove
 import shelve
 
-from shared_functions.dmis_logger import dms_error, dms_info
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
@@ -97,8 +97,10 @@ class ClassifierCache:
         Args:
             poiner: unique pointer
         """
-
-        self.cache.pop(pointer)
+        try:
+            self.cache.pop(pointer)
+        except KeyError:
+            dms_warning(f"Tried to remove classification for non-existing file: {pointer}.")
 
     def remove_classifications(self, files: list[dict[str, str]]) -> None:
         """Remove a list classifications from cache.

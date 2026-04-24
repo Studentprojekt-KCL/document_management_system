@@ -17,7 +17,6 @@ from shared_functions.dmis_logger import dms_warning
 
 SWEDISH_CHARS = set("åäö")
 
-
 def detect_language(text: str, sample_size: int, swedish_char_threshold: int) -> str:
     """Detect Swedish via early-exit heuristic on sampled prefix. Fast & injection-resistant."""
 
@@ -32,7 +31,6 @@ def detect_language(text: str, sample_size: int, swedish_char_threshold: int) ->
 
     return "english"
 
-
 @dataclass
 class SummarizerConfig:
     """Configuration for the Summarizer service."""
@@ -41,7 +39,6 @@ class SummarizerConfig:
     model: str
     timeout: int
     lang_config: LanguageConfig
-
 
 class Summarizer:
     """Two-stage document summarizer using an external LLM.

@@ -13,7 +13,7 @@ FROM python:3.13-slim-trixie
 
 WORKDIR /app
 
-COPY --from=builder /build/connectors/connector-gateway/dist/*.whl /tmp/
+COPY --from=builder /build/shared_functions /tmp/shared_functions
 COPY --from=builder /build/connectors/connector-gateway/dist/*.whl /tmp/
 
 RUN python -m pip install --no-cache-dir /tmp/*.whl \

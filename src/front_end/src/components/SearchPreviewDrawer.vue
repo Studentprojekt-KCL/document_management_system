@@ -137,7 +137,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
             @click="$router.push({ name: 'MergeFiles' })"
           >
             <p>
-              <StarsIcon :size="13" />
+              <ExternalLink :size="13" />
               Merge Files
             </p>
           </button>

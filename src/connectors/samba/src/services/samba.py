@@ -51,8 +51,8 @@ class Samba:
         port = read_port("CONSMB_SMB_SHARE_PORT")
         user = read_env_variable("CONSMB_SMB_SHARE_SERVICE_USER")
         password = read_env_variable("CONSMB_SMB_SHARE_SERVICE_PASS")
-        service_mount = read_env_variable("CONSMB_SAMBA_SERVICE_MOUNT_PATH").rstrip("/")
-        user_mount = read_env_variable("CONSMB_SAMBA_USER_MOUNT_PATH").rstrip("/")
+        service_mount = read_env_variable("CONSMB_SMB_SERVICE_MOUNT_PATH").rstrip("/")
+        user_mount = read_env_variable("CONSMB_SMB_USER_MOUNT_PATH").rstrip("/")
         self.source_system = read_env_variable("CONSMB_SYSTEM_NAME")
 
         share = rf"//{host}/{read_env_variable("CONSMB_SMB_SHARE_NAME")}"

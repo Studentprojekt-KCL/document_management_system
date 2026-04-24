@@ -78,8 +78,21 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
       <!-- AI Summary section -->
       <section class="panel-section">
         <p class="section-title">AI SUMMARY</p>
-        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
-          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        <div v-if="aiSummaryHtml">
+          <div class="meta-cell meta-cell-summary">
+            <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+          </div>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isGeneratingSummary"
+            @click="generateAISummary"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isGeneratingSummary ? 'Generating summary...' : 'Regenerate Summary' }}
+            </p>
+          </button>
         </div>
         <button
           v-else
@@ -107,7 +120,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
           </ul>
           <!-- Possibility to merge files button -->
           <button
-            class="meta-cell meta-cell-summary summary-cell-button"
+            class="meta-cell meta-cell-summary summary-regenerate-button"
             type="button"
             @click="$router.push({ name: 'MergeFiles' })"
           >
@@ -115,6 +128,18 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
               <StarsIcon :size="13" />
               Merge Files
             </p>
+          </button>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isReranking"
+            @click="generateAIRerank"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isReranking ? 'Finding matches...' : 'Regenerate Similar Files' }}
+            </p>
+            <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
           </button>
         </div>
         <button
@@ -305,6 +330,21 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 }
 
 .summary-cell-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+.summary-regenerate-button {
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+
+.summary-regenerate-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-regenerate-button:disabled {
   opacity: 0.8;
   cursor: wait;
 }

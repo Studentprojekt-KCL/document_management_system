@@ -14,6 +14,7 @@ exclude = [".env", "venv", "__pycache__", ".tox", "build", ".venv", "test"]
 select = ["T20", "PYI056", "ASYNC", "B", "SIM", "PL", "UP"]
 
 [tool.mypy]
+explicit_package_bases = true
 disallow_untyped_defs = true
 exclude = '(\.env|venv|__pycache__|\.tox|build/|setup\.py|test/)'
 ignore_missing_imports = true

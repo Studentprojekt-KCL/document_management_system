@@ -6,7 +6,16 @@ from base64 import b64decode
 import httpx
 
 from gateway.schemas import InputItem, MetadataTemplate
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+
+
+class ConnectorUnreachable(Exception):
+    """Raised when the connector microservice request fails at the transport layer."""
+
+
+class ContentUnavailable(Exception):
+    """Raised when the connector responded but a file's content could not be extracted."""
 
 
 class Connector:
@@ -23,6 +32,22 @@ class Connector:
         self.client = client
         self.timeout = timeout
 
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Connector":
+        """Construct a Connector from environment variables.
+
+        Reads:
+            STOCHAN_CONGATEWAY_URL: Base URL for the connector service.
+
+        Raises:
+            RuntimeError: If the required variable is missing.
+        """
+        url = read_env_variable("STOCHAN_CONGATEWAY_URL")
+        if url is None:
+            dms_error("Connector env var not defined: STOCHAN_CONGATEWAY_URL")
+            raise RuntimeError("Missing env var: STOCHAN_CONGATEWAY_URL")
+        return cls(url=url, client=client)
+
     async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
         """Fetch contents for all file pointers from the connector.
 
@@ -30,7 +55,14 @@ class Connector:
             pointers: List of unique file pointers.
 
         Returns:
-            List of successfully retrieved InputItems.
+            List of successfully retrieved InputItems. May be empty if the
+            connector returned no files for the given pointers.
+
+        Raises:
+            ConnectorUnreachable: If the connector cannot be reached or
+                returned a non-success status.
+            ContentUnavailable: If the connector responded but at least one
+                file had no extractable or decodable content.
         """
         try:
             response = await self.client.post(
@@ -48,20 +80,20 @@ class Connector:
             httpx.ConnectError,
         ) as err:
             dms_warning(f"Connector request failed for pointer '{pointers}': {err}")
-            return []
+            raise ConnectorUnreachable(str(err)) from err
 
         items = []
         for individual_data in data:
+            unique_pointer = individual_data.get("unique_pointer")
             encoded_content = individual_data.get("content")
             if encoded_content is None:
-                dms_warning(f"No content returned for pointer '{pointers}'")
-                return []
+                dms_warning(f"No content returned for pointer '{unique_pointer}'")
+                raise ContentUnavailable(f"No extractable content for pointer '{unique_pointer}'.")
             try:
                 content = b64decode(encoded_content).decode("utf-8")
-            except (binascii.Error, UnicodeDecodeError):
-                dms_warning(f"Base64 decode failed for pointer '{pointers}'")
-                return []
-            unique_pointer = individual_data.get("unique_pointer")
+            except (binascii.Error, UnicodeDecodeError) as err:
+                dms_warning(f"Base64 decode failed for pointer '{unique_pointer}'")
+                raise ContentUnavailable(f"Content could not be decoded for pointer '{unique_pointer}'.") from err
             items.append(
                 InputItem(
                     content=content,

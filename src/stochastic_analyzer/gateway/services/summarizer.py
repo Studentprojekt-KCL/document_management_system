@@ -1,19 +1,20 @@
 """Batch document summarization via external Ministral LLM."""
 
 import asyncio
+from dataclasses import dataclass
 from json.decoder import JSONDecodeError
 
-from dataclasses import dataclass
-from gateway.config import LanguageConfig
+import httpx
+
 from gateway.preprompts import (
     INDIVIDUAL_SUMMARY_PROMPT,
     SYNTHESIS_PROMPT,
     SUMMARIZER_SYSTEM_PROMPT,
 )
 from gateway.schemas import InputItem, SummaryResult
-import httpx
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 SWEDISH_CHARS = set("åäö")
 
@@ -31,6 +32,19 @@ def detect_language(text: str, sample_size: int, swedish_char_threshold: int) ->
                 return "swedish"
 
     return "english"
+
+
+@dataclass
+class LanguageConfig:
+    """Language detection configuration.
+
+    Attributes:
+        sample_size: number of characters to sample from the document for language detection.
+        swedish_char_threshold: number of Swedish characters to trigger Swedish detection.
+    """
+
+    sample_size: int
+    swedish_char_threshold: int
 
 
 @dataclass
@@ -60,6 +74,52 @@ class Summarizer:
         self.timeout = config.timeout
         self.lang_config = config.lang_config
         self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Summarizer":
+        """Construct a Summarizer from environment variables.
+
+        Reads:
+            STOCHAN_LLM_URL: URL for the LLM endpoint.
+            STOCHAN_LLM_MODEL: Model identifier.
+            STOCHAN_LLM_TIMEOUT: Request timeout in seconds.
+            STOCHAN_SAMPLE_SIZE: Sample length for language detection.
+            STOCHAN_SWEDISH_CHAR_THRESHOLD: Trigger count for Swedish detection.
+
+        Raises:
+            RuntimeError: If any required variable is missing.
+        """
+        url = read_env_variable("STOCHAN_LLM_URL")
+        model = read_env_variable("STOCHAN_LLM_MODEL")
+        timeout = read_env_variable("STOCHAN_LLM_TIMEOUT")
+        sample_size = read_env_variable("STOCHAN_SAMPLE_SIZE")
+        swedish_threshold = read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD")
+
+        missing = [
+            name
+            for name, value in (
+                ("STOCHAN_LLM_URL", url),
+                ("STOCHAN_LLM_MODEL", model),
+                ("STOCHAN_LLM_TIMEOUT", timeout),
+                ("STOCHAN_SAMPLE_SIZE", sample_size),
+                ("STOCHAN_SWEDISH_CHAR_THRESHOLD", swedish_threshold),
+            )
+            if value is None
+        ]
+        if missing:
+            dms_error(f"Summarizer env vars not defined: {', '.join(missing)}")
+            raise RuntimeError(f"Missing env vars: {missing}")
+
+        config = SummarizerConfig(
+            url=url,
+            model=model,
+            timeout=int(timeout),
+            lang_config=LanguageConfig(
+                sample_size=int(sample_size),
+                swedish_char_threshold=int(swedish_threshold),
+            ),
+        )
+        return cls(config=config, client=client)
 
     async def _call_llm(self, prompt: str) -> str | None:
         """Send a prompt to the LLM and return the response text."""

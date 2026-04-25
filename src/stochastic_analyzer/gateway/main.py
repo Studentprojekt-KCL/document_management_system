@@ -1,7 +1,9 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+import argparse
 import logging
 from contextlib import asynccontextmanager
+from os import environ
 from typing import Any
 from collections.abc import AsyncIterator, Sequence
 
@@ -12,13 +14,32 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from gateway.config import APIConfiguration
 from gateway.routes import Services, create_router
 from gateway.services.classifier import Classifier
 from gateway.services.connector import Connector
-from gateway.services.summarizer import Summarizer, SummarizerConfig
+from gateway.services.summarizer import Summarizer
 from gateway.services.summarizer_pdf import PdfConverter
-from gateway.services.indexer import Indexer, IndexerConfig
+from gateway.services.indexer import Indexer
+
+from shared_functions.dmis_logger import dms_error
+from shared_functions.initialisation_tools import read_port
+
+
+def _parse_log_level() -> str:
+    """Parse the --dev CLI flag into a log level."""
+    parser = argparse.ArgumentParser()
+    _ = parser.add_argument("--dev", action="store_true")
+    args = parser.parse_args()
+    return "debug" if args.dev else "info"
+
+
+def _read_bind() -> str:
+    """Read the bind address from the environment."""
+    bind = environ.get("STOCHAN_BIND_ADDR")
+    if bind is None:
+        dms_error("STOCHAN_BIND_ADDR is not defined.")
+        raise RuntimeError("Missing env var: STOCHAN_BIND_ADDR")
+    return bind
 
 
 class API:
@@ -26,19 +47,26 @@ class API:
 
     Attributes:
         app: FastAPI application.
-        config: API configuration.
         http_client: Shared async HTTP client for all outbound service calls.
+        log_level: Log level string ('debug' or 'info').
+        bind: Bind address for the HTTP server.
+        port: Bind port for the HTTP server.
     """
 
     app: FastAPI
-    config: APIConfiguration
     http_client: httpx.AsyncClient
+    log_level: str
+    bind: str
+    port: int
 
     def __init__(self) -> None:
         logging.basicConfig()
-        self.config = APIConfiguration()
+        self.log_level = _parse_log_level()
+        self.bind = _read_bind()
+        self.port = read_port("STOCHAN_BIND_PORT")
+        device = environ.get("DEVICE", "external")
 
-        if self.config.log_level == "debug":
+        if self.log_level == "debug":
             logging.getLogger().setLevel(logging.DEBUG)
         else:
             logging.getLogger().setLevel(logging.INFO)
@@ -58,37 +86,14 @@ class API:
         )
 
         services = Services(
-            connector=Connector(
-                url=self.config.services.connector_url,
-                client=self.http_client,
-            ),
-            summarizer=Summarizer(
-                config=SummarizerConfig(
-                    url=self.config.services.any_llm.url,
-                    model=self.config.services.any_llm.model,
-                    timeout=self.config.services.any_llm.timeout,
-                    lang_config=self.config.services.language,
-                ),
-                client=self.http_client,
-            ),
-            classifier=Classifier(
-                url=self.config.services.classifier_url,
-                escalation_threshold=self.config.services.escalation_threshold,
-                client=self.http_client,
-            ),
+            connector=Connector.from_env(self.http_client),
+            summarizer=Summarizer.from_env(self.http_client),
+            classifier=Classifier.from_env(self.http_client),
             pdf_converter=PdfConverter(),
-            indexer=Indexer(
-                config=IndexerConfig(
-                    embedding_url=self.config.services.vector.embedding_url,
-                    qdrant_url=self.config.services.vector.qdrant_url,
-                    batch_size=self.config.services.vector.batch_size,
-                    max_chars=self.config.services.vector.max_chars,
-                ),
-                client=self.http_client,
-            ),
+            indexer=Indexer.from_env(self.http_client),
         )
 
-        self.app.include_router(create_router(services, self.config.device))
+        self.app.include_router(create_router(services, device))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     @asynccontextmanager
@@ -103,9 +108,9 @@ class API:
         """Start the API."""
         uvicorn.run(
             self.app,
-            host=self.config.bind,
-            port=self.config.port,
-            log_level=self.config.log_level,
+            host=self.bind,
+            port=self.port,
+            log_level=self.log_level,
         )
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
@@ -116,11 +121,7 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict[str, str]
-        if self.config.log_level == "debug":
-            content = jsonable_encoder(errors)
-        else:
-            content = "ERROR"
+        content: str | dict[str, str] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
 

@@ -4,10 +4,12 @@ import hashlib
 from base64 import b64decode
 from dataclasses import dataclass
 from http import HTTPStatus
+from os import environ
 
 import httpx
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 
 def _to_uuid(pointer: str) -> str:
@@ -49,6 +51,44 @@ class Indexer:
         self.batch_size = config.batch_size
         self.max_chars = config.max_chars
         self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Indexer":
+        """Construct an Indexer from environment variables.
+
+        Reads (required):
+            STOCHAN_EMBEDDING_URL: URL for the TEI embedding container.
+            STOCHAN_QDRANT_URL: URL for the Qdrant vector database.
+
+        Reads (optional):
+            INDEX_BATCH_SIZE: Documents embedded per batch (default 8).
+            STOCHAN_INDEX_MAX_CHARS: Max characters per document (default 2000).
+
+        Raises:
+            RuntimeError: If any required variable is missing.
+        """
+        embedding_url = read_env_variable("STOCHAN_EMBEDDING_URL")
+        qdrant_url = read_env_variable("STOCHAN_QDRANT_URL")
+
+        missing = [
+            name
+            for name, value in (
+                ("STOCHAN_EMBEDDING_URL", embedding_url),
+                ("STOCHAN_QDRANT_URL", qdrant_url),
+            )
+            if value is None
+        ]
+        if missing:
+            dms_error(f"Indexer env vars not defined: {', '.join(missing)}")
+            raise RuntimeError(f"Missing env vars: {missing}")
+
+        config = IndexerConfig(
+            embedding_url=embedding_url,
+            qdrant_url=qdrant_url,
+            batch_size=int(environ.get("INDEX_BATCH_SIZE", "8")),
+            max_chars=int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000")),
+        )
+        return cls(config=config, client=client)
 
     async def index(self, connector_url: str) -> dict:
         """Run the full indexing pipeline.

@@ -9,6 +9,7 @@ dynamic = ["dependencies"]
 version = "0.0.1"
 
 [tool.setuptools]
+packages = ["connector_gateway"]
 package-dir = {"" = "src"}
 
 [project.scripts]

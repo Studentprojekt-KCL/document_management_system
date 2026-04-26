@@ -1,31 +1,27 @@
 # Builder
-FROM python:3.13.13-alpine3.23 AS builder
+FROM python:3.13.13-slim-trixie AS builder
 
-WORKDIR /build
+RUN pip install --upgrade pip build
 
-COPY src/connectors/connector-gateway /build/connectors/connector-gateway
-COPY src/shared_functions /build/shared_functions
+COPY src/connectors/connector-gateway/pyproject.toml /build/connectors/connector-gateway/
+COPY src/connectors/connector-gateway/setup.py /build/connectors/connector-gateway/
+COPY src/connectors/connector-gateway/src/ /build/connectors/connector-gateway/src/
 
-RUN python -m pip install --upgrade pip build \
- && python -m build /build/connectors/connector-gateway
+COPY src/shared_functions/pyproject.toml /build/shared_functions/
+COPY src/shared_functions/src/ /build/shared_functions/src/
+
+RUN python -m build /build/connectors/connector-gateway
+RUN pip install /build/connectors/connector-gateway 
 
 # Runner 
-FROM python:3.13.13-alpine3.23
+FROM gcr.io/distroless/python3-debian13:nonroot
 
-RUN addgroup -S appgroup \
- && adduser -S appuser -G appgroup \
- && mkdir -p /app \
- && chown -R appuser:appgroup /app
+WORKDIR /home/nonroot
 
-WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin/connector_gateway /usr/local/bin/connector_gateway
 
-COPY --from=builder /build/shared_functions/ /tmp/shared_functions/
-COPY --from=builder /build/connectors/connector-gateway/dist/*.whl /tmp/connectors/connector-gateway/
+ENV PYTHONPATH="/usr/local/lib/python3.13/site-packages"
 
-RUN python -m pip install --no-cache-dir \
- /tmp/connectors/connector-gateway/*.whl \
- && rm -rf /tmp/connectors/connector-gateway \
- && rm -rf /tmp/shared_functions
-
-USER appuser
-ENTRYPOINT ["connector_gateway"]
+# I know this is ugly but but it's a huge hassle to fix linking from /usr/local/bin/python3.13 -> /usr/bin/python
+ENTRYPOINT ["python", "/usr/local/bin/connector_gateway"]

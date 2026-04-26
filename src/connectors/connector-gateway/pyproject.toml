@@ -12,4 +12,4 @@ version = "0.0.1"
 package-dir = {"" = "src"}
 
 [project.scripts]
-connector_gateway = "api:run"
+connector_gateway = "connector_gateway.api:run"

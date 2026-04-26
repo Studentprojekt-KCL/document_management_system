@@ -3,7 +3,7 @@ from typing import Any
 import uvicorn
 import fastapi
 
-from connector_client import ConnectorClient
+from connector_gateway.connector_client import ConnectorClient
 
 from shared_functions.initialisation_tools import read_env_variable, read_port
 
@@ -59,5 +59,5 @@ def run() -> None:
         api.app,
         host = read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR"),
         port = read_port("CONGATEWAY_FASTAPI_BIND_PORT"),
-        log_level = read_env_variable("CONGATEWAY_FAST_API_LOG_LEVEL")
+        log_level = read_env_variable("CONGATEWAY_FASTAPI_LOG_LEVEL")
     )

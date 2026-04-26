@@ -1,4 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+
 import time
 
 from shared_functions.initialisation_tools import read_env_variable
@@ -55,8 +56,12 @@ class Database:
             service: Name of service token authenticates against.
             enc_obj: Encrypted session token.
             expiry_time: Number of seconds until token expires.
-        """
 
+        Returns:
+        -------
+            True if insertion was possible, else false.
+        """
+        success: bool = False
         timestamp = int(time.time()) + expiry_time
 
         try:
@@ -71,10 +76,11 @@ class Database:
             """
             cursor.execute(sql, (user, service, enc_obj, timestamp, enc_obj, timestamp))
             db.commit()
+            success = True
         except connector.Error as err:
             dms_warning(f"Unable to insert session value into database: {err}")
         finally:
             cursor.close()
             db.close()
 
-        return True
+        return success

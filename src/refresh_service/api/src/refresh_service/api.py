@@ -13,18 +13,22 @@ from collections.abc import Sequence
 from fastapi.exceptions import RequestValidationError
 from refresh_service.session_encryption_tools import SessionEncryption
 from refresh_service.auth_token import authorize_and_get_token
+from refresh_service.database import Database
 from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.dmis_logger import dms_warning
 
 class RefreshService:
-    """ ."""
+
+    DEFAULT_EXPIRY_TIME: int = 1800 #NOTE; 401 should probably be signaled by connector to execute refresh.
 
     app = FastAPI()
     session_encryption: SessionEncryption
-
-    db_storage: dict = {} #TODO remove this.
+    database: Database
 
     def __init__(self, log_level: str | None = None):
         self.log_level = log_level
+
+        self.database = Database()
         self.session_enc = SessionEncryption(read_env_variable("REFSERVICE_SESSION_ENC_PASSW"))
 
         self.app.add_api_route("/add_session", self.add_session, methods=["POST"])
@@ -43,18 +47,19 @@ class RefreshService:
         return JSONResponse(status_code=422, content=content)
 
     async def add_session(self, service_name: str, session_vars: dict[Any, Any], authorization: str | None = Header(default=None)):
-        #TODO The SUB value is a unique value for each user, which prob also should be used in the encryption password.
         if not isinstance(session_vars, dict):
             raise HTTPException(status_code=422)
-        print(authorization)
         status, token_values = authorize_and_get_token(authorization)
         if status is False:
             raise HTTPException(status_code=401)
 
-        content = {service_name: session_vars}
-        enc_session_vars = self.session_enc.encrypt_session_vars(content)
+        enc_session_vars = self.session_enc.encrypt_session_vars(session_vars)
+        expiry_time = session_vars.get("expires_in")
+        if expiry_time is None:
+            dms_warning(f"Refresh service recieved Oauth token without expiry_time ({session_vars})")
+            expiry_time = self.DEFAULT_EXPIRY_TIME
 
-        self.db_storage[token_values.get("sub")] = enc_session_vars
+        self.database.insert_session_token(token_values.get("sub"), service_name, enc_session_vars, expiry_time)
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
@@ -62,9 +67,9 @@ class RefreshService:
         status, token_values = authorize_and_get_token(authorization)
         if status is False:
             raise HTTPException(status_code=401)
-        content = self.db_storage.get(token_values.get("sub"))
 
-        return json.loads(self.session_enc.decrypt_session_vars(content)).get(service_name).get("access_token") #TODO implement refresh
+        content = self.database.get_session_token(token_values.get("sub"), service_name)
+        return self.session_enc.decrypt_session_vars(content).get("access_token")
 
 
 def run() -> None:

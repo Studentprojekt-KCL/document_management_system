@@ -6,8 +6,8 @@ import queue
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
-import json
 from fastapi import HTTPException
+import httpx
 from se_api.services.connector import Connector
 from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
@@ -51,7 +51,7 @@ class Handler:
     def reset(self) -> None:
         """Reset the connector."""
         self.search_engine.reset()
-        self.connector.set_subdata(None)
+        self.connector.write_subdata({})
         self.query.reset()
         dms_info("Search engine was reset.")
 
@@ -127,35 +127,20 @@ class Handler:
         await self.indexing.acquire()
         dms_info("Starting indexing of new files.")
         start = datetime.now()
+        fetch_queue: Queue = await self.connector.connector_fetch()
         index_queue: queue.Queue = queue.Queue()
         transfer_queue: Queue = Queue()
-
         indexer_thread: Thread = Thread(target=self._add_file, args=(index_queue,))
-
-        raw: str = ""
-        data: dict
-        subdata: str | None = None
 
         indexer_thread.start()
 
+        fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, transfer_queue)) for _ in range(self.WORKERS)]
         transfer_tasks: list = [create_task(self._transfer_file(index_queue, transfer_queue)) for _ in range(self.WORKERS)]
 
-        async for chunk in self.connector.streaming_fetch():
-            raw += chunk
-            try:
-                if not raw.endswith("}"):
-                    continue
-                data = json.loads(raw)
-                raw = ""
-            except json.JSONDecodeError:
-                continue
-            if subdata is None and data.get("subdata") is not None:
-                subdata = data.get("subdata")
-                continue
-            await transfer_queue.put(data)
-        self.connector.set_subdata(subdata)
+        await fetch_queue.join()
+        for _ in fetch_tasks:
+            await fetch_queue.put(None)
         dms_info(f"Finished fetching new files, time: {(datetime.now() - start).total_seconds()}s.")
-
         await transfer_queue.join()
         for _ in transfer_tasks:
             await transfer_queue.put(None)
@@ -163,8 +148,27 @@ class Handler:
         index_queue.join()
         index_queue.put(None)
         indexer_thread.join()
+        self.connector.write_subdata()
         self.indexing.release()
         dms_info(f"Finished indexing of new files, time: {(datetime.now() - start).total_seconds()}s.")
+
+    async def _fetch_files(self, fetch_queue: Queue, transfer_queue: Queue) -> None:
+        """Fetch files from stream.
+
+        Args:
+            fetch_queue: queue with urls to connectors.
+            transfer_queue: queue for transferring files to the searchengine.
+        """
+        while True:
+            stream_url: str | None = await fetch_queue.get()
+            if stream_url is None:
+                break
+            try:
+                async for file in self.connector.stream(stream_url):
+                    await transfer_queue.put(file)
+            except httpx.HTTPError:
+                dms_warning(f"Failed to connect to {stream_url}.")
+            fetch_queue.task_done()
 
     async def _transfer_file(self, index_queue: queue.Queue, transfer_queue: Queue) -> None:
         """Format and transfer file to search engine indexing queue.
@@ -185,25 +189,6 @@ class Handler:
                 continue
             await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
-
-    def _decode(self, file: dict) -> dict | None:
-        """Decode file content.
-
-        Args:
-            file: dict containing the content in base64.
-        Returns: dict with decoded file content, or none on failure.
-        """
-        flat_file = self._flatten_dict(file)
-        content: str | None = flat_file.get("content")
-
-        if content is None:
-            dms_warning("File is missing content.")
-            return None
-        content_bytes: bytes = base64.b64decode(content)
-        content = content_bytes.decode("utf-8")
-        flat_file["content"] = content
-
-        return flat_file
 
     def _add_file(self, index_queue: queue.Queue) -> None:
         """Wait for formatted file and add it to the search engine.
@@ -234,6 +219,25 @@ class Handler:
             dms_info(f"Batch of {len(batch)} commited")
             self.search_engine.close_writer()
             batch.clear()
+
+    def _decode(self, file: dict) -> dict | None:
+        """Decode file content.
+
+        Args:
+            file: dict containing the content in base64.
+        Returns: dict with decoded file content, or none on failure.
+        """
+        flat_file = self._flatten_dict(file)
+        content: str | None = flat_file.get("content")
+
+        if content is None:
+            dms_warning("File is missing content.")
+            return None
+        content_bytes: bytes = base64.b64decode(content)
+        content = content_bytes.decode("utf-8")
+        flat_file["content"] = content
+
+        return flat_file
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

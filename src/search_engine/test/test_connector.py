@@ -10,7 +10,7 @@ class TestConnector(IsolatedAsyncioTestCase):
         self.instance.index_needed_bool = "/index_needed_bool"
         self.instance.url_files_to_index = "/files_to_index"
         self.instance.url_get_files = "/get_files"
-        self.instance.subdata = None
+        self.instance.subdata = {}
 
     # ==== FETCH_FILES_FROM_POINTERS ====
 

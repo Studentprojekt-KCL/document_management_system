@@ -229,9 +229,9 @@ def run() -> None:
         "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL"),
     }
     required_scopes = {
-        "searcheng": read_env_variable("DMISAPI_SEARCHENG_SCOPE").split(),
-        "stochan": read_env_variable("DMISAPI_STOCHAN_SCOPE").split(),
-        "congateway": read_env_variable("DMISAPI_CONGATEWAY_SCOPE").split(),
+        "searcheng": read_env_variable("DMISAPI_SEARCHENG_SCOPE", required=False).split(),
+        "stochan": read_env_variable("DMISAPI_STOCHAN_SCOPE", required=False).split(),
+        "congateway": read_env_variable("DMISAPI_CONGATEWAY_SCOPE", required=False).split(),
     }
 
     log_level = "debug" if args.dev else None

@@ -53,7 +53,7 @@ class ConnectorClient:
             for grouped_pointers in sorted_pointers.copy():
                 if host in grouped_pointers[0]:
                     grouped_pointers.append(pointer)
-                    continue
+                    break
                 sorted_pointers.append([pointer])
 
         return sorted_pointers

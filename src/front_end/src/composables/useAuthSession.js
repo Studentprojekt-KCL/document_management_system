@@ -18,7 +18,9 @@ export function useAuthSession() {
   }
 
   // LOGOUT
-  const triggerLogout = async () => {
+  const triggerLogout = async (reason = 'unknown') => {
+    console.log("Logout triggered: ", reason)
+    console.trace()
     broadcastLogout()
     await logout()
   }
@@ -43,19 +45,19 @@ export function useAuthSession() {
 
       // inactivity logout
       if (!isActive) {
-        await triggerLogout()
+        await triggerLogout('inactive')
         return
       }
 
       const stillAuthed = await isAuthenticated()
       if (!stillAuthed) {
-        await triggerLogout()
+        await triggerLogout('auth-check-failed')
         return
       }
 
       const refreshed = await refreshSession()
       if (!refreshed) {
-        await triggerLogout()
+        await triggerLogout('refresh-failed')
       }
     }, REFRESH_TIME)
   }

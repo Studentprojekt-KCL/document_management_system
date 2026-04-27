@@ -46,7 +46,7 @@ class AuthRoutes:
             key=key,
             value=value,
             httponly=True,
-            secure=True,  # True in production with HTTPS
+            secure=False,  # True in production with HTTPS
             samesite="none",
             max_age=max_age,
         )
@@ -202,19 +202,19 @@ class AuthRoutes:
         response.delete_cookie(
                 "access_token",
                 path="/",
-                secure=True,
+                secure=False,
                 samesite="none"
             )
         response.delete_cookie(
                 "refresh_token",
                 path="/",
-                secure=True,
+                secure=False,
                 samesite="none"
             )
         response.delete_cookie(
                 "id_token",
                 path="/",
-                secure=True,
+                secure=False,
                 samesite="none"
             )
         return response

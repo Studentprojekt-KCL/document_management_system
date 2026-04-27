@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Header, Cookie
+from fastapi import FastAPI, Request, HTTPException, Cookie
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse

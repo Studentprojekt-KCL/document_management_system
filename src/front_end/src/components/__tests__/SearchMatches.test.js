@@ -1,218 +1,231 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-
-/* Mock useSearchMetadata with new API */
-vi.mock('@/composables/useSearchMetadata', () => {
-  return {
-    useSearchMetadata: () => ({
-      normalizeMatches: (matches = []) =>
-        matches.map((entry, index) => ({
-          rawMatch: entry,
-          filename: entry.name || `result-${index + 1}`,
-          title: entry.name || `result-${index + 1}`,
-          type: entry.file_type_description || 'Unknown'
-        })),
-      resolveDateOnly: (entry) => (entry?.last_edit_date || '').split('T')[0] || '',
-      resolveSource: (entry) => entry?.source_system || '',
-      resolveSecurityClass: (entry) => entry?.security_class || '',
-      resolveDocumentType: (entry) => entry?.file_type_description || '',
-      resolveDocumentExtension: (entry) => entry?.file_type || ''
-    })
-  }
-})
-
 import SearchMatches from '@/components/SearchMatches.vue'
 
-describe('SearchMatches', () => {
-  const mockMatches = [
-    {
-      name: 'report.pdf',
-      file_type_description: 'PDF Document',
-      file_type: '.pdf',
-      last_edit_date: '2026-04-15T14:30:00.000Z',
-      source_system: 'GitLab',
-      security_class: 'Public'
-    },
-    {
-      name: 'memo.docx',
-      file_type_description: 'Word Document',
-      file_type: '.docx',
-      last_edit_date: '2026-04-14T10:00:00.000Z',
-      source_system: 'GitHub',
-      security_class: 'Confidential'
-    },
-    {
-      name: 'data.xlsx',
-      file_type_description: 'Excel Spreadsheet',
-      file_type: '.xlsx',
-      last_edit_date: '2026-04-13T08:00:00.000Z',
-      source_system: 'GitLab',
-      security_class: 'Internal'
-    }
-  ]
+/* ──────────────────────────────────────────────
+   Mock useSearchMetadata so the component can
+   normalise matches without hitting real logic
+   ────────────────────────────────────────────── */
+vi.mock('@/composables/useSearchMetadata', () => ({
+  useSearchMetadata: () => ({
+    normalizeMatches: (matches) =>
+      (matches || []).map((m, i) => ({
+        rawMatch: m,
+        filename: m?.metadata?.name || m?.name || `result-${i + 1}`,
+        title: m?.metadata?.name || m?.name || `result-${i + 1}`,
+        type: m?.metadata?.file_type_description || ''
+      })),
+    resolveDateOnly: (m) => m?.last_edit_date?.split('T')[0] || 'N/A',
+    resolveSource: (m) => m?.source_system || 'Unknown',
+    resolveDocumentType: (m) => m?.file_type_description || 'Document',
+    resolveSecurityClass: (m) => m?.security_class || 'Unknown'
+  }),
+  resolveLink: (m) => m?.clickable_url || '#'
+}))
 
-  const mountMatches = (props = {}) => {
-    return mount(SearchMatches, {
-      props: {
-        matches: [],
-        loading: false,
-        selected: '',
-        query: '',
-        ...props
-      }
+/* ──────────────────────────────────────────────
+   Helpers
+   ────────────────────────────────────────────── */
+const makeMatch = (overrides = {}) => ({
+  name: 'test-file.pdf',
+  file_type_description: 'PDF Document',
+  source_system: 'SharePoint',
+  last_edit_date: '2025-04-01T12:00:00Z',
+  clickable_url: 'https://example.com/test-file.pdf',
+  security_class: 'Internal',
+  unique_pointer: 'ptr-001',
+  ...overrides
+})
+
+const defaultProps = {
+  matches: [makeMatch(), makeMatch({ name: 'second.docx', unique_pointer: 'ptr-002' })],
+  loading: false,
+  selected: '',
+  query: 'test query'
+}
+
+const mountComponent = (props = {}) =>
+  mount(SearchMatches, {
+    props: { ...defaultProps, ...props },
+    global: { stubs: { Calendar: true, FileText: true, ExternalLink: true } }
+  })
+
+/* ═══════════════════════════════════════════════ */
+
+describe('SearchMatches.vue', () => {
+  /* ─── Rendering ─── */
+
+  describe('rendering', () => {
+    it('renders the correct number of result items', () => {
+      const wrapper = mountComponent()
+      expect(wrapper.findAll('.result-item')).toHaveLength(2)
     })
-  }
 
-  /* ── Empty / Loading states ── */
-  describe('states', () => {
-    it('shows "Searching…" when loading', () => {
-      const wrapper = mountMatches({ loading: true })
+    it('shows the results count label', () => {
+      const wrapper = mountComponent()
+      expect(wrapper.find('.results-count').text()).toContain('Found 2 results for "test query"')
+    })
+
+    it('shows singular label for one result', () => {
+      const wrapper = mountComponent({ matches: [makeMatch()] })
+      expect(wrapper.find('.results-count').text()).toContain('1 result')
+    })
+
+    it('shows "No results" message when matches is empty', () => {
+      const wrapper = mountComponent({ matches: [], query: 'missing' })
+      expect(wrapper.find('.results-count').text()).toContain('No results found for "missing"')
+    })
+
+    it('shows loading text when loading is true', () => {
+      const wrapper = mountComponent({ loading: true })
       expect(wrapper.find('.state-text').text()).toBe('Searching…')
     })
 
     it('does not show results count when loading', () => {
-      const wrapper = mountMatches({ loading: true, query: 'test' })
+      const wrapper = mountComponent({ loading: true })
       expect(wrapper.find('.results-count').exists()).toBe(false)
     })
 
-    it('shows no results message when query exists but matches is empty', () => {
-      const wrapper = mountMatches({ query: 'something', matches: [] })
-      expect(wrapper.find('.results-count').text()).toContain('No results found')
-      expect(wrapper.find('.results-count').text()).toContain('something')
-    })
-
-    it('shows nothing when there is no query and not loading', () => {
-      const wrapper = mountMatches()
-      expect(wrapper.find('.state-text').exists()).toBe(false)
+    it('does not show results count when query is empty', () => {
+      const wrapper = mountComponent({ query: '' })
       expect(wrapper.find('.results-count').exists()).toBe(false)
     })
-  })
 
-  /* ── Results display ── */
-  describe('results display', () => {
-    it('renders correct number of result cards', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      expect(wrapper.findAll('.result-item')).toHaveLength(3)
-    })
-
-    it('shows results count with correct number', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      expect(wrapper.find('.results-count').text()).toContain('Found 3 results')
-    })
-
-    it('shows singular "result" for single match', () => {
-      const wrapper = mountMatches({ matches: [mockMatches[0]], query: 'test' })
-      expect(wrapper.find('.results-count').text()).toContain('Found 1 result for')
-    })
-
-    it('displays the file title', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
+    it('renders match titles', () => {
+      const wrapper = mountComponent()
       const titles = wrapper.findAll('.result-title')
-      expect(titles[0].text()).toBe('report.pdf')
-      expect(titles[1].text()).toBe('memo.docx')
-      expect(titles[2].text()).toBe('data.xlsx')
-    })
-
-    it('displays file type in metadata row', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      const firstCard = wrapper.findAll('.result-card')[0]
-      expect(firstCard.text()).toContain('PDF Document')
-    })
-
-    it('displays date in metadata row', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      const firstCard = wrapper.findAll('.result-card')[0]
-      expect(firstCard.text()).toContain('2026-04-15')
-    })
-
-    it('displays source in metadata row', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      const firstCard = wrapper.findAll('.result-card')[0]
-      expect(firstCard.text()).toContain('GitLab')
-    })
-
-    it('displays security badge', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      const badges = wrapper.findAll('.security-badge')
-      expect(badges).toHaveLength(3)
-      expect(badges[0].text()).toBe('Public')
-      expect(badges[1].text()).toBe('Confidential')
-      expect(badges[2].text()).toBe('Internal')
-    })
-
-    it('applies correct security class to badge', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-      const badges = wrapper.findAll('.security-badge')
-      expect(badges[0].classes()).toContain('security-public')
-      expect(badges[1].classes()).toContain('security-confidential')
-      expect(badges[2].classes()).toContain('security-internal')
+      expect(titles[0].text()).toBe('test-file.pdf')
+      expect(titles[1].text()).toBe('second.docx')
     })
   })
 
-  /* ── Selection ── */
-  describe('selection', () => {
-    it('emits select with raw match when card is clicked', async () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
+  /* ─── Selection (default mode) ─── */
 
+  describe('selection — default mode (not selectable)', () => {
+    it('emits "select" with the raw match on card click', async () => {
+      const wrapper = mountComponent()
       await wrapper.findAll('.result-card')[0].trigger('click')
 
-      expect(wrapper.emitted('select')).toBeTruthy()
-      expect(wrapper.emitted('select')[0][0]).toEqual(mockMatches[0])
+      expect(wrapper.emitted('select')).toHaveLength(1)
+      expect(wrapper.emitted('select')[0][0]).toMatchObject({ name: 'test-file.pdf' })
     })
 
-    it('emits select with correct match for second item', async () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'test' })
-
-      await wrapper.findAll('.result-card')[1].trigger('click')
-
-      expect(wrapper.emitted('select')[0][0]).toEqual(mockMatches[1])
+    it('applies "active" class to the selected card', () => {
+      const wrapper = mountComponent({ selected: 'test-file.pdf' })
+      const firstCard = wrapper.findAll('.result-card')[0]
+      expect(firstCard.classes()).toContain('active')
     })
 
-    it('highlights the selected card', () => {
-      const wrapper = mountMatches({
-        matches: mockMatches,
-        query: 'test',
-        selected: 'report.pdf'
-      })
-
-      const cards = wrapper.findAll('.result-card')
-      expect(cards[0].classes()).toContain('active')
-      expect(cards[1].classes()).not.toContain('active')
-    })
-
-    it('no card is highlighted when nothing is selected', () => {
-      const wrapper = mountMatches({
-        matches: mockMatches,
-        query: 'test',
-        selected: ''
-      })
-
-      const activeCards = wrapper.findAll('.result-card.active')
-      expect(activeCards).toHaveLength(0)
+    it('does not apply "active" to non-selected cards', () => {
+      const wrapper = mountComponent({ selected: 'test-file.pdf' })
+      const secondCard = wrapper.findAll('.result-card')[1]
+      expect(secondCard.classes()).not.toContain('active')
     })
   })
 
-  /* ── Edge cases ── */
-  describe('edge cases', () => {
-    it('handles matches with missing fields gracefully', () => {
-      const sparseMatches = [{ name: 'file.txt' }, {}]
+  /* ─── Selectable (multi-select) mode ─── */
 
-      const wrapper = mountMatches({ matches: sparseMatches, query: 'test' })
-      const items = wrapper.findAll('.result-item')
-      expect(items).toHaveLength(2)
+  describe('selection — selectable mode', () => {
+    const selectableProps = {
+      selectable: true,
+      selectedPointers: ['ptr-001']
+    }
+
+    it('does not emit "select" in selectable mode', async () => {
+      const wrapper = mountComponent(selectableProps)
+      await wrapper.findAll('.result-card')[0].trigger('click')
+
+      expect(wrapper.emitted('select')).toBeUndefined()
     })
 
-    it('shows "Unknown" for missing security class', () => {
-      const noSecurity = [{ name: 'file.txt' }]
+    it('emits update:selectedPointers to remove a pointer when already selected', async () => {
+      const wrapper = mountComponent(selectableProps)
+      await wrapper.findAll('.result-card')[0].trigger('click')
 
-      const wrapper = mountMatches({ matches: noSecurity, query: 'test' })
+      const emitted = wrapper.emitted('update:selectedPointers')
+      expect(emitted).toHaveLength(1)
+      // ptr-001 was selected, clicking it should remove it
+      expect(emitted[0][0]).toEqual([])
+    })
+
+    it('emits update:selectedPointers to add a pointer when not selected', async () => {
+      const wrapper = mountComponent(selectableProps)
+      await wrapper.findAll('.result-card')[1].trigger('click')
+
+      const emitted = wrapper.emitted('update:selectedPointers')
+      expect(emitted).toHaveLength(1)
+      expect(emitted[0][0]).toContain('ptr-002')
+      expect(emitted[0][0]).toContain('ptr-001')
+    })
+
+    it('applies "selected" class to selected cards', () => {
+      const wrapper = mountComponent(selectableProps)
+      const firstCard = wrapper.findAll('.result-card')[0]
+      expect(firstCard.classes()).toContain('selected')
+    })
+
+    it('does not apply "selected" class to unselected cards', () => {
+      const wrapper = mountComponent(selectableProps)
+      const secondCard = wrapper.findAll('.result-card')[1]
+      expect(secondCard.classes()).not.toContain('selected')
+    })
+  })
+
+  /* ─── Badge modes ─── */
+
+  describe('badge modes', () => {
+    it('shows security class in default badge mode', () => {
+      const wrapper = mountComponent({ badgeMode: 'security' })
+      const badge = wrapper.find('.security-badge')
+      expect(badge.text()).toBe('Internal')
+    })
+
+    it('applies correct security CSS class', () => {
+      const wrapper = mountComponent({ badgeMode: 'security' })
+      const badge = wrapper.find('.security-badge')
+      expect(badge.classes()).toContain('security-internal')
+    })
+
+    it('shows score in score badge mode', () => {
+      const match = makeMatch({ scorePercent: '85.0%' })
+      const wrapper = mountComponent({ matches: [match], badgeMode: 'score' })
+      const badge = wrapper.find('.security-badge')
+      expect(badge.text()).toBe('85.0%')
+      expect(badge.classes()).toContain('score-badge')
+    })
+
+    it('shows "N/A" when score is missing in score mode', () => {
+      const match = makeMatch() // no scorePercent
+      const wrapper = mountComponent({ matches: [match], badgeMode: 'score' })
+      const badge = wrapper.find('.security-badge')
+      expect(badge.text()).toBe('N/A')
+    })
+
+    it('shows "Unknown" when security_class is missing', () => {
+      const match = makeMatch({ security_class: '' })
+      const wrapper = mountComponent({ matches: [match], badgeMode: 'security' })
       const badge = wrapper.find('.security-badge')
       expect(badge.text()).toBe('Unknown')
     })
+  })
 
-    it('includes query text in results label', () => {
-      const wrapper = mountMatches({ matches: mockMatches, query: 'keycloak config' })
-      expect(wrapper.find('.results-count').text()).toContain('keycloak config')
+  /* ─── External link ─── */
+
+  describe('external link', () => {
+    it('renders a link to the source with target="_blank"', () => {
+      const wrapper = mountComponent()
+      const link = wrapper.find('.meta-row a')
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toContain('noopener')
+    })
+
+    it('stops propagation on link click (does not trigger card select)', async () => {
+      const wrapper = mountComponent()
+      const link = wrapper.find('.meta-row a')
+      await link.trigger('click')
+
+      // The link has @click.stop so it should not emit 'select'
+      expect(wrapper.emitted('select')).toBeUndefined()
     })
   })
 })

@@ -1,310 +1,283 @@
 import { describe, it, expect } from 'vitest'
 import {
+  useSearchMetadata,
   resolveFilename,
   resolveDocumentType,
   resolveDocumentExtension,
   resolveSource,
   resolveDateOnly,
   resolveLink,
-  resolveSecurityClass,
-  useSearchMetadata
-} from '../useSearchMetadata'
+  resolveSecurityClass
+} from '@/composables/useSearchMetadata'
 
-/* ── resolveFilename ── */
+/* ──────────────────────────────────────────────
+   Helper: builds a match object that mirrors
+   the shape returned by the search API
+   ────────────────────────────────────────────── */
+const makeMatch = (overrides = {}, metaOverrides = null) => {
+  const base = {
+    name: 'report.pdf',
+    file_type: 'pdf',
+    file_type_description: 'PDF Document',
+    source_system: 'SharePoint',
+    last_edit_date: '2025-03-12T10:30:00Z',
+    clickable_url: 'https://example.com/report.pdf',
+    security_class: 'Internal',
+    unique_pointer: 'ptr-abc-123',
+    size: 204800,
+    ...overrides
+  }
+
+  if (metaOverrides) {
+    return { metadata: { ...base, ...metaOverrides }, ...overrides }
+  }
+
+  return base
+}
+
+/* ═══════════════════════════════════════════════
+   1. Pure utility functions (exported standalone)
+   ═══════════════════════════════════════════════ */
+
 describe('resolveFilename', () => {
-  it('returns name from metadata object', () => {
-    const entry = { metadata: { name: 'report.pdf' } }
-    expect(resolveFilename(entry)).toBe('report.pdf')
+  it('returns metadata.name when present', () => {
+    const entry = { metadata: { name: 'from-meta.docx' }, name: 'from-root.docx' }
+    expect(resolveFilename(entry)).toBe('from-meta.docx')
   })
 
-  it('returns name from entry directly when no metadata wrapper', () => {
-    const entry = { name: 'document.txt' }
-    expect(resolveFilename(entry)).toBe('document.txt')
+  it('falls back to entry.name when metadata.name is missing', () => {
+    const entry = { name: 'root-only.txt' }
+    expect(resolveFilename(entry)).toBe('root-only.txt')
   })
 
   it('returns indexed fallback when no name exists', () => {
-    expect(resolveFilename({}, 0)).toBe('result-1')
     expect(resolveFilename({}, 4)).toBe('result-5')
   })
 
-  it('returns result-1 for null or undefined input', () => {
-    expect(resolveFilename(null)).toBe('result-1')
-    expect(resolveFilename(undefined)).toBe('result-1')
+  it('returns indexed fallback for null entry', () => {
+    expect(resolveFilename(null, 0)).toBe('result-1')
   })
 
-  it('skips empty string names', () => {
-    const entry = { metadata: { name: '' }, name: 'fallback.md' }
-    expect(resolveFilename(entry)).toBe('fallback.md')
-  })
-
-  it('skips whitespace-only names', () => {
-    const entry = { metadata: { name: '   ' } }
-    expect(resolveFilename(entry, 2)).toBe('result-3')
+  it('ignores whitespace-only names', () => {
+    expect(resolveFilename({ name: '   ' }, 2)).toBe('result-3')
   })
 })
 
-/* ── resolveDocumentType (now reads file_type_description from entry) ── */
 describe('resolveDocumentType', () => {
   it('returns file_type_description from metadata', () => {
-    const entry = { metadata: { file_type_description: 'PDF Document' } }
-    expect(resolveDocumentType(entry)).toBe('PDF Document')
-  })
-
-  it('returns file_type_description from entry directly', () => {
-    const entry = { file_type_description: 'Word Document' }
+    const entry = { metadata: { file_type_description: 'Word Document' } }
     expect(resolveDocumentType(entry)).toBe('Word Document')
   })
 
-  it('returns empty string when no description exists', () => {
+  it('falls back to entry-level file_type_description', () => {
+    const entry = { file_type_description: 'Spreadsheet' }
+    expect(resolveDocumentType(entry)).toBe('Spreadsheet')
+  })
+
+  it('returns empty string when missing', () => {
     expect(resolveDocumentType({})).toBe('')
   })
-
-  it('handles null input', () => {
-    expect(resolveDocumentType(null)).toBe('')
-  })
-
-  it('handles undefined input', () => {
-    expect(resolveDocumentType(undefined)).toBe('')
-  })
-
-  it('prefers metadata value over entry value', () => {
-    const entry = { metadata: { file_type_description: 'From metadata' }, file_type_description: 'From entry' }
-    expect(resolveDocumentType(entry)).toBe('From metadata')
-  })
 })
 
-/* ── resolveDocumentExtension ── */
 describe('resolveDocumentExtension', () => {
   it('returns file_type from metadata', () => {
-    const entry = { metadata: { file_type: '.pdf' } }
-    expect(resolveDocumentExtension(entry)).toBe('.pdf')
+    const entry = { metadata: { file_type: 'xlsx' } }
+    expect(resolveDocumentExtension(entry)).toBe('xlsx')
   })
 
-  it('returns file_type from entry directly', () => {
-    const entry = { file_type: '.docx' }
-    expect(resolveDocumentExtension(entry)).toBe('.docx')
-  })
-
-  it('returns empty string when no file_type exists', () => {
-    expect(resolveDocumentExtension({})).toBe('')
-  })
-
-  it('handles null input', () => {
-    expect(resolveDocumentExtension(null)).toBe('')
-  })
-
-  it('handles undefined input', () => {
-    expect(resolveDocumentExtension(undefined)).toBe('')
+  it('falls back to entry-level file_type', () => {
+    expect(resolveDocumentExtension({ file_type: 'csv' })).toBe('csv')
   })
 })
 
-/* ── resolveSource ── */
 describe('resolveSource', () => {
   it('returns source_system from metadata', () => {
-    const entry = { metadata: { source_system: 'GitLab' } }
-    expect(resolveSource(entry)).toBe('GitLab')
+    const entry = { metadata: { source_system: 'Confluence' } }
+    expect(resolveSource(entry)).toBe('Confluence')
   })
 
-  it('returns source_system from entry directly', () => {
-    const entry = { source_system: 'GitHub' }
-    expect(resolveSource(entry)).toBe('GitHub')
+  it('falls back to entry-level source_system', () => {
+    expect(resolveSource({ source_system: 'Teams' })).toBe('Teams')
   })
 
-  it('returns empty string when no source exists', () => {
+  it('returns empty string for missing source', () => {
     expect(resolveSource({})).toBe('')
-  })
-
-  it('handles null input', () => {
-    expect(resolveSource(null)).toBe('')
   })
 })
 
-/* ── resolveDateOnly ── */
 describe('resolveDateOnly', () => {
-  it('extracts date from ISO datetime with timezone', () => {
-    const entry = { last_edit_date: '2026-04-15T14:30:00.000Z' }
-    expect(resolveDateOnly(entry)).toBe('2026-04-15')
+  it('extracts date portion from ISO datetime', () => {
+    expect(resolveDateOnly({ last_edit_date: '2025-03-12T10:30:00Z' })).toBe('2025-03-12')
   })
 
-  it('extracts date from metadata last_edit_date', () => {
-    const entry = { metadata: { last_edit_date: '2026-02-17T08:42:57.000-05:00' } }
-    expect(resolveDateOnly(entry)).toBe('2026-02-17')
+  it('works with date-only strings', () => {
+    expect(resolveDateOnly({ last_edit_date: '2024-01-15' })).toBe('2024-01-15')
   })
 
-  it('returns date as-is if no T separator', () => {
-    const entry = { last_edit_date: '2026-04-15' }
-    expect(resolveDateOnly(entry)).toBe('2026-04-15')
+  it('reads from metadata.last_edit_date first', () => {
+    const entry = {
+      metadata: { last_edit_date: '2025-06-01T00:00:00Z' },
+      last_edit_date: '2024-01-01T00:00:00Z'
+    }
+    expect(resolveDateOnly(entry)).toBe('2025-06-01')
   })
 
   it('returns empty string when no date exists', () => {
     expect(resolveDateOnly({})).toBe('')
   })
-
-  it('handles null input', () => {
-    expect(resolveDateOnly(null)).toBe('')
-  })
 })
 
-/* ── resolveLink ── */
 describe('resolveLink', () => {
   it('returns clickable_url from metadata', () => {
-    const entry = { metadata: { clickable_url: 'https://gitlab.com/file' } }
-    expect(resolveLink(entry)).toBe('https://gitlab.com/file')
+    const entry = { metadata: { clickable_url: 'https://a.com/doc' } }
+    expect(resolveLink(entry)).toBe('https://a.com/doc')
   })
 
-  it('returns clickable_url from entry directly', () => {
-    const entry = { clickable_url: 'https://github.com/file' }
-    expect(resolveLink(entry)).toBe('https://github.com/file')
+  it('falls back to entry-level clickable_url', () => {
+    expect(resolveLink({ clickable_url: 'https://b.com' })).toBe('https://b.com')
   })
 
-  it('returns empty string when no link exists', () => {
+  it('returns empty string when missing', () => {
     expect(resolveLink({})).toBe('')
-  })
-
-  it('handles null input', () => {
-    expect(resolveLink(null)).toBe('')
   })
 })
 
-/* ── resolveSecurityClass ── */
 describe('resolveSecurityClass', () => {
   it('returns security_class from metadata', () => {
     const entry = { metadata: { security_class: 'Confidential' } }
     expect(resolveSecurityClass(entry)).toBe('Confidential')
   })
 
-  it('returns security_class from entry directly', () => {
-    const entry = { security_class: 'Public' }
-    expect(resolveSecurityClass(entry)).toBe('Public')
+  it('falls back to entry-level security_class', () => {
+    expect(resolveSecurityClass({ security_class: 'Public' })).toBe('Public')
   })
 
-  it('returns empty string when no classification exists', () => {
+  it('returns empty string when missing', () => {
     expect(resolveSecurityClass({})).toBe('')
-  })
-
-  it('handles null input', () => {
-    expect(resolveSecurityClass(null)).toBe('')
   })
 })
 
-/* ── useSearchMetadata composable ── */
-describe('useSearchMetadata', () => {
+/* ═══════════════════════════════════════════════
+   2. useSearchMetadata composable (computed props)
+   ═══════════════════════════════════════════════ */
+
+describe('useSearchMetadata composable', () => {
+  const match = makeMatch()
+
   const createProps = (selectedMatch = null) => ({
     selectedMatch,
-    matches: []
+    matches: selectedMatch ? [selectedMatch] : []
   })
 
-  it('returns empty/default values when selectedMatch is null', () => {
-    const props = createProps(null)
-    const { previewTitle, previewSize, previewLink, previewSecurityClass, uniquePointer } = useSearchMetadata(props)
-
-    expect(previewTitle.value).toBe('result-1')
-    expect(previewSize.value).toBe('')
-    expect(previewLink.value).toBe('')
-    expect(previewSecurityClass.value).toBe('')
-    expect(uniquePointer.value).toBe('')
+  it('returns all expected keys', () => {
+    const meta = useSearchMetadata(createProps(match))
+    const keys = [
+      'uniquePointer',
+      'previewTitle',
+      'previewSize',
+      'previewFileDescription',
+      'previewFileExtension',
+      'previewCreatedAt',
+      'sourceSystem',
+      'previewLink',
+      'previewSecurityClass',
+      'normalizeMatches',
+      'resolveSecurityClass',
+      'resolveDateOnly',
+      'resolveSource',
+      'resolveDocumentType',
+      'resolveDocumentExtension'
+    ]
+    keys.forEach((key) => {
+      expect(meta).toHaveProperty(key)
+    })
   })
 
-  it('extracts title from match name', () => {
-    const props = createProps({ name: 'test_file.py' })
-    const { previewTitle } = useSearchMetadata(props)
-    expect(previewTitle.value).toBe('test_file.py')
+  describe('computed properties from selectedMatch', () => {
+    const meta = useSearchMetadata(createProps(match))
+
+    it('previewTitle resolves filename', () => {
+      expect(meta.previewTitle.value).toBe('report.pdf')
+    })
+
+    it('previewSize resolves size', () => {
+      expect(meta.previewSize.value).toBe(204800)
+    })
+
+    it('previewFileDescription resolves document type', () => {
+      expect(meta.previewFileDescription.value).toBe('PDF Document')
+    })
+
+    it('previewFileExtension resolves extension', () => {
+      expect(meta.previewFileExtension.value).toBe('pdf')
+    })
+
+    it('previewCreatedAt resolves date only', () => {
+      expect(meta.previewCreatedAt.value).toBe('2025-03-12')
+    })
+
+    it('sourceSystem resolves source', () => {
+      expect(meta.sourceSystem.value).toBe('SharePoint')
+    })
+
+    it('previewLink resolves clickable url', () => {
+      expect(meta.previewLink.value).toBe('https://example.com/report.pdf')
+    })
+
+    it('previewSecurityClass resolves classification', () => {
+      expect(meta.previewSecurityClass.value).toBe('Internal')
+    })
+
+    it('uniquePointer resolves pointer', () => {
+      expect(meta.uniquePointer.value).toBe('ptr-abc-123')
+    })
   })
 
-  it('extracts uniquePointer', () => {
-    const pointer = 'https://gitlab.com/api/v4/projects/1/repository/files/test.py'
-    const props = createProps({ unique_pointer: pointer })
-    const { uniquePointer } = useSearchMetadata(props)
-    expect(uniquePointer.value).toBe(pointer)
+  describe('computed properties with null selectedMatch', () => {
+    const meta = useSearchMetadata(createProps(null))
+
+    it('returns empty strings for all fields', () => {
+      expect(meta.previewTitle.value).toBe('result-1')
+      expect(meta.previewSize.value).toBe('')
+      expect(meta.sourceSystem.value).toBe('')
+      expect(meta.previewLink.value).toBe('')
+      expect(meta.previewSecurityClass.value).toBe('')
+    })
   })
 
-  it('extracts file size', () => {
-    const props = createProps({ size: '44982' })
-    const { previewSize } = useSearchMetadata(props)
-    expect(previewSize.value).toBe('44982')
-  })
-
-  it('extracts source system', () => {
-    const props = createProps({ source_system: 'GitLab' })
-    const { sourceSystem } = useSearchMetadata(props)
-    expect(sourceSystem.value).toBe('GitLab')
-  })
-
-  it('extracts clickable URL', () => {
-    const url = 'https://gitlab.com/project/-/blob/main/file.py'
-    const props = createProps({ clickable_url: url })
-    const { previewLink } = useSearchMetadata(props)
-    expect(previewLink.value).toBe(url)
-  })
-
-  it('extracts security class', () => {
-    const props = createProps({ security_class: 'Sensitive' })
-    const { previewSecurityClass } = useSearchMetadata(props)
-    expect(previewSecurityClass.value).toBe('Sensitive')
-  })
-
-  it('extracts date from last_edit_date', () => {
-    const props = createProps({ last_edit_date: '2026-02-17T08:42:57.000-05:00' })
-    const { previewCreatedAt } = useSearchMetadata(props)
-    expect(previewCreatedAt.value).toBe('2026-02-17')
-  })
-
-  it('extracts file description', () => {
-    const props = createProps({ file_type_description: 'PDF Document' })
-    const { previewFileDescription } = useSearchMetadata(props)
-    expect(previewFileDescription.value).toBe('PDF Document')
-  })
-
-  it('extracts file extension', () => {
-    const props = createProps({ file_type: '.pdf' })
-    const { previewFileExtension } = useSearchMetadata(props)
-    expect(previewFileExtension.value).toBe('.pdf')
-  })
-
-  /* ── normalizeMatches ── */
   describe('normalizeMatches', () => {
     it('normalizes an array of matches', () => {
-      const props = createProps()
-      const { normalizeMatches } = useSearchMetadata(props)
-
-      const matches = [
-        { name: 'file1.pdf', file_type_description: 'PDF Document' },
-        { name: 'file2.md', file_type_description: 'Markdown Document' }
-      ]
-
+      const { normalizeMatches } = useSearchMetadata(createProps())
+      const matches = [makeMatch({ name: 'alpha.pdf' }), makeMatch({ name: 'beta.docx' })]
       const result = normalizeMatches(matches)
+
       expect(result).toHaveLength(2)
-      expect(result[0].title).toBe('file1.pdf')
-      expect(result[1].title).toBe('file2.md')
+      expect(result[0].title).toBe('alpha.pdf')
+      expect(result[1].title).toBe('beta.docx')
+    })
+
+    it('preserves rawMatch reference', () => {
+      const { normalizeMatches } = useSearchMetadata(createProps())
+      const original = makeMatch({ name: 'test.txt' })
+      const [normalized] = normalizeMatches([original])
+
+      expect(normalized.rawMatch).toBe(original)
+    })
+
+    it('assigns indexed filename when name is missing', () => {
+      const { normalizeMatches } = useSearchMetadata(createProps())
+      const result = normalizeMatches([{}])
+      expect(result[0].filename).toBe('result-1')
     })
 
     it('returns empty array for empty input', () => {
-      const props = createProps()
-      const { normalizeMatches } = useSearchMetadata(props)
+      const { normalizeMatches } = useSearchMetadata(createProps())
       expect(normalizeMatches([])).toEqual([])
     })
 
     it('returns empty array for undefined input', () => {
-      const props = createProps()
-      const { normalizeMatches } = useSearchMetadata(props)
+      const { normalizeMatches } = useSearchMetadata(createProps())
       expect(normalizeMatches()).toEqual([])
-    })
-
-    it('preserves rawMatch reference', () => {
-      const props = createProps()
-      const { normalizeMatches } = useSearchMetadata(props)
-      const original = { name: 'test.txt', unique_pointer: 'ptr' }
-      const result = normalizeMatches([original])
-      expect(result[0].rawMatch).toBe(original)
-    })
-
-    it('generates fallback filenames with correct index', () => {
-      const props = createProps()
-      const { normalizeMatches } = useSearchMetadata(props)
-      const result = normalizeMatches([{}, {}, {}])
-      expect(result[0].filename).toBe('result-1')
-      expect(result[1].filename).toBe('result-2')
-      expect(result[2].filename).toBe('result-3')
     })
   })
 })

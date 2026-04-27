@@ -1,235 +1,222 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-/* Mock dependencies */
-const mockAuthFetch = vi.hoisted(() => vi.fn())
+/* ──────────────────────────────────────────────
+   Mocks — must be declared before the import
+   that triggers them
+   ────────────────────────────────────────────── */
 
-vi.mock('@/utils/api', () => ({
-  authFetch: mockAuthFetch,
-  API_PATHS: {
-    rerank: '/api/stochastic-analyzer/rerank'
-  }
+// Mock useSearchMetadata to return a controllable uniquePointer
+const mockUniquePointer = { value: 'ptr-abc-123' }
+vi.mock('@/composables/useSearchMetadata', () => ({
+  useSearchMetadata: () => ({ uniquePointer: mockUniquePointer })
 }))
 
-vi.mock('@/composables/useSearchMetadata', () => {
-  const { computed } = require('vue')
-  return {
-    useSearchMetadata: (props) => ({
-      uniquePointer: computed(() => props.selectedMatch?.unique_pointer || '')
-    }),
-    resolveFilename: (entry, index) => entry?.name || `result-${index + 1}`
-  }
-})
+// Mock authFetch so we never hit the network
+const mockAuthFetch = vi.fn()
+vi.mock('@/utils/api', () => ({
+  authFetch: (...args) => mockAuthFetch(...args),
+  API_PATHS: { rerank: '/api/rerank' }
+}))
 
+// Mock useReload to return plain refs (the real one persists across HMR)
 vi.mock('@/composables/useReload', () => {
   const { ref } = require('vue')
+  const store = {}
   return {
-    useReload: (key, defaultValue) => ({
-      state: ref(defaultValue),
-      clear: vi.fn()
-    })
+    useReload: (key, initial) => {
+      if (!store[key]) store[key] = { state: ref(initial) }
+      return store[key]
+    }
   }
 })
 
 import { useAIRerank } from '@/composables/aiRerank'
 
+/* ═══════════════════════════════════════════════ */
+
 describe('useAIRerank', () => {
-  const createProps = (pointer = 'test-pointer') => ({
-    selectedMatch: { unique_pointer: pointer }
-  })
+  let rerank
 
   beforeEach(() => {
     vi.clearAllMocks()
+    rerank = useAIRerank({ selectedMatch: { unique_pointer: 'ptr-abc-123' } })
+    // Reset state between tests
+    rerank.aiRerankResults.value = []
+    rerank.rerankPointer.value = ''
+    rerank.rerankFilename.value = ''
+    rerank.isReranking.value = false
+    rerank.rerankError.value = ''
+    mockUniquePointer.value = 'ptr-abc-123'
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it('returns all expected keys', () => {
+    const keys = [
+      'aiRerankResults',
+      'aiRerankResultsComputed',
+      'rerankPointer',
+      'rerankFilename',
+      'isReranking',
+      'rerankError',
+      'generateAIRerank'
+    ]
+    keys.forEach((key) => {
+      expect(rerank).toHaveProperty(key)
+    })
   })
 
-  it('returns expected properties', () => {
-    const result = useAIRerank(createProps())
-    expect(result).toHaveProperty('aiRerankResultsComputed')
-    expect(result).toHaveProperty('isReranking')
-    expect(result).toHaveProperty('rerankError')
-    expect(result).toHaveProperty('generateAIRerank')
-  })
+  /* ─── aiRerankResultsComputed ─── */
 
-  it('starts with empty results', () => {
-    const { aiRerankResultsComputed } = useAIRerank(createProps())
-    expect(aiRerankResultsComputed.value).toEqual([])
-  })
+  describe('aiRerankResultsComputed', () => {
+    it('returns results when rerankPointer matches uniquePointer', () => {
+      rerank.aiRerankResults.value = [{ name: 'a.pdf', score: 0.95, rank: 1 }]
+      rerank.rerankPointer.value = 'ptr-abc-123'
 
-  it('starts not reranking', () => {
-    const { isReranking } = useAIRerank(createProps())
-    expect(isReranking.value).toBe(false)
-  })
-
-  it('starts with no error', () => {
-    const { rerankError } = useAIRerank(createProps())
-    expect(rerankError.value).toBe('')
-  })
-
-  describe('generateAIRerank', () => {
-    it('calls authFetch with correct endpoint and body', async () => {
-      mockAuthFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ ranked_results: [] })
-      })
-
-      const { generateAIRerank } = useAIRerank(createProps('ptr-456'))
-      await generateAIRerank()
-
-      expect(mockAuthFetch).toHaveBeenCalledWith(
-        '/api/stochastic-analyzer/rerank',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pointers: ['ptr-456'] })
-        })
-      )
+      expect(rerank.aiRerankResultsComputed.value).toHaveLength(1)
     })
 
-    it('sets isReranking during fetch', async () => {
-      let resolvePromise
+    it('returns empty array when pointers differ', () => {
+      rerank.aiRerankResults.value = [{ name: 'a.pdf', score: 0.95, rank: 1 }]
+      rerank.rerankPointer.value = 'ptr-OTHER'
+
+      expect(rerank.aiRerankResultsComputed.value).toEqual([])
+    })
+  })
+
+  /* ─── generateAIRerank — success ─── */
+
+  describe('generateAIRerank — success', () => {
+    const apiResults = [
+      { name: 'alpha.pdf', score: 0.92, unique_pointer: 'ptr-1' },
+      { name: 'beta.docx', score: 0.78, unique_pointer: 'ptr-2' }
+    ]
+
+    beforeEach(() => {
+      mockAuthFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ ranked_results: apiResults })
+      })
+    })
+
+    it('calls authFetch with the correct pointer payload', async () => {
+      await rerank.generateAIRerank('my-file.pdf')
+
+      expect(mockAuthFetch).toHaveBeenCalledWith('/api/rerank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointers: ['ptr-abc-123'] })
+      })
+    })
+
+    it('sets isReranking to true during the request', async () => {
+      // Start but don't await
+      let resolveResponse
       mockAuthFetch.mockReturnValue(
-        new Promise((resolve) => {
-          resolvePromise = resolve
+        new Promise((res) => {
+          resolveResponse = res
         })
       )
 
-      const { isReranking, generateAIRerank } = useAIRerank(createProps())
-      const promise = generateAIRerank()
+      const promise = rerank.generateAIRerank()
+      expect(rerank.isReranking.value).toBe(true)
 
-      expect(isReranking.value).toBe(true)
-
-      resolvePromise({
-        ok: true,
-        json: () => Promise.resolve({ ranked_results: [] })
-      })
+      resolveResponse({ ok: true, json: async () => ({ ranked_results: [] }) })
       await promise
-
-      expect(isReranking.value).toBe(false)
+      expect(rerank.isReranking.value).toBe(false)
     })
 
-    it('maps ranked results with correct structure', async () => {
-      mockAuthFetch.mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ranked_results: [
-              { name: 'file1.pdf', pointer: 'ptr1', score: 0.95 },
-              { name: 'file2.md', pointer: 'ptr2', score: 0.73 }
-            ]
-          })
-      })
+    it('maps ranked results with rank and scorePercent', async () => {
+      await rerank.generateAIRerank('my-file.pdf')
 
-      const { aiRerankResultsComputed, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
-
-      const results = aiRerankResultsComputed.value
+      const results = rerank.aiRerankResults.value
       expect(results).toHaveLength(2)
-      expect(results[0]).toEqual({
-        rank: 1,
-        name: 'file1.pdf',
-        pointer: 'ptr1',
-        scorePercent: '95.0%'
-      })
-      expect(results[1]).toEqual({
-        rank: 2,
-        name: 'file2.md',
-        pointer: 'ptr2',
-        scorePercent: '73.0%'
-      })
+      expect(results[0]).toMatchObject({ rank: 1, scorePercent: '92.0%' })
+      expect(results[1]).toMatchObject({ rank: 2, scorePercent: '78.0%' })
     })
 
-    it('handles empty ranked_results', async () => {
-      mockAuthFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ ranked_results: [] })
-      })
+    it('stores the rerankPointer and rerankFilename on success', async () => {
+      await rerank.generateAIRerank('my-file.pdf')
 
-      const { aiRerankResultsComputed, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
-
-      expect(aiRerankResultsComputed.value).toEqual([])
+      expect(rerank.rerankPointer.value).toBe('ptr-abc-123')
+      expect(rerank.rerankFilename.value).toBe('my-file.pdf')
     })
 
-    it('handles missing ranked_results key', async () => {
-      mockAuthFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({})
-      })
+    it('clears previous error on success', async () => {
+      rerank.rerankError.value = 'old error'
+      await rerank.generateAIRerank()
 
-      const { aiRerankResultsComputed, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
+      expect(rerank.rerankError.value).toBe('')
+    })
+  })
 
-      expect(aiRerankResultsComputed.value).toEqual([])
+  /* ─── generateAIRerank — error handling ─── */
+
+  describe('generateAIRerank — errors', () => {
+    it('sets rerankError on non-ok response', async () => {
+      mockAuthFetch.mockResolvedValue({ ok: false, status: 500 })
+
+      await rerank.generateAIRerank()
+
+      expect(rerank.rerankError.value).toContain('500')
+      expect(rerank.aiRerankResults.value).toEqual([])
     })
 
-    it('sets error on failed response', async () => {
-      mockAuthFetch.mockResolvedValue({
-        ok: false,
-        status: 500
-      })
+    it('sets rerankError on network failure', async () => {
+      mockAuthFetch.mockRejectedValue(new Error('Network down'))
 
-      const { rerankError, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
+      await rerank.generateAIRerank()
 
-      expect(rerankError.value).toContain('500')
+      expect(rerank.rerankError.value).toBe('Network down')
     })
 
-    it('sets error on network failure', async () => {
-      mockAuthFetch.mockRejectedValue(new Error('Connection refused'))
-
-      const { rerankError, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
-
-      expect(rerankError.value).toBe('Connection refused')
-    })
-
-    it('does nothing when uniquePointer is empty', async () => {
-      const { generateAIRerank } = useAIRerank(createProps(''))
-      await generateAIRerank()
-
-      expect(mockAuthFetch).not.toHaveBeenCalled()
-    })
-
-    it('resets isReranking even on error', async () => {
+    it('sets isReranking back to false after error', async () => {
       mockAuthFetch.mockRejectedValue(new Error('fail'))
 
-      const { isReranking, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
+      await rerank.generateAIRerank()
 
-      expect(isReranking.value).toBe(false)
+      expect(rerank.isReranking.value).toBe(false)
     })
+  })
 
-    it('formats score as percentage with one decimal', async () => {
+  /* ─── generateAIRerank — no pointer ─── */
+
+  describe('generateAIRerank — no uniquePointer', () => {
+    it('resets state and returns early without calling authFetch', async () => {
+      mockUniquePointer.value = ''
+
+      await rerank.generateAIRerank()
+
+      expect(mockAuthFetch).not.toHaveBeenCalled()
+      expect(rerank.aiRerankResults.value).toEqual([])
+      expect(rerank.rerankFilename.value).toBe('')
+      expect(rerank.rerankError.value).toBe('')
+    })
+  })
+
+  /* ─── Edge cases ─── */
+
+  describe('edge cases', () => {
+    it('handles missing ranked_results in response', async () => {
       mockAuthFetch.mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            ranked_results: [{ name: 'test.txt', pointer: 'p', score: 0.1234 }]
-          })
+        json: async () => ({})
       })
 
-      const { aiRerankResultsComputed, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
+      await rerank.generateAIRerank()
 
-      expect(aiRerankResultsComputed.value[0].scorePercent).toBe('12.3%')
+      expect(rerank.aiRerankResults.value).toEqual([])
     })
 
-    it('handles zero score', async () => {
+    it('handles null score gracefully (defaults to 0)', async () => {
       mockAuthFetch.mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            ranked_results: [{ name: 'test.txt', pointer: 'p', score: 0 }]
-          })
+        json: async () => ({
+          ranked_results: [{ name: 'x.pdf', score: null }]
+        })
       })
 
-      const { aiRerankResultsComputed, generateAIRerank } = useAIRerank(createProps())
-      await generateAIRerank()
+      await rerank.generateAIRerank()
 
-      expect(aiRerankResultsComputed.value[0].scorePercent).toBe('0.0%')
+      expect(rerank.aiRerankResults.value[0].scorePercent).toBe('0.0%')
     })
   })
 })

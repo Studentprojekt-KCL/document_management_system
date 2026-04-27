@@ -1,181 +1,246 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-/* Mock dependencies */
-const mockAuthFetch = vi.hoisted(() => vi.fn())
+/* ──────────────────────────────────────────────
+   Mocks
+   ────────────────────────────────────────────── */
 
-vi.mock('@/utils/api', () => ({
-  authFetch: mockAuthFetch,
-  API_PATHS: {
-    summarize: '/api/stochastic-analyzer/summarize'
-  }
+const mockUniquePointer = { value: 'ptr-abc-123' }
+vi.mock('@/composables/useSearchMetadata', () => ({
+  useSearchMetadata: () => ({ uniquePointer: mockUniquePointer })
 }))
 
-vi.mock('@/composables/useSearchMetadata', () => {
-  const { computed } = require('vue')
-  return {
-    useSearchMetadata: (props) => ({
-      uniquePointer: computed(() => props.selectedMatch?.unique_pointer || '')
-    })
-  }
-})
+const mockAuthFetch = vi.fn()
+vi.mock('@/utils/api', () => ({
+  authFetch: (...args) => mockAuthFetch(...args),
+  API_PATHS: { summarize: '/api/summarize' }
+}))
 
 vi.mock('@/composables/useReload', () => {
   const { ref } = require('vue')
+  const store = {}
   return {
-    useReload: (key, defaultValue) => ({
-      state: ref(defaultValue),
-      clear: vi.fn()
-    })
+    useReload: (key, initial) => {
+      if (!store[key]) store[key] = { state: ref(initial) }
+      return store[key]
+    }
   }
 })
 
+// Mock marked for markdown-to-html conversion
+globalThis.marked = { parse: (text) => `<p>${text}</p>` }
+
 import { useAISummary } from '@/composables/aiSummary'
 
+/* ═══════════════════════════════════════════════ */
+
 describe('useAISummary', () => {
-  const createProps = (pointer = 'test-pointer') => ({
-    selectedMatch: { unique_pointer: pointer }
-  })
+  let summary
 
   beforeEach(() => {
     vi.clearAllMocks()
-    globalThis.marked = undefined
+    summary = useAISummary({ selectedMatch: { unique_pointer: 'ptr-abc-123' } })
+    // Reset state
+    summary.summaryError.value = ''
+    summary.isGeneratingSummary.value = false
+    mockUniquePointer.value = 'ptr-abc-123'
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it('returns all expected keys', () => {
+    const keys = ['aiSummaryHtml', 'summaryError', 'isGeneratingSummary', 'generateAISummary']
+    keys.forEach((key) => {
+      expect(summary).toHaveProperty(key)
+    })
   })
 
-  it('returns expected properties', () => {
-    const result = useAISummary(createProps())
-    expect(result).toHaveProperty('aiSummaryHtml')
-    expect(result).toHaveProperty('summaryError')
-    expect(result).toHaveProperty('isGeneratingSummary')
-    expect(result).toHaveProperty('generateAISummary')
-  })
+  /* ─── aiSummaryHtml computed ─── */
 
-  it('starts with empty summary', () => {
-    const { aiSummaryHtml } = useAISummary(createProps())
-    expect(aiSummaryHtml.value).toBe('')
-  })
-
-  it('starts with no error', () => {
-    const { summaryError } = useAISummary(createProps())
-    expect(summaryError.value).toBe('')
-  })
-
-  it('starts not generating', () => {
-    const { isGeneratingSummary } = useAISummary(createProps())
-    expect(isGeneratingSummary.value).toBe(false)
-  })
-
-  describe('generateAISummary', () => {
-    it('calls authFetch with correct endpoint and body', async () => {
+  describe('aiSummaryHtml', () => {
+    it('returns html when summaryPointer matches uniquePointer', async () => {
       mockAuthFetch.mockResolvedValue({
         ok: true,
         headers: { get: () => 'application/json' },
-        json: () => Promise.resolve({ summary: 'Test summary' })
+        json: async () => ({ summary: 'Test summary' })
       })
 
-      const { generateAISummary } = useAISummary(createProps('ptr-123'))
-      await generateAISummary()
-
-      expect(mockAuthFetch).toHaveBeenCalledWith(
-        '/api/stochastic-analyzer/summarize',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pointers: ['ptr-123'] })
-        })
-      )
+      await summary.generateAISummary()
+      expect(summary.aiSummaryHtml.value).toContain('Test summary')
     })
 
-    it('sets isGeneratingSummary during fetch', async () => {
-      let resolvePromise
+    it('returns empty string when pointer does not match', async () => {
+      mockAuthFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ summary: 'Summary text' })
+      })
+
+      await summary.generateAISummary()
+
+      // Change uniquePointer after generation
+      mockUniquePointer.value = 'ptr-DIFFERENT'
+
+      // The computed should now return empty since pointers diverge
+      // (summaryPointer was set to 'ptr-abc-123' but uniquePointer is now different)
+      expect(summary.aiSummaryHtml.value).toBe('')
+    })
+  })
+
+  /* ─── generateAISummary — default (current file) ─── */
+
+  describe('generateAISummary — single file (default)', () => {
+    beforeEach(() => {
+      mockAuthFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ summary: '# Document Overview\nThis is a test.' })
+      })
+    })
+
+    it('calls authFetch with the current uniquePointer', async () => {
+      await summary.generateAISummary()
+
+      expect(mockAuthFetch).toHaveBeenCalledWith('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointers: ['ptr-abc-123'] })
+      })
+    })
+
+    it('sets isGeneratingSummary during the request', async () => {
+      let resolveResponse
       mockAuthFetch.mockReturnValue(
-        new Promise((resolve) => {
-          resolvePromise = resolve
+        new Promise((res) => {
+          resolveResponse = res
         })
       )
 
-      const { isGeneratingSummary, generateAISummary } = useAISummary(createProps())
-      const promise = generateAISummary()
+      const promise = summary.generateAISummary()
+      expect(summary.isGeneratingSummary.value).toBe(true)
 
-      expect(isGeneratingSummary.value).toBe(true)
-
-      resolvePromise({
+      resolveResponse({
         ok: true,
-        headers: { get: () => 'text/plain' },
-        text: () => Promise.resolve('summary')
+        headers: { get: () => 'application/json' },
+        json: async () => ({ summary: 'done' })
       })
       await promise
-
-      expect(isGeneratingSummary.value).toBe(false)
+      expect(summary.isGeneratingSummary.value).toBe(false)
     })
 
-    it('sets error on failed response', async () => {
+    it('parses markdown via globalThis.marked', async () => {
+      await summary.generateAISummary()
+
+      expect(summary.aiSummaryHtml.value).toContain('<p>')
+    })
+  })
+
+  /* ─── generateAISummary — multiple pointers ─── */
+
+  describe('generateAISummary — multiple pointers (merge)', () => {
+    beforeEach(() => {
       mockAuthFetch.mockResolvedValue({
-        ok: false,
-        status: 500
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ summary: 'Merged summary' })
       })
-
-      const { summaryError, generateAISummary } = useAISummary(createProps())
-      await generateAISummary()
-
-      expect(summaryError.value).toContain('500')
     })
 
-    it('sets error on network failure', async () => {
-      mockAuthFetch.mockRejectedValue(new Error('Network down'))
+    it('sends all pointers plus sourcePointer, deduplicated', async () => {
+      await summary.generateAISummary(['ptr-1', 'ptr-2'], 'ptr-1')
 
-      const { summaryError, generateAISummary } = useAISummary(createProps())
-      await generateAISummary()
-
-      expect(summaryError.value).toBe('Network down')
+      const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body)
+      // ptr-1 appears in both arrays but should only be sent once
+      expect(body.pointers).toEqual(['ptr-1', 'ptr-2'])
     })
 
-    it('does nothing when uniquePointer is empty', async () => {
-      const { generateAISummary } = useAISummary(createProps(''))
-      await generateAISummary()
+    it('filters out empty/whitespace pointers', async () => {
+      await summary.generateAISummary(['ptr-1', '', '  '], 'ptr-2')
 
-      expect(mockAuthFetch).not.toHaveBeenCalled()
+      const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body)
+      expect(body.pointers).toEqual(['ptr-1', 'ptr-2'])
     })
 
-    it('handles text/plain response', async () => {
+    it('falls back to uniquePointer when pointers array is empty', async () => {
+      await summary.generateAISummary([], '')
+
+      const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body)
+      expect(body.pointers).toEqual(['ptr-abc-123'])
+    })
+  })
+
+  /* ─── generateAISummary — plain text response ─── */
+
+  describe('generateAISummary — plain text response', () => {
+    it('handles non-JSON content-type by reading as text', async () => {
       mockAuthFetch.mockResolvedValue({
         ok: true,
         headers: { get: () => 'text/plain' },
-        text: () => Promise.resolve('Plain text summary')
+        text: async () => 'Plain text summary'
       })
 
-      const { generateAISummary } = useAISummary(createProps())
-      await generateAISummary()
+      await summary.generateAISummary()
 
-      // No error means it processed successfully
-      expect(mockAuthFetch).toHaveBeenCalled()
+      expect(summary.aiSummaryHtml.value).toContain('Plain text summary')
+    })
+  })
+
+  /* ─── generateAISummary — error handling ─── */
+
+  describe('generateAISummary — errors', () => {
+    it('sets summaryError on non-ok response', async () => {
+      mockAuthFetch.mockResolvedValue({ ok: false, status: 503 })
+
+      await summary.generateAISummary()
+
+      expect(summary.summaryError.value).toContain('503')
     })
 
-    it('uses marked.parse when available', async () => {
-      globalThis.marked = { parse: (text) => `<p>${text}</p>` }
+    it('sets summaryError on network failure', async () => {
+      mockAuthFetch.mockRejectedValue(new Error('Connection refused'))
 
-      mockAuthFetch.mockResolvedValue({
-        ok: true,
-        headers: { get: () => 'text/plain' },
-        text: () => Promise.resolve('Test text')
-      })
+      await summary.generateAISummary()
 
-      const { generateAISummary } = useAISummary(createProps())
-      await generateAISummary()
-
-      expect(mockAuthFetch).toHaveBeenCalled()
+      expect(summary.summaryError.value).toBe('Connection refused')
     })
 
-    it('resets isGeneratingSummary even on error', async () => {
+    it('resets isGeneratingSummary after error', async () => {
       mockAuthFetch.mockRejectedValue(new Error('fail'))
 
-      const { isGeneratingSummary, generateAISummary } = useAISummary(createProps())
-      await generateAISummary()
+      await summary.generateAISummary()
 
-      expect(isGeneratingSummary.value).toBe(false)
+      expect(summary.isGeneratingSummary.value).toBe(false)
+    })
+  })
+
+  /* ─── generateAISummary — no pointers at all ─── */
+
+  describe('generateAISummary — no valid pointers', () => {
+    it('resets state and skips fetch when no pointers resolve', async () => {
+      mockUniquePointer.value = ''
+
+      await summary.generateAISummary([], '')
+
+      expect(mockAuthFetch).not.toHaveBeenCalled()
+      expect(summary.summaryError.value).toBe('')
+    })
+  })
+
+  /* ─── Edge: marked not available ─── */
+
+  describe('edge: globalThis.marked unavailable', () => {
+    it('falls back to raw text when marked is not loaded', async () => {
+      const originalMarked = globalThis.marked
+      globalThis.marked = undefined
+
+      mockAuthFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ summary: 'raw text fallback' })
+      })
+
+      await summary.generateAISummary()
+
+      expect(summary.aiSummaryHtml.value).toContain('raw text fallback')
+
+      globalThis.marked = originalMarked
     })
   })
 })

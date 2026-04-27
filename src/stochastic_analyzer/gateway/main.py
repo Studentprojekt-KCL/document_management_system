@@ -16,7 +16,7 @@ from gateway.config import APIConfiguration
 from gateway.routes import Services, create_router
 from gateway.services.classifier import Classifier
 from gateway.services.connector import Connector
-from gateway.services.summarizer import Summarizer
+from gateway.services.summarizer import Summarizer, SummarizerConfig
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer, IndexerConfig
 
@@ -63,9 +63,12 @@ class API:
                 client=self.http_client,
             ),
             summarizer=Summarizer(
-                url=self.config.services.any_llm.url,
-                model=self.config.services.any_llm.model,
-                timeout=self.config.services.any_llm.timeout,
+                config=SummarizerConfig(
+                    url=self.config.services.any_llm.url,
+                    model=self.config.services.any_llm.model,
+                    timeout=self.config.services.any_llm.timeout,
+                    lang_config=self.config.services.language,
+                ),
                 client=self.http_client,
             ),
             classifier=Classifier(

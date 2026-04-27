@@ -220,7 +220,7 @@ def run() -> None:
     bind_address = read_env_variable("DMISAPI_BIND_ADDR")
     port = read_port("DMISAPI_BIND_PORT")
     keycloak_issuer = read_env_variable("DMISAPI_AD_URL")
-    keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL")
+    keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL", required=False)
     expected_audience = [value.strip() for value in read_env_variable("DMISAPI_AD_AUDIENCE").split(",") if value.strip()]
     allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
     upstream_urls = {

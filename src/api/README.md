@@ -15,6 +15,7 @@
     DMISAPI_AD_AUDIENCE=<Expected audience (aud claim) for this API, comma separated if multiple>
     DMISAPI_AD_ALLOWED_AZP=<Allowed authorized party (azp claim), comma separated if multiple>
 
+## Optional environmental variables
     DMISAPI_SEARCHENG_SCOPE=<Required scope name(s) for search engine endpoints, space-separated if multiple>
     DMISAPI_STOCHAN_SCOPE=<Required scope name(s) for stochastic analyzer endpoints, space-separated if multiple>
     DMISAPI_CONGATEWAY_SCOPE=<Required scope name(s) for connector endpoints, space-separated if multiple>

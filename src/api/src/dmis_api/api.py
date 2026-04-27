@@ -19,7 +19,9 @@ from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
-from .state_routes import StateRoutes
+
+# For local Working
+from fastapi.middleware.cors import CORSMiddleware
 
 class API:
     """Management class for main API."""
@@ -47,6 +49,20 @@ class API:
     ):
         """Constructor."""
         self.app = FastAPI()
+        
+        #For local working
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+                "http://localhost:5174",
+                "http://127.0.0.1:5174",
+            ],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
@@ -67,7 +83,6 @@ class API:
             frontend_client_id=self.frontend_client_id,
             frontend_redirect_uri=self.frontend_redirect_uri,
         )
-        self.state_routes = StateRoutes(token_verifier=self.token_verifier)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
@@ -83,10 +98,6 @@ class API:
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
         self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["GET"])
-
-        self.app.add_api_route("/state", self.state_routes.get_state, methods=["GET"])
-        self.app.add_api_route("/state", self.state_routes.put_state, methods=["PUT"])
-        self.app.add_api_route("/state", self.state_routes.delete_state, methods=["DELETE"])
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[None]:
@@ -177,7 +188,8 @@ class API:
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
     async def search_engine_post(
@@ -188,7 +200,8 @@ class API:
     ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_get(
@@ -199,7 +212,8 @@ class API:
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_post(
@@ -210,7 +224,8 @@ class API:
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
     async def connector_get(
@@ -221,7 +236,8 @@ class API:
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
 
     async def connector_post(
@@ -232,7 +248,8 @@ class API:
     ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.cookie_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"))
+        #self.authorize(authorization, request.headers.get("Referer"))
+        self.authorize(authorization)
         return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
     
     def cookie_authorization(self, access_token: str | None) -> str:

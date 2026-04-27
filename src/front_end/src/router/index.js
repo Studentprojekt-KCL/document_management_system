@@ -22,7 +22,6 @@ import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
-import { useAppState } from '@/composables/useAppState'
 import MergeFilesView from '@/views/MergeFilesView.vue'
 
 const routes = [
@@ -137,9 +136,7 @@ router.beforeEach(async (to) => {
   if (!authenticated) {
     return { path: '/401' }
   }
-  const { restoreStateFromBackend } = useAppState()
-  await restoreStateFromBackend()
-
+  
   /* Admin only route */
   if (to.meta?.requiresAdmin) {
     const authInfo = await getCurrentUser()

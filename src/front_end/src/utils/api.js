@@ -17,9 +17,9 @@ export const API_PATHS = {
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
 
-  stateGet: `${FRONTEND_DMISAPI_BASE_URL}/state`,
-  statePut: `${FRONTEND_DMISAPI_BASE_URL}/state`,
-  stateDelete: `${FRONTEND_DMISAPI_BASE_URL}/state`,
+  //stateGet: `${FRONTEND_DMISAPI_BASE_URL}/state`,
+  //statePut: `${FRONTEND_DMISAPI_BASE_URL}/state`,
+  //stateDelete: `${FRONTEND_DMISAPI_BASE_URL}/state`,
 
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,

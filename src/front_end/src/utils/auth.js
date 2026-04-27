@@ -1,6 +1,5 @@
 import { LOCAL_KEY_LOGOUT_EVENT } from '@/utils/config'
 import { apiFetch, API_PATHS } from '@/utils/api'
-import { clearAppState } from '@/utils/state'
 import { getCurrentUser } from '@/utils/authClient'
 
 export async function hasRole(role) {
@@ -27,11 +26,7 @@ export async function refreshSession() {
 }
 
 export async function logout() {
-  try {
-    await clearAppState()
-  } catch (error) {
-    console.error('error:', error)
-  }
+
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
   window.location.assign(API_PATHS.authLogout)
   localStorage.removeItem('pkce_verifier')

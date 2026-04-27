@@ -12,7 +12,6 @@
  */
 
 import { ref } from 'vue'
-import { useAppState } from '@/composables/useAppState'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
@@ -21,16 +20,12 @@ import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/us
 import { authFetch, API_PATHS } from '@/utils/api'
 
 /* Reactive state variables for search results and UI state */
-const {
-  searchMatches: matches,
-  searchAllMatches: allMatches,
-  selectedFile,
-  selectedMatch,
-  lastQuery,
-  isPreviewOpen,
-  markStateChanged,
-  stateReady
-} = useAppState()
+const matches = ref([])
+const allMatches = ref([])
+const selectedFile = ref('')
+const selectedMatch = ref(null)
+const lastQuery = ref('')
+const isPreviewOpen = ref(false)
 
 const error = ref('')
 const isSearching = ref(false)
@@ -45,7 +40,6 @@ const selectedFilters = ref({
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async (query) => {
   lastQuery.value = query
-  markStateChanged()
 
   error.value = ''
   matches.value = []
@@ -74,7 +68,6 @@ const handleSearch = async (query) => {
 
     allMatches.value = resultArray
     matches.value = resultArray
-    markStateChanged()
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
@@ -93,13 +86,11 @@ const selectMatch = (match) => {
 
   selectedMatch.value = match
   isPreviewOpen.value = true
-  markStateChanged()
 }
 
 /* Closes the search preview drawer */
 const closePreview = () => {
   isPreviewOpen.value = false
-  markStateChanged()
 }
 
 /* Handle changes to search filters  */
@@ -135,13 +126,12 @@ const handleFilterChange = (filters) => {
     // return typeMatch && sourceMatch && securityMatch
     return typeMatch && securityMatch
   })
-  markStateChanged()
 }
 </script>
 
 <template>
   <!-- Search View Section -->
-  <section v-if="stateReady" class="search-view">
+  <section class="search-view">
     <!-- Search Bar Component -->
     <SearchBar :loading="isSearching" @search="handleSearch" />
 
@@ -160,7 +150,6 @@ const handleFilterChange = (filters) => {
       @close="closePreview"
     />
   </section>
-  <section v-else class="search-view">Loading Search state...</section>
 </template>
 
 <style scoped>

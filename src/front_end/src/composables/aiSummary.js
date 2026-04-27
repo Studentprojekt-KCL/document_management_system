@@ -1,14 +1,19 @@
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useAppState } from '@/composables/useAppState'
 
 export function useAISummary(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Summary state */
-  const { aiSummary, aiSummaryHtmlRaw, summaryPointer, summaryError, isGeneratingSummary } = useAppState()
+  const aiSummary = ref('')
+  const aiSummaryHtmlRaw = ref('')
+  const summaryPointer = ref('')
+  const summaryError = ref('')
+  const isGeneratingSummary = ref(false)
+
+
 
   const aiSummaryHtml = computed(() => {
     if (!uniquePointer.value) {

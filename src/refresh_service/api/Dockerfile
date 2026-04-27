@@ -17,6 +17,5 @@ RUN pip install /build/refresh_service/api
 FROM gcr.io/distroless/python3-debian13:nonroot
 
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin/refresh_service /usr/local/bin/refresh_service
-
-ENV PYTHONPATH="/usr/local/lib/python3.13/site-packages"
+COPY --from=builder /usr/local/bin/refresh-service /usr/local/bin/refresh-service
+COPY --from=builder /usr/local/bin/refresh-worker /usr/local/bin/refresh-worker

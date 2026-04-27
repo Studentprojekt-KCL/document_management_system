@@ -42,3 +42,20 @@ services:
     image: stochastic-analyzer:pr
     build:
       dockerfile: src/stochastic_analyzer/Dockerfile
+
+  refresh_service-service:
+    command: refresh-service
+    image: refresh-service:pr
+    build:
+      dockerfile: src/refresh_service/api/Dockerfile
+
+  refresh_service-worker:
+    command: refresh-worker
+    image: refresh-service:pr
+    build:
+      dockerfile: src/refresh_service/api/Dockerfile
+
+  refresh_service-redis:
+    image: refresh_service-redis:pr
+    build:
+      dockerfile: src/refresh_service/redis/Dockerfile

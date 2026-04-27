@@ -36,7 +36,6 @@ class API:
         self,
         upstream_urls: dict[str, str],
         token_verifier: TokenVerifier,
-        required_scopes: dict[str, list[str]],
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
@@ -46,12 +45,21 @@ class API:
         self.upstream_urls = {key: value.rstrip("/") for key, value in upstream_urls.items()}
         self.token_verifier = token_verifier
         self.http_client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0))
-        self.required_scopes = required_scopes
 
         self.app.add_exception_handler(
             RequestValidationError,
             self.validation_exception_handler,
         )
+
+        searcheng_scope_raw = read_env_variable("DMISAPI_SEARCHENG_SCOPE", required=False)
+        stochan_scope_raw = read_env_variable("DMISAPI_STOCHAN_SCOPE", required=False)
+        congateway_scope_raw = read_env_variable("DMISAPI_CONGATEWAY_SCOPE", required=False)
+
+        self.required_scopes = {
+            "searcheng": searcheng_scope_raw.split() if searcheng_scope_raw else [],
+            "stochan": stochan_scope_raw.split() if stochan_scope_raw else [],
+            "congateway": congateway_scope_raw.split() if congateway_scope_raw else [],
+        }
 
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
@@ -221,17 +229,13 @@ def run() -> None:
     port = read_port("DMISAPI_BIND_PORT")
     keycloak_issuer = read_env_variable("DMISAPI_AD_URL")
     keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL")
-    expected_audience = [value.strip() for value in read_env_variable("DMISAPI_AD_AUDIENCE").split(",") if value.strip()]
+    audience_raw = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
+    expected_audience = [value.strip() for value in audience_raw.split(",") if value.strip()] if audience_raw else None
     allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
     upstream_urls = {
         "searcheng": read_env_variable("DMISAPI_SEARCHENG_URL"),
         "stochan": read_env_variable("DMISAPI_STOCHAN_URL"),
         "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL"),
-    }
-    required_scopes = {
-        "searcheng": read_env_variable("DMISAPI_SEARCHENG_SCOPE").split(),
-        "stochan": read_env_variable("DMISAPI_STOCHAN_SCOPE").split(),
-        "congateway": read_env_variable("DMISAPI_CONGATEWAY_SCOPE").split(),
     }
 
     log_level = "debug" if args.dev else None
@@ -246,7 +250,6 @@ def run() -> None:
     api = API(
         upstream_urls=upstream_urls,
         token_verifier=token_verifier,
-        required_scopes=required_scopes,
         log_level=log_level,
     )
 

@@ -13,7 +13,7 @@ from gateway.preprompts import (
 )
 from gateway.schemas import InputItem, SummaryResult
 
-from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 SWEDISH_CHARS = set("åäö")
@@ -85,38 +85,14 @@ class Summarizer:
             STOCHAN_LLM_TIMEOUT: Request timeout in seconds.
             STOCHAN_SAMPLE_SIZE: Sample length for language detection.
             STOCHAN_SWEDISH_CHAR_THRESHOLD: Trigger count for Swedish detection.
-
-        Raises:
-            RuntimeError: If any required variable is missing.
         """
-        url = read_env_variable("STOCHAN_LLM_URL")
-        model = read_env_variable("STOCHAN_LLM_MODEL")
-        timeout = read_env_variable("STOCHAN_LLM_TIMEOUT")
-        sample_size = read_env_variable("STOCHAN_SAMPLE_SIZE")
-        swedish_threshold = read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD")
-
-        missing = [
-            name
-            for name, value in (
-                ("STOCHAN_LLM_URL", url),
-                ("STOCHAN_LLM_MODEL", model),
-                ("STOCHAN_LLM_TIMEOUT", timeout),
-                ("STOCHAN_SAMPLE_SIZE", sample_size),
-                ("STOCHAN_SWEDISH_CHAR_THRESHOLD", swedish_threshold),
-            )
-            if value is None
-        ]
-        if missing:
-            dms_error(f"Summarizer env vars not defined: {', '.join(missing)}")
-            raise RuntimeError(f"Missing env vars: {missing}")
-
         config = SummarizerConfig(
-            url=url,
-            model=model,
-            timeout=int(timeout),
+            url=read_env_variable("STOCHAN_LLM_URL"),
+            model=read_env_variable("STOCHAN_LLM_MODEL"),
+            timeout=int(read_env_variable("STOCHAN_LLM_TIMEOUT")),
             lang_config=LanguageConfig(
-                sample_size=int(sample_size),
-                swedish_char_threshold=int(swedish_threshold),
+                sample_size=int(read_env_variable("STOCHAN_SAMPLE_SIZE")),
+                swedish_char_threshold=int(read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD")),
             ),
         )
         return cls(config=config, client=client)

@@ -29,3 +29,28 @@ def read_env_variable(env_variable: str) -> str:
     if not variable or not isinstance(variable, str):
         dms_error(f"{env_variable} must be set in local environement.")
     return variable  # type: ignore
+
+
+def read_bind_addr(env_variable: str) -> str:
+    """Read a bind address from a local env variable.
+
+    Args:
+        env_variable: Name of env variable.
+    """
+    addr = environ.get(env_variable)
+    if not addr or not isinstance(addr, str):
+        dms_error(f"Export {env_variable} in environment (bind address must be a non-empty string).")
+    return addr  # type: ignore
+
+
+def read_optional_env_variable(env_variable: str, default: str) -> str:
+    """Read an optional env variable from local environment, returning a default if unset.
+
+    Args:
+        env_variable: Name of env variable.
+        default: Value to return when the env variable is unset or empty.
+    """
+    variable = environ.get(env_variable)
+    if not variable or not isinstance(variable, str):
+        return default
+    return variable

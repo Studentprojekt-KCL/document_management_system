@@ -6,7 +6,7 @@ from base64 import b64decode
 import httpx
 
 from gateway.schemas import InputItem, MetadataTemplate
-from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
@@ -38,15 +38,11 @@ class Connector:
 
         Reads:
             STOCHAN_CONGATEWAY_URL: Base URL for the connector service.
-
-        Raises:
-            RuntimeError: If the required variable is missing.
         """
-        url = read_env_variable("STOCHAN_CONGATEWAY_URL")
-        if url is None:
-            dms_error("Connector env var not defined: STOCHAN_CONGATEWAY_URL")
-            raise RuntimeError("Missing env var: STOCHAN_CONGATEWAY_URL")
-        return cls(url=url, client=client)
+        return cls(
+            url=read_env_variable("STOCHAN_CONGATEWAY_URL"),
+            client=client,
+        )
 
     async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
         """Fetch contents for all file pointers from the connector.

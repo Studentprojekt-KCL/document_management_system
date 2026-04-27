@@ -3,7 +3,6 @@
 import argparse
 import logging
 from contextlib import asynccontextmanager
-from os import environ
 from typing import Any
 from collections.abc import AsyncIterator, Sequence
 
@@ -21,8 +20,11 @@ from gateway.services.summarizer import Summarizer
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
 
-from shared_functions.dmis_logger import dms_error
-from shared_functions.initialisation_tools import read_port
+from shared_functions.initialisation_tools import (
+    read_bind_addr,
+    read_optional_env_variable,
+    read_port,
+)
 
 
 def _parse_log_level() -> str:
@@ -31,15 +33,6 @@ def _parse_log_level() -> str:
     _ = parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
     return "debug" if args.dev else "info"
-
-
-def _read_bind() -> str:
-    """Read the bind address from the environment."""
-    bind = environ.get("STOCHAN_BIND_ADDR")
-    if bind is None:
-        dms_error("STOCHAN_BIND_ADDR is not defined.")
-        raise RuntimeError("Missing env var: STOCHAN_BIND_ADDR")
-    return bind
 
 
 class API:
@@ -62,9 +55,9 @@ class API:
     def __init__(self) -> None:
         logging.basicConfig()
         self.log_level = _parse_log_level()
-        self.bind = _read_bind()
+        self.bind = read_bind_addr("STOCHAN_BIND_ADDR")
         self.port = read_port("STOCHAN_BIND_PORT")
-        device = environ.get("DEVICE", "external")
+        device = read_optional_env_variable("DEVICE", "external")
 
         if self.log_level == "debug":
             logging.getLogger().setLevel(logging.DEBUG)

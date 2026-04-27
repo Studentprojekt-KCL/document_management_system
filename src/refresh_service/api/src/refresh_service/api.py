@@ -25,6 +25,8 @@ class RefreshService:
 
     def __init__(self, log_level: str | None = None):
         self.log_level = log_level
+        self.ad_issuer = read_env_variable("REFSERVICE_AD_URL")
+        self.openid_connect_url = read_env_variable("REFSERVICE_AD_JWKS_URL")
 
         self.redis_database = RedisDataBase()
         self.session_enc = SessionEncryption(read_env_variable("REFSERVICE_SESSION_ENC_PASSW"))
@@ -50,7 +52,7 @@ class RefreshService:
         if (str, dict) != (type(refresh_url), type(session_variables)):
             raise HTTPException(status_code=422)
 
-        status, token_values = authorize_and_get_token(authorization)
+        status, token_values = authorize_and_get_token(authorization, self.ad_issuer, self.openid_connect_url)
         if status is False:
             raise HTTPException(status_code=401)
 
@@ -59,8 +61,8 @@ class RefreshService:
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
-    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)): #TODO, remove enc string.
-        status, token_values = authorize_and_get_token(authorization)
+    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)):
+        status, token_values = authorize_and_get_token(authorization, self.ad_issuer, self.openid_connect_url)
         if status is False:
             raise HTTPException(status_code=401)
 

@@ -82,7 +82,7 @@ SEARCHENG_BIND_PORT=<Search engine port>
 SEARCHENG_BIND_ADDR=<Search engine bind address>
 SEARCHENG_CONGATEWAY_URL=<Connector address>
 SEARCHENG_STOCHAN_URL=<Query address>
-SEARCHENG_DATA_DIRECTORY=<Data location>
+SEARCHENG_WORKING_DIRECTORY=<Data location>
 ```
 
 Optional flags:

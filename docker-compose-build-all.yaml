@@ -44,13 +44,13 @@ services:
       dockerfile: src/stochastic_analyzer/Dockerfile
 
   refresh_service-service:
-    command: refresh-service
+    command: /usr/local/bin/refresh-service
     image: refresh-service:pr
     build:
       dockerfile: src/refresh_service/api/Dockerfile
 
   refresh_service-worker:
-    command: refresh-worker
+    command: /usr/local/bin/refresh-worker
     image: refresh-service:pr
     build:
       dockerfile: src/refresh_service/api/Dockerfile

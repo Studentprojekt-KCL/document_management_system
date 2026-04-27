@@ -13,6 +13,7 @@ setup(
         "pyjwt",
         "celery>=5.6",
         "redis>=7.4",
+        "aiohttp>=3.13",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

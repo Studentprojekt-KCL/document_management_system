@@ -74,12 +74,11 @@ async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> S
     return result
 
 
-def create_router(services: Services, device: str) -> APIRouter:
+def create_router(services: Services) -> APIRouter:
     """Create router with pre-constructed service dependencies.
 
     Args:
         services: Pre-configured service instances.
-        device: Device identifier for health checks.
 
     Returns:
         Configured APIRouter with all endpoints.
@@ -89,7 +88,7 @@ def create_router(services: Services, device: str) -> APIRouter:
     @router.get("/health", response_model=HealthCheck)
     async def health_check() -> dict:
         """Health checks."""
-        return {"status": "active", "model_loaded": True, "device": device}
+        return {"status": "active", "model_loaded": True}
 
     @router.post("/rerank", response_model=RankResponse)
     async def rerank_documents(payload: PointerRequest) -> dict:

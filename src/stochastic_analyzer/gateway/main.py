@@ -53,7 +53,6 @@ class API:
         self.log_level = _parse_log_level()
         self.bind = read_env_variable("STOCHAN_BIND_ADDR")
         self.port = read_port("STOCHAN_BIND_PORT")
-        device = read_env_variable("STOCHAN_DEVICE")
 
         if self.log_level == "debug":
             logging.getLogger().setLevel(logging.DEBUG)
@@ -82,7 +81,7 @@ class API:
             indexer=Indexer.from_env(self.http_client),
         )
 
-        self.app.include_router(create_router(services, device))
+        self.app.include_router(create_router(services))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     @asynccontextmanager

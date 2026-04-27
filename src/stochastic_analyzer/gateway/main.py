@@ -20,11 +20,7 @@ from gateway.services.summarizer import Summarizer
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
 
-from shared_functions.initialisation_tools import (
-    read_bind_addr,
-    read_optional_env_variable,
-    read_port,
-)
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 
 def _parse_log_level() -> str:
@@ -55,9 +51,9 @@ class API:
     def __init__(self) -> None:
         logging.basicConfig()
         self.log_level = _parse_log_level()
-        self.bind = read_bind_addr("STOCHAN_BIND_ADDR")
+        self.bind = read_env_variable("STOCHAN_BIND_ADDR")
         self.port = read_port("STOCHAN_BIND_PORT")
-        device = read_optional_env_variable("DEVICE", "external")
+        device = read_env_variable("STOCHAN_DEVICE")
 
         if self.log_level == "debug":
             logging.getLogger().setLevel(logging.DEBUG)

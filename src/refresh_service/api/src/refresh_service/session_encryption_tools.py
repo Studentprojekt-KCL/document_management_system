@@ -34,7 +34,7 @@ class SessionEncryption:
         raw_string = session_str.encode()
         return self.suite.encrypt(raw_string).decode('utf-8')
 
-    def decrypt_session_vars(self, encrypted_str: str) -> dict:
+    def decrypt_session_variables(self, encrypted_str: str) -> dict:
         """Decrypt session variables."""
         encrypted_bytes = bytes(encrypted_str, "utf-8")
         return json.loads(self.suite.decrypt(encrypted_bytes).decode())

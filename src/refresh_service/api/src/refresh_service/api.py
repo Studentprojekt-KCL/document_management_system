@@ -3,32 +3,30 @@
 import argparse
 
 from typing import Any
-import json
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from collections.abc import Sequence
-
 from fastapi.exceptions import RequestValidationError
+
 from refresh_service.session_encryption_tools import SessionEncryption
 from refresh_service.auth_token import authorize_and_get_token
-from refresh_service.database import Database
+from refresh_service.database import RedisDataBase
+from refresh_service.token_refresh import insert_session
+
 from shared_functions.initialisation_tools import read_env_variable, read_port
-from shared_functions.dmis_logger import dms_warning
+
 
 class RefreshService:
 
-    DEFAULT_EXPIRY_TIME: int = 1800 #NOTE; 401 should probably be signaled by connector to execute refresh.
-
     app = FastAPI()
     session_encryption: SessionEncryption
-    database: Database
 
     def __init__(self, log_level: str | None = None):
         self.log_level = log_level
 
-        self.database = Database()
+        self.redis_database = RedisDataBase()
         self.session_enc = SessionEncryption(read_env_variable("REFSERVICE_SESSION_ENC_PASSW"))
 
         self.app.add_api_route("/add_session", self.add_session, methods=["POST"])
@@ -46,20 +44,18 @@ class RefreshService:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def add_session(self, service_name: str, session_vars: dict[Any, Any], authorization: str | None = Header(default=None)):
-        if not isinstance(session_vars, dict):
+    async def add_session(self, service_name: str, body: dict[Any, Any], authorization: str | None = Header(default=None)):
+        refresh_url = body.get("refresh_url")
+        session_variables = body.get("session_variables")
+        if (str, dict) != (type(refresh_url), type(session_variables)):
             raise HTTPException(status_code=422)
+
         status, token_values = authorize_and_get_token(authorization)
         if status is False:
             raise HTTPException(status_code=401)
 
-        enc_session_vars = self.session_enc.encrypt_session_vars(session_vars)
-        expiry_time = session_vars.get("expires_in")
-        if expiry_time is None:
-            dms_warning(f"Refresh service recieved Oauth token without expiry_time ({session_vars})")
-            expiry_time = self.DEFAULT_EXPIRY_TIME
-
-        self.database.insert_session_token(token_values.get("sub"), service_name, enc_session_vars, expiry_time)
+        if insert_session(token_values.get("sub"), service_name, refresh_url, session_variables) is False:
+            raise HTTPException(status_code=400)
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
@@ -68,8 +64,8 @@ class RefreshService:
         if status is False:
             raise HTTPException(status_code=401)
 
-        content = self.database.get_session_token(token_values.get("sub"), service_name)
-        return self.session_enc.decrypt_session_vars(content).get("access_token")
+        content = self.redis_database.get_session_token(token_values.get("sub"), service_name).get("enc_object")
+        return self.session_enc.decrypt_session_variables(content).get("access_token")
 
 
 def run() -> None:

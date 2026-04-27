@@ -1,6 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import time
+from redis import Redis, exceptions
+
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
@@ -10,7 +12,62 @@ from mysql import connector
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from mysql.connector.pooling import PooledMySQLConnection
 
-class Database:
+
+class RedisDataBase:
+
+    redis_instance: Redis
+
+    def __init__(self):
+        """Constructor."""
+        self.redis_instance = Redis(host=read_env_variable("REFSERVICE_REDIS_HOST"), port=read_env_variable("REFSERVICE_REDIS_PORT"), decode_responses=True)
+
+    def get_session_token(self, user: str, service: str) -> tuple:
+        """Retrive session token from database.
+
+        Args:
+        ----
+            user: Users sub UUID.
+            service: Name of service token authenticates against.
+        """
+        redis_key = f"{user}:{service}"
+        element = self.redis_instance.hgetall(redis_key)
+        if not isinstance(element, dict):
+            dms_warning(f"It appears an incorrect session token was stored for: {redis_key}")
+            return ""
+
+        return element.get("enc_object"), element.get("refresh_url")
+
+    def insert_session_token(self, user: str, service: str, expiry_time: int, refresh_url: str, enc_obj: str) -> bool:
+        """Insert encrypted user tokens into database.
+
+        Args:
+        ----
+            user: Users sub UUID.
+            service: Name of service token authenticates against.
+            enc_obj: Encrypted session token.
+            expiry_time: Number of seconds until token expires.
+
+        Returns:
+        -------
+            True if insertion was possible, else false.
+        """
+        redis_key = f"{user}:{service}"
+        json_object = {"expiry_time": expiry_time, "enc_object": enc_obj, "refresh_url": refresh_url}
+        try:
+            self.redis_instance.hset(redis_key, mapping=json_object)
+        except (exceptions.ConnectionError, exceptions.TimeoutError) as err:
+            dms_warning(f"Unable to connect to redis database. {err}")
+            return False
+        except exceptions.AuthenticationError as err:
+            dms_warning(f"Redis password was incorrect. {err}")
+            return False
+        except (exceptions.ResponseError, exceptions.DataError) as err:
+            dms_warning(f"Input to redis had incorrect format. {err}")
+            return False
+        return True
+
+
+class SQLDatabase:
     """Service class for the database."""
 
     host: str

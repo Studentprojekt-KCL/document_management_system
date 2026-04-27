@@ -13,3 +13,4 @@ package-dir = {"" = "src"}
 
 [project.scripts]
 refresh-service = "refresh_service.api:run"
+refresh-worker = "refresh_service.token_refresh:run"

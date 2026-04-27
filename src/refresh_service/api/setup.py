@@ -11,6 +11,8 @@ setup(
         "mysql-connector-python>=9.5",
         "cryptography>=46.0.7",
         "pyjwt",
+        "celery>=5.6",
+        "redis>=7.4",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

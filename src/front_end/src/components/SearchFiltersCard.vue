@@ -1,22 +1,51 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
-import { useSourceFilters, useDocumentsOnlyFilters, useSecurityFilters } from '@/composables/useFilters'
+import { useSourceFilters, useDocumentsOnlyFilters, useAllFileTypeFilters, useSecurityFilters } from '@/composables/useFilters'
 
 const sourceFilters = useSourceFilters()
 const documentsOnlyFilters = useDocumentsOnlyFilters()
+const allFilesTypeFilters = useAllFileTypeFilters()
 const securityFilters = useSecurityFilters()
 
-const typeFilters = computed(() =>
-  documentsOnlyFilters.value.map((item) => ({
-    label: `${item.description} (${item.extension.join(', ')})`,
-    value: item.extension.join('|')
-  }))
-)
-
 const props = defineProps({
-  selectedFilters: Object
+  selectedFilters: Object,
+  documentsOnly: { type: Boolean, default: true }
 })
+
+/* If documentsOnly is true, only show document type filters, otherwise show all file type filters with a dropdown */
+const typeFilters = computed(() => {
+  const source = props.documentsOnly ? documentsOnlyFilters.value : allFilesTypeFilters.value
+
+  if (props.documentsOnly) {
+    return source.map((item) => ({
+      label: `${item.description} (${item.extension.join(', ')})`,
+      value: item.extension.join('|')
+    }))
+  } else {
+    return source.map((item) => ({
+      label: `${item.description}`,
+      value: item.extension.join('|')
+    }))
+  }
+})
+
+/* Show all document filters, but only first N chips for all-files mode. */
+const visibleTypeFilters = computed(() => (props.documentsOnly ? typeFilters.value : typeFilters.value.slice(0, 11)))
+
+/* Remaining filters go into dropdown in all-files mode. */
+const overflowTypeFilters = computed(() => {
+  if (props.documentsOnly) return []
+
+  return typeFilters.value.slice(11)
+})
+
+function selectTypeFromMenu(event) {
+  const value = event.target.value
+  if (value) toggleFilter('type', value)
+  event.target.value = ''
+}
+
 const emit = defineEmits(['update:filters'])
 
 /* Local refs for filter selection */
@@ -98,13 +127,27 @@ const clearAllFilters = () => {
           TYPE:
         </span>
         <button
-          v-for="item in typeFilters"
+          v-for="item in visibleTypeFilters"
           :key="item.value"
           :class="['chip', { active: isSelected('type', item.value) }]"
           @click="toggleFilter('type', item.value)"
         >
           {{ item.label }}
         </button>
+
+        <div v-if="!props.documentsOnly && overflowTypeFilters.length" class="type-dropdown">
+          <select class="more-types-select" @change="selectTypeFromMenu">
+            <option value="">More Types</option>
+            <option
+              v-for="item in overflowTypeFilters"
+              :key="item.value"
+              :value="item.value"
+              :class="{ active: isSelected('type', item.value) }"
+            >
+              {{ item.label }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <span class="group-divider" aria-hidden="true"></span>
@@ -211,6 +254,17 @@ const clearAllFilters = () => {
   width: 1px;
   height: 22px;
   background: #d9dfe8;
+}
+
+.more-types-select {
+  border: 1px solid #d8dee7;
+  border-radius: 10px;
+  padding: 0.35rem 0.7rem;
+  background: #edf0f4;
+  color: #6f7e95;
+  font-size: 0.93rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

@@ -30,6 +30,7 @@ const { state: selectedFile } = useReload('selectedFile', '')
 const { state: selectedMatch } = useReload('selectedMatch', null)
 const { state: lastQuery } = useReload('lastQuery', '')
 const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
+const documentsOnlyMode = ref(true)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -40,6 +41,7 @@ const selectedFilters = ref({
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async ({ query, documentsOnly }) => {
+  documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
   error.value = ''
@@ -78,6 +80,10 @@ const handleSearch = async ({ query, documentsOnly }) => {
   } finally {
     isSearching.value = false
   }
+}
+
+const handleDocumentsOnlyChange = (documentsOnly) => {
+  documentsOnlyMode.value = documentsOnly
 }
 
 /* Handles selection of a search result match, updating state and opening the preview drawer */
@@ -133,10 +139,10 @@ const handleFilterChange = (filters) => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

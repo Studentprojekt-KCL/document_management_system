@@ -13,15 +13,16 @@ import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Header, Cookie
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
-from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,missing-function-docstring,pointless-string-statement
 
 class API:
     """Management class for main API."""

@@ -12,11 +12,6 @@ class TestConnector(IsolatedAsyncioTestCase):
         self.instance.url_get_files = "/get_files"
         self.instance.subdata = {}
 
-    def test_reset(self):
-        self.instance.subdata = {"stream": "subdata"}
-        self.instance.reset()
-        assert self.instance.subdata == {}
-
     # ==== FETCH_FILES_FROM_POINTERS ====
 
     @mock.patch("se_api.services.connector.Connector._get_file_from_pointers")

@@ -12,10 +12,12 @@ class ConnectorClient:
 
     timeout: int
     source_systems: list[dict]
+    http_client: httpx.AsyncClient
 
     def __init__(self, config_path: str, timeout: int) -> None:
 
         self.timeout = timeout
+        self.http_client = httpx.AsyncClient()
         self.source_systems = self._load_source_systems_from_file(config_path)
 
         for system in self.source_systems:
@@ -36,7 +38,9 @@ class ConnectorClient:
 
         sorted_pointers: list[list] = self._sort_pointers(pointers)
 
-        meta_data: list = await self._get_file_from_pointer(sorted_pointers, include_content, include_last_edit_date)
+        meta_data: list = await self._get_file_from_pointer(
+            sorted_pointers, include_content, include_last_edit_date, self.http_client
+        )
         return meta_data
 
     def _sort_pointers(self, pointers: list[str]) -> list[list]:
@@ -65,7 +69,7 @@ class ConnectorClient:
         return f"{scheme}://{host}"
 
     async def _get_file_from_pointer(
-        self, sorted_pointers: list[list], include_content: bool, include_last_edit_date: bool
+        self, sorted_pointers: list[list], include_content: bool, include_last_edit_date: bool, http_client: httpx.AsyncClient
     ) -> list:
         """makes http requests to all source systems to gather meta data from pointers"""
 
@@ -78,21 +82,20 @@ class ConnectorClient:
                     break
 
         # Send requests to downstream connectors
-        async with httpx.AsyncClient() as client:
-            tasks = [
-                client.post(
-                    f"{source_system_host_list[sorted_pointers.index(grouped_pointers)]}/get_files",
-                    params=[
-                        ("include_content", include_content),
-                        ("include_last_edit_date", include_last_edit_date),
-                    ],
-                    json={"file_pointers": grouped_pointers},
-                    timeout=self.timeout,
-                )
-                for grouped_pointers in sorted_pointers
-            ]
-            responses = await asyncio.gather(*tasks)
-            return [item for r in responses for item in r.json()]
+        tasks = [
+            http_client.post(
+                f"{source_system_host_list[sorted_pointers.index(grouped_pointers)]}/get_files",
+                params=[
+                    ("include_content", include_content),
+                    ("include_last_edit_date", include_last_edit_date),
+                ],
+                json={"file_pointers": grouped_pointers},
+                timeout=self.timeout,
+            )
+            for grouped_pointers in sorted_pointers
+        ]
+        responses = await asyncio.gather(*tasks)
+        return [item for r in responses for item in r.json()]
 
     def fetch_start_of_streams(self) -> list[str]:
         """returns URL to connector for stream proto://<connector-host>/stream_files_to_index"""

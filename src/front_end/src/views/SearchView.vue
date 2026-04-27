@@ -39,7 +39,7 @@ const selectedFilters = ref({
 })
 
 /* Performs a search when the SearchBar emits a search event */
-const handleSearch = async (query) => {
+const handleSearch = async ({ query, documentsOnly }) => {
   lastQuery.value = query
 
   error.value = ''
@@ -55,8 +55,8 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
-
+    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}&documents_only=${documentsOnly}`)
+    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return

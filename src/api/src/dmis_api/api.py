@@ -35,7 +35,7 @@ class API:
     token_verifier: TokenVerifier
     http_client: httpx.AsyncClient
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments # noqa: PLR0913
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         search_api_url: str,
         query_api_url: str,

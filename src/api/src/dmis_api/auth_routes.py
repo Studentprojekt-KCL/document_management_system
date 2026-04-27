@@ -3,15 +3,18 @@ from __future__ import annotations
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import Cookie, Form
+from fastapi import Cookie, Form, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
+from typing import Any
+
 
 
 class AuthRoutes:
+    """Authentication route handlers."""
     ACCESS_COOKIE_MAX_AGE = 3600
     REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
 
-    def __init__(
+    def __init__( # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         token_verifier,
         http_client: httpx.AsyncClient,
@@ -27,7 +30,7 @@ class AuthRoutes:
         self.frontend_client_id = frontend_client_id
         self.frontend_redirect_uri = frontend_redirect_uri
 
-    def _verify_cookie_token(self, access_token: str | None):
+    def _verify_cookie_token(self, access_token: str | None)-> dict[str,any]|None:
         if not access_token:
             return None
         try:
@@ -93,7 +96,7 @@ class AuthRoutes:
             },
         )
 
-    async def auth_me(self, access_token: str | None = Cookie(default=None)):
+    async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         claims = self._verify_cookie_token(access_token)
         if not claims:
             return self._unauthenticated_response()
@@ -186,7 +189,7 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, id_token: str | None = Cookie(default=None)):
+    async def logout_auth(self, id_token: str | None = Cookie(default=None))-> RedirectResponse:
         post_logout_redirect_uri = self.frontend_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
 
         params = {

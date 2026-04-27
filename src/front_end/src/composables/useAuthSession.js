@@ -19,7 +19,7 @@ export function useAuthSession() {
 
   // LOGOUT
   const triggerLogout = async (reason = 'unknown') => {
-    console.log("Logout triggered: ", reason)
+    console.log('Logout triggered: ', reason)
     console.trace()
     broadcastLogout()
     await logout()

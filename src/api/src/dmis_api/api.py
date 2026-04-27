@@ -209,8 +209,8 @@ class API:
         authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
-        authorization = self.resolve_authorization(authorization, access_token)
         """GET request to search engine."""
+        authorization = self.resolve_authorization(authorization, access_token)
         self.authorize(authorization, request.headers.get("Referer"), required_scopes=self.required_scopes["searcheng"])
         return await self.execute_get_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
@@ -221,8 +221,8 @@ class API:
         authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
-        authorization = self.resolve_authorization(authorization, access_token)
         """POST request to search engine."""
+        authorization = self.resolve_authorization(authorization, access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -237,8 +237,8 @@ class API:
         authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
-        authorization = self.resolve_authorization(authorization, access_token)
         """GET request to stochastic analyzer."""
+        authorization = self.resolve_authorization(authorization, access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -269,8 +269,8 @@ class API:
         authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
-        authorization = self.resolve_authorization(authorization, access_token)
         """GET request to connector API."""
+        authorization = self.resolve_authorization(authorization, access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -285,8 +285,8 @@ class API:
         authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
-        authorization = self.resolve_authorization(authorization, access_token)
         """POST request to connector API."""
+        authorization = self.resolve_authorization(authorization, access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),

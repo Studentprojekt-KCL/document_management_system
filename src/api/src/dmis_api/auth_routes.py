@@ -1,28 +1,32 @@
+"""Authentication routes for DMIS API."""
+
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import Cookie, Form, HTTPException
+from fastapi import Cookie, Form
 from fastapi.responses import JSONResponse, RedirectResponse
-from typing import Any
 
+# pylint: disable=missing-function-docstring,broad-exception-caught
 
 
 class AuthRoutes:
     """Authentication route handlers."""
+
     ACCESS_COOKIE_MAX_AGE = 3600
     REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
 
-    def __init__( # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        token_verifier,
+        token_verifier: Any,
         http_client: httpx.AsyncClient,
         keycloak_token_url: str,
         keycloak_logout_url: str,
         frontend_client_id: str,
         frontend_redirect_uri: str,
-    ):
+    ) -> None:
         self.token_verifier = token_verifier
         self.http_client = http_client
         self.keycloak_token_url = keycloak_token_url
@@ -30,7 +34,7 @@ class AuthRoutes:
         self.frontend_client_id = frontend_client_id
         self.frontend_redirect_uri = frontend_redirect_uri
 
-    def _verify_cookie_token(self, access_token: str | None)-> dict[str,any]|None:
+    def _verify_cookie_token(self, access_token: str | None) -> dict[str, Any] | None:
         if not access_token:
             return None
         try:
@@ -49,24 +53,24 @@ class AuthRoutes:
             key=key,
             value=value,
             httponly=True,
-            secure=True,  # True in production with HTTPS
+            secure=True,
             samesite="none",
             max_age=max_age,
         )
 
-    def _set_auth_cookies(self, response: JSONResponse, token_data: dict) -> None:
+    def _set_auth_cookies(self, response: JSONResponse, token_data: dict[str, Any]) -> None:
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
-        if access_token:
+        if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, self.ACCESS_COOKIE_MAX_AGE)
-        if refresh_token:
+        if isinstance(refresh_token, str):
             self._set_cookie(response, "refresh_token", refresh_token, self.REFRESH_COOKIE_MAX_AGE)
-        if id_token:
+        if isinstance(id_token, str):
             self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE)
 
-    async def _request_tokens(self, data: dict) -> dict | None:
+    async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any] | None:
         try:
             resp = await self.http_client.post(
                 self.keycloak_token_url,
@@ -81,7 +85,7 @@ class AuthRoutes:
     def _unauthenticated_response(self) -> JSONResponse:
         return JSONResponse(status_code=401, content={"authenticated": False})
 
-    async def check_auth(self, access_token: str | None = Cookie(default=None)):
+    async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         claims = self._verify_cookie_token(access_token)
         if not claims:
             return self._unauthenticated_response()
@@ -101,11 +105,7 @@ class AuthRoutes:
         if not claims:
             return self._unauthenticated_response()
 
-        client_roles = (
-            claims.get("resource_access", {})
-            .get(self.frontend_client_id, {})
-            .get("roles", [])
-        )
+        client_roles = claims.get("resource_access", {}).get(self.frontend_client_id, {}).get("roles", [])
         realm_roles = claims.get("realm_access", {}).get("roles", [])
 
         return JSONResponse(
@@ -189,7 +189,7 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, id_token: str | None = Cookie(default=None))-> RedirectResponse:
+    async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> RedirectResponse:
         post_logout_redirect_uri = self.frontend_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
 
         params = {
@@ -202,22 +202,7 @@ class AuthRoutes:
         logout_url = f"{self.keycloak_logout_url}?{urlencode(params)}"
 
         response = RedirectResponse(url=logout_url, status_code=302)
-        response.delete_cookie(
-                "access_token",
-                path="/",
-                secure=True,
-                samesite="none"
-            )
-        response.delete_cookie(
-                "refresh_token",
-                path="/",
-                secure=True,
-                samesite="none"
-            )
-        response.delete_cookie(
-                "id_token",
-                path="/",
-                secure=True,
-                samesite="none"
-            )
+        response.delete_cookie("access_token", path="/", secure=True, samesite="none")
+        response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
+        response.delete_cookie("id_token", path="/", secure=True, samesite="none")
         return response

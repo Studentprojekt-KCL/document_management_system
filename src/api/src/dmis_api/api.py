@@ -2,26 +2,28 @@
 
 from __future__ import annotations
 
-from json.decoder import JSONDecodeError
 import argparse
-from typing import Any
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from json.decoder import JSONDecodeError
+from typing import Any
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Cookie
+from fastapi import Cookie, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from shared_functions.dmis_logger import dms_warning, dms_info
+from shared_functions.dmis_logger import dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable, read_port
+
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
-# For local Working
-from fastapi.middleware.cors import CORSMiddleware
+# pylint: disable=too-many-instance-attributes,too-many-locals,broad-exception-caught
+
 
 class API:
     """Management class for main API."""
@@ -46,11 +48,10 @@ class API:
         frontend_redirect_uri: str,
         keycloak_logout_url: str,
         log_level: str | None = None,
-    ):
+    ) -> None:
         """Constructor."""
         self.app = FastAPI()
-        
-        #For local working
+
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=[
@@ -63,7 +64,6 @@ class API:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        # End for local working
 
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")
@@ -189,7 +189,6 @@ class API:
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_get_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
@@ -201,7 +200,6 @@ class API:
     ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_post_request(f"{self.search_api_url}/{endpoint}", request, authorization)
 
@@ -213,7 +211,6 @@ class API:
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_get_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
@@ -225,7 +222,6 @@ class API:
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_post_request(f"{self.query_api_url}/{endpoint}", request, authorization)
 
@@ -237,7 +233,6 @@ class API:
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_get_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
 
@@ -249,11 +244,11 @@ class API:
     ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.cookie_authorization(access_token)
-        #self.authorize(authorization, request.headers.get("Referer"))
         self.authorize(authorization)
         return await self.execute_post_request(f"{self.connector_api_url}/{endpoint}", request, authorization)
-    
+
     def cookie_authorization(self, access_token: str | None) -> str:
+        """Build authorization header from access token cookie."""
         if not access_token:
             raise HTTPException(status_code=401, detail="Missing access token cookie")
         return f"Bearer {access_token}"

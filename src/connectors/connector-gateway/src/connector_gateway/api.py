@@ -41,14 +41,14 @@ class API:
         )
         return files_meta_data
 
-    def stream_files_to_index(self) -> list[str]:
+    async def stream_files_to_index(self) -> list[str]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
-        stream_urls: list[str] = self.down_stream_client.fetch_start_of_streams()
+        stream_urls: list[str] = await self.down_stream_client.fetch_start_of_streams()
         return stream_urls
 
-    def connected_source_systems(self) -> list[str]:
+    async def connected_source_systems(self) -> list[str]:
         """Returns list with names of all connected source systems"""
-        names_of_source_systems: list[str] = self.down_stream_client.get_source_system_names()
+        names_of_source_systems: list[str] = await self.down_stream_client.get_source_system_names()
         return names_of_source_systems
 
 

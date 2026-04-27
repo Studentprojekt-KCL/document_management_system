@@ -4,6 +4,7 @@ import asyncio
 import json
 import httpx
 
+from shared_functions.dmis_logger import dms_warning
 
 class ConnectorClient:
     """
@@ -82,22 +83,28 @@ class ConnectorClient:
                     break
 
         # Send requests to downstream connectors
-        tasks = [
-            http_client.post(
-                f"{source_system_host_list[sorted_pointers.index(grouped_pointers)]}/get_files",
-                params=[
-                    ("include_content", include_content),
-                    ("include_last_edit_date", include_last_edit_date),
-                ],
-                json={"file_pointers": grouped_pointers},
-                timeout=self.timeout,
-            )
-            for grouped_pointers in sorted_pointers
-        ]
-        responses = await asyncio.gather(*tasks)
-        return [item for r in responses for item in r.json()]
+        try:
+            tasks = [
+                http_client.post(
+                    f"{source_system_host_list[sorted_pointers.index(grouped_pointers)]}/get_files",
+                    params=[
+                        ("include_content", include_content),
+                        ("include_last_edit_date", include_last_edit_date),
+                    ],
+                    json={"file_pointers": grouped_pointers},
+                    timeout=self.timeout,
+                )
+                for grouped_pointers in sorted_pointers
+            ]
+            responses = await asyncio.gather(*tasks)
+            return [item for r in responses for item in r.json()]
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out")
+        except httpx.HTTPError:
+            dms_warning("Failed to connect to connector.")
+        return []
 
-    def fetch_start_of_streams(self) -> list[str]:
+    async def fetch_start_of_streams(self) -> list[str]:
         """returns URL to connector for stream proto://<connector-host>/stream_files_to_index"""
         stream_urls: list[str] = []
         for source_system in self.source_systems:
@@ -106,7 +113,7 @@ class ConnectorClient:
             stream_urls.append(stream_url)
         return stream_urls
 
-    def get_source_system_names(self) -> list[str]:
+    async def get_source_system_names(self) -> list[str]:
         """Returns names of source systems according to config file"""
         names_of_source_systems: list[str] = []
         for source_system in self.source_systems:

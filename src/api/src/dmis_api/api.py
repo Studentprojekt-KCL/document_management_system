@@ -118,7 +118,7 @@ class API:
         content: str | dict[str, Any] = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    def authorize(self, authorization: str | None ) -> dict[str, Any]:
+    def authorize(self, authorization: str | None) -> dict[str, Any]:
         """Validate bearer token and return claims."""
         claims = self.token_verifier.verify_access_token(authorization)
         dms_info(

@@ -6,6 +6,7 @@ import httpx
 
 from shared_functions.dmis_logger import dms_warning
 
+
 class ConnectorClient:
     """
     Class for interacing with connectors to source systems

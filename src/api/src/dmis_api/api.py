@@ -24,6 +24,7 @@ from .auth_routes import AuthRoutes
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,missing-function-docstring,pointless-string-statement
 
+
 class API:
     """Management class for main API."""
 

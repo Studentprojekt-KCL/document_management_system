@@ -1,29 +1,33 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import argparse
-
 from typing import Any
+from collections.abc import Sequence
+
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from collections.abc import Sequence
 from fastapi.exceptions import RequestValidationError
 
-from refresh_service.session_encryption_tools import SessionEncryption
-from refresh_service.auth_token import authorize_and_get_token
-from refresh_service.database import RedisDataBase
-from refresh_service.token_refresh import insert_session
+# Refresh service is not installed in pylint env.
+from refresh_service.session_encryption_tools import SessionEncryption  # pylint: disable=E0611
+from refresh_service.auth_token import authorize_and_get_token  # pylint: disable=E0611
+from refresh_service.database import RedisDataBase  # pylint: disable=E0611
+from refresh_service.token_refresh import insert_session  # pylint: disable=E0611
 
 from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.dmis_logger import dms_warning
 
 
 class RefreshService:
+    """Refresh service API."""
 
     app = FastAPI()
     session_encryption: SessionEncryption
 
     def __init__(self, log_level: str | None = None):
+        """Constructor."""
         self.log_level = log_level
         self.ad_issuer = read_env_variable("REFSERVICE_AD_URL")
         self.openid_connect_url = read_env_variable("REFSERVICE_AD_JWKS_URL")
@@ -46,7 +50,11 @@ class RefreshService:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def add_session(self, service_name: str, body: dict[Any, Any], authorization: str | None = Header(default=None)):
+    async def add_session(
+        self, service_name: str, body: dict[Any, Any], authorization: str | None = Header(default=None)
+    ) -> JSONResponse:
+        """Store users session token for given service, body should be given as
+        {"refresh_url": "<refresh_url>", "session_variables": <session_token>}."""
         refresh_url = body.get("refresh_url")
         session_variables = body.get("session_variables")
         if (str, dict) != (type(refresh_url), type(session_variables)):
@@ -56,17 +64,34 @@ class RefreshService:
         if status is False:
             raise HTTPException(status_code=401)
 
-        if insert_session(token_values.get("sub"), service_name, refresh_url, session_variables) is False:
+        user = token_values.get("sub")
+        if not isinstance(user, str):
+            dms_warning(f"Recieded token with missing 'sub': {token_values}")
+            raise HTTPException(status_code=400)
+        if not isinstance(refresh_url, str):
+            dms_warning(f"Recieved unexpected format for refresh_url key in request body: {body}")
+            raise HTTPException(status_code=400)
+        if not isinstance(session_variables, dict):
+            dms_warning(f"Recieved unexpected format for session_variables key in request body: {body}")
+            raise HTTPException(status_code=400)
+
+        if insert_session(user, service_name, refresh_url, session_variables) is False:
             raise HTTPException(status_code=400)
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
-    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)):
+    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)) -> dict | None:
+        """Endpoint for retrieving single sesison token for specified service."""
         status, token_values = authorize_and_get_token(authorization, self.ad_issuer, self.openid_connect_url)
         if status is False:
             raise HTTPException(status_code=401)
 
-        content = self.redis_database.get_session_token(token_values.get("sub"), service_name).get("enc_object")
+        user = token_values.get("sub")
+        if not isinstance(user, str):
+            dms_warning(f"Recieded token with missing 'sub': {token_values}")
+            raise HTTPException(status_code=400)
+
+        content = self.redis_database.get_session_token(user, service_name)[0]
         return self.session_enc.decrypt_session_variables(content).get("access_token")
 
 

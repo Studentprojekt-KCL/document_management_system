@@ -1,25 +1,27 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import time
+
 from redis import Redis, exceptions
-
-
-from shared_functions.initialisation_tools import read_env_variable
-from shared_functions.dmis_logger import dms_warning
-
 from mysql import connector
-
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from mysql.connector.pooling import PooledMySQLConnection
 
+# Refresh service is not installed in pylint env.
+from shared_functions.initialisation_tools import read_env_variable  # pylint: disable=E0611
+from shared_functions.dmis_logger import dms_warning  # pylint: disable=E0611
+
 
 class RedisDataBase:
+    """Redis database connection methods."""
 
     redis_instance: Redis
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Constructor."""
-        self.redis_instance = Redis(host=read_env_variable("REFSERVICE_REDIS_HOST"), port=read_env_variable("REFSERVICE_REDIS_PORT"), decode_responses=True)
+        self.redis_instance = Redis(
+            host=read_env_variable("REFSERVICE_REDIS_HOST"), port=read_env_variable("REFSERVICE_REDIS_PORT"), decode_responses=True
+        )
 
     def get_session_token(self, user: str, service: str) -> tuple:
         """Retrive session token from database.
@@ -33,11 +35,13 @@ class RedisDataBase:
         element = self.redis_instance.hgetall(redis_key)
         if not isinstance(element, dict):
             dms_warning(f"It appears an incorrect session token was stored for: {redis_key}")
-            return ""
+            return "", ""
 
         return element.get("enc_object"), element.get("refresh_url")
 
-    def insert_session_token(self, user: str, service: str, expiry_time: int, refresh_url: str, enc_obj: str) -> bool:
+    def insert_session_token(  # pylint: disable=R0913,R0917
+        self, user: str, service: str, expiry_time: int, refresh_url: str, enc_obj: str
+    ) -> bool:
         """Insert encrypted user tokens into database.
 
         Args:
@@ -85,7 +89,7 @@ class SQLDatabase:
         """Return database connection."""
         return connector.connect(host=self.host, user=self.user, database=self.database, password=self.password)
 
-    def get_session_token(self, user: str, service: str):
+    def get_session_token(self, user: str, service: str) -> list:
         """Retrive session token from database.
 
         Args:

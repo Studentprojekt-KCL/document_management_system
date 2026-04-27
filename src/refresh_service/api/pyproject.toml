@@ -9,6 +9,7 @@ description = "Logging API"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
+packages = ["refresh_service"]
 package-dir = {"" = "src"}
 
 [project.scripts]

@@ -16,8 +16,6 @@ RUN pip install /build/connectors/connector-gateway
 # Runner 
 FROM gcr.io/distroless/python3-debian13:nonroot
 
-WORKDIR /home/nonroot
-
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin/connector_gateway /usr/local/bin/connector_gateway
 

@@ -59,7 +59,7 @@ def run() -> None:
 
     uvicorn.run(
         api.app,
-        host=read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR"),
-        port=read_port("CONGATEWAY_FASTAPI_BIND_PORT"),
-        log_level=read_env_variable("CONGATEWAY_FASTAPI_LOG_LEVEL"),
+        host = read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR"),
+        port = read_port("CONGATEWAY_FASTAPI_BIND_PORT"),
+        log_level = read_env_variable("CONGATEWAY_FASTAPI_LOG_LEVEL"),
     )

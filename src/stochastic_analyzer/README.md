@@ -19,7 +19,6 @@ Configuration is done through environment variables.
 
 - `STOCHAN_BIND_ADDR` — Address to bind to.
 - `STOCHAN_BIND_PORT` — Port to host on.
-- `STOCHAN_TEI_URL` — URL for the TEI reranker container.
 - `STOCHAN_CLASSIFIER_URL` — URL for the TEI classifier container.
 - `STOCHAN_LLM_URL` — URL for the Ministral LLM container.
 - `STOCHAN_LLM_MODEL` — Model identifier for Ministral.

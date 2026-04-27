@@ -47,3 +47,8 @@ services:
     image: stochastic-analyzer:pr
     build:
       dockerfile: src/stochastic_analyzer/Dockerfile
+      
+  connector-gateway:
+    image: connector-gateway:pr
+    build:
+      dockerfile: src/connectors/connector-gateway/Dockerfile

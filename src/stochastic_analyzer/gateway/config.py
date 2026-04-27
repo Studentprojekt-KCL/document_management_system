@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import argparse
+from dataclasses import dataclass
 from os import environ
 
 from shared_functions.dmis_logger import dms_error
@@ -23,6 +24,20 @@ class VectorConfig:
     max_chars: int
 
 
+@dataclass
+class LanguageConfig:
+    """Language detection configuration.
+
+    Attributes:
+        sample_size: number of characters to sample from the document for language detection.
+        swedish_char_threshold: number of Swedish characters to trigger Swedish detection.
+    """
+
+    sample_size: int
+    swedish_char_threshold: int
+
+
+@dataclass
 class MinistralConfig:
     """Ministral LLM configuration.
 
@@ -44,7 +59,8 @@ class ServiceConfig:
         classifier_url: URL for the TEI classifier container.
         connector_url: connector url.
         escalation_threshold: score gap threshold for classification escalation.
-        ministral: Ministral LLM configuration.
+        any_llm: Ministral LLM configuration.
+        language: language detection configuration.
         vector: vector search service configuration.
     """
 
@@ -52,6 +68,7 @@ class ServiceConfig:
     connector_url: str
     escalation_threshold: float
     any_llm: MinistralConfig
+    language: LanguageConfig
     vector: VectorConfig
 
 
@@ -124,7 +141,6 @@ class APIConfiguration:
         self.device = environ.get("DEVICE", "external")
         self.services = ServiceConfig()
         self.services.vector = VectorConfig()
-        self.services.any_llm = MinistralConfig()
 
         required = {
             "STOCHAN_CLASSIFIER_URL": read_env_variable("STOCHAN_CLASSIFIER_URL"),
@@ -135,6 +151,8 @@ class APIConfiguration:
             "STOCHAN_ESCALATION_THRESHOLD": read_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
             "STOCHAN_EMBEDDING_URL": read_env_variable("STOCHAN_EMBEDDING_URL"),
             "STOCHAN_QDRANT_URL": read_env_variable("STOCHAN_QDRANT_URL"),
+            "STOCHAN_SAMPLE_SIZE": read_env_variable("STOCHAN_SAMPLE_SIZE"),
+            "STOCHAN_SWEDISH_CHAR_THRESHOLD": read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD"),
         }
 
         for name, value in required.items():
@@ -145,10 +163,16 @@ class APIConfiguration:
         self.services.classifier_url = required["STOCHAN_CLASSIFIER_URL"]
         self.services.connector_url = required["STOCHAN_CONGATEWAY_URL"]
         self.services.escalation_threshold = float(required["STOCHAN_ESCALATION_THRESHOLD"])
-        self.services.any_llm.url = required["STOCHAN_LLM_URL"]
-        self.services.any_llm.model = required["STOCHAN_LLM_MODEL"]
-        self.services.any_llm.timeout = int(required["STOCHAN_LLM_TIMEOUT"])
+        self.services.any_llm = MinistralConfig(
+            url=required["STOCHAN_LLM_URL"],
+            model=required["STOCHAN_LLM_MODEL"],
+            timeout=int(required["STOCHAN_LLM_TIMEOUT"]),
+        )
         self.services.vector.embedding_url = required["STOCHAN_EMBEDDING_URL"]
         self.services.vector.qdrant_url = required["STOCHAN_QDRANT_URL"]
         self.services.vector.batch_size = int(environ.get("INDEX_BATCH_SIZE", "8"))
         self.services.vector.max_chars = int(environ.get("STOCHAN_INDEX_MAX_CHARS", "2000"))
+        self.services.language = LanguageConfig(
+            sample_size=int(required["STOCHAN_SAMPLE_SIZE"]),
+            swedish_char_threshold=int(required["STOCHAN_SWEDISH_CHAR_THRESHOLD"]),
+        )

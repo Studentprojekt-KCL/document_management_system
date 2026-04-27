@@ -130,13 +130,24 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
             </p>
             <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
           </button>
+          <!-- Possibility to merge files button -->
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            @click="$router.push({ name: 'MergeFiles' })"
+          >
+            <p>
+              <ExternalLink :size="13" />
+              Merge Files
+            </p>
+          </button>
         </div>
         <button
           v-else
           class="meta-cell meta-cell-summary summary-cell-button"
           type="button"
           :disabled="isReranking"
-          @click="generateAIRerank"
+          @click="generateAIRerank(previewTitle)"
         >
           <p>
             <StarsIcon :size="13" />
@@ -326,6 +337,10 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 .summary-regenerate-button {
   margin-top: 0.75rem;
   cursor: pointer;
+}
+
+.summary-regenerate-button + .summary-regenerate-button {
+  margin-left: 1rem;
 }
 
 .summary-regenerate-button:hover:not(:disabled) {

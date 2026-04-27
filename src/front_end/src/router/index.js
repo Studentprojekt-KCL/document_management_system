@@ -23,6 +23,7 @@ import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
 import { useAppState } from '@/composables/useAppState'
+import MergeFilesView from '@/views/MergeFilesView.vue'
 
 const routes = [
   /* Public */
@@ -44,6 +45,13 @@ const routes = [
     component: SearchView,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/merge-files',
+    name: 'MergeFiles',
+    component: MergeFilesView,
+    meta: { requiresAuth: true }
+  },
+
   /* Admin only routes */
   {
     path: '/sources',

@@ -19,13 +19,15 @@ class TokenVerifier:
         self,
         issuer: str,
         jwks_url: str,
-        expected_audience: str | Iterable[str],
+        expected_audience: str | Iterable[str] | None = None,
         allowed_azp: Iterable[str] | None = None,
     ) -> None:
         """Initialize token verifier with Keycloak settings."""
         self.issuer = issuer.rstrip("/")
         self.jwks_client = PyJWKClient(jwks_url)
-        if isinstance(expected_audience, str):
+        if expected_audience is None:
+            self.expected_audience = None
+        elif isinstance(expected_audience, str):
             self.expected_audience = [expected_audience]
         else:
             self.expected_audience = list(expected_audience)
@@ -67,6 +69,7 @@ class TokenVerifier:
                 algorithms=["RS256"],
                 issuer=self.issuer,
                 audience=self.expected_audience,
+                options={"verify_aud": self.expected_audience is not None},
             )
         except jwt.InvalidTokenError as exc:
             dms_info(f"Invalid access token: {exc}")

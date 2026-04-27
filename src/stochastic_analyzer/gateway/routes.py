@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
 from gateway.services.classifier import Classifier, LABELS
-from gateway.services.connector import Connector, ConnectorUnreachable, ContentUnavailable
+from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
@@ -35,33 +35,12 @@ class Services:
     indexer: Indexer
 
 
-# Shared user-facing messages so the summarize and rerank endpoints stay consistent.
-_UPSTREAM_UNAVAILABLE_MSG = "Document service is unavailable. Please try again later."
-_CONTENT_UNAVAILABLE_MSG = (
-    "No readable text could be extracted from the selected file. "
-    "This can happen with unsupported file types, encrypted files, or empty documents."
-)
-
-
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
-    """Fetch documents from the connector or raise a specific HTTPException.
-
-    Maps connector failure modes onto distinct HTTP responses so the frontend
-    can surface a meaningful message to the user:
-      - ConnectorUnreachable -> 502 Bad Gateway
-      - ContentUnavailable   -> 422 Unprocessable Entity
-      - no files returned    -> 404 Not Found
-    """
-    try:
-        items = await connector.get_file_contents(pointers)
-    except ConnectorUnreachable as err:
-        raise HTTPException(status_code=502, detail=_UPSTREAM_UNAVAILABLE_MSG) from err
-    except ContentUnavailable as err:
-        raise HTTPException(status_code=422, detail=_CONTENT_UNAVAILABLE_MSG) from err
-
+    """Fetch documents from connector or raise 502."""
+    items = await connector.get_file_contents(pointers)
     if not items:
-        dms_warning("Connector returned no documents for the requested pointers.")
-        raise HTTPException(status_code=404, detail="Requested document could not be found.")
+        dms_warning("No documents could be retrieved from connector.")
+        raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
     return items
 
 
@@ -101,15 +80,10 @@ def create_router(services: Services) -> APIRouter:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
 
         query_pointer = payload.pointers[0]
-        try:
-            reference_items = await services.connector.get_file_contents([query_pointer])
-        except ConnectorUnreachable as err:
-            raise HTTPException(status_code=502, detail=_UPSTREAM_UNAVAILABLE_MSG) from err
-        except ContentUnavailable as err:
-            raise HTTPException(status_code=422, detail=_CONTENT_UNAVAILABLE_MSG) from err
-
+        reference_items = await services.connector.get_file_contents([query_pointer])
         if not reference_items:
-            raise HTTPException(status_code=404, detail="Reference document could not be found.")
+            dms_warning("Failed to retrieve reference document from connector.")
+            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
 
         query = reference_items[0].content
 

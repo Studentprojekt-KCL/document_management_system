@@ -10,14 +10,6 @@ from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
-class ConnectorUnreachable(Exception):
-    """Raised when the connector microservice request fails at the transport layer."""
-
-
-class ContentUnavailable(Exception):
-    """Raised when the connector responded but a file's content could not be extracted."""
-
-
 class Connector:
     """Client for fetching file contents from the connector microservice.
 
@@ -51,14 +43,7 @@ class Connector:
             pointers: List of unique file pointers.
 
         Returns:
-            List of successfully retrieved InputItems. May be empty if the
-            connector returned no files for the given pointers.
-
-        Raises:
-            ConnectorUnreachable: If the connector cannot be reached or
-                returned a non-success status.
-            ContentUnavailable: If the connector responded but at least one
-                file had no extractable or decodable content.
+            List of successfully retrieved InputItems.
         """
         try:
             response = await self.client.post(
@@ -76,20 +61,20 @@ class Connector:
             httpx.ConnectError,
         ) as err:
             dms_warning(f"Connector request failed for pointer '{pointers}': {err}")
-            raise ConnectorUnreachable(str(err)) from err
+            return []
 
         items = []
         for individual_data in data:
-            unique_pointer = individual_data.get("unique_pointer")
             encoded_content = individual_data.get("content")
             if encoded_content is None:
-                dms_warning(f"No content returned for pointer '{unique_pointer}'")
-                raise ContentUnavailable(f"No extractable content for pointer '{unique_pointer}'.")
+                dms_warning(f"No content returned for pointer '{pointers}'")
+                return []
             try:
                 content = b64decode(encoded_content).decode("utf-8")
-            except (binascii.Error, UnicodeDecodeError) as err:
-                dms_warning(f"Base64 decode failed for pointer '{unique_pointer}'")
-                raise ContentUnavailable(f"Content could not be decoded for pointer '{unique_pointer}'.") from err
+            except (binascii.Error, UnicodeDecodeError):
+                dms_warning(f"Base64 decode failed for pointer '{pointers}'")
+                return []
+            unique_pointer = individual_data.get("unique_pointer")
             items.append(
                 InputItem(
                     content=content,

@@ -9,7 +9,7 @@ shared_lib_path = (Path(__file__).parent / "../../shared_functions").resolve().a
 setup(
     install_requires=[
         "fastapi[standard]>=0.128",
-        "requests>=2.32",
+        "httpx>=0.27",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

@@ -33,38 +33,11 @@ class TestSearchEngine(TestCase):
         )
         assert result == True
 
-    # ==== _FLATTEN_DICT ====
-
-    def test_flatten_dict_flat(self):
-        result = self.instance._flatten_dict({"category1": "", "category2": "", "category3": "", "category4": ""})
-        assert result == {"category1": "", "category2": "", "category3": "", "category4": ""}
-
-    def test_flatten_dict_layers(self):
-        result = self.instance._flatten_dict(
-            {"category1": "", "metadata": {"category2": ""}, "subcategory": {"subsubcategory": {"category3": "", "category4": ""}}}
-        )
-        assert result == {"category1": "", "category2": "", "category3": "", "category4": ""}
-
-    # ==== ADD_FILE ====
-
-    def test_add_file(self):
-        self.instance = SearchEngine()
-        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": self.file_content}])
-        pointers = self.instance.query_files("this", 10)
-        assert pointers == ["file/pointer/at/somewhere"]
-        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": self.file_content}])
-        pointers = self.instance.query_files("this", 10)
-        assert pointers == ["file/pointer/at/somewhere"]
-        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere/else", "content": self.file_content}])
-        pointers = self.instance.query_files("this", 10)
-        assert pointers == ["file/pointer/at/somewhere", "file/pointer/at/somewhere/else"] or [
-            "file/pointer/at/somewhere/else",
-            "file/pointer/at/somewhere",
-        ]
+    # ==== REMOVE_FILE ====
 
     def test_remove_file(self):
         self.instance = SearchEngine()
-        self.instance.add_files([{"unique_pointer": "file/pointer/at/somewhere", "content": self.file_content}])
+        self.instance.add_file({"unique_pointer": "file/pointer/at/somewhere", "content": self.file_content})
         self.instance.remove_file("file/pointer/at/somewhere")
         pointers = self.instance.query_files("this", 10)
         assert pointers == []

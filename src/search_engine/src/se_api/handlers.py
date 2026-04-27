@@ -4,10 +4,10 @@ import base64
 from threading import Thread
 import queue
 
-from asyncio import AbstractEventLoop, Lock, Queue, create_task, get_event_loop
+from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
-import json
 from fastapi import HTTPException
+import httpx
 from se_api.services.connector import Connector
 from se_api.services.query import Query
 from se_api.services.search_engine import SearchEngine
@@ -27,7 +27,8 @@ class Handler:
     query: Query
     search_engine: SearchEngine
 
-    WORKERS: int = 16  # Format and send workers
+    WORKERS: int = 8  # Format and send workers
+    BATCH_SIZE: int = 10_000
     indexing: Lock
 
     def __init__(self) -> None:
@@ -40,6 +41,7 @@ class Handler:
     async def init(self) -> None:
         """Init handler"""
         await self.query.init()
+        self.search_engine.init()
 
     async def close(self) -> None:
         """Clean up"""
@@ -48,10 +50,9 @@ class Handler:
 
     def reset(self) -> None:
         """Reset the connector."""
-        self.search_engine = SearchEngine()
-        self.connector = Connector()
+        self.search_engine.reset()
+        self.connector.write_subdata({})
         self.query.reset()
-        self.query = Query()
         dms_info("Search engine was reset.")
 
     def set_classification(self, change: dict[str, str]) -> dict[str, str]:
@@ -126,53 +127,58 @@ class Handler:
         await self.indexing.acquire()
         dms_info("Starting indexing of new files.")
         start = datetime.now()
+        fetch_queue: Queue = await self.connector.connector_fetch()
         index_queue: queue.Queue = queue.Queue()
         transfer_queue: Queue = Queue()
-
         indexer_thread: Thread = Thread(target=self._add_file, args=(index_queue,))
 
-        raw: str = ""
-        data: dict
-        subdata: str | None = None
-
         indexer_thread.start()
-        loop = get_event_loop()
 
-        transfer_tasks: list = [create_task(self._transfer_file(index_queue, transfer_queue, loop)) for _ in range(self.WORKERS)]
+        fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, transfer_queue)) for _ in range(self.WORKERS)]
+        transfer_tasks: list = [create_task(self._transfer_file(index_queue, transfer_queue)) for _ in range(self.WORKERS)]
 
-        async for chunk in self.connector.streaming_fetch():
-            raw += chunk
-            try:
-                if not raw.endswith("}"):
-                    continue
-                data = json.loads(raw)
-                raw = ""
-            except json.JSONDecodeError:
-                continue
-            if subdata is None and data.get("subdata") is not None:
-                subdata = data.get("subdata")
-                continue
-            await transfer_queue.put(data)
-        self.connector.subdata = subdata
+        await fetch_queue.join()
+        for _ in fetch_tasks:
+            await fetch_queue.put(None)
         dms_info(f"Finished fetching new files, time: {(datetime.now() - start).total_seconds()}s.")
-
         await transfer_queue.join()
         for _ in transfer_tasks:
             await transfer_queue.put(None)
         dms_info(f"Formatted and transferred files to indexer, time: {(datetime.now() - start).total_seconds()}s.")
-        await loop.run_in_executor(None, index_queue.join)
-        await loop.run_in_executor(None, index_queue.put, None)
-        await loop.run_in_executor(None, indexer_thread.join)
+        index_queue.join()
+        index_queue.put(None)
+        indexer_thread.join()
+        self.connector.write_subdata()
         self.indexing.release()
         dms_info(f"Finished indexing of new files, time: {(datetime.now() - start).total_seconds()}s.")
 
-    async def _transfer_file(self, index_queue: queue.Queue, transfer_queue: Queue, loop: AbstractEventLoop) -> None:
+    async def _fetch_files(self, fetch_queue: Queue, transfer_queue: Queue) -> None:
+        """Fetch files from stream.
+
+        Args:
+            fetch_queue: queue with urls to connectors.
+            transfer_queue: queue for transferring files to the searchengine.
+        """
+        while True:
+            stream_url: str | None = await fetch_queue.get()
+            if stream_url is None:
+                break
+            try:
+                async for file in self.connector.stream(stream_url):
+                    await transfer_queue.put(file)
+            except httpx.HTTPError:
+                dms_warning(f"Failed to connect to {stream_url}.")
+            fetch_queue.task_done()
+
+    async def _transfer_file(self, index_queue: queue.Queue, transfer_queue: Queue) -> None:
         """Format and transfer file to search engine indexing queue.
 
         index_queue: queue containing all the ready files to index.
         transfer_queue: queue of raw dicts with file data.
         loop: global event loop.
         """
+
+        loop = get_event_loop()
 
         while True:
             file: dict | None = await transfer_queue.get()
@@ -183,6 +189,36 @@ class Handler:
                 continue
             await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
+
+    def _add_file(self, index_queue: queue.Queue) -> None:
+        """Wait for formatted file and add it to the search engine.
+
+        Args:
+            task_queue: queue containing all the files to add.
+        """
+
+        batch: list[dict] = []
+
+        while True:
+            file: dict | None = index_queue.get()
+            if file is None:
+                break
+            batch.append(file)
+            if len(batch) >= self.BATCH_SIZE:
+                self.search_engine.open_writer()
+                for file in batch:
+                    self.search_engine.add_file(file)
+                dms_info(f"Batch of {len(batch)} commited")
+                self.search_engine.close_writer()
+                batch.clear()
+            index_queue.task_done()
+        if batch:
+            self.search_engine.init()
+            for file in batch:
+                self.search_engine.add_file(file)
+            dms_info(f"Batch of {len(batch)} commited")
+            self.search_engine.close_writer()
+            batch.clear()
 
     def _decode(self, file: dict) -> dict | None:
         """Decode file content.
@@ -203,22 +239,6 @@ class Handler:
 
         return flat_file
 
-    def _add_file(self, index_queue: queue.Queue) -> None:
-        """Wait for formatted file and add it to the search engine.
-
-        Args:
-            task_queue: queue containing all the files to add.
-        """
-
-        self.search_engine.init()
-        while True:
-            file: dict | None = index_queue.get()
-            if file is None:
-                break
-            self.search_engine.add_file(file)
-            index_queue.task_done()
-        self.search_engine.close()
-
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.
 
@@ -234,5 +254,4 @@ class Handler:
                 flat.update(self._flatten_dict(val))
             else:
                 flat.update({key: str(val)})
-
         return flat

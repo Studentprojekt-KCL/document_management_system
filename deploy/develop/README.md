@@ -86,7 +86,6 @@ MINIO_PASSWORD=<password>
 # stochastic-analyzer
 STOCHAN_BIND_ADDR=<bind address>
 STOCHAN_BIND_PORT=<port number>
-STOCHAN_TEI_URL=<rerank endpoint URL>
 STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
 STOCHAN_LLM_URL=<LLM endpoint URL>
 STOCHAN_LLM_MODEL=<model name>

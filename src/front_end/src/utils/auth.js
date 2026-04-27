@@ -26,7 +26,6 @@ export async function refreshSession() {
 }
 
 export async function logout() {
-
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
   window.location.assign(API_PATHS.authLogout)
   localStorage.removeItem('pkce_verifier')

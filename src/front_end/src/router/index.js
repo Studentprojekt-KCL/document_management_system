@@ -136,7 +136,7 @@ router.beforeEach(async (to) => {
   if (!authenticated) {
     return { path: '/401' }
   }
-  
+
   /* Admin only route */
   if (to.meta?.requiresAdmin) {
     const authInfo = await getCurrentUser()

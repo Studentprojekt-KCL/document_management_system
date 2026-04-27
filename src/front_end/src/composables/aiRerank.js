@@ -1,4 +1,4 @@
-import { computed, ref} from 'vue'
+import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 

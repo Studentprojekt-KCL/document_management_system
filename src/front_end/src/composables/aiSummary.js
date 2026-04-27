@@ -13,8 +13,6 @@ export function useAISummary(props = {}) {
   const summaryError = ref('')
   const isGeneratingSummary = ref(false)
 
-
-
   const aiSummaryHtml = computed(() => {
     if (!uniquePointer.value) {
       return aiSummaryHtmlRaw.value

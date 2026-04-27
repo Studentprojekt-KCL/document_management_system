@@ -63,6 +63,7 @@ class API:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        # End for local working
 
         self.log_level = log_level
         self.search_api_url = search_api_url.rstrip("/")

@@ -3,19 +3,32 @@
 import asyncio
 import base64
 import binascii
+import gzip
 import json
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 
 from shared_functions.dmis_logger import dms_info, dms_warning
-from shared_functions.file_type_logic import determine_file_type, get_documents_only_rescource
+from shared_functions.file_type_logic import determine_file_type, get_file_resource
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.variables import SOURCE_FILE
 
 HTTP_OK = 200
+HTTP_FORBIDDEN = 403
+HTTP_TOO_MANY_REQUESTS = 429
 REQUEST_TIMEOUT = 120
+MAX_CONCURRENT_REQUESTS = 20
+MAX_RETRIES = 3
+
+
+class _HttpCtx(NamedTuple):
+    """Bundles the three request-scoped values threaded through all private methods. (Happy pylint (: )"""
+
+    client: httpx.AsyncClient
+    sem: asyncio.Semaphore
+    token: str | None
 
 
 class SharePoint:
@@ -29,78 +42,94 @@ class SharePoint:
     def __init__(self) -> None:
         """Constructor."""
         self.source_system = read_env_variable("CONSHAREPOINT_SYSTEM_NAME")
-        resource = get_documents_only_rescource()
-        self.file_extensions = [ext for t in resource for ext in t["extension"]]
-        self.extension_descriptions = {ext: t["description"] for t in resource for ext in t["extension"]}
+        file_type_resource = get_file_resource()
+        self.file_extensions = [t.get("extension") for t in file_type_resource]
+        self.extension_descriptions = {t.get("extension"): t.get("description") for t in file_type_resource}
 
     @staticmethod
-    def _get_headers(token: str | None = None) -> dict:
-        if isinstance(token, str):
-            return {"Authorization": f"Bearer {token}"}
-        return {}
+    async def _get_with_retry(ctx: _HttpCtx, url: str, **kwargs: Any) -> httpx.Response:
+        """GET with semaphore-limited concurrency and 429 Retry-After handling.
 
-    async def _get_sites(self, token: str | None = None) -> list[dict]:
+        The semaphore is released before sleeping so the slot is not held during backoff.
+        Returns the final response after retries are exhausted; caller handles non-200.
+        """
+        headers = {"Authorization": f"Bearer {ctx.token}"} if isinstance(ctx.token, str) else {}
+        kwargs.setdefault("headers", headers)
+        last_response: httpx.Response
+        for attempt in range(MAX_RETRIES):
+            async with ctx.sem:
+                last_response = await ctx.client.get(url, **kwargs)
+            if last_response.status_code != HTTP_TOO_MANY_REQUESTS:
+                return last_response
+            raw = last_response.headers.get("Retry-After", "5")
+            retry_after = int(raw) if raw.isdigit() else 5
+            dms_warning(f"SharePoint: rate limited, retrying in {retry_after}s (attempt {attempt + 1}/{MAX_RETRIES})")
+            await asyncio.sleep(retry_after)
+        return last_response
+
+    async def _get_sites(self, ctx: _HttpCtx) -> list[dict]:
         """Retrieve all accessible SharePoint sites."""
         sites: list[dict] = []
         url: str | None = f"{self.GRAPH_BASE}/sites?search=*"
-        async with httpx.AsyncClient() as client:
-            while url:
-                response = await client.get(url, headers=self._get_headers(token), timeout=REQUEST_TIMEOUT)
-                if response.status_code != HTTP_OK:
-                    dms_warning(f"SharePoint: GET {url} returned {response.status_code}")
-                    break
-                data = response.json()
-                sites.extend(data.get("value", []))
-                url = data.get("@odata.nextLink")
+        while url:
+            response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
+            if response.status_code != HTTP_OK:
+                dms_warning(f"SharePoint: site listing failed with status {response.status_code}")
+                break
+            data = response.json()
+            sites.extend(data.get("value", []))
+            url = data.get("@odata.nextLink")
         return sites
 
-    async def _get_drives(self, site_id: str, token: str | None = None) -> list[dict]:
+    async def _get_drives(self, ctx: _HttpCtx, site_id: str) -> list[dict]:
         """Retrieve all document library drives for a site."""
         url = f"{self.GRAPH_BASE}/sites/{site_id}/drives"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self._get_headers(token), timeout=REQUEST_TIMEOUT)
-            if response.status_code != HTTP_OK:
-                dms_warning(f"SharePoint: GET {url} returned {response.status_code}")
-                return []
+        response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
+        if response.status_code == HTTP_FORBIDDEN:
+            dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
+            return []
+        if response.status_code != HTTP_OK:
+            dms_warning(f"SharePoint: drive listing failed with status {response.status_code}")
+            return []
         return response.json().get("value", [])
 
-    async def _run_delta_query(self, url: str, token: str | None = None) -> tuple[list[dict], str]:
+    async def _run_delta_query(self, ctx: _HttpCtx, url: str) -> tuple[list[dict], str]:
         """Run a paginated delta query. Returns (items, new_delta_link)."""
         items: list[dict] = []
         delta_link: str = ""
         current_url: str | None = url
-        async with httpx.AsyncClient() as client:
-            while current_url:
-                response = await client.get(current_url, headers=self._get_headers(token), timeout=REQUEST_TIMEOUT)
-                if response.status_code != HTTP_OK:
-                    dms_warning(f"SharePoint: delta query {current_url} returned {response.status_code}")
-                    break
-                data = response.json()
-                items.extend(data.get("value", []))
-                if "@odata.deltaLink" in data:
-                    delta_link = data["@odata.deltaLink"]
-                    current_url = None
-                else:
-                    current_url = data.get("@odata.nextLink")
+        while current_url:
+            response = await self._get_with_retry(ctx, current_url, timeout=REQUEST_TIMEOUT)
+            if response.status_code != HTTP_OK:
+                dms_warning(f"SharePoint: delta query failed with status {response.status_code}")
+                break
+            data = response.json()
+            items.extend(data.get("value", []))
+            if "@odata.deltaLink" in data:
+                delta_link = data["@odata.deltaLink"]
+                current_url = None
+            else:
+                current_url = data.get("@odata.nextLink")
         return items, delta_link
 
-    def _decode_subdata(self, subdata: str | None) -> dict[str, str]:
+    @staticmethod
+    def _decode_subdata(subdata: str | None) -> dict[str, str]:
         """Decode base64 subdata string to {drive_id: delta_link} dict."""
         if subdata is None:
             return {}
         try:
-            decoded = base64.urlsafe_b64decode(subdata).decode("utf-8")
+            decoded = gzip.decompress(base64.urlsafe_b64decode(subdata)).decode("utf-8")
             result = json.loads(decoded)
             if isinstance(result, dict):
                 return result
-        except (binascii.Error, json.JSONDecodeError, UnicodeDecodeError):
-            dms_info(f"SharePoint: could not decode subdata: {subdata}")
+        except (binascii.Error, gzip.BadGzipFile, json.JSONDecodeError, OSError, UnicodeDecodeError):
+            dms_info("SharePoint: could not decode subdata, starting fresh")
         return {}
 
     @staticmethod
     def _encode_subdata(delta_map: dict[str, str]) -> str:
-        """Encode {drive_id: delta_link} dict to base64 subdata string."""
-        return base64.urlsafe_b64encode(json.dumps(delta_map).encode("utf-8")).decode("utf-8")
+        """Encode {drive_id: delta_link} dict to gzip-compressed base64 subdata string."""
+        return base64.urlsafe_b64encode(gzip.compress(json.dumps(delta_map).encode("utf-8"))).decode("utf-8")
 
     def _build_file_record(self, item: dict, drive_id: str) -> dict | None:
         """Build a streaming file record from a Graph API drive item.
@@ -128,18 +157,28 @@ class SharePoint:
             | extension,
         }
 
-    async def _process_drive(self, drive_id: str, delta_url: str, token: str | None) -> tuple[str, list[dict], str]:
+    async def _process_drive(self, ctx: _HttpCtx, drive_id: str, delta_url: str) -> tuple[str, list[dict], str]:
         """Run delta query for one drive. Returns (drive_id, qualifying_records, new_delta_link)."""
-        items, new_delta_link = await self._run_delta_query(delta_url, token)
+        items, new_delta_link = await self._run_delta_query(ctx, delta_url)
         records = [r for item in items if (r := self._build_file_record(item, drive_id)) is not None]
         return drive_id, records, new_delta_link
 
-    async def _collect_drive_tasks(self, token: str | None, delta_map: dict[str, str]) -> list[tuple[str, str]]:
-        """Return (drive_id, delta_url) pairs for all accessible drives across all sites."""
+    async def _collect_drive_tasks(self, ctx: _HttpCtx, delta_map: dict[str, str]) -> list[tuple[str, str]]:
+        """Return (drive_id, delta_url) pairs for all accessible drives across all sites.
+
+        Site pagination is sequential; _get_drives calls for all sites run in parallel.
+        """
+        sites = [site for site in await self._get_sites(ctx) if site.get("id")]
+        drives_results = await asyncio.gather(
+            *[self._get_drives(ctx, site["id"]) for site in sites],
+            return_exceptions=True,
+        )
         drive_tasks: list[tuple[str, str]] = []
-        for site in await self._get_sites(token):
-            site_id = site.get("id", "")
-            for drive in await self._get_drives(site_id, token):
+        for drives in drives_results:
+            if isinstance(drives, BaseException):
+                dms_warning(f"SharePoint: skipping inaccessible site ({type(drives).__name__})")
+                continue
+            for drive in drives:
                 drive_id = drive.get("id", "")
                 if not drive_id:
                     continue
@@ -155,8 +194,20 @@ class SharePoint:
         delta tokens are required for the subdata header.
         """
         delta_map = self._decode_subdata(subdata)
-        drive_tasks = await self._collect_drive_tasks(token, delta_map)
-        results = await asyncio.gather(*[self._process_drive(drive_id, delta_url, token) for drive_id, delta_url in drive_tasks])
+        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        async with httpx.AsyncClient(cookies={}) as client:
+            ctx = _HttpCtx(client, sem, token)
+            drive_tasks = await self._collect_drive_tasks(ctx, delta_map)
+            raw = await asyncio.gather(
+                *[self._process_drive(ctx, drive_id, delta_url) for drive_id, delta_url in drive_tasks],
+                return_exceptions=True,
+            )
+        results = []
+        for outcome in raw:
+            if isinstance(outcome, BaseException):
+                dms_warning(f"SharePoint: skipping drive due to processing error ({type(outcome).__name__})")
+            else:
+                results.append(outcome)
         new_delta_map = {drive_id: lnk for drive_id, _, lnk in results if lnk}
 
         yield json.dumps({"subdata": self._encode_subdata(new_delta_map)}).encode("utf-8")
@@ -165,20 +216,19 @@ class SharePoint:
             for record in records:
                 yield json.dumps(record).encode("utf-8")
 
-    async def get_file(
+    async def _get_file(
         self,
+        ctx: _HttpCtx,
         unique_pointer: str,
-        token: str | None = None,
         include_content: bool = False,
         include_last_edit_date: bool = True,
     ) -> dict:
-        """Fetch metadata (and optionally content) for a single file by unique pointer."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(unique_pointer, headers=self._get_headers(token), timeout=REQUEST_TIMEOUT)
-            if response.status_code != HTTP_OK:
-                dms_warning(f"SharePoint: GET {unique_pointer} returned {response.status_code}")
-                return {}
-            item = response.json()
+        """Fetch metadata (and optionally content) for a single file using the provided client."""
+        response = await self._get_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
+        if response.status_code != HTTP_OK:
+            dms_warning(f"SharePoint: file metadata request failed with status {response.status_code}")
+            return {}
+        item = response.json()
 
         name = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
@@ -196,15 +246,12 @@ class SharePoint:
 
         if include_content:
             content_url = f"{unique_pointer}/content"
-            async with httpx.AsyncClient() as client:
-                content_response = await client.get(
-                    content_url, headers=self._get_headers(token), timeout=REQUEST_TIMEOUT, follow_redirects=True
-                )
-                if content_response.status_code == HTTP_OK:
-                    result["content"] = base64.b64encode(content_response.content).decode("utf-8")
-                else:
-                    dms_warning(f"SharePoint: could not fetch content for {unique_pointer}")
-                    result["content"] = None
+            content_response = await self._get_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+            if content_response.status_code == HTTP_OK:
+                result["content"] = base64.b64encode(content_response.content).decode("utf-8")
+            else:
+                dms_warning("SharePoint: could not fetch file content")
+                result["content"] = None
 
         return result
 
@@ -216,26 +263,32 @@ class SharePoint:
         include_last_edit_date: bool = True,
     ) -> list:
         """Retrieve information for each file in a list of unique pointers."""
-        return list(await asyncio.gather(*[self.get_file(ptr, token, include_content, include_last_edit_date) for ptr in pointers]))
+        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        async with httpx.AsyncClient(cookies={}) as client:
+            ctx = _HttpCtx(client, sem, token)
+            return list(
+                await asyncio.gather(*[self._get_file(ctx, ptr, include_content, include_last_edit_date) for ptr in pointers])
+            )
+
+    async def _check_drive_delta(self, ctx: _HttpCtx, delta_link: str) -> bool:
+        """Return True if this drive has changes or its delta token is invalid/expired."""
+        response = await self._get_with_retry(ctx, delta_link, timeout=REQUEST_TIMEOUT)
+        if response.status_code != HTTP_OK:
+            return True
+        return bool(response.json().get("value"))
 
     async def check_index_needed(self, subdata: str | None, token: str | None = None) -> dict[str, bool]:
         """Check whether any files have changed since the last sync."""
         delta_map = self._decode_subdata(subdata)
         if not delta_map:
             return {"index_needed": True}
-
-        async with httpx.AsyncClient() as client:
-            for delta_link in delta_map.values():
-                response = await client.get(
-                    delta_link,
-                    headers=self._get_headers(token),
-                    params={"$select": "id,deleted"},
-                    timeout=REQUEST_TIMEOUT,
-                )
-                if response.status_code != HTTP_OK:
-                    dms_warning(f"SharePoint: delta check returned {response.status_code}")
-                    continue
-                if response.json().get("value"):
-                    return {"index_needed": True}
-
+        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        async with httpx.AsyncClient(cookies={}) as client:
+            ctx = _HttpCtx(client, sem, token)
+            results = await asyncio.gather(
+                *[self._check_drive_delta(ctx, lnk) for lnk in delta_map.values()],
+                return_exceptions=True,
+            )
+        if any(r is True or isinstance(r, BaseException) for r in results):
+            return {"index_needed": True}
         return {"index_needed": False}

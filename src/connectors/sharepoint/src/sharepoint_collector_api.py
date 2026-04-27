@@ -113,7 +113,7 @@ class API:
             return JSONResponse(content="ERROR", status_code=403)
 
         token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(cookies={}) as client:
             token_resp = await client.post(
                 token_url,
                 data={
@@ -134,7 +134,7 @@ class API:
     async def refresh_token(self, refresh_token: Annotated[str | None, Header()] = None) -> JSONResponse:
         """Refresh a Microsoft access token using a refresh token."""
         token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(cookies={}) as client:
             response = await client.post(
                 token_url,
                 data={

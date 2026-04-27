@@ -1,6 +1,5 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import base64
 import json
 from tantivy import (
     Document,
@@ -23,9 +22,11 @@ class SearchEngine:
 
     index: Index
     categories: list[str]
+    writer: IndexWriter | None
 
     def __init__(self) -> None:
         self.categories = ["unique_pointer", "content"]
+        self.writer = None
         self.rebuild()
 
     def rebuild(self) -> None:
@@ -87,38 +88,44 @@ class SearchEngine:
 
         return pointers
 
-    def add_files(self, files: list) -> None:
-        """Add a list of files to the index.
+    def init(self) -> None:
+        """Init index writer."""
+        if self.writer is not None:
+            return
+        self.writer = self.index.writer()
+
+    def commit(self) -> None:
+        """Commit added files without closing the writer."""
+        if self.writer is None:
+            return
+        self.writer.commit()
+
+    def close(self) -> None:
+        """Close the writer."""
+        if self.writer is None:
+            return
+        self.writer.commit()
+        self.writer.wait_merging_threads()
+        self.writer = None
+
+    def add_file(self, file: dict) -> None:
+        """Add file to index.
+
+        Requiers init call before and after.
 
         Args:
-            files: list of files.
+            file: file dict
         """
 
-        writer: IndexWriter = self.index.writer()
-        for file in files:
-            flat_file = self._flatten_dict(file)
-            content = flat_file.get("content")
-            unique_pointer = flat_file.get("unique_pointer")
+        if self.writer is None:
+            return
+        unique_pointer: str | None = file.get("unique_pointer")
+        if unique_pointer is None:
+            dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
+            return
+        self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
 
-            if content is None:
-                dms_warning("File is missing content.")
-                continue
-            if unique_pointer is None:
-                dms_warning("File is missing unique pointer.")
-                continue
-
-            writer.delete_documents("unique_pointer", unique_pointer)
-
-            content_bytes: bytes = base64.b64decode(content)
-            content = content_bytes.decode("utf-8")
-            flat_file["content"] = content
-
-            writer.add_json(json.dumps(flat_file))
-
-        writer.commit()
-        writer.wait_merging_threads()
-
-        self.index.reload()
+        self.writer.add_json(json.dumps(file))
 
     def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
@@ -133,14 +140,3 @@ class SearchEngine:
         writer.wait_merging_threads()
         dms_info(f"Removed {pointer} from index.")
         self.index.reload()
-
-    def _flatten_dict(self, d: dict) -> dict:
-        flat: dict = {}
-
-        for key, val in d.items():
-            if isinstance(val, dict):
-                flat.update(self._flatten_dict(val))
-            else:
-                flat.update({key: str(val)})
-
-        return flat

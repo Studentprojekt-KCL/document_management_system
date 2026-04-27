@@ -28,6 +28,11 @@ services:
     build:
       dockerfile: src/connectors/gitlab/Dockerfile
 
+  connector-samba:
+    image: connector-samba
+    build:
+      dockerfile: src/connectors/samba/Dockerfile
+
   connector-github:
     image: connector-github:pr
     build:
@@ -47,3 +52,8 @@ services:
     image: stochastic-analyzer:pr
     build:
       dockerfile: src/stochastic_analyzer/Dockerfile
+      
+  connector-gateway:
+    image: connector-gateway:pr
+    build:
+      dockerfile: src/connectors/connector-gateway/Dockerfile

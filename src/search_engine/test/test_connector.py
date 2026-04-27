@@ -10,12 +10,12 @@ class TestConnector(IsolatedAsyncioTestCase):
         self.instance.index_needed_bool = "/index_needed_bool"
         self.instance.url_files_to_index = "/files_to_index"
         self.instance.url_get_files = "/get_files"
-        self.instance.subdata = None
+        self.instance.subdata = {}
 
     def test_reset(self):
-        self.instance.subdata = ""
+        self.instance.subdata = {"stream": "subdata"}
         self.instance.reset()
-        assert self.instance.subdata is None
+        assert self.instance.subdata == {}
 
     # ==== FETCH_FILES_FROM_POINTERS ====
 

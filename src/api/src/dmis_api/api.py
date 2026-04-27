@@ -34,7 +34,6 @@ class API:
     http_client: httpx.AsyncClient
     required_scopes: dict[str, list[str]]
 
-
     def __init__(
         self,
         upstream_urls: dict[str, str],
@@ -143,6 +142,7 @@ class API:
             f"azp={claims.get('azp')}"
         )
         return claims
+
     def resolve_authorization(
         self,
         authorization: str | None,
@@ -201,8 +201,11 @@ class API:
         return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         authorization = self.resolve_authorization(authorization, access_token)
         """GET request to search engine."""
@@ -210,8 +213,11 @@ class API:
         return await self.execute_get_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
     async def search_engine_post(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         authorization = self.resolve_authorization(authorization, access_token)
         """POST request to search engine."""
@@ -223,8 +229,11 @@ class API:
         return await self.execute_post_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_get(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         authorization = self.resolve_authorization(authorization, access_token)
         """GET request to stochastic analyzer."""
@@ -236,8 +245,11 @@ class API:
         return await self.execute_get_request(f"{self.upstream_urls['stochan']}/{endpoint}", request, authorization)
 
     async def stochastic_analyzer_post(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(authorization, access_token)
@@ -249,8 +261,11 @@ class API:
         return await self.execute_post_request(f"{self.upstream_urls['stochan']}/{endpoint}", request, authorization)
 
     async def connector_get(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         authorization = self.resolve_authorization(authorization, access_token)
         """GET request to connector API."""
@@ -262,8 +277,11 @@ class API:
         return await self.execute_get_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
     async def connector_post(
-        self, endpoint: str, request: Request,  authorization: str | None = Header(default=None),
-    access_token: str | None = Cookie(default=None)
+        self,
+        endpoint: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         authorization = self.resolve_authorization(authorization, access_token)
         """POST request to connector API."""

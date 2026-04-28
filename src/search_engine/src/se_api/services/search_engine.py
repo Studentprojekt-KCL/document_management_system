@@ -82,6 +82,8 @@ class SearchEngine:
         """Query through the files in the index.
 
         Args:
+            content: dict with fields and their queries.
+            count: number of wanted results.
 
         Returns:
             List of file pointers with matching content.

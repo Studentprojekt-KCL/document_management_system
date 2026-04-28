@@ -22,6 +22,7 @@ class API:
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -50,6 +51,10 @@ class API:
         """Returns list with names of all connected source systems"""
         names_of_source_systems: list[str] = await self.down_stream_client.get_source_system_names()
         return names_of_source_systems
+
+    async def defined_fields(self) -> list[str]:
+        """Retrieve a unions of all defined fields from defined connectors."""
+        return await self.down_stream_client.retrieve_defined_fields()
 
 
 def run() -> None:

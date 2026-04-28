@@ -36,7 +36,6 @@ class HealthCheck(BaseModel):
 
     status: str
     model_loaded: bool
-    device: str
 
 
 class MetadataTemplate(BaseModel):

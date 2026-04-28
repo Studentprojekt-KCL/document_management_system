@@ -17,10 +17,13 @@ const props = defineProps({
 })
 
 /* Emit to parent component (SearchView) when a search is performed */
-const emit = defineEmits(['search'])
+const emit = defineEmits(['search', 'documents-only-change'])
 
-/* Search query state */
-const searchQuery = ref('')
+/* Notify parent when user toggles between documents-only and all files mode */
+const toggleDocumentsOnly = () => {
+  documentsOnly.value = !documentsOnly.value
+  emit('documents-only-change', documentsOnly.value)
+}
 
 /* Handle search action when user clicks the search button or presses Enter */
 const handleSearch = () => {
@@ -29,12 +32,18 @@ const handleSearch = () => {
     return
   }
 
-  emit('search', query)
+  emit('search', { query, documentsOnly: documentsOnly.value })
   searchQuery.value = ''
 }
 
 /* Disable search button if query is empty or currently searching */
 const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loading)
+
+/* Documents Only button True by defult, user can click to disable it and search all files, when enabled it will only search documents */
+const documentsOnly = ref(true)
+
+/* Search query state */
+const searchQuery = ref('')
 </script>
 
 <template>
@@ -48,7 +57,10 @@ const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loadi
       :disabled="loading"
       :placeholder="loading ? 'Searching...' : 'Search for documents across all sources...'"
     />
-
+    <!-- Button to choose Documents Only or not, sends down true or false when user search -->
+    <button class="documents-only-button" type="button" @click="toggleDocumentsOnly">
+      {{ documentsOnly ? 'Showing Documents Only' : 'Showing All Files' }}
+    </button>
     <!-- Search button to trigger the search action -->
     <button class="search-button" type="submit" :disabled="isSearchDisabled">Search</button>
   </form>
@@ -111,6 +123,17 @@ const isSearchDisabled = computed(() => !searchQuery.value.trim() || props.loadi
 .search-button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.documents-only-button {
+  border: none;
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 @media (max-width: 1200px) {

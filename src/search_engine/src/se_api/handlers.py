@@ -92,7 +92,7 @@ class Handler:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
-            request: Query to perform.
+            content: query per field.
             count: how many results.
             offset: how deep in to grab the results.
         Returns: matching files or None.

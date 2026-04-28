@@ -37,8 +37,8 @@ class RefreshService:
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
-        self.app.add_api_route("/add_session", self.add_session, methods=["POST"])
-        self.app.add_api_route("/get_session", self.get_session, methods=["GET"])
+        self.app.add_api_route("/add_session_token", self.add_session_token, methods=["POST"])
+        self.app.add_api_route("/get_session_tokens", self.get_session_tokens, methods=["POST"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -52,7 +52,7 @@ class RefreshService:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def add_session(
+    async def add_session_token(
         self, service_name: str, body: dict[Any, Any], authorization: str | None = Header(default=None)
     ) -> JSONResponse:
         """Store users session token for given service, body should be given as
@@ -82,8 +82,9 @@ class RefreshService:
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
-    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)) -> str:
-        """Endpoint for retrieving single sesison token for specified service."""
+    async def get_session_tokens(self, body: list[str], authorization: str | None = Header(default=None)) -> dict:
+        """Endpoint for retrieving sesison tokens for specified services in list, example body:
+        ['service1', 'service2']."""
         status, token_values = authorize_and_get_token(authorization, self.ad_issuer, self.openid_connect_url)
         if status is False:
             raise HTTPException(status_code=401)
@@ -93,11 +94,12 @@ class RefreshService:
             dms_warning(f"Recieded token with missing 'sub': {token_values}")
             raise HTTPException(status_code=400)
 
-        content = self.redis_database.get_session_token(user, service_name)[0]
-        access_token = self.session_enc.decrypt_session_variables(content).get("access_token")
-        if isinstance(access_token, str):
-            return access_token
-        return ""
+        access_tokens = {}
+        for service_name in body:
+            content = self.redis_database.get_session_token(user, service_name)[0]
+            access_tokens[service_name] = self.session_enc.decrypt_session_variables(content).get("access_token")
+
+        return access_tokens
 
 
 def run() -> None:

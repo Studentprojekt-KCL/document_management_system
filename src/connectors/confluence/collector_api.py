@@ -197,5 +197,3 @@ def run() -> None:
 
     port = read_port("CONFLUENCE_CONNECTOR_PORT")
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)
-
-

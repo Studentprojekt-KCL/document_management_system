@@ -12,7 +12,7 @@ optional MinIO env vars for uploads.
 
 import argparse
 import os
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, Header, Request
@@ -21,6 +21,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from shared_functions.initialisation_tools import read_port
+from contextlib import asynccontextmanager
+
 
 from boto_tools import upload_file
 from dmis_logger import dms_warning
@@ -42,22 +44,23 @@ class API:
     log_level: str | None = None
 
     def __init__(self) -> None:
-        self.app = FastAPI()
         self.confluence_instance = ConfluenceInterfacer()
+        self.app = FastAPI(lifespan=self.lifespan)
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_event_handler("shutdown", self.shutdown_event)
         # Legacy (same as older GitLab connector in this repo)
         self.app.add_api_route("/files", self.files, methods=["GET"])
         self.app.add_api_route("/file", self.file, methods=["GET"])
         # DMS-aligned routes
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
-    async def shutdown_event(self) -> None:
-        """Close connector HTTP client cleanly on app shutdown."""
+    @asynccontextmanager
+    async def lifespan(self, _: FastAPI) -> AsyncGenerator:
+        # before startup
+        yield
+        # after api closes
         await self.confluence_instance.session.aclose()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
@@ -134,10 +137,6 @@ class API:
                 api_token=token,
             )
         )
-
-    async def connected_source_systems(self) -> list[str]:
-        """Registered source label (DMS ``/connected_source_systems``)."""
-        return ["Confluence"]
 
     async def stream_files_to_index(
         self,

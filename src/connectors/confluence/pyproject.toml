@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "confluence_service"
-description = ""
+description = "Conflucence connector"
 version = "0.1.0"
 dynamic = ["dependencies"]
 
@@ -12,4 +12,4 @@ dynamic = ["dependencies"]
 package-dir = {"" = "src"}
 
 [project.scripts]
-confluence_connector = "collector_api:run"
+confluence_connector = "confluence_service.collector_api:run"

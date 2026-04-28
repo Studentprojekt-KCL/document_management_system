@@ -24,10 +24,9 @@ from pydantic import BaseModel, Field
 
 from boto_tools import upload_file
 from dmis_logger import dms_warning
+from interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
 from shared_functions.initialisation_tools import read_port
-
-from interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
 
 class GetFilesBody(BaseModel):

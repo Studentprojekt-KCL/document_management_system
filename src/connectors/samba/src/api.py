@@ -101,11 +101,11 @@ class API:
         return await self.samba_service.check_index_needed(subdata)
 
     async def files(
-            self, 
-            content: dict, 
-            authorization: Annotated[str | None, Header()] = None,
-            include_content: bool = True, 
-            include_last_edit_date: bool = True, 
+        self,
+        content: dict,
+        authorization: Annotated[str | None, Header()] = None,
+        include_content: bool = True,
+        include_last_edit_date: bool = True,
     ) -> JSONResponse:
         """Grab a list of files as a user.
 

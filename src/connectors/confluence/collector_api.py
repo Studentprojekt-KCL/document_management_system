@@ -12,7 +12,7 @@ optional MinIO env vars for uploads.
 
 import argparse
 import os
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Header, Request
@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from shared_functions.initialisation_tools import read_port
 from contextlib import asynccontextmanager
-
+from collections.abc import AsyncGenerator
 
 from boto_tools import upload_file
 from dmis_logger import dms_warning

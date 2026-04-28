@@ -114,7 +114,6 @@ class Connector:
             dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
         return None
 
-
     async def stream(self, stream_url: str) -> AsyncGenerator:
         """Open stream connection to connector.
 

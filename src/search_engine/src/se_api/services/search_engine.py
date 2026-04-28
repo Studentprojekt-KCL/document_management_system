@@ -93,12 +93,9 @@ class SearchEngine:
         sub_queries: list[tuple] = []
         for field, value in content.items():
             try:
-                if field == "documents_only":
-                    field = "is_document"
-                sub_queries.append((
-                    Occur.Must,
-                    self.index.parse_query(value, [field])
-                ))
+                sub_queries.append(
+                    (Occur.Must, self.index.parse_query(value, [field if field != "documents_only" else "is_document"]))
+                )
             except ValueError:
                 dms_warning(f"Failed to create query: {value} for field: {field}")
             except TypeError:

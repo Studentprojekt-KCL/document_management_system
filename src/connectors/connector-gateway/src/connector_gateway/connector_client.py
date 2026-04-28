@@ -136,3 +136,12 @@ class ConnectorClient:
             except (json.JSONDecodeError, TypeError) as err:
                 dms_warning(f"Recieved unexpected format in /defined_fields response from {source_system}. {err}")
         return defined_fields
+
+    async def get_auth_urls(self) -> list[dict]:
+        """Returns list of dicts with name and auth_user url"""
+        auth_user_endpoints: list[dict] = []
+        for source_system in self.source_systems:
+            auth_user_endpoints.append(
+                {"name": source_system["name"], "endpoint": f"/auth_user&source_system={source_system['name'].lower()}"}
+            )
+        return auth_user_endpoints

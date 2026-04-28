@@ -23,6 +23,7 @@ class API:
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
+        self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -37,24 +38,25 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        files_meta_data: list = await self.down_stream_client.fetch_files_metadata(
+        return await self.down_stream_client.fetch_files_metadata(
             file_pointers["file_pointers"], include_content, include_last_edit_date
         )
-        return files_meta_data
 
     async def stream_files_to_index(self) -> list[str]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
-        stream_urls: list[str] = await self.down_stream_client.fetch_start_of_streams()
-        return stream_urls
+        return await self.down_stream_client.fetch_start_of_streams()
 
     async def connected_source_systems(self) -> list[str]:
         """Returns list with names of all connected source systems"""
-        names_of_source_systems: list[str] = await self.down_stream_client.get_source_system_names()
-        return names_of_source_systems
+        return await self.down_stream_client.get_source_system_names()
 
     async def defined_fields(self) -> list[str]:
         """Retrieve a unions of all defined fields from defined connectors."""
         return await self.down_stream_client.retrieve_defined_fields()
+
+    async def get_auth_user_urls(self) -> list[dict]:
+        """returns names of source systems and auth_user entrypoints"""
+        return await self.down_stream_client.get_auth_urls()
 
 
 def run() -> None:

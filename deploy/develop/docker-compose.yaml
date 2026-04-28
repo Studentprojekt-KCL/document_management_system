@@ -150,22 +150,21 @@ services:
         REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
         REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
 
-  refresh_service-worker:
-      image: registry.dms-lookup.com/refresh-service:latest
-      container_name: refresh-worker
-      command: /usr/local/bin/refresh-worker
-      networks:
-        dev_net:
-          ipv4_address: ${IP_REFSERVICE}
-      environment:
-        REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
-        REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
-        REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
-        REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
-        REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
-        REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
-        REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
-
+  refresh_service-service:
+    image: registry.dms-lookup.com/refresh-service:latest
+    container_name: refresh-worker
+    command: /usr/local/bin/refresh-worker
+    networks:
+      dev_net:
+        ipv4_address: ${IP_REFSERVICE}
+    environment:
+      REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
+      REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
+      REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
+      REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
+      REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+      REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
+      REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
 
   refresh_service-redis:
       image: registry.dms-lookup.com/refresh_service-redis:latest

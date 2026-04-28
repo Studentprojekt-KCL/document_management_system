@@ -28,11 +28,6 @@ services:
     build:
       dockerfile: src/connectors/gitlab/Dockerfile
       
-  connector-confluence:
-    image: connector-confluence:pr
-    build:
-      dockerfile: src/connectors/confluence/Dockerfile
-
   connector-github:
     image: connector-github:pr
     build:

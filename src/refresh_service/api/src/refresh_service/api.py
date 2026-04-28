@@ -82,7 +82,7 @@ class RefreshService:
 
         return JSONResponse(status_code=200, content={"status": "success"})
 
-    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)) -> dict | None:
+    async def get_session(self, service_name: str, authorization: str | None = Header(default=None)) -> str:
         """Endpoint for retrieving single sesison token for specified service."""
         status, token_values = authorize_and_get_token(authorization, self.ad_issuer, self.openid_connect_url)
         if status is False:
@@ -94,7 +94,10 @@ class RefreshService:
             raise HTTPException(status_code=400)
 
         content = self.redis_database.get_session_token(user, service_name)[0]
-        return self.session_enc.decrypt_session_variables(content).get("access_token")
+        access_token = self.session_enc.decrypt_session_variables(content).get("access_token")
+        if isinstance(access_token, str):
+            return access_token
+        return ""
 
 
 def run() -> None:

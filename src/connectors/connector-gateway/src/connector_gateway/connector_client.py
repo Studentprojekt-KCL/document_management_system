@@ -4,6 +4,8 @@ import asyncio
 import json
 import httpx
 
+from shared_functions.dmis_logger import dms_error, dms_warning
+
 
 class ConnectorClient:
     """
@@ -112,3 +114,19 @@ class ConnectorClient:
         for source_system in self.source_systems:
             names_of_source_systems.append(source_system["name"])
         return names_of_source_systems
+
+    async def retrieve_defined_fields(self) -> list:
+        """Retreve a union of all defined fields from defined connectors."""
+        defined_fields = []
+        for source_system in self.source_systems:
+            connector_url = source_system.get("connector_url")
+            if not isinstance(connector_url, str):
+                dms_error(f"Sourcesystem is missing connector_url for {source_system}")
+                return []
+            response = await self.http_client.get(f"{connector_url.rstrip('/')}/defined_fields")
+            try:
+                list_object = response.json()
+                defined_fields.extend(list_object)
+            except (json.JSONDecodeError, TypeError) as err:
+                dms_warning(f"Recieved unexpected format in /defined_fields response from {source_system}. {err}")
+        return defined_fields

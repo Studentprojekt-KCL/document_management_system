@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 import logging
 import argparse
 from collections.abc import AsyncGenerator, Sequence
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -98,10 +98,15 @@ class API:
             subdata: base64 encoded date.
         Returns: true if needed else false.
         """
-
         return await self.samba_service.check_index_needed(subdata)
 
-    async def files(self, content: dict, include_content: bool = True, include_last_edit_date: bool = True) -> JSONResponse:
+    async def files(
+            self, 
+            content: dict, 
+            authorization: Annotated[str | None, Header()] = None,
+            include_content: bool = True, 
+            include_last_edit_date: bool = True, 
+    ) -> JSONResponse:
         """Grab a list of files as a user.
 
         Args:
@@ -110,7 +115,9 @@ class API:
             include_last_edit_date: if last modification date is wanted or not.
         Returns: json response with the files.
         """
-        response = self.samba_service.grab_files(content, include_content, include_last_edit_date)
+        if authorization is None:
+            return JSONResponse(content=[])
+        response = self.samba_service.grab_files(content, authorization, include_content, include_last_edit_date)
         return JSONResponse(content=response)
 
     async def stream_files_to_index(self, subdata: str | None = None) -> StreamingResponse:

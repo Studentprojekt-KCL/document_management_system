@@ -6,7 +6,7 @@ from os import scandir
 import json
 import os
 from collections.abc import AsyncGenerator
-from base64 import urlsafe_b64decode, urlsafe_b64encode, b64encode
+from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode, b64encode
 from pathlib import Path
 
 from subprocess import CalledProcessError, run
@@ -110,7 +110,7 @@ class Samba:
             index_needed = len(self.changes) != 0
         return {"index_needed": index_needed}
 
-    def grab_files(self, content: dict, include_content: bool, include_last_edit_date: bool) -> list[dict]:
+    def grab_files(self, content: dict, authorization: str, include_content: bool, include_last_edit_date: bool) -> list[dict]:
         """Grab the requested files.
 
         Mounts the share as the requesting user and grabs the requested files.
@@ -121,9 +121,10 @@ class Samba:
             include_last_edit_date: to include the modification date.
         Returns: list of files.
         """
+        username: str | None = None
+        password: str | None = None
+        username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
         pointers: list[str] | None = content.get("file_pointers")
-        username: str | None = content.get("username", self.mount_options.user)  # NOTE: DO NOT KEEP
-        password: str | None = content.get("password", self.mount_options.password)  # NOTE: DO NOT KEEP
 
         if pointers is None or username is None or password is None:
             return []

@@ -123,7 +123,14 @@ class Samba:
         """
         username: str | None = None
         password: str | None = None
-        username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+        try:
+            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+        except UnicodeDecodeError:
+            dms_warning("Failed to decode authorization header for base64 decoding.")
+        except UnicodeEncodeError:
+            dms_warning("Failed to encode authorization header after base64 decoding.")
+        except ValueError:
+            dms_warning("Might be too many arguments in authorization header.")
         pointers: list[str] | None = content.get("file_pointers")
 
         if pointers is None or username is None or password is None:

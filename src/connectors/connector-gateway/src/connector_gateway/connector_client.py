@@ -100,7 +100,7 @@ class ConnectorClient:
             responses = await asyncio.gather(*tasks)
             return [item for r in responses for item in r.json()]
         except httpx.TimeoutException:
-            dms_warning(f"Request timed out")
+            dms_warning("Request timed out")
         except httpx.HTTPError:
             dms_warning("Failed to connect to connector.")
         return []

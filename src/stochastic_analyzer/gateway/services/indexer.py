@@ -8,6 +8,7 @@ from http import HTTPStatus
 import httpx
 
 from shared_functions.dmis_logger import dms_warning
+from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable
 
 
 def _to_uuid(pointer: str) -> str:
@@ -49,6 +50,26 @@ class Indexer:
         self.batch_size = config.batch_size
         self.max_chars = config.max_chars
         self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Indexer":
+        """Construct an Indexer from environment variables.
+
+        Reads (required):
+            STOCHAN_EMBEDDING_URL: URL for the TEI embedding container.
+            STOCHAN_QDRANT_URL: URL for the Qdrant vector database.
+
+        Reads (optional):
+            INDEX_BATCH_SIZE: Documents embedded per batch (default 8).
+            STOCHAN_INDEX_MAX_CHARS: Max characters per document (default 2000).
+        """
+        config = IndexerConfig(
+            embedding_url=read_env_variable("STOCHAN_EMBEDDING_URL"),
+            qdrant_url=read_env_variable("STOCHAN_QDRANT_URL"),
+            batch_size=read_int_env_variable("STOCHAN_INDEX_BATCH_SIZE"),
+            max_chars=read_int_env_variable("STOCHAN_INDEX_MAX_CHARS"),
+        )
+        return cls(config=config, client=client)
 
     async def index(self, connector_url: str) -> dict:
         """Run the full indexing pipeline.

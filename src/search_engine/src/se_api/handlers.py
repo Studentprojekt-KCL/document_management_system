@@ -98,6 +98,13 @@ class Handler:
         Returns: matching files or None.
         """
 
+        if count <= 0:
+            dms_warning(f"Count result count is invalid. (count: {count}).")
+            return []
+        if offset < 0:
+            dms_warning(f"Offset is invalid. (offset: {offset}).")
+            return []
+
         if not self.indexing.locked():
             loop = get_event_loop()
             loop.create_task(self._handle_new())

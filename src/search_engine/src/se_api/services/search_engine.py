@@ -1,7 +1,8 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import base64
 import json
+from os import listdir, mkdir, path, remove
+
 from tantivy import (
     Document,
     Index,
@@ -11,7 +12,8 @@ from tantivy import (
     Searcher,
 )
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class SearchEngine:
@@ -23,14 +25,21 @@ class SearchEngine:
 
     index: Index
     categories: list[str]
+    writer: IndexWriter | None
+    index_path: str
 
     def __init__(self) -> None:
+        """Constructor"""
+        self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/") + "/index"
         self.categories = ["unique_pointer", "content"]
-        self.rebuild()
+        self.writer = None
 
-    def rebuild(self) -> None:
-        """Rebuild the index schema with the saved categories."""
-        dms_info(f"Rebuilding schema, new set: {self.categories}.")
+    def init(self) -> None:
+        """Initialize the index schema with the saved categories."""
+        if not path.exists(self.index_path):
+            mkdir(self.index_path)
+        if not path.isdir(self.index_path):
+            dms_error(f"{self.index_path} is not a directory.")
         schema_builder = SchemaBuilder()
         for category in self.categories:
             if category == "unique_pointer":
@@ -38,28 +47,22 @@ class SearchEngine:
             else:
                 schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
-        self.index = Index(schema)
+        try:
+            self.index = Index(schema, path=self.index_path)
+        except ValueError:
+            dms_warning(f"Directory containing different schema was found in {self.index_path}, removing.")
+            for file in listdir(self.index_path):
+                remove(f"{self.index_path}/{file}")
+            try:
+                self.index = Index(schema, path=self.index_path)
+            except ValueError:
+                dms_error(f"Failed loading index directory, path: {self.index_path}.")
 
-    def have_new_category(self, categories: dict) -> bool:
-        """Check if there is an apsent category.
-
-        Args:
-            categories: the dict containing the categories.
-
-        Returns:
-        True if there are new ones, else False
-        """
-
-        new: bool = False
-        for key in categories:
-            category = categories.get(key)
-            if isinstance(category, dict):
-                new = new or self.have_new_category(category)
-            elif key not in self.categories:
-                new = True
-                self.categories.append(key)
-
-        return new
+    def reset(self) -> None:
+        """Reset the search engine."""
+        for file in listdir(self.index_path):
+            remove(f"{self.index_path}/{file}")
+        self.init()
 
     def query_files(self, q: str, k: int) -> list[str]:
         """Query through the files in the index.
@@ -87,38 +90,38 @@ class SearchEngine:
 
         return pointers
 
-    def add_files(self, files: list) -> None:
-        """Add a list of files to the index.
+    def open_writer(self) -> None:
+        """Init index writer."""
+        if self.writer is not None:
+            return
+        self.writer = self.index.writer()
+
+    def close_writer(self) -> None:
+        """Close the writer."""
+        if self.writer is None:
+            return
+        self.writer.commit()
+        self.writer.wait_merging_threads()
+        self.writer = None
+
+    def add_file(self, file: dict) -> None:
+        """Add file to index.
+
+        Requiers init call before and after.
 
         Args:
-            files: list of files.
+            file: file dict
         """
 
-        writer: IndexWriter = self.index.writer()
-        for file in files:
-            flat_file = self._flatten_dict(file)
-            content = flat_file.get("content")
-            unique_pointer = flat_file.get("unique_pointer")
+        if self.writer is None:
+            return
+        unique_pointer: str | None = file.get("unique_pointer")
+        if unique_pointer is None:
+            dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
+            return
+        self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
 
-            if content is None:
-                dms_warning("File is missing content.")
-                continue
-            if unique_pointer is None:
-                dms_warning("File is missing unique pointer.")
-                continue
-
-            writer.delete_documents("unique_pointer", unique_pointer)
-
-            content_bytes: bytes = base64.b64decode(content)
-            content = content_bytes.decode("utf-8")
-            flat_file["content"] = content
-
-            writer.add_json(json.dumps(flat_file))
-
-        writer.commit()
-        writer.wait_merging_threads()
-
-        self.index.reload()
+        self.writer.add_json(json.dumps(file))
 
     def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
@@ -133,14 +136,3 @@ class SearchEngine:
         writer.wait_merging_threads()
         dms_info(f"Removed {pointer} from index.")
         self.index.reload()
-
-    def _flatten_dict(self, d: dict) -> dict:
-        flat: dict = {}
-
-        for key, val in d.items():
-            if isinstance(val, dict):
-                flat.update(self._flatten_dict(val))
-            else:
-                flat.update({key: str(val)})
-
-        return flat

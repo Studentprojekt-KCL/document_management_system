@@ -12,6 +12,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import binascii
 import asyncio
+import copy
 
 import requests
 import httpx
@@ -36,16 +37,20 @@ class GitLab:
     blame_cache: dict = {}
     file_extensions: list = []
     extension_descriptions: dict = {}
+    defined_fields: dict
 
-    def __init__(self) -> None:
+    def __init__(self, address: str) -> None:
         """Constructor."""
         self.session = requests.session()
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
-        address = read_env_variable("CONGITLAB_GITLAB_URL")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
         self.file_extensions = [extension.get("extension") for extension in file_type_resource]
         self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
+
+        self.defined_fields = {"content": None, "name": None, "unique_pointer": None, "size": None, "source_system": None} | {
+            key: None for key in determine_file_type("", self.file_extensions, self.extension_descriptions)
+        }
 
     @staticmethod
     def _construct_request_headers(bearer_token: str | None = None) -> dict:
@@ -151,7 +156,8 @@ class GitLab:
 
         file_name: str | None = file.get("file_name")
         extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
-        base_structure: dict[Any, Any] = {
+        base_structure = copy.deepcopy(self.defined_fields)
+        base_structure |= {
             "unique_pointer": url,
             "name": file_name,
             "size": file.get("size"),
@@ -208,22 +214,20 @@ class GitLab:
                     continue
                 try:
                     file_content = zip_file.read(file).decode("utf-8")
-                except UnicodeDecodeError as err:
+                except UnicodeDecodeError:
                     file_content = ""
-                    dms_info(f"Could not decode file: {file}. {err}")
                 file_name = file_path.name
                 extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
-                files_data.append(
-                    {
-                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
-                        "metadata": {
-                            "name": file_name,
-                            "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
-                            "size": info.file_size,
-                        }
-                        | extension,
-                    }
-                )
+                base_structure = copy.deepcopy(self.defined_fields)
+                base_structure |= {
+                    "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                    "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
+                    "name": file_name,
+                    "size": info.file_size,
+                    "type": SOURCE_FILE,
+                    "source_system": self.source_system,
+                } | extension
+                files_data.append(base_structure)
 
         return files_data
 
@@ -386,7 +390,10 @@ class GitLab:
                 dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
             subdata_str = subdata_bytes.decode("utf-8")
             try:
-                return datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
+                date = datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
+                if date.tzinfo is None:
+                    date = date.replace(tzinfo=timezone.utc)
+                return date
             except ValueError:
                 dms_error("Gitlab connector could not interpret subdata: %s", subdata)
         return datetime.min.replace(tzinfo=timezone.utc)

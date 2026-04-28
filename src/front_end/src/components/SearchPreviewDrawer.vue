@@ -27,6 +27,7 @@ import { useAISummary } from '@/composables/aiSummary'
 import { hasRole } from '@/utils/auth'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { saveClassification } from '@/utils/api'
+import { useAIRerank } from '@/composables/aiRerank'
 
 /* Props */
 const props = defineProps({
@@ -115,6 +116,8 @@ watch(
     notification.value.visible = false
   }
 )
+/* AI rerank composable */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -194,8 +197,21 @@ watch(
       <!-- AI Summary section -->
       <section class="panel-section">
         <p class="section-title">AI SUMMARY</p>
-        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
-          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        <div v-if="aiSummaryHtml">
+          <div class="meta-cell meta-cell-summary">
+            <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+          </div>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isGeneratingSummary"
+            @click="generateAISummary"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isGeneratingSummary ? 'Generating summary...' : 'Regenerate Summary' }}
+            </p>
+          </button>
         </div>
         <button
           v-else
@@ -219,6 +235,54 @@ watch(
         @save="handleClassificationSave"
         @cancel="isEditingClassification = false"
       />
+
+      <!-- Rerank (similarity) section -->
+      <section class="panel-section">
+        <p class="section-title">SIMILARITY</p>
+        <div v-if="aiRerankResultsComputed.length">
+          <ul>
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
+              <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
+            </li>
+          </ul>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isReranking"
+            @click="generateAIRerank"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isReranking ? 'Finding matches...' : 'Regenerate Similar Files' }}
+            </p>
+            <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+          </button>
+          <!-- Possibility to merge files button -->
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            @click="$router.push({ name: 'MergeFiles' })"
+          >
+            <p>
+              <ExternalLink :size="13" />
+              Merge Files
+            </p>
+          </button>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isReranking"
+          @click="generateAIRerank(previewTitle)"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isReranking ? 'Finding matches...' : 'Find Similar Files' }}
+          </p>
+          <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+        </button>
+      </section>
     </div>
 
     <div class="preview-footer">
@@ -298,6 +362,9 @@ watch(
   margin-top: 2rem;
   text-align: center;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .tag-row {
@@ -361,6 +428,19 @@ watch(
   overflow: hidden;
 }
 
+.meta-cell-rerank {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.meta-cell-rerank p {
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+}
+
 .summary-markdown {
   padding: 1rem 1.5rem;
 }
@@ -379,6 +459,25 @@ watch(
 }
 
 .summary-cell-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+.summary-regenerate-button {
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+
+.summary-regenerate-button + .summary-regenerate-button {
+  margin-left: 1rem;
+}
+
+.summary-regenerate-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-regenerate-button:disabled {
   opacity: 0.8;
   cursor: wait;
 }

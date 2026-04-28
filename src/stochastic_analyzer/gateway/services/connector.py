@@ -7,6 +7,7 @@ import httpx
 
 from gateway.schemas import InputItem, MetadataTemplate
 from shared_functions.dmis_logger import dms_warning
+from shared_functions.initialisation_tools import read_env_variable
 
 
 class Connector:
@@ -14,17 +15,38 @@ class Connector:
 
     Attributes:
         url: Base URL for the connector file endpoint.
+        client: Shared async HTTP client.
         timeout: Request timeout in seconds.
     """
 
-    def __init__(self, url: str, timeout: int = 120) -> None:
+    def __init__(self, url: str, client: httpx.AsyncClient, timeout: int = 120) -> None:
         self.url = url
+        self.client = client
         self.timeout = timeout
 
-    async def _get_content(self, pointers: list[str], client: httpx.AsyncClient) -> list[InputItem]:
-        """Fetch and decode files from the connector."""
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Connector":
+        """Construct a Connector from environment variables.
+
+        Reads:
+            STOCHAN_CONGATEWAY_URL: Base URL for the connector service.
+        """
+        return cls(
+            url=read_env_variable("STOCHAN_CONGATEWAY_URL"),
+            client=client,
+        )
+
+    async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
+        """Fetch contents for all file pointers from the connector.
+
+        Args:
+            pointers: List of unique file pointers.
+
+        Returns:
+            List of successfully retrieved InputItems.
+        """
         try:
-            response = await client.post(
+            response = await self.client.post(
                 f"{self.url.rstrip('/')}/get_files",
                 params=[("include_content", True), ("include_last_edit_date", False)],
                 json={"file_pointers": pointers},
@@ -62,18 +84,6 @@ class Connector:
 
         return items
 
-    async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
-        """Fetch contents for all file pointers from the connector.
-
-        Args:
-            pointers: List of unique file pointers.
-
-        Returns:
-            List of successfully retrieved InputItems.
-        """
-        async with httpx.AsyncClient() as client:
-            return await self._get_content(pointers, client)
-
     async def get_file_metadata(self, pointers: list[str]) -> list[dict]:
         """Fetch file metadata from the connector without content payloads.
 
@@ -84,21 +94,20 @@ class Connector:
             List of metadata dicts as provided by the connector, or an
             empty list if the request fails.
         """
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.url.rstrip('/')}/get_files",
-                    params=[("include_content", False), ("include_last_edit_date", True)],
-                    json={"file_pointers": pointers},
-                    timeout=self.timeout,
-                )
-                response.raise_for_status()
-                return response.json()
-            except (
-                httpx.HTTPStatusError,
-                httpx.TimeoutException,
-                ValueError,
-                httpx.ConnectError,
-            ) as err:
-                dms_warning(f"Connector metadata request failed: {err}")
-                return []
+        try:
+            response = await self.client.post(
+                f"{self.url.rstrip('/')}/get_files",
+                params=[("include_content", False), ("include_last_edit_date", True)],
+                json={"file_pointers": pointers},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except (
+            httpx.HTTPStatusError,
+            httpx.TimeoutException,
+            ValueError,
+            httpx.ConnectError,
+        ) as err:
+            dms_warning(f"Connector metadata request failed: {err}")
+            return []

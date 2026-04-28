@@ -150,7 +150,7 @@ refresh_service-service:
       REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
       REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
 
-refresh_service-service:
+refresh_service-worker:
     image: registry.dms-lookup.com/refresh-service:latest
     container_name: refresh-worker
     command: /usr/local/bin/refresh-worker

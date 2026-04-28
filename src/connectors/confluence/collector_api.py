@@ -20,6 +20,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from shared_functions.initialisation_tools import read_port
 
 from boto_tools import upload_file
 from dmis_logger import dms_warning
@@ -197,13 +198,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    port = os.environ.get("CONFLUENCE_CONNECTOR_PORT")
-    if port is None or not port.isdigit():
-        return
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=int(port))
+    port = read_port("CONFLUENCE_CONNECTOR_PORT")
+    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)
 
 
-if __name__ == "__main__":
-    run()
-
-app = API().app

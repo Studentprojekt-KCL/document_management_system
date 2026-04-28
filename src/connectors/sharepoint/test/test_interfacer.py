@@ -58,6 +58,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
     def setUp(self):
         with mock.patch("interfacer_sharepoint.SharePoint.__init__", return_value=None):
             self.instance = SharePoint()
+        self.instance.graph_base = GRAPH_BASE
         self.instance.source_system = "SharePoint"
         self.instance.file_extensions = [".pdf", ".docx", ".txt", ".md"]
         self.instance.extension_descriptions = {
@@ -70,7 +71,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
     # --- subdata encoding/decoding ---
 
     def test_encode_decode_subdata_roundtrip(self):
-        delta_map = {"drive_abc": "https://graph.microsoft.com/v1.0/drives/drive_abc/root/delta?token=xyz"}
+        delta_map = {"drive_abc": "xyz"}
         encoded = SharePoint._encode_subdata(delta_map)
         decoded = self.instance._decode_subdata(encoded)
         assert decoded == delta_map
@@ -105,9 +106,11 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert record["metadata"]["last_edit_date"] == "2026-01-01T00:00:00Z"
         assert record["content"] is None
 
-    def test_build_file_record_unknown_extension_returns_none(self):
+    def test_build_file_record_unknown_extension_returns_record(self):
         item = {"id": "item123", "name": "script.py", "size": 500}
-        assert self.instance._build_file_record(item, "drive456") is None
+        record = self.instance._build_file_record(item, "drive456")
+        assert record is not None
+        assert record["metadata"]["file_type"] == "Unknown"
 
     def test_build_file_record_folder_returns_none(self):
         item = {"id": "folder1", "name": "Documents", "size": 0, "folder": {"childCount": 3}}
@@ -228,11 +231,10 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert tasks == [("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")]
 
     async def test_collect_drive_tasks_uses_stored_delta_link(self):
-        stored = f"{GRAPH_BASE}/drives/drive1/root/delta?token=stored"
         self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}])
         self.instance._get_drives = mock.AsyncMock(return_value=[{"id": "drive1"}])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {"drive1": stored})
-        assert tasks == [("drive1", stored)]
+        tasks = await self.instance._collect_drive_tasks(_CTX, {"drive1": "stored"})
+        assert tasks == [("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta?token=stored")]
 
     async def test_collect_drive_tasks_multiple_sites(self):
         self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}, {"id": "site2"}])
@@ -298,6 +300,22 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1", include_content=True)
         assert result["content"] == base64.b64encode(b"file bytes").decode("utf-8")
 
+    # --- _fetch_record_content ---
+
+    async def test_fetch_record_content_success(self):
+        content_resp = _mock_response(200)
+        content_resp.content = b"file bytes"
+        ctx = _ctx(content_resp)
+        record = {"content": None, "metadata": {"unique_pointer": f"{GRAPH_BASE}/drives/d1/items/i1", "name": "doc.pdf"}}
+        await self.instance._fetch_record_content(ctx, record)
+        assert record["content"] == base64.b64encode(b"file bytes").decode("utf-8")
+
+    async def test_fetch_record_content_non_200_leaves_content_none(self):
+        ctx = _ctx(_mock_response(403))
+        record = {"content": None, "metadata": {"unique_pointer": f"{GRAPH_BASE}/drives/d1/items/i1", "name": "doc.pdf"}}
+        await self.instance._fetch_record_content(ctx, record)
+        assert record["content"] is None
+
     # --- stream_files_to_index ---
 
     async def test_stream_files_to_index_yields_subdata_then_records(self):
@@ -311,16 +329,23 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         }
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+
+        async def _set_content(_, record):
+            record["content"] = base64.b64encode(b"bytes").decode("utf-8")
+
+        self.instance._fetch_record_content = mock.AsyncMock(side_effect=_set_content)
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
         assert "subdata" in chunks[0]
         assert len(chunks) == 2
         assert chunks[1]["metadata"]["name"] == "report.pdf"
+        assert chunks[1]["content"] == base64.b64encode(b"bytes").decode("utf-8")
 
     async def test_stream_files_to_index_drive_exception_is_skipped(self):
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(side_effect=ConnectionError("network failure"))
+        self.instance._fetch_record_content = mock.AsyncMock()
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
@@ -330,13 +355,14 @@ class TestSharePoint(IsolatedAsyncioTestCase):
 
     async def test_stream_files_to_index_no_drives_yields_only_subdata(self):
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[])
+        self.instance._fetch_record_content = mock.AsyncMock()
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
         assert len(chunks) == 1
         assert "subdata" in chunks[0]
 
-    async def test_stream_files_to_index_filters_unsupported_files(self):
+    async def test_stream_files_to_index_passes_all_file_types(self):
         new_link = f"{GRAPH_BASE}/drives/drive1/root/delta?token=new"
         items = [
             {"id": "i1", "name": "report.pdf", "size": 100, "webUrl": "https://sp.com/report.pdf"},
@@ -344,11 +370,13 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         ]
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(return_value=(items, new_link))
+        self.instance._fetch_record_content = mock.AsyncMock()
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
-        assert len(chunks) == 2
-        assert chunks[1]["metadata"]["name"] == "report.pdf"
+        assert len(chunks) == 3
+        names = {c["metadata"]["name"] for c in chunks[1:]}
+        assert names == {"report.pdf", "script.py"}
 
     # --- check_index_needed ---
 
@@ -357,10 +385,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert result == {"index_needed": True}
 
     async def test_check_index_needed_parallel_no_changes(self):
-        delta_map = {
-            "drive_a": f"{GRAPH_BASE}/drives/drive_a/root/delta?token=a",
-            "drive_b": f"{GRAPH_BASE}/drives/drive_b/root/delta?token=b",
-        }
+        delta_map = {"drive_a": "a", "drive_b": "b"}
         subdata = SharePoint._encode_subdata(delta_map)
         empty = _mock_response(200, {"value": []})
         with mock.patch("httpx.AsyncClient", return_value=_mock_client_ctx(empty, empty)):
@@ -368,7 +393,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert result == {"index_needed": False}
 
     async def test_check_index_needed_parallel_one_drive_changed(self):
-        delta_map = {"drive_abc": f"{GRAPH_BASE}/drives/drive_abc/root/delta?token=xyz"}
+        delta_map = {"drive_abc": "xyz"}
         subdata = SharePoint._encode_subdata(delta_map)
         with mock.patch(
             "httpx.AsyncClient",
@@ -378,14 +403,14 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert result == {"index_needed": True}
 
     async def test_check_index_needed_expired_token_returns_index_needed(self):
-        delta_map = {"drive_abc": f"{GRAPH_BASE}/drives/drive_abc/root/delta?token=xyz"}
+        delta_map = {"drive_abc": "xyz"}
         subdata = SharePoint._encode_subdata(delta_map)
         with mock.patch("httpx.AsyncClient", return_value=_mock_client_ctx(_mock_response(410))):
             result = await self.instance.check_index_needed(subdata)
         assert result == {"index_needed": True}
 
     async def test_check_index_needed_parallel_drive_exception(self):
-        delta_map = {"drive_abc": f"{GRAPH_BASE}/drives/drive_abc/root/delta?token=xyz"}
+        delta_map = {"drive_abc": "xyz"}
         subdata = SharePoint._encode_subdata(delta_map)
         self.instance._check_drive_delta = mock.AsyncMock(side_effect=ConnectionError("timeout"))
         result = await self.instance.check_index_needed(subdata)

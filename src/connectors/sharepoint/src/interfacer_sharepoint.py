@@ -7,6 +7,7 @@ import gzip
 import json
 from collections.abc import AsyncGenerator
 from typing import Any, NamedTuple
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
@@ -15,9 +16,9 @@ from shared_functions.file_type_logic import determine_file_type, get_file_resou
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.variables import SOURCE_FILE
 
-HTTP_OK = 200
-HTTP_FORBIDDEN = 403
-HTTP_TOO_MANY_REQUESTS = 429
+HTTP_OK = httpx.codes.OK
+HTTP_FORBIDDEN = httpx.codes.FORBIDDEN
+HTTP_TOO_MANY_REQUESTS = httpx.codes.TOO_MANY_REQUESTS
 REQUEST_TIMEOUT = 120
 MAX_CONCURRENT_REQUESTS = 20
 MAX_RETRIES = 3
@@ -34,13 +35,14 @@ class _HttpCtx(NamedTuple):
 class SharePoint:
     """SharePoint connector methods using Microsoft Graph API with delta queries."""
 
-    GRAPH_BASE: str = "https://graph.microsoft.com/v1.0"
+    graph_base: str
     source_system: str
-    file_extensions: list = []
-    extension_descriptions: dict = {}
+    file_extensions: list
+    extension_descriptions: dict
 
     def __init__(self) -> None:
         """Constructor."""
+        self.graph_base = read_env_variable("CONSHAREPOINT_GRAPH_BASE")
         self.source_system = read_env_variable("CONSHAREPOINT_SYSTEM_NAME")
         file_type_resource = get_file_resource()
         self.file_extensions = [t.get("extension") for t in file_type_resource]
@@ -70,7 +72,7 @@ class SharePoint:
     async def _get_sites(self, ctx: _HttpCtx) -> list[dict]:
         """Retrieve all accessible SharePoint sites."""
         sites: list[dict] = []
-        url: str | None = f"{self.GRAPH_BASE}/sites?search=*"
+        url: str | None = f"{self.graph_base}/sites?search=*"
         while url:
             response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
             if response.status_code != HTTP_OK:
@@ -83,7 +85,7 @@ class SharePoint:
 
     async def _get_drives(self, ctx: _HttpCtx, site_id: str) -> list[dict]:
         """Retrieve all document library drives for a site."""
-        url = f"{self.GRAPH_BASE}/sites/{site_id}/drives"
+        url = f"{self.graph_base}/sites/{site_id}/drives"
         response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
         if response.status_code == HTTP_FORBIDDEN:
             dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
@@ -114,7 +116,7 @@ class SharePoint:
 
     @staticmethod
     def _decode_subdata(subdata: str | None) -> dict[str, str]:
-        """Decode base64 subdata string to {drive_id: delta_link} dict."""
+        """Decode base64 subdata string to {drive_id: delta_token} dict."""
         if subdata is None:
             return {}
         try:
@@ -128,25 +130,23 @@ class SharePoint:
 
     @staticmethod
     def _encode_subdata(delta_map: dict[str, str]) -> str:
-        """Encode {drive_id: delta_link} dict to gzip-compressed base64 subdata string."""
+        """Encode {drive_id: delta_token} dict to gzip-compressed base64 subdata string."""
         return base64.urlsafe_b64encode(gzip.compress(json.dumps(delta_map).encode("utf-8"))).decode("utf-8")
 
     def _build_file_record(self, item: dict, drive_id: str) -> dict | None:
         """Build a streaming file record from a Graph API drive item.
 
-        Returns None if the item is a folder, deletion tombstone, or non-qualifying file type.
+        Returns None if the item is a folder or deletion tombstone.
         """
         if item.get("deleted") is not None or "folder" in item:
             return None
         name: str | None = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
-        if extension.get("file_type") == "Unknown":
-            return None
         item_id = item.get("id", "")
         return {
             "content": None,
             "metadata": {
-                "unique_pointer": f"{self.GRAPH_BASE}/drives/{drive_id}/items/{item_id}",
+                "unique_pointer": f"{self.graph_base}/drives/{drive_id}/items/{item_id}",
                 "name": name,
                 "size": item.get("size", 0),
                 "type": SOURCE_FILE,
@@ -156,6 +156,15 @@ class SharePoint:
             }
             | extension,
         }
+
+    async def _fetch_record_content(self, ctx: _HttpCtx, record: dict) -> None:
+        """Fetch file bytes and base64-encode them into record['content'] in-place."""
+        content_url = f"{record['metadata']['unique_pointer']}/content"
+        response = await self._get_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+        if response.status_code == HTTP_OK:
+            record["content"] = base64.b64encode(response.content).decode("utf-8")
+        else:
+            dms_warning(f"SharePoint: could not fetch content for {record['metadata'].get('name')}")
 
     async def _process_drive(self, ctx: _HttpCtx, drive_id: str, delta_url: str) -> tuple[str, list[dict], str]:
         """Run delta query for one drive. Returns (drive_id, qualifying_records, new_delta_link)."""
@@ -182,7 +191,12 @@ class SharePoint:
                 drive_id = drive.get("id", "")
                 if not drive_id:
                     continue
-                delta_url = delta_map.get(drive_id, f"{self.GRAPH_BASE}/drives/{drive_id}/root/delta")
+                stored = delta_map.get(drive_id)
+                delta_url = (
+                    f"{self.graph_base}/drives/{drive_id}/root/delta?token={stored}"
+                    if stored
+                    else f"{self.graph_base}/drives/{drive_id}/root/delta"
+                )
                 drive_tasks.append((drive_id, delta_url))
         return drive_tasks
 
@@ -194,21 +208,23 @@ class SharePoint:
         delta tokens are required for the subdata header.
         """
         delta_map = self._decode_subdata(subdata)
-        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
         async with httpx.AsyncClient(cookies={}) as client:
-            ctx = _HttpCtx(client, sem, token)
+            ctx = _HttpCtx(client, asyncio.Semaphore(MAX_CONCURRENT_REQUESTS), token)
             drive_tasks = await self._collect_drive_tasks(ctx, delta_map)
             raw = await asyncio.gather(
                 *[self._process_drive(ctx, drive_id, delta_url) for drive_id, delta_url in drive_tasks],
                 return_exceptions=True,
             )
-        results = []
-        for outcome in raw:
-            if isinstance(outcome, BaseException):
-                dms_warning(f"SharePoint: skipping drive due to processing error ({type(outcome).__name__})")
-            else:
-                results.append(outcome)
-        new_delta_map = {drive_id: lnk for drive_id, _, lnk in results if lnk}
+            results = []
+            for outcome in raw:
+                if isinstance(outcome, BaseException):
+                    dms_warning(f"SharePoint: skipping drive due to processing error ({type(outcome).__name__})")
+                else:
+                    results.append(outcome)
+            await asyncio.gather(*[self._fetch_record_content(ctx, r) for _, records, _ in results for r in records])
+        new_delta_map = {
+            drive_id: tok for drive_id, _, lnk in results if lnk and (tok := parse_qs(urlparse(lnk).query).get("token", [""])[0])
+        }
 
         yield json.dumps({"subdata": self._encode_subdata(new_delta_map)}).encode("utf-8")
 
@@ -286,7 +302,10 @@ class SharePoint:
         async with httpx.AsyncClient(cookies={}) as client:
             ctx = _HttpCtx(client, sem, token)
             results = await asyncio.gather(
-                *[self._check_drive_delta(ctx, lnk) for lnk in delta_map.values()],
+                *[
+                    self._check_drive_delta(ctx, f"{self.graph_base}/drives/{drive_id}/root/delta?token={tok}")
+                    for drive_id, tok in delta_map.items()
+                ],
                 return_exceptions=True,
             )
         if any(r is True or isinstance(r, BaseException) for r in results):

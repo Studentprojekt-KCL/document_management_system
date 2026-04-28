@@ -2,6 +2,7 @@ The following needs to be exported in local environment:
 
     CONSHAREPOINT_BIND_ADDR=<BIND_ADDRESS>
     CONSHAREPOINT_BIND_PORT=<CONNECTOR_PORT>
+    CONSHAREPOINT_GRAPH_BASE=<Graph API base URL>               # Should almost always be "https://graph.microsoft.com/v1.0"
     CONSHAREPOINT_SYSTEM_NAME=<Name to display in frontend for this SharePoint instance (e.g. 'SharePoint')>
     CONSHAREPOINT_TENANT_ID=<Azure AD tenant ID — found in Azure portal: Entra ID → Overview>
     CONSHAREPOINT_CLIENT_ID=<Client ID of DMIS application registered in Azure AD>

@@ -11,6 +11,8 @@ optional MinIO env vars for uploads.
 """
 
 import argparse
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import uvicorn
@@ -19,12 +21,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from shared_functions.initialisation_tools import read_port
-from contextlib import asynccontextmanager
-from collections.abc import AsyncGenerator
 
 from boto_tools import upload_file
 from dmis_logger import dms_warning
+
+from shared_functions.initialisation_tools import read_port
 
 from interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
@@ -57,9 +58,8 @@ class API:
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
-        # before startup
+        """Handle startup and shutdown lifecycle for the API."""
         yield
-        # after api closes
         await self.confluence_instance.session.aclose()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:

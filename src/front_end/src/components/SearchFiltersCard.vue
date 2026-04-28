@@ -30,19 +30,35 @@ const typeFilters = computed(() => {
   }
 })
 
-/* Show all document filters, but only first N chips for all-files mode. */
-const visibleTypeFilters = computed(() => (props.documentsOnly ? typeFilters.value : typeFilters.value.slice(0, 11)))
+/* Tracks types picked from the dropdown so they appear as buttons? on filtercard. */
+const selectedTypes = ref([])
 
-/* Remaining filters go into dropdown in all-files mode. */
+/* Show all document filters, but only first 11 ones + any selected from dropdown in all files mode. */
+const visibleTypeFilters = computed(() => {
+  if (props.documentsOnly) return typeFilters.value
+
+  const base = typeFilters.value.slice(0, 11)
+  const selected = typeFilters.value.filter(
+    (item) => selectedTypes.value.includes(item.value) && !base.some((b) => b.value === item.value)
+  )
+  return [...base, ...selected]
+})
+
+/* Remaining filters stay in dropdown, excludes already visible filters. */
 const overflowTypeFilters = computed(() => {
   if (props.documentsOnly) return []
 
-  return typeFilters.value.slice(11)
+  const visibleValues = new Set(visibleTypeFilters.value.map((item) => item.value))
+  return typeFilters.value.filter((item) => !visibleValues.has(item.value))
 })
 
 function selectTypeFromMenu(event) {
   const value = event.target.value
-  if (value) toggleFilter('type', value)
+  if (!value) return
+  if (!selectedTypes.value.includes(value)) {
+    selectedTypes.value = [...selectedTypes.value, value]
+  }
+  toggleFilter('type', value)
   event.target.value = ''
 }
 
@@ -91,6 +107,7 @@ const clearAllFilters = () => {
   localSource.value = []
   localType.value = []
   localSecurity.value = []
+  selectedTypes.value = []
   emit('update:filters', {
     source: [],
     type: [],
@@ -136,7 +153,7 @@ const clearAllFilters = () => {
         </button>
 
         <div v-if="!props.documentsOnly && overflowTypeFilters.length" class="type-dropdown">
-          <select class="more-types-select" @change="selectTypeFromMenu">
+          <select class="chip more-types" @change="selectTypeFromMenu">
             <option value="">More Types</option>
             <option
               v-for="item in overflowTypeFilters"
@@ -256,15 +273,8 @@ const clearAllFilters = () => {
   background: #d9dfe8;
 }
 
-.more-types-select {
-  border: 1px solid #d8dee7;
-  border-radius: 10px;
-  padding: 0.35rem 0.7rem;
-  background: #edf0f4;
-  color: #6f7e95;
-  font-size: 0.93rem;
-  font-weight: 600;
-  cursor: pointer;
+.more-types {
+  width: 8.5rem;
 }
 
 @media (max-width: 768px) {

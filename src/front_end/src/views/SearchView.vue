@@ -82,8 +82,12 @@ const handleSearch = async ({ query, documentsOnly }) => {
   }
 }
 
+/* Should send down a new request to the backend if the user press the button */
 const handleDocumentsOnlyChange = (documentsOnly) => {
   documentsOnlyMode.value = documentsOnly
+  if (lastQuery.value && lastQuery.value.trim()) {
+    handleSearch({ query: lastQuery.value, documentsOnly })
+  }
 }
 
 /* Handles selection of a search result match, updating state and opening the preview drawer */

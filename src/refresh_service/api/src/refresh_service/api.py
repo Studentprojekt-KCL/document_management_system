@@ -35,6 +35,8 @@ class RefreshService:
         self.redis_database = RedisDataBase()
         self.session_enc = SessionEncryption(read_env_variable("REFSERVICE_SESSION_ENC_PASSW"))
 
+        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+
         self.app.add_api_route("/add_session", self.add_session, methods=["POST"])
         self.app.add_api_route("/get_session", self.get_session, methods=["GET"])
 

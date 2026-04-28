@@ -17,7 +17,8 @@ export const API_PATHS = {
   classifications: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/classifications`,
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
-  allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`
+  allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
+  mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`
 }
 
 /**

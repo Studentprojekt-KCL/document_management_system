@@ -14,7 +14,7 @@ from gateway.preprompts import (
 from gateway.schemas import InputItem, SummaryResult
 
 from shared_functions.dmis_logger import dms_warning
-from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable
 
 SWEDISH_CHARS = set("åäö")
 
@@ -77,22 +77,14 @@ class Summarizer:
 
     @classmethod
     def from_env(cls, client: httpx.AsyncClient) -> "Summarizer":
-        """Construct a Summarizer from environment variables.
-
-        Reads:
-            STOCHAN_LLM_URL: URL for the LLM endpoint.
-            STOCHAN_LLM_MODEL: Model identifier.
-            STOCHAN_LLM_TIMEOUT: Request timeout in seconds.
-            STOCHAN_SAMPLE_SIZE: Sample length for language detection.
-            STOCHAN_SWEDISH_CHAR_THRESHOLD: Trigger count for Swedish detection.
-        """
+        """..."""
         config = SummarizerConfig(
             url=read_env_variable("STOCHAN_LLM_URL"),
             model=read_env_variable("STOCHAN_LLM_MODEL"),
-            timeout=int(read_env_variable("STOCHAN_LLM_TIMEOUT")),
+            timeout=read_int_env_variable("STOCHAN_LLM_TIMEOUT"),
             lang_config=LanguageConfig(
-                sample_size=int(read_env_variable("STOCHAN_SAMPLE_SIZE")),
-                swedish_char_threshold=int(read_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD")),
+                sample_size=read_int_env_variable("STOCHAN_SAMPLE_SIZE"),
+                swedish_char_threshold=read_int_env_variable("STOCHAN_SWEDISH_CHAR_THRESHOLD"),
             ),
         )
         return cls(config=config, client=client)

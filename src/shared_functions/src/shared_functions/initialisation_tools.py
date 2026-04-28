@@ -29,3 +29,31 @@ def read_env_variable(env_variable: str) -> str:
     if not variable or not isinstance(variable, str):
         dms_error(f"{env_variable} must be set in local environement.")
     return variable  # type: ignore
+
+
+def read_int_env_variable(env_variable: str) -> int:
+    """Read an integer env variable from local environment.
+
+    Args:
+        env_variable: Name of env variable.
+    """
+    value = environ.get(env_variable)
+    if value is None or not value.lstrip("-").isdigit():
+        dms_error(f"{env_variable} must be set to an integer.")
+    return int(value)  # type: ignore
+
+
+def read_float_env_variable(env_variable: str) -> float:
+    """Read a float env variable from local environment.
+
+    Args:
+        env_variable: Name of env variable.
+    """
+    value = environ.get(env_variable)
+    if value is None:
+        dms_error(f"{env_variable} must be set.")
+    try:
+        return float(value)  # type: ignore
+    except ValueError:
+        dms_error(f"{env_variable} must be a number.")
+        return 0.0  # unreachable, but keeps the type checker happy

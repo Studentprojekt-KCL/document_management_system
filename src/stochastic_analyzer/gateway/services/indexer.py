@@ -8,7 +8,7 @@ from http import HTTPStatus
 import httpx
 
 from shared_functions.dmis_logger import dms_warning
-from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable
 
 
 def _to_uuid(pointer: str) -> str:
@@ -66,8 +66,8 @@ class Indexer:
         config = IndexerConfig(
             embedding_url=read_env_variable("STOCHAN_EMBEDDING_URL"),
             qdrant_url=read_env_variable("STOCHAN_QDRANT_URL"),
-            batch_size=int(read_env_variable("STOCHAN_INDEX_BATCH_SIZE")),
-            max_chars=int(read_env_variable("STOCHAN_INDEX_MAX_CHARS")),
+            batch_size=read_int_env_variable("STOCHAN_INDEX_BATCH_SIZE"),
+            max_chars=read_int_env_variable("STOCHAN_INDEX_MAX_CHARS"),
         )
         return cls(config=config, client=client)
 

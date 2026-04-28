@@ -8,7 +8,7 @@ import httpx
 from gateway.schemas import InputItem, ClassificationResult
 
 from shared_functions.dmis_logger import dms_warning
-from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.initialisation_tools import read_env_variable, read_float_env_variable
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
@@ -52,7 +52,7 @@ class Classifier:
         """
         return cls(
             url=read_env_variable("STOCHAN_CLASSIFIER_URL"),
-            escalation_threshold=float(read_env_variable("STOCHAN_ESCALATION_THRESHOLD")),
+            escalation_threshold=read_float_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
             client=client,
         )
 

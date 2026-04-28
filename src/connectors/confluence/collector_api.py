@@ -11,7 +11,6 @@ optional MinIO env vars for uploads.
 """
 
 import argparse
-import os
 from typing import Any
 
 import uvicorn

@@ -33,6 +33,7 @@ class API:
     http_client: httpx.AsyncClient
     required_scopes: dict[str, list[str]]
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
         upstream_urls: dict[str, str],
@@ -160,7 +161,7 @@ class API:
             params = dict(request.query_params)
         except TypeError:
             dms_info(f"API retrieved a GET request ({url}) with incorrect param format: {request.query_params}")
-            return JSONResponse(status_code=400)
+            return JSONResponse(status_code=400, content={})
 
         try:
             response = await self.http_client.get(url, params=params, headers={"Authorization": authorization})
@@ -291,7 +292,7 @@ class API:
         )
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
-
+# pylint: disable=too-many-locals
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()

@@ -7,10 +7,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import Cookie, Form
-from fastapi.responses import JSONResponse, RedirectResponse
-
-# pylint: disable=missing-function-docstring,broad-exception-caught
-
+from fastapi.responses import JSONResponse
 
 class AuthRoutes:
     """Authentication route handlers."""
@@ -35,11 +32,12 @@ class AuthRoutes:
         self.frontend_redirect_uri = frontend_redirect_uri
 
     def _verify_cookie_token(self, access_token: str | None) -> dict[str, Any] | None:
+        """Verify access token from cookie and return claims."""
         if not access_token:
             return None
         try:
             return self.token_verifier.verify_access_token(f"Bearer {access_token}")
-        except Exception:
+        except httpx.HTTPError:
             return None
 
     def _set_cookie(
@@ -49,6 +47,7 @@ class AuthRoutes:
         value: str,
         max_age: int,
     ) -> None:
+        """Set an HTTP-only authentication cookie on the response."""
         response.set_cookie(
             key=key,
             value=value,
@@ -59,6 +58,7 @@ class AuthRoutes:
         )
 
     def _set_auth_cookies(self, response: JSONResponse, token_data: dict[str, Any]) -> None:
+        """Set authentication cookies from token response data."""
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
@@ -71,6 +71,7 @@ class AuthRoutes:
             self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE)
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any] | None:
+        """Request tokens from Keycloak using provided form data."""
         try:
             resp = await self.http_client.post(
                 self.keycloak_token_url,
@@ -79,13 +80,15 @@ class AuthRoutes:
             )
             resp.raise_for_status()
             return resp.json()
-        except Exception:
+        except httpx.HTTPError:
             return None
 
     def _unauthenticated_response(self) -> JSONResponse:
+        """Return a standardized unauthenticated response."""
         return JSONResponse(status_code=401, content={"authenticated": False})
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Check if user is authenticated."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
             return self._unauthenticated_response()
@@ -101,11 +104,16 @@ class AuthRoutes:
         )
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Return authenticated user details and roles."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
             return self._unauthenticated_response()
 
-        client_roles = claims.get("resource_access", {}).get(self.frontend_client_id, {}).get("roles", [])
+        client_roles = (
+            claims.get("resource_access", {})
+            .get(self.frontend_client_id, {})
+            .get("roles", [])
+        )
         realm_roles = claims.get("realm_access", {}).get("roles", [])
 
         return JSONResponse(
@@ -126,6 +134,7 @@ class AuthRoutes:
         code: str = Form(...),
         code_verifier: str = Form(...),
     ) -> JSONResponse:
+        """Exchange authorization code for tokens via Keycloak."""
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
@@ -156,6 +165,7 @@ class AuthRoutes:
         return response
 
     async def refresh_auth(self, refresh_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Refresh session using the refresh token."""
         if not refresh_token:
             return JSONResponse(
                 status_code=401,
@@ -189,7 +199,8 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> RedirectResponse:
+    async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Generate Keycloak logout URL and clear authentication cookies."""
         post_logout_redirect_uri = self.frontend_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
 
         params = {
@@ -200,7 +211,6 @@ class AuthRoutes:
             params["id_token_hint"] = id_token
 
         logout_url = f"{self.keycloak_logout_url}?{urlencode(params)}"
-        
         response = JSONResponse(
             status_code=200,
             content={"logout_url": logout_url},

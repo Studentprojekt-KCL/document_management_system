@@ -4,11 +4,15 @@ from pydantic import BaseModel, StrictStr
 
 
 class MetadataTemplate(BaseModel):
+    """Metadata schema."""
+
     unique_pointer: StrictStr
     name: StrictStr | None = None
 
 
 class InputItem(BaseModel):
+    """Schema for content and metadata."""
+
     content: StrictStr
     metadata: MetadataTemplate
 

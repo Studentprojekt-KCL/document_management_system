@@ -17,7 +17,7 @@ class Connector:
 
     def __init__(self) -> None:
         self.url = read_env_variable("STOCHAN_CONGATEWAY_URL").rstrip("/")
-        self.session: aiohttp.ClientSession | None = None
+        self.session: aiohttp.ClientSession
 
     async def init(self) -> None:
         """Open the HTTP session."""
@@ -28,6 +28,7 @@ class Connector:
         await self.session.close()
 
     async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
+        """Get file content from connector"""
         try:
             async with self.session.post(
                 f"{self.url}/get_files",

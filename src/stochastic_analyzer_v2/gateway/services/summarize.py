@@ -17,7 +17,7 @@ class Summarizer:
     def __init__(self) -> None:
         self.url = read_env_variable("STOCHAN_LLM_URL").rstrip("/")
         self.model = read_env_variable("STOCHAN_LLM_MODEL")
-        self.session: aiohttp.ClientSession | None = None
+        self.session: aiohttp.ClientSession
 
     async def init(self) -> None:
         """Open connection."""

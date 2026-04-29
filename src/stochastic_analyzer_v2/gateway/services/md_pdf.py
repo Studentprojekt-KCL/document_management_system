@@ -18,6 +18,6 @@ class PdfConverter:
             out = BytesIO()
             pdf.save_bytes(out)
             return out.getvalue()
-        except Exception as err:
+        except (ValueError, RuntimeError) as err:
             dms_warning(f"PDF conversion failed: {err}")
             return None

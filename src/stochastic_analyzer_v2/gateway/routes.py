@@ -11,10 +11,11 @@ from gateway.services.connector import Connector
 from shared_functions.dmis_logger import dms_warning
 
 
-def create_router(pdf_converter: PdfConverter,
-                  connector: Connector,
-                  summarizer: Summarizer,
-                  ) -> APIRouter:
+def create_router(
+    pdf_converter: PdfConverter,
+    connector: Connector,
+    summarizer: Summarizer,
+) -> APIRouter:
     """Create a router that handles the logic for services."""
     router = APIRouter()
 

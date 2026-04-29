@@ -21,15 +21,15 @@ class AuthRoutes:
         http_client: httpx.AsyncClient,
         keycloak_token_url: str,
         keycloak_logout_url: str,
-        frontend_client_id: str,
-        frontend_redirect_uri: str,
+        dmisapi_client_id: str,
+        dmisapi_redirect_uri: str,
     ) -> None:
         self.token_verifier = token_verifier
         self.http_client = http_client
         self.keycloak_token_url = keycloak_token_url
         self.keycloak_logout_url = keycloak_logout_url
-        self.frontend_client_id = frontend_client_id
-        self.frontend_redirect_uri = frontend_redirect_uri
+        self.dmisapi_client_id = dmisapi_client_id
+        self.dmisapi_redirect_uri = dmisapi_redirect_uri
 
     def _verify_cookie_token(self, access_token: str | None) -> dict[str, Any] | None:
         """Verify access token from cookie and return claims."""
@@ -111,7 +111,7 @@ class AuthRoutes:
 
         client_roles = (
             claims.get("resource_access", {})
-            .get(self.frontend_client_id, {})
+            .get(self.dmisapi_client_id, {})
             .get("roles", [])
         )
         realm_roles = claims.get("realm_access", {}).get("roles", [])
@@ -138,9 +138,9 @@ class AuthRoutes:
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
-                "client_id": self.frontend_client_id,
+                "client_id": self.dmisapi_client_id,
                 "code": code,
-                "redirect_uri": self.frontend_redirect_uri,
+                "redirect_uri": self.dmisapi_redirect_uri,
                 "code_verifier": code_verifier,
             }
         )
@@ -175,7 +175,7 @@ class AuthRoutes:
         token_data = await self._request_tokens(
             {
                 "grant_type": "refresh_token",
-                "client_id": self.frontend_client_id,
+                "client_id": self.dmisapi_client_id,
                 "refresh_token": refresh_token,
             }
         )
@@ -201,11 +201,11 @@ class AuthRoutes:
 
     async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Generate Keycloak logout URL and clear authentication cookies."""
-        post_logout_redirect_uri = self.frontend_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
+        post_logout_redirect_uri = self.dmisapi_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,
-            "client_id": self.frontend_client_id,
+            "client_id": self.dmisapi_client_id,
         }
         if id_token:
             params["id_token_hint"] = id_token

@@ -4,12 +4,17 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from gateway.services.md_pdf import PdfConverter
-from gateway.schemas import MarkdownRequest
+from gateway.schemas import MarkdownRequest, SummaryResult, PointerRequest
+from gateway.services.summarize import Summarizer
+from gateway.services.connector import Connector
 
 from shared_functions.dmis_logger import dms_warning
 
 
-def create_router(pdf_converter: PdfConverter) -> APIRouter:
+def create_router(pdf_converter: PdfConverter,
+                  connector: Connector,
+                  summarizer: Summarizer,
+                  ) -> APIRouter:
     """Create a router that handles the logic for services."""
     router = APIRouter()
 
@@ -26,5 +31,22 @@ def create_router(pdf_converter: PdfConverter) -> APIRouter:
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename='summary.pdf'"},
         )
+
+    @router.post("/summarize", response_model=SummaryResult)
+    async def summarize(payload: PointerRequest) -> SummaryResult:
+        """Summarize a single document."""
+        if len(payload.pointers) != 1:
+            dms_warning("Only 1 pointer plz")
+            raise HTTPException(status_code=400)
+
+        items = await connector.get_file_contents(payload.pointers)
+        if not items:
+            dms_warning("document retreival failure")
+            raise HTTPException(status_code=502)
+        result = await summarizer.summarize(items[0])
+        if result is None:
+            dms_warning("summarization failed")
+            raise HTTPException(status_code=500)
+        return result
 
     return router

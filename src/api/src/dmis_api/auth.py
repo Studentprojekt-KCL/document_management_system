@@ -15,7 +15,7 @@ from shared_functions.dmis_logger import dms_info
 class TokenVerifier:
     """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
+    def __init__(
         self,
         issuer: str,
         jwks_url: str,

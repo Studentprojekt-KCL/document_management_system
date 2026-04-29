@@ -1,16 +1,22 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 import json
+from os import listdir, mkdir, path, remove
+
 from tantivy import (
     Document,
     Index,
     IndexWriter,
+    Occur,
+    Query,
     SchemaBuilder,
     SearchResult,
     Searcher,
 )
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.file_type_logic import get_documents_only_rescource
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class SearchEngine:
@@ -23,51 +29,61 @@ class SearchEngine:
     index: Index
     categories: list[str]
     writer: IndexWriter | None
+    index_path: str
+    documents_only_extension: list
 
     def __init__(self) -> None:
-        self.categories = ["unique_pointer", "content"]
+        """Constructor"""
+        self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/") + "/index"
+        self.categories = ["is_document"]
+        extentions = get_documents_only_rescource()
+        self.documents_only_extension = []
+        for extention in extentions:
+            self.documents_only_extension.extend(extention.get("extension", []))
         self.writer = None
-        self.rebuild()
 
-    def rebuild(self) -> None:
-        """Rebuild the index schema with the saved categories."""
-        dms_info(f"Rebuilding schema, new set: {self.categories}.")
+    def init(self, fields: list[str] | None) -> None:
+        """Initialize the index schema with the saved categories."""
+        if not path.exists(self.index_path):
+            mkdir(self.index_path)
+        if not path.isdir(self.index_path):
+            dms_error(f"{self.index_path} is not a directory.")
+            return
+        if fields is not None:
+            self.categories.extend(fields)
         schema_builder = SchemaBuilder()
         for category in self.categories:
+            dms_info(f"added field {category}")
             if category == "unique_pointer":
                 schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
+            elif category == "is_document":
+                schema_builder.add_boolean_field(category, stored=True, indexed=True)
             else:
                 schema_builder.add_text_field(category, stored=True)
         schema = schema_builder.build()
-        self.index = Index(schema)
+        try:
+            self.index = Index(schema, path=self.index_path)
+        except ValueError:
+            dms_warning(f"Directory containing different schema was found in {self.index_path}, removing.")
+            for file in listdir(self.index_path):
+                remove(f"{self.index_path}/{file}")
+            try:
+                self.index = Index(schema, path=self.index_path)
+            except ValueError:
+                dms_error(f"Failed loading index directory, path: {self.index_path}.")
 
-    def have_new_category(self, categories: dict) -> bool:
-        """Check if there is an apsent category.
+    def reset(self) -> None:
+        """Reset the search engine."""
+        for file in listdir(self.index_path):
+            remove(f"{self.index_path}/{file}")
+        self.init(None)
 
-        Args:
-            categories: the dict containing the categories.
-
-        Returns:
-        True if there are new ones, else False
-        """
-
-        new: bool = False
-        for key in categories:
-            category = categories.get(key)
-            if isinstance(category, dict):
-                new = new or self.have_new_category(category)
-            elif key not in self.categories:
-                new = True
-                self.categories.append(key)
-
-        return new
-
-    def query_files(self, q: str, k: int) -> list[str]:
+    def query_files(self, content: dict[str, str], count: int) -> list[str]:
         """Query through the files in the index.
 
         Args:
-            q: The query to perform.
-            k: Maximum number of results.
+            content: dict with fields and their queries.
+            count: number of wanted results.
 
         Returns:
             List of file pointers with matching content.
@@ -76,10 +92,21 @@ class SearchEngine:
             SeAPIException: Potential formatting errors.
         """
 
-        query = self.index.parse_query(q, self.categories)
+        sub_queries: list[tuple] = []
+        for field, value in content.items():
+            try:
+                sub_queries.append(
+                    (Occur.Must, self.index.parse_query(value, [field if field != "documents_only" else "is_document"]))
+                )
+            except ValueError:
+                dms_warning(f"Failed to create query: {value} for field: {field}")
+            except TypeError:
+                dms_warning(f"Value is of wrong type, expected string got {type(value)}: {value}")
+
+        query: Query = Query.boolean_query(sub_queries)
 
         searcher: Searcher = self.index.searcher()
-        result: SearchResult = searcher.search(query, k)
+        result: SearchResult = searcher.search(query, count)
         pointers: list[str] = []
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
@@ -88,19 +115,13 @@ class SearchEngine:
 
         return pointers
 
-    def init(self) -> None:
+    def open_writer(self) -> None:
         """Init index writer."""
         if self.writer is not None:
             return
         self.writer = self.index.writer()
 
-    def commit(self) -> None:
-        """Commit added files without closing the writer."""
-        if self.writer is None:
-            return
-        self.writer.commit()
-
-    def close(self) -> None:
+    def close_writer(self) -> None:
         """Close the writer."""
         if self.writer is None:
             return
@@ -124,7 +145,8 @@ class SearchEngine:
             dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
             return
         self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
-
+        extension: str = file.get("file_type", "")
+        file.update({"is_document": extension in self.documents_only_extension})
         self.writer.add_json(json.dumps(file))
 
     def remove_file(self, pointer: str) -> None:

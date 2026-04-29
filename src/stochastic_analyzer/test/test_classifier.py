@@ -6,14 +6,14 @@ Unit tests for the stochastic_analyzer NLI document classifier.
 # Tests intentionally call private helpers on Classifier for focused checks.
 # pylint: disable=protected-access
 
-import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from json.decoder import JSONDecodeError
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
 from gateway.schemas import ClassificationResult, InputItem, MetadataTemplate
-from gateway.services.classifier import LABELS, Classifier
+from gateway.services.classifier import LABELS, LABEL_TRIGGERS, Classifier
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,7 +23,7 @@ from gateway.services.classifier import LABELS, Classifier
 def _make_item(
     content: str = "Some document content.",
     name: str | None = "doc.pdf",
-    author: str | None = "Alice",
+    author: str | None = "Ali",
     pointer: str | None = "ptr-001",
 ) -> InputItem:
     """Return a minimal valid InputItem."""
@@ -34,8 +34,9 @@ def _make_item(
 
 
 def _make_classifier(url: str = "http://tei", threshold: float = 0.05) -> Classifier:
-    """Return a Classifier with sensible test defaults."""
-    return Classifier(url=url, escalation_threshold=threshold)
+    """Return a Classifier with a mock async HTTP client."""
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    return Classifier(url=url, escalation_threshold=threshold, client=mock_client)
 
 
 def _entailment_response(score: float) -> list[dict]:
@@ -44,6 +45,14 @@ def _entailment_response(score: float) -> list[dict]:
         {"label": "entailment", "score": score},
         {"label": "contradiction", "score": 1.0 - score},
     ]
+
+
+def _mock_post_response(mock_client: AsyncMock, scores: list[float]) -> None:
+    """Configure mock_client.post to return entailment predictions for given scores."""
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = [_entailment_response(s) for s in scores]
+    mock_client.post.return_value = mock_resp
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +72,12 @@ class TestClassifierInit(unittest.TestCase):
         """Constructor stores the escalation_threshold attribute."""
         c = _make_classifier(threshold=0.12)
         self.assertEqual(c.escalation_threshold, 0.12)
+
+    def test_client_is_stored(self) -> None:
+        """Constructor stores the injected client."""
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        c = Classifier(url="http://tei", escalation_threshold=0.05, client=mock_client)
+        self.assertIs(c.client, mock_client)
 
     def test_class_level_defaults(self) -> None:
         """Class-level constants have expected default values."""
@@ -96,8 +111,6 @@ class TestBuildInputs(unittest.TestCase):
 
     def test_hypothesis_matches_label_trigger(self) -> None:
         """Hypothesis strings in pairs correspond to LABEL_TRIGGERS entries."""
-        from gateway.services.classifier import LABEL_TRIGGERS
-
         result = self.classifier._build_inputs([_make_item()])
         hypotheses = [pair[1] for pair in result]
         self.assertEqual(hypotheses, LABEL_TRIGGERS)
@@ -150,24 +163,21 @@ class TestEscalate(unittest.TestCase):
 
     def test_no_escalation_when_gap_exceeds_threshold(self) -> None:
         """Best index is unchanged when higher-ranked scores are far below."""
-        # Public=0.9, Internal=0.1, Sensitive=0.05, Confidential=0.02
         scores = [0.9, 0.1, 0.05, 0.02]
         result = Classifier._escalate(scores, best_index=0, escalation_threshold=0.05)
         self.assertEqual(result, 0)
 
     def test_escalates_when_higher_label_within_threshold(self) -> None:
         """Index is bumped to a higher-ranked label when score gap is below threshold."""
-        # Public=0.5, Internal=0.48 → gap 0.02 < threshold 0.05 → escalate to Internal
         scores = [0.5, 0.48, 0.1, 0.05]
         result = Classifier._escalate(scores, best_index=0, escalation_threshold=0.05)
         self.assertGreater(result, 0)
 
     def test_escalates_to_highest_within_threshold(self) -> None:
         """When multiple higher-ranked labels are within threshold, picks the highest rank."""
-        # Public=0.5, Internal=0.48, Sensitive=0.47, Confidential=0.46
         scores = [0.5, 0.48, 0.47, 0.46]
         result = Classifier._escalate(scores, best_index=0, escalation_threshold=0.1)
-        self.assertEqual(result, 3)  # Confidential has highest rank
+        self.assertEqual(result, 3)
 
     def test_already_highest_rank_no_escalation(self) -> None:
         """Confidential (rank 3) is never escalated further."""
@@ -196,16 +206,14 @@ class TestResolveLabels(unittest.TestCase):
     def test_returns_one_result_per_item(self) -> None:
         """_resolve_labels returns exactly one ClassificationResult per InputItem."""
         items = [_make_item(), _make_item()]
-        # 2 docs × 4 labels = 8 scores
-        all_scores = [0.1, 0.9, 0.2, 0.3, 0.3, 0.2, 0.1, 0.8]  # doc0 → Internal  # doc1 → Confidential
+        all_scores = [0.1, 0.9, 0.2, 0.3, 0.3, 0.2, 0.1, 0.8]
         results = self.classifier._resolve_labels(items, all_scores)
         self.assertEqual(len(results), 2)
 
     def test_picks_label_with_highest_score(self) -> None:
         """_resolve_labels assigns the label whose score is highest."""
         items = [_make_item(pointer="p1")]
-        # Sensitive has highest score at index 2
-        all_scores = [0.1, 0.2, 0.9, 0.3]
+        all_scores = [0.1, 0.2, 0.9, 0.3]  # index 2 → Sensitive
         results = self.classifier._resolve_labels(items, all_scores)
         self.assertEqual(results[0].security_class, "Sensitive")
 
@@ -232,134 +240,117 @@ class TestResolveLabels(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# classify (async, HTTP mocked)
+# classify (async, client injected and mocked)
 # ---------------------------------------------------------------------------
 
 
 class TestClassify(unittest.IsolatedAsyncioTestCase):
-    """Tests for Classifier.classify — HTTP layer is fully mocked."""
+    """Tests for Classifier.classify — injected client is fully mocked."""
 
-    def _make_mock_response(self, scores_per_pair: list[float]) -> MagicMock:
-        """Build a mock httpx.Response whose .json() returns entailment predictions."""
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
-        mock_resp.json.return_value = [_entailment_response(s) for s in scores_per_pair]
-        return mock_resp
-
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_returns_list_of_classification_results(self, mock_client_cls: MagicMock) -> None:
+    async def test_returns_list_of_classification_results(self) -> None:
         """classify() returns a list of ClassificationResult for a valid response."""
-        scores = [0.1, 0.2, 0.3, 0.9]  # one doc × 4 labels → Confidential wins
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.return_value = self._make_mock_response(scores)
-
         classifier = _make_classifier(threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.2, 0.3, 0.9])
+
         results = await classifier.classify([_make_item()])
 
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], ClassificationResult)
 
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_correct_label_assigned(self, mock_client_cls: MagicMock) -> None:
+    async def test_correct_label_assigned(self) -> None:
         """classify() assigns the label corresponding to the highest entailment score."""
-        # Index 1 (Internal) has the highest score
-        scores = [0.1, 0.9, 0.2, 0.1]
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.return_value = self._make_mock_response(scores)
-
         classifier = _make_classifier(threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.9, 0.2, 0.1])  # index 1 → Internal
+
         results = await classifier.classify([_make_item(pointer="doc-1")])
 
         self.assertEqual(results[0].security_class, "Internal")
 
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_empty_input_returns_empty_list(self, mock_client_cls: MagicMock) -> None:
+    async def test_empty_input_returns_empty_list(self) -> None:
         """classify() returns an empty list when given no items."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-
         classifier = _make_classifier()
+
         results = await classifier.classify([])
 
         self.assertEqual(results, [])
+        classifier.client.post.assert_not_called()
 
-    @patch("gateway.services.classifier.dms_warning")
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_http_status_error_returns_empty_list(self, mock_client_cls: MagicMock, mock_warning: MagicMock) -> None:
+    async def test_http_status_error_returns_empty_list(self) -> None:
         """classify() returns [] and logs a warning on HTTPStatusError."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.side_effect = httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock())
-
         classifier = _make_classifier()
-        results = await classifier.classify([_make_item()])
+        classifier.client.post.side_effect = httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock())
+
+        with unittest.mock.patch("gateway.services.classifier.dms_warning") as mock_warning:
+            results = await classifier.classify([_make_item()])
 
         self.assertEqual(results, [])
         mock_warning.assert_called_once()
 
-    @patch("gateway.services.classifier.dms_warning")
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_timeout_returns_empty_list(self, mock_client_cls: MagicMock, mock_warning: MagicMock) -> None:
+    async def test_timeout_returns_empty_list(self) -> None:
         """classify() returns [] and logs a warning on TimeoutException."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.side_effect = httpx.TimeoutException("timed out")
-
         classifier = _make_classifier()
-        results = await classifier.classify([_make_item()])
+        classifier.client.post.side_effect = httpx.TimeoutException("timed out")
+
+        with unittest.mock.patch("gateway.services.classifier.dms_warning") as mock_warning:
+            results = await classifier.classify([_make_item()])
 
         self.assertEqual(results, [])
         mock_warning.assert_called_once()
 
-    @patch("gateway.services.classifier.dms_warning")
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_json_decode_error_returns_empty_list(self, mock_client_cls: MagicMock, mock_warning: MagicMock) -> None:
+    async def test_json_decode_error_returns_empty_list(self) -> None:
         """classify() returns [] and logs a warning on JSONDecodeError."""
-        from json.decoder import JSONDecodeError
-
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
+        classifier = _make_classifier()
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.side_effect = JSONDecodeError("bad json", "", 0)
-        mock_client.post.return_value = mock_resp
+        classifier.client.post.return_value = mock_resp
 
-        classifier = _make_classifier()
-        results = await classifier.classify([_make_item()])
+        with unittest.mock.patch("gateway.services.classifier.dms_warning") as mock_warning:
+            results = await classifier.classify([_make_item()])
 
         self.assertEqual(results, [])
         mock_warning.assert_called_once()
 
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_post_called_with_correct_url(self, mock_client_cls: MagicMock) -> None:
+    async def test_post_called_with_correct_url(self) -> None:
         """classify() posts to <url>/predict."""
-        scores = [0.1, 0.2, 0.3, 0.9]
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.return_value = self._make_mock_response(scores)
+        classifier = _make_classifier(url="http://tei-host", threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.2, 0.3, 0.9])
 
-        classifier = _make_classifier(url="http://tei-host")
         await classifier.classify([_make_item()])
 
-        called_url = mock_client.post.call_args[0][0]
+        called_url = classifier.client.post.call_args[0][0]
         self.assertEqual(called_url, "http://tei-host/predict")
 
-    @patch("gateway.services.classifier.httpx.AsyncClient")
-    async def test_multiple_documents_return_correct_count(self, mock_client_cls: MagicMock) -> None:
+    async def test_multiple_documents_return_correct_count(self) -> None:
         """classify() returns one result per input document."""
         num_docs = 3
-        scores = [0.1, 0.2, 0.3, 0.9] * num_docs
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client.post.return_value = self._make_mock_response(scores)
-
         classifier = _make_classifier(threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.2, 0.3, 0.9] * num_docs)
+
         items = [_make_item(pointer=f"ptr-{i}") for i in range(num_docs)]
         results = await classifier.classify(items)
 
         self.assertEqual(len(results), num_docs)
+
+    async def test_post_called_with_inputs_payload(self) -> None:
+        """classify() sends the NLI pairs under the 'inputs' key."""
+        classifier = _make_classifier(threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.2, 0.3, 0.9])
+
+        await classifier.classify([_make_item()])
+
+        call_kwargs = classifier.client.post.call_args[1]
+        self.assertIn("inputs", call_kwargs["json"])
+
+    async def test_post_called_with_correct_timeout(self) -> None:
+        """classify() forwards the configured timeout to the HTTP call."""
+        classifier = _make_classifier(threshold=0.0)
+        _mock_post_response(classifier.client, [0.1, 0.2, 0.3, 0.9])
+
+        await classifier.classify([_make_item()])
+
+        call_kwargs = classifier.client.post.call_args[1]
+        self.assertEqual(call_kwargs["timeout"], Classifier.timeout)
 
 
 if __name__ == "__main__":

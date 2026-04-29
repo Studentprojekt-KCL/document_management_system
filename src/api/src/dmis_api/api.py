@@ -22,9 +22,6 @@ from shared_functions.initialisation_tools import read_env_variable, read_port
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,missing-function-docstring,pointless-string-statement
-
-
 class API:
     """Management class for main API."""
 
@@ -100,7 +97,7 @@ class API:
         self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
-        self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["GET"])
+        self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[None]:

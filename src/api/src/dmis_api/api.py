@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Header, Cookie
+from fastapi import FastAPI, Request, HTTPException, Cookie
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,12 +145,9 @@ class API:
 
     def resolve_authorization(
         self,
-        authorization: str | None,
         access_token: str | None,
     ) -> str | None:
         """Resolve Authorization header, falling back to access token cookie."""
-        if authorization:
-            return authorization
         if access_token:
             return f"Bearer {access_token}"
         return None
@@ -204,11 +201,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """GET request to search engine."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(authorization, request.headers.get("Referer"), required_scopes=self.required_scopes["searcheng"])
         return await self.execute_get_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
@@ -216,11 +212,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to search engine."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -232,11 +227,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -248,11 +242,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -264,11 +257,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """GET request to connector API."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),
@@ -280,11 +272,10 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        authorization: str | None = Header(default=None),
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to connector API."""
-        authorization = self.resolve_authorization(authorization, access_token)
+        authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
             request.headers.get("Referer"),

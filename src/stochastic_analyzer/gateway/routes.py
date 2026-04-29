@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, JSONResponse
 
 from gateway.services.classifier import Classifier, LABELS
-from gateway.services.connector import Connector
+from gateway.services.connector import (
+    Connector,
+    ConnectorUnreachable,
+    UnsupportedContent,
+    EmptyContent,
+)
 from gateway.services.summarizer import Summarizer
 from gateway.services.merger import Merger
 from gateway.services.summarizer_pdf import PdfConverter
@@ -41,12 +46,42 @@ class Services:
 
 
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
-    """Fetch documents from connector or raise 502."""
-    items = await connector.get_file_contents(pointers)
+    """Fetch documents from connector, mapping connector failures to HTTP errors."""
+    try:
+        items = await connector.get_file_contents(pointers)
+    except ConnectorUnreachable as err:
+        raise HTTPException(
+            status_code=502,
+            detail="The document service is currently unavailable. Please try again in a moment.",
+        ) from err
+    except UnsupportedContent as err:
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                f"'{err.filename}' is in a format we can't process. "
+                f"Supported formats are text files and PDFs with embedded text."
+            ),
+        ) from err
+    except EmptyContent as err:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"No text could be extracted from '{err.filename}'. "
+                f"This usually happens with scanned documents or image-based PDFs "
+                f"without OCR. Try a different file or run OCR first."
+            ),
+        ) from err
+
     if not items:
-        dms_warning("No documents could be retrieved from connector.")
-        raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
+        dms_warning("Connector returned an empty list without raising.")
+        raise HTTPException(status_code=502, detail="No documents were returned.")
     return items
+
+
+async def _fetch_one(connector: Connector, pointer: str) -> InputItem:
+    """Fetch a single document, reusing the batch helper's error translation."""
+    items = await _retrieve_documents(connector, [pointer])
+    return items[0]
 
 
 async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> SummaryResult:
@@ -123,19 +158,14 @@ def create_router(services: Services, merge_limits: MergeLimits) -> APIRouter:
             raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
 
         query_pointer = payload.pointers[0]
-        reference_items = await services.connector.get_file_contents([query_pointer])
-        if not reference_items:
-            dms_warning("Failed to retrieve reference document from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
-
-        query = reference_items[0].content
+        reference_item = await _fetch_one(services.connector, query_pointer)
+        query = reference_item.content
 
         results = await services.indexer.search_similar(query, limit=6)
         results = [(p, s) for p, s in results if p != query_pointer][:5]
         if not results:
             return {"ranked_results": []}
 
-        # Join scores with connector-provided metadata by unique_pointer.
         pointer_to_score = dict(results)
         metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
 

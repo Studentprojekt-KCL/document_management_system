@@ -13,6 +13,31 @@ from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
+class ConnectorError(Exception):
+    """Base class for connector failures that map to HTTP responses."""
+
+
+class ConnectorUnreachable(ConnectorError):
+    """The connector service is unreachable or returned a transport error."""
+
+
+class UnsupportedContent(ConnectorError):
+    """File content could not be decoded — bad format, corruption, or unsupported encoding."""
+
+    def __init__(self, filename: str, reason: str) -> None:
+        self.filename = filename
+        self.reason = reason
+        super().__init__(f"{filename}: {reason}")
+
+
+class EmptyContent(ConnectorError):
+    """File was decoded successfully but contains no extractable text."""
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        super().__init__(f"{filename}: no extractable text")
+
+
 class Connector:
     """Client for fetching file contents from the connector microservice.
 
@@ -42,11 +67,10 @@ class Connector:
     async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
         """Fetch contents for all file pointers from the connector.
 
-        Args:
-            pointers: List of unique file pointers.
-
-        Returns:
-            List of successfully retrieved InputItems.
+        Raises:
+            ConnectorUnreachable: when the connector cannot be reached.
+            UnsupportedContent: when a file's bytes cannot be decoded.
+            EmptyContent: when a file decoded fine but has no extractable text.
         """
         try:
             response = await self.client.post(
@@ -60,19 +84,22 @@ class Connector:
         except (
             httpx.HTTPStatusError,
             httpx.TimeoutException,
-            ValueError,
             httpx.ConnectError,
+            ValueError,
         ) as err:
-            dms_warning(f"Connector request failed for pointer '{pointers}': {err}")
-            return []
+            dms_warning(f"Connector request failed for pointers {pointers}: {err}")
+            raise ConnectorUnreachable(str(err)) from err
 
-        items = []
+        items: list[InputItem] = []
         for individual_data in data:
             encoded_content = individual_data.get("content")
-            unique_pointer = individual_data.get("unique_pointer")
+            unique_pointer = individual_data.get("unique_pointer", "unknown")
+            display_name = individual_data.get("name") or unique_pointer
+
             if encoded_content is None:
-                dms_warning(f"No content returned for pointer '{pointers}'")
-                return []
+                dms_warning(f"No content returned for pointer '{unique_pointer}'")
+                raise EmptyContent(display_name)
+
             try:
                 raw = b64decode(encoded_content)
                 if raw.startswith(b"%PDF-"):
@@ -81,10 +108,11 @@ class Connector:
                     content = raw.decode("utf-8")
             except (binascii.Error, UnicodeDecodeError, PdfReadError, ValueError) as err:
                 dms_warning(f"Decode failed for pointer '{unique_pointer}': {err}")
-                return []
+                raise UnsupportedContent(display_name, str(err)) from err
 
             if not content:
-                continue
+                dms_warning(f"Empty content after extraction for '{unique_pointer}'")
+                raise EmptyContent(display_name)
 
             items.append(
                 InputItem(

@@ -105,8 +105,12 @@ class API:
         """Retrieve fields delivered for file conent."""
         return list(self.gitlab_instance.defined_fields.keys())
 
-    def auth_user(self, request: Request) -> RedirectResponse:
-        """Callback endpoint to set in GitLab application."""
+    def auth_user(self, callback_url: str = Header()) -> RedirectResponse:
+        """Callback endpoint to set in GitLab application.
+
+        Required headers:
+            callback-url: <REDIRECT_URL>
+        """
         payload = {
             "nonce": secrets.token_urlsafe(16),
             "iat": int(time.time()),
@@ -117,7 +121,7 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": callback_url,
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,

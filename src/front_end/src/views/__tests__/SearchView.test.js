@@ -107,6 +107,11 @@ describe('SearchView', () => {
     })
   }
 
+  /** Helper to emit a search event with the correct object shape */
+  const emitSearch = (wrapper, query, documentsOnly = true) => {
+    wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', { query, documentsOnly })
+  }
+
   /* ── Rendering ── */
   describe('rendering', () => {
     it('renders all child components', () => {
@@ -138,7 +143,7 @@ describe('SearchView', () => {
     it('fetches results on search event', async () => {
       mockSuccessResponse()
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test query')
+      emitSearch(wrapper, 'test query')
       await flushPromises()
 
       expect(mockAuthFetch).toHaveBeenCalledTimes(1)
@@ -147,9 +152,8 @@ describe('SearchView', () => {
 
     it('encodes the query parameter', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'hello world')
+      emitSearch(wrapper, 'hello world')
       await flushPromises()
 
       const [url] = mockAuthFetch.mock.calls[0]
@@ -158,9 +162,8 @@ describe('SearchView', () => {
 
     it('passes results to SearchMatches after successful search', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       const matches = wrapper.findComponent({ name: 'SearchMatches' })
@@ -169,9 +172,8 @@ describe('SearchView', () => {
 
     it('passes query to SearchMatches', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'my query')
+      emitSearch(wrapper, 'my query')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('query')).toBe('my query')
@@ -179,7 +181,7 @@ describe('SearchView', () => {
 
     it('handles empty search query', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', '')
+      emitSearch(wrapper, '')
       await flushPromises()
 
       expect(mockAuthFetch).not.toHaveBeenCalled()
@@ -187,7 +189,7 @@ describe('SearchView', () => {
 
     it('handles whitespace-only search query', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', '   ')
+      emitSearch(wrapper, '   ')
       await flushPromises()
 
       expect(mockAuthFetch).not.toHaveBeenCalled()
@@ -201,7 +203,7 @@ describe('SearchView', () => {
       })
 
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toEqual([])
@@ -211,7 +213,7 @@ describe('SearchView', () => {
       mockAuthFetch.mockRejectedValue(new Error('Network error'))
 
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toEqual([])
@@ -225,7 +227,7 @@ describe('SearchView', () => {
       })
 
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toEqual(mockResults)
@@ -239,7 +241,7 @@ describe('SearchView', () => {
       })
 
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toEqual(mockResults)
@@ -247,9 +249,8 @@ describe('SearchView', () => {
 
     it('resets state before each new search', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'first')
+      emitSearch(wrapper, 'first')
       await flushPromises()
 
       mockAuthFetch.mockResolvedValue({
@@ -258,7 +259,7 @@ describe('SearchView', () => {
         text: () => Promise.resolve('')
       })
 
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'second')
+      emitSearch(wrapper, 'second')
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('open')).toBe(false)
@@ -269,9 +270,8 @@ describe('SearchView', () => {
   describe('match selection', () => {
     it('opens the drawer when a match is selected', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', mockResults[0])
@@ -282,9 +282,8 @@ describe('SearchView', () => {
 
     it('passes selected match to drawer', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', mockResults[0])
@@ -298,9 +297,8 @@ describe('SearchView', () => {
   describe('drawer close', () => {
     it('closes the drawer on close event', async () => {
       mockSuccessResponse()
-
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchMatches' }).vm.$emit('select', mockResults[0])
@@ -321,7 +319,7 @@ describe('SearchView', () => {
 
     it('shows all results when no filters are active', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -336,7 +334,7 @@ describe('SearchView', () => {
 
     it('filters by file type extension', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -353,7 +351,7 @@ describe('SearchView', () => {
 
     it('filters by security — Public only', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -369,7 +367,7 @@ describe('SearchView', () => {
 
     it('filters by security — Confidential only', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -386,7 +384,7 @@ describe('SearchView', () => {
 
     it('combines type and security filters', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -403,7 +401,7 @@ describe('SearchView', () => {
 
     it('returns empty when no matches pass filters', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {
@@ -419,7 +417,7 @@ describe('SearchView', () => {
 
     it('restores all results when filters are cleared', async () => {
       const wrapper = mountView()
-      wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', 'test')
+      emitSearch(wrapper, 'test')
       await flushPromises()
 
       wrapper.findComponent({ name: 'SearchFiltersCard' }).vm.$emit('update:filters', {

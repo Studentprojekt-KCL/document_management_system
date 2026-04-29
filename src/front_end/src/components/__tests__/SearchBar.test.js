@@ -73,13 +73,13 @@ describe('SearchBar', () => {
 
   /* ── Search emit ── */
   describe('search emit', () => {
-    it('emits search with trimmed query on form submit', async () => {
+    it('emits search with trimmed query and documentsOnly on form submit', async () => {
       const wrapper = mountBar()
       await wrapper.find('.search-input').setValue('  test query  ')
       await wrapper.find('form').trigger('submit')
 
       expect(wrapper.emitted('search')).toBeTruthy()
-      expect(wrapper.emitted('search')[0]).toEqual(['test query'])
+      expect(wrapper.emitted('search')[0]).toEqual([{ query: 'test query', documentsOnly: true }])
     })
 
     it('emits search on Enter key', async () => {
@@ -88,7 +88,7 @@ describe('SearchBar', () => {
       await wrapper.find('form').trigger('submit')
 
       expect(wrapper.emitted('search')).toBeTruthy()
-      expect(wrapper.emitted('search')[0]).toEqual(['hello'])
+      expect(wrapper.emitted('search')[0]).toEqual([{ query: 'hello', documentsOnly: true }])
     })
 
     it('does not emit search when input is empty', async () => {
@@ -130,8 +130,8 @@ describe('SearchBar', () => {
       await wrapper.find('form').trigger('submit')
 
       expect(wrapper.emitted('search')).toHaveLength(2)
-      expect(wrapper.emitted('search')[0]).toEqual(['first'])
-      expect(wrapper.emitted('search')[1]).toEqual(['second'])
+      expect(wrapper.emitted('search')[0]).toEqual([{ query: 'first', documentsOnly: true }])
+      expect(wrapper.emitted('search')[1]).toEqual([{ query: 'second', documentsOnly: true }])
     })
   })
 })

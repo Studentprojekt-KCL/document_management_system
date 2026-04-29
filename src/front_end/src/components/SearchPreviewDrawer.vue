@@ -158,13 +158,15 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
             <span>Format</span>
             <p><FileType2 :size="13" /> {{ previewFileDescription }}</p>
           </div>
-          <div class="meta-cell" style="position: relative">
+          <div class="meta-cell">
             <span>Security Class</span>
-            <p>{{ currentSecurityLevel || 'Unknown' }}</p>
-            <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
-              <Pencil :size="14" />
-              Edit
-            </button>
+            <div class="security-class-row">
+              <p>{{ currentSecurityLevel || 'Unknown' }}</p>
+              <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
+                <Pencil :size="14" />
+                Edit
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -488,7 +490,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 }
 
 .edit-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.35rem 0.7rem;
@@ -499,6 +501,13 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  margin-left: auto;
+}
+
+.security-class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .edit-btn:hover {

@@ -34,7 +34,6 @@ class Connector:
 
     subdata: dict[str, str | None]
 
-    index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
     data_path: str

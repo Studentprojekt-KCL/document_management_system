@@ -27,11 +27,11 @@ from shared_functions.boto_tools import upload_file
 from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_port
 
+from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
+
 # When compose interpolates unset ${CONFLUENCE_CONNECTOR_PORT} to "", it overrides Dockerfile ENV;
 # treat blank like unset so preview stacks still boot (override per env in real deployments).
 _CONF_PORT_FALLBACK = 8010
-
-from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
 
 class GetFilesBody(BaseModel):

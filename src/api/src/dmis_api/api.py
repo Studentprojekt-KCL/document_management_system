@@ -39,8 +39,8 @@ class API:
         upstream_urls: dict[str, str],
         token_verifier: TokenVerifier,
         keycloak_token_url: str,
-        frontend_client_id: str,
-        frontend_redirect_uri: str,
+        dmisapi_client_id: str,
+        dmisapi_redirect_uri: str,
         keycloak_logout_url: str,
         log_level: str | None = None,
     ) -> None:
@@ -56,8 +56,8 @@ class API:
             http_client=self.http_client,
             keycloak_token_url=keycloak_token_url,
             keycloak_logout_url=keycloak_logout_url,
-            frontend_client_id=frontend_client_id,
-            frontend_redirect_uri=frontend_redirect_uri,
+            dmisapi_client_id=dmisapi_client_id,
+            dmisapi_redirect_uri=dmisapi_redirect_uri,
         )
 
         self.app.add_exception_handler(
@@ -311,8 +311,8 @@ def run() -> None:
         "stochan": read_env_variable("DMISAPI_STOCHAN_URL"),
         "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL"),
     }
-    frontend_client_id = read_env_variable("FRONTEND_AD_CLIENT_ID")
-    frontend_redirect_uri = read_env_variable("FRONTEND_REDIRECT_URI")
+    dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+    dmisapi_redirect_uri = read_env_variable("DMISAPI_REDIRECT_URI")
     keycloak_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
     keycloak_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
 
@@ -329,8 +329,8 @@ def run() -> None:
         upstream_urls=upstream_urls,
         token_verifier=token_verifier,
         keycloak_token_url=keycloak_token_url,
-        frontend_client_id=frontend_client_id,
-        frontend_redirect_uri=frontend_redirect_uri,
+        dmisapi_client_id=dmisapi_client_id,
+        dmisapi_redirect_uri=dmisapi_redirect_uri,
         keycloak_logout_url=keycloak_logout_url,
         log_level=log_level,
     )

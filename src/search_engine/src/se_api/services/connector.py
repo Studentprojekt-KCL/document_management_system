@@ -1,15 +1,17 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
 from collections.abc import AsyncGenerator
+import dbm
 from json import JSONDecodeError
 import json
+import shelve
 from typing import Any
 from asyncio import Queue
 
 from httpx import AsyncClient
 import httpx
 
-from shared_functions.dmis_logger import dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
@@ -27,12 +29,14 @@ class Connector:
 
     GET_FILE_ENDPOINT: str = "/get_files"
     STREAM_ENDPOINT: str = "/stream_files_to_index"
+    DATA_FILE: str = "/data"
 
     subdata: dict[str, str | None]
 
     index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
+    data_path: str
 
     client: AsyncClient
 
@@ -40,15 +44,31 @@ class Connector:
         """Constructor"""
         address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")
         self.client = AsyncClient(base_url=address)
-        self.subdata = {}
+        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"
+        try:
+            with shelve.open(self.data_path) as f:
+                self.subdata = f.get("subdata", {})
+        except OSError:
+            dms_error(f"Failed to open file: {self.data_path}.")
+        except dbm.error:
+            dms_error(f"Failed opening file: {self.data_path}")
 
     async def close(self) -> None:
         """Close clients"""
         await self.client.aclose()
 
-    def reset(self) -> None:
-        """Resets the subdata, getting all files."""
-        self.subdata = {}
+    def write_subdata(self, subdata: dict | None = None) -> None:
+        """Set the subdata.
+
+        Args:
+            subdata: subdata string returned from the connectos.
+        """
+        with shelve.open(self.data_path) as f:
+            if subdata is not None:
+                f["subdata"] = subdata
+                self.subdata = subdata
+            else:
+                f["subdata"] = self.subdata
 
     async def connector_fetch(self) -> Queue:
         """Grab connectors from gateway.

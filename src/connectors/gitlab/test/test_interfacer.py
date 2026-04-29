@@ -63,6 +63,17 @@ class TestGitLab(TestCase):
         mock_session = mock.Mock()
         mock_session.get.side_effect = self.get_side_effect
         self.instance.base = ""
+        self.instance.defined_fields = {
+            "unique_pointer": None,
+            "name": None,
+            "size": None,
+            "last_edit_date": None,
+            "type": None,
+            "source_system": None,
+            "content": None,
+            "file_type": None,
+            "file_type_description": None,
+        }
         self.instance.session = mock_session
         self.instance.file_extensions = [".txt"]
         self.instance.extension_descriptions = {".txt": "text file"}

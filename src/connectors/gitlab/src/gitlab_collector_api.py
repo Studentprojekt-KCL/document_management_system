@@ -42,8 +42,8 @@ class API:
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
 
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
@@ -93,10 +93,6 @@ class API:
         url = upload_file(content, "gitlab_content.json")
         return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
 
-    async def connected_source_systems(self) -> list:
-        """NOT; THIS IS A TEMPORARY ENDPOINT WHICH WILL BE MIGRATED TO SHARED CONNECTOR."""
-        return ["GitLab"]
-
     async def stream_files_to_index(
         self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
     ) -> StreamingResponse:
@@ -104,6 +100,10 @@ class API:
         return StreamingResponse(
             self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
         )
+
+    async def defined_fields(self) -> list:
+        """Retrieve fields delivered for file conent."""
+        return list(self.gitlab_instance.defined_fields.keys())
 
     def auth_user(self, request: Request) -> RedirectResponse:
         """Callback endpoint to set in GitLab application."""

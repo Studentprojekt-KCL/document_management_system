@@ -41,6 +41,7 @@ class Handler:
     async def init(self) -> None:
         """Init handler"""
         await self.query.init()
+        self.search_engine.init()
 
     async def close(self) -> None:
         """Clean up"""
@@ -49,10 +50,9 @@ class Handler:
 
     def reset(self) -> None:
         """Reset the connector."""
-        self.search_engine = SearchEngine()
-        self.connector = Connector()
+        self.search_engine.reset()
+        self.connector.write_subdata({})
         self.query.reset()
-        self.query = Query()
         dms_info("Search engine was reset.")
 
     def set_classification(self, change: dict[str, str]) -> dict[str, str]:
@@ -148,6 +148,7 @@ class Handler:
         index_queue.join()
         index_queue.put(None)
         indexer_thread.join()
+        self.connector.write_subdata()
         self.indexing.release()
         dms_info(f"Finished indexing of new files, time: {(datetime.now() - start).total_seconds()}s.")
 
@@ -189,6 +190,36 @@ class Handler:
             await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
 
+    def _add_file(self, index_queue: queue.Queue) -> None:
+        """Wait for formatted file and add it to the search engine.
+
+        Args:
+            task_queue: queue containing all the files to add.
+        """
+
+        batch: list[dict] = []
+
+        while True:
+            file: dict | None = index_queue.get()
+            if file is None:
+                break
+            batch.append(file)
+            if len(batch) >= self.BATCH_SIZE:
+                self.search_engine.open_writer()
+                for file in batch:
+                    self.search_engine.add_file(file)
+                dms_info(f"Batch of {len(batch)} commited")
+                self.search_engine.close_writer()
+                batch.clear()
+            index_queue.task_done()
+        if batch:
+            self.search_engine.init()
+            for file in batch:
+                self.search_engine.add_file(file)
+            dms_info(f"Batch of {len(batch)} commited")
+            self.search_engine.close_writer()
+            batch.clear()
+
     def _decode(self, file: dict) -> dict | None:
         """Decode file content.
 
@@ -207,36 +238,6 @@ class Handler:
         flat_file["content"] = content
 
         return flat_file
-
-    def _add_file(self, index_queue: queue.Queue) -> None:
-        """Wait for formatted file and add it to the search engine.
-
-        Args:
-            task_queue: queue containing all the files to add.
-        """
-
-        batch: list[dict] = []
-
-        while True:
-            file: dict | None = index_queue.get()
-            if file is None:
-                break
-            batch.append(file)
-            if len(batch) >= self.BATCH_SIZE:
-                self.search_engine.init()
-                for file in batch:
-                    self.search_engine.add_file(file)
-                dms_info(f"Batch of {len(batch)} commited")
-                self.search_engine.close()
-                batch.clear()
-            index_queue.task_done()
-        if batch:
-            self.search_engine.init()
-            for file in batch:
-                self.search_engine.add_file(file)
-            dms_info(f"Batch of {len(batch)} commited")
-            self.search_engine.close()
-            batch.clear()
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

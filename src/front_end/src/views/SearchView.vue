@@ -30,6 +30,7 @@ const { state: selectedFile } = useReload('selectedFile', '')
 const { state: selectedMatch } = useReload('selectedMatch', null)
 const { state: lastQuery } = useReload('lastQuery', '')
 const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
+const documentsOnlyMode = ref(true)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -39,7 +40,8 @@ const selectedFilters = ref({
 })
 
 /* Performs a search when the SearchBar emits a search event */
-const handleSearch = async (query) => {
+const handleSearch = async ({ query, documentsOnly }) => {
+  documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
   error.value = ''
@@ -55,8 +57,8 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
-
+    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}&documents_only=${documentsOnly}`)
+    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return
@@ -77,6 +79,14 @@ const handleSearch = async (query) => {
     error.value = `Search error: ${String(e)}`
   } finally {
     isSearching.value = false
+  }
+}
+
+/* Should send down a new request to the backend if the user press the button */
+const handleDocumentsOnlyChange = (documentsOnly) => {
+  documentsOnlyMode.value = documentsOnly
+  if (lastQuery.value && lastQuery.value.trim()) {
+    handleSearch({ query: lastQuery.value, documentsOnly })
   }
 }
 
@@ -133,10 +143,10 @@ const handleFilterChange = (filters) => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

@@ -200,8 +200,11 @@ class AuthRoutes:
             params["id_token_hint"] = id_token
 
         logout_url = f"{self.keycloak_logout_url}?{urlencode(params)}"
-
-        response = RedirectResponse(url=logout_url, status_code=302)
+        
+        response = JSONResponse(
+            status_code=200,
+            content={"logout_url": logout_url},
+        )
         response.delete_cookie("access_token", path="/", secure=True, samesite="none")
         response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
         response.delete_cookie("id_token", path="/", secure=True, samesite="none")

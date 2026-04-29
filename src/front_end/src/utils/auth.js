@@ -27,7 +27,30 @@ export async function refreshSession() {
 
 export async function logout() {
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
-  window.location.assign(API_PATHS.authLogout)
+
   localStorage.removeItem('pkce_verifier')
   localStorage.removeItem('oidc_state')
+
+  try {
+    const response = await apiFetch(API_PATHS.authLogout, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      window.location.href = '/'
+      return
+    }
+
+    const data = await response.json()
+
+    if (data.logout_url) {
+      window.location.href = data.logout_url
+      return
+    }
+
+    window.location.href = '/'
+  } catch (err) {
+    console.error('Logout failed:', err)
+    window.location.href = '/'
+  }
 }

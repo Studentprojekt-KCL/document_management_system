@@ -3,6 +3,8 @@
 import uvicorn
 import fastapi
 
+from fastapi import Header
+from fastapi.responses import RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
 
 from shared_functions.initialisation_tools import read_env_variable, read_port
@@ -24,6 +26,7 @@ class API:
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
+        self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -57,6 +60,12 @@ class API:
     async def get_auth_user_urls(self) -> list[dict]:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
+
+    async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
+        """returns redirect to source system to authenitacte"""
+        if not isinstance(source_system, str):
+            return
+        return await self.down_stream_client.get_auth_redirect(source_system, referer)
 
 
 def run() -> None:

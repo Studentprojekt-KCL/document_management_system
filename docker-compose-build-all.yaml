@@ -41,6 +41,8 @@ services:
     image: connector-confluence:pr
     build:
       dockerfile: src/connectors/confluence/Dockerfile
+    environment:
+      CONFLUENCE_CONNECTOR_PORT: ${CONFLUENCE_CONNECTOR_PORT:-8010}
 
   connector-minio:
     image: connector-minio:pr

@@ -11,6 +11,7 @@ optional MinIO env vars for uploads.
 """
 
 import argparse
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -25,6 +26,10 @@ from pydantic import BaseModel, Field
 from shared_functions.boto_tools import upload_file
 from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_port
+
+# When compose interpolates unset ${CONFLUENCE_CONNECTOR_PORT} to "", it overrides Dockerfile ENV;
+# treat blank like unset so preview stacks still boot (override per env in real deployments).
+_CONF_PORT_FALLBACK = 8010
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
@@ -195,5 +200,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
+    if not (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip():
+        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
     port = read_port("CONFLUENCE_CONNECTOR_PORT")
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)

@@ -15,9 +15,6 @@ from shared_functions.file_type_logic import determine_file_type, get_file_resou
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.variables import SOURCE_FILE
 
-HTTP_OK = 200
-HTTP_FORBIDDEN = 403
-HTTP_TOO_MANY_REQUESTS = 429
 REQUEST_TIMEOUT = 120
 MAX_CONCURRENT_REQUESTS = 20
 MAX_RETRIES = 3
@@ -59,7 +56,7 @@ class SharePoint:
         for attempt in range(MAX_RETRIES):
             async with ctx.sem:
                 last_response = await ctx.client.get(url, **kwargs)
-            if last_response.status_code != HTTP_TOO_MANY_REQUESTS:
+            if last_response.status_code != httpx.codes.TOO_MANY_REQUESTS:
                 return last_response
             raw = last_response.headers.get("Retry-After", "5")
             retry_after = int(raw) if raw.isdigit() else 5
@@ -73,7 +70,7 @@ class SharePoint:
         url: str | None = f"{self.GRAPH_BASE}/sites?search=*"
         while url:
             response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
-            if response.status_code != HTTP_OK:
+            if response.status_code != httpx.codes.OK:
                 dms_warning(f"SharePoint: site listing failed with status {response.status_code}")
                 break
             data = response.json()
@@ -85,10 +82,10 @@ class SharePoint:
         """Retrieve all document library drives for a site."""
         url = f"{self.GRAPH_BASE}/sites/{site_id}/drives"
         response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
-        if response.status_code == HTTP_FORBIDDEN:
+        if response.status_code == httpx.codes.FORBIDDEN:
             dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
             return []
-        if response.status_code != HTTP_OK:
+        if response.status_code != httpx.codes.OK:
             dms_warning(f"SharePoint: drive listing failed with status {response.status_code}")
             return []
         return response.json().get("value", [])
@@ -100,7 +97,7 @@ class SharePoint:
         current_url: str | None = url
         while current_url:
             response = await self._get_with_retry(ctx, current_url, timeout=REQUEST_TIMEOUT)
-            if response.status_code != HTTP_OK:
+            if response.status_code != httpx.codes.OK:
                 dms_warning(f"SharePoint: delta query failed with status {response.status_code}")
                 break
             data = response.json()
@@ -225,7 +222,7 @@ class SharePoint:
     ) -> dict:
         """Fetch metadata (and optionally content) for a single file using the provided client."""
         response = await self._get_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
-        if response.status_code != HTTP_OK:
+        if response.status_code != httpx.codes.OK:
             dms_warning(f"SharePoint: file metadata request failed with status {response.status_code}")
             return {}
         item = response.json()
@@ -247,7 +244,7 @@ class SharePoint:
         if include_content:
             content_url = f"{unique_pointer}/content"
             content_response = await self._get_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
-            if content_response.status_code == HTTP_OK:
+            if content_response.status_code == httpx.codes.OK:
                 result["content"] = base64.b64encode(content_response.content).decode("utf-8")
             else:
                 dms_warning("SharePoint: could not fetch file content")
@@ -273,7 +270,7 @@ class SharePoint:
     async def _check_drive_delta(self, ctx: _HttpCtx, delta_link: str) -> bool:
         """Return True if this drive has changes or its delta token is invalid/expired."""
         response = await self._get_with_retry(ctx, delta_link, timeout=REQUEST_TIMEOUT)
-        if response.status_code != HTTP_OK:
+        if response.status_code != httpx.codes.OK:
             return True
         return bool(response.json().get("value"))
 

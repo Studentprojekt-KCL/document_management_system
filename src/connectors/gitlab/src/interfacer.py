@@ -7,7 +7,6 @@ import json
 import io
 from pathlib import Path
 import zipfile
-from typing import Any
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import binascii
@@ -58,7 +57,7 @@ class GitLab:
             return {"Authorization": f"Bearer {bearer_token}"}
         return {}
 
-    def _get_projects(self, bearer_token: str | None = None) -> dict | list:
+    def _get_projects(self, bearer_token: str | None = None) -> dict:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
         projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
@@ -70,23 +69,9 @@ class GitLab:
             for project in projects
         }
 
-        return projects
-
-    def get_project_ids(self, bearer_token: str | None = None) -> dict[int, str]:
-        """Retrieve a dictionary of IDs for all available projects.
-
-        Returns:
-        -------
-            Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
-        """
-        ids: dict[int, str] = {}
-        for project in self._get_projects(bearer_token):
-            last_activity = project.get("last_activity_at")
-            if not last_activity:
-                continue  # Entails there was no activity for this project
-            ids[project.get("id")] = last_activity
-
-        return ids
+        if isinstance(self.project_information, dict):
+            return self.project_information
+        return {}
 
     @staticmethod
     def _get_project_id(url: str) -> None | str:
@@ -231,62 +216,73 @@ class GitLab:
 
         return files_data
 
-    def _subdata_setup(self, subdata: str | None = None) -> datetime:
-        """Set up subdata, either by parsind data, or if None, return datatime.min data."""
-        if subdata is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
+    @staticmethod
+    def _create_date_object(date_string: str) -> datetime:
+        """Generate datetime object from string and set UTC timezone."""
+        date = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date
 
-        return self._provided_date(subdata)
+    @staticmethod
+    def _parse_subdata(subdata: str | None) -> dict:
+        """Parse string dateobject from iso format to datetime object."""
+        if subdata is None:
+            return {}
+
+        try:
+            subdata_bytes = base64.b64decode(subdata)
+        except binascii.Error:
+            dms_warning("Request where subdata was invalid base64 encoding made to Gitlab connector: %s", subdata)
+            return {}
+        subdata_str = subdata_bytes.decode("utf-8")
+
+        try:
+            return json.loads(subdata_str)
+        except json.decoder.JSONDecodeError:
+            dms_warning("Request where decoded subdata was invalid json structure made to Gitlab connector: %s", subdata_str)
+            return {}
+
+    @staticmethod
+    def _generate_subdata(new_subdata: dict) -> str:
+        """Generate base64 encoded subdata from dict."""
+        return base64.urlsafe_b64encode(json.dumps(new_subdata).encode("utf-8")).decode()
+
+    def _projects_to_re_index(self, projects: dict[str, dict], subdata: str | None = None) -> tuple[list, str]:
+        """Determine project needing to be reindexed, together with new subdata."""
+        projects_to_index: list = []
+        subdata_dict = self._parse_subdata(subdata)
+        new_subdata: dict = subdata_dict
+        for project_id, project in projects.items():
+            if not isinstance(project, dict):
+                continue
+            subdata_project = subdata_dict.get(project_id)
+            branch = project.get("default_branch")
+            edit_date = project.get("last_activity_at")
+            if not isinstance(subdata_project, str):
+                projects_to_index.append(
+                    (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+                )
+                new_subdata[project_id] = edit_date
+                continue
+            if edit_date is None:  # quick fix dont know if this is wanted behaviour.
+                continue
+            subdata_date_object = self._create_date_object(subdata_project)
+            edit_date_object = self._create_date_object(edit_date)
+            if edit_date_object > subdata_date_object:
+                projects_to_index.append(
+                    (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+                )
+                new_subdata[project_id] = edit_date
+
+        encoded_subdata = self._generate_subdata(new_subdata)
+
+        return projects_to_index, encoded_subdata
 
     def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
         """Retrieve a structure of files to index."""
-
-        subdata_date = self._subdata_setup(subdata)
-        current_subdata = self.get_project_ids()
         projects = self._get_projects(bearer_token)
-        new_date = subdata_date
-
-        project_data: list[tuple] = []
-        for project in projects:
-            project_id = project.get("id")
-            new_timestamp = current_subdata.get(project_id)
-            if not isinstance(new_timestamp, str):
-                continue
-            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object <= subdata_date:
-                continue
-            new_date = max(new_date, new_timestamp_object)
-            branch = project.get("default_branch")
-            project_data.append(
-                (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
-            )
-
-        generated_subdata = base64.urlsafe_b64encode(new_date.isoformat().encode()).decode()
-
-        return project_data, generated_subdata
-
-    def files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> dict:
-        """Retrieve a structure of files to index.
-
-        Args:
-        ----
-            subdata: Base64 encoded isostructured timestamp.
-            bearer_token: A valid bearer GitLab token or None.
-
-        Returns:
-        -------
-            Dict structure {"subdata": generated_subdata, "files": file_data, "index_needed":
-              <BOOL INDICATIANG IF REINDEX IS NEEED>}
-        """
-        files_data: list = []
-        pointers_to_projects, generated_subdata = self._project_urls(subdata, bearer_token)
-
-        for project_pointers in pointers_to_projects:
-            url, project_id = project_pointers
-            content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content, project_id))
-
-        return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
+        return self._projects_to_re_index(projects, subdata)
 
     async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
         """Download all artifacts from tast_queue and put in zip_queue."""
@@ -354,49 +350,6 @@ class GitLab:
                 break
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
-
-    def check_index_needed(self, subdata: str | None, bearer_token: str | None = None) -> dict[str, Any]:
-        """Simple check if reindex is needed based on subdata.
-
-        Args:
-        ----
-            subdata: Base64 encoded isostructured timestamp.
-            bearer_token: A valid bearer GitLab token or None.
-
-        Returns:
-        --------
-            Dict structure {"index_needed": <BOOL>}
-        """
-        provided_date = self._provided_date(subdata)
-        project_ids = self.get_project_ids(bearer_token)
-
-        for change_time in project_ids.values():
-            if not isinstance(change_time, str):
-                continue
-            new_timestamp_object = datetime.fromisoformat(change_time.replace("Z", "+00:00"))
-            if new_timestamp_object <= provided_date:
-                continue
-            return {"index_needed": True}
-
-        return {"index_needed": False}
-
-    @staticmethod
-    def _provided_date(subdata: str | None) -> datetime:
-        """Parse string dateobject from iso format to datetime object."""
-        if subdata is not None:
-            try:
-                subdata_bytes = base64.b64decode(subdata)
-            except binascii.Error:
-                dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
-            subdata_str = subdata_bytes.decode("utf-8")
-            try:
-                date = datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
-                if date.tzinfo is None:
-                    date = date.replace(tzinfo=timezone.utc)
-                return date
-            except ValueError:
-                dms_error("Gitlab connector could not interpret subdata: %s", subdata)
-        return datetime.min.replace(tzinfo=timezone.utc)
 
     def _execute_get_request(self, url: str, headers: dict) -> dict | list:
         """Execute GET request to supplied URL, JSON content in response expected."""

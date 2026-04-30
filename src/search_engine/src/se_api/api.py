@@ -56,7 +56,7 @@ class API:
         self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/search", self.query, methods=["GET"])
+        self.app.add_api_route("/search", self.query, methods=["POST"])
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
@@ -107,7 +107,7 @@ class API:
     async def find_matching(self, pointer: str) -> None:
         self.handler.find_matching(pointer)
 
-    async def query(self, query: str | None = None, count: int = 10, offset: int = 0) -> list:
+    async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -116,8 +116,7 @@ class API:
         Returns:
             List of found files or None.
         """
-
-        return await self.handler.preform_search(query, count, offset)
+        return await self.handler.preform_search(conent, count, offset)
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""

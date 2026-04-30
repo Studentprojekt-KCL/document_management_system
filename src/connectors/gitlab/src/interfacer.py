@@ -68,9 +68,11 @@ class GitLab:
             }
             for project in projects
         }
+        # NOTE could probably be done better, just need to get it running.
+        projects_dict = {str(project.get("id")): project for project in projects}
 
-        if isinstance(self.project_information, dict):
-            return self.project_information
+        if isinstance(projects_dict, dict):
+            return projects_dict
         return {}
 
     @staticmethod

@@ -7,7 +7,7 @@ from fastapi import Header
 from fastapi.responses import RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
 
-from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable, read_port
 
 
 class API:
@@ -17,7 +17,8 @@ class API:
 
     def __init__(self) -> None:
         self.down_stream_client = ConnectorClient(
-            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH"), int(read_env_variable("CONGATEWAY_REQUEST_TIMEOUT"))
+            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True), # type: ignore
+            read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT")
         )
 
         # Endpints
@@ -26,7 +27,7 @@ class API:
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
-        self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
+        self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"], response_model=None)
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -75,7 +76,7 @@ def run() -> None:
 
     uvicorn.run(
         api.app,
-        host=read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR"),
+        host=read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR", required=True), # type: ignore
         port=read_port("CONGATEWAY_FASTAPI_BIND_PORT"),
         log_level=read_env_variable("CONGATEWAY_FASTAPI_LOG_LEVEL"),
     )

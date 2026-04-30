@@ -17,8 +17,8 @@ class API:
 
     def __init__(self) -> None:
         self.down_stream_client = ConnectorClient(
-            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True), # type: ignore
-            read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT")
+            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True),  # type: ignore
+            read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"),
         )
 
         # Endpints
@@ -76,7 +76,7 @@ def run() -> None:
 
     uvicorn.run(
         api.app,
-        host=read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR", required=True), # type: ignore
+        host=read_env_variable("CONGATEWAY_FASTAPI_BIND_ADDR", required=True),  # type: ignore
         port=read_port("CONGATEWAY_FASTAPI_BIND_PORT"),
         log_level=read_env_variable("CONGATEWAY_FASTAPI_LOG_LEVEL"),
     )

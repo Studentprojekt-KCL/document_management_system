@@ -7,14 +7,16 @@
 import { computed, ref } from 'vue'
 import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
+import { useMdToPdf } from '@/composables/mdToPdf'
 import SearchMatches from '@/components/SearchMatches.vue'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary()
+const { pdfError, isGeneratingPDF, generatePDF } = useMdToPdf()
 
-const selectedPointers = ref([rerankPointer.value]) // Start with the reranked file selected
+const selectedPointer = ref([rerankPointer.value]) // Start with the reranked file selected
 
-const selectedCount = computed(() => selectedPointers.value.length)
+const selectedCount = computed(() => selectedPointer.value.length)
 </script>
 
 <template>
@@ -27,7 +29,7 @@ const selectedCount = computed(() => selectedPointers.value.length)
         Click on one or more files to select them to merge and summarize them together with the reranked file.
       </p>
 
-      <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointers" badge-mode="score" selectable />
+      <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointer" badge-mode="score" selectable />
 
       <div class="merge-actions">
         <p>{{ selectedCount }} file{{ selectedCount === 1 ? '' : 's' }} selected</p>
@@ -35,10 +37,21 @@ const selectedCount = computed(() => selectedPointers.value.length)
         <div>
           <button
             type="button"
-            :disabled="isGeneratingSummary || selectedCount === 0"
-            @click="generateAISummary(selectedPointers, rerankPointer.value)"
+            :disabled="isGeneratingPDF || selectedCount === 0"
+            @click="generatePDF(selectedPointer[0] || rerankPointer)"
           >
-            {{ isGeneratingSummary ? 'Generating summary...' : 'Merge & Summarize' }}
+            {{ isGeneratingPDF ? 'Generating PDF...' : 'Generate PDF' }}
+          </button>
+          <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            :disabled="isGeneratingSummary || selectedCount === 0"
+            @click="generateAISummary(selectedPointer, rerankPointer.value)"
+          >
+            {{ isGeneratingSummary ? 'Generating summary...' : 'Summarize' }}
           </button>
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </div>

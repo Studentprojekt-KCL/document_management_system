@@ -199,5 +199,8 @@ def run() -> None:
     api = API()
     if args.dev:
         api.log_level = "debug"
+
+    if not (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip():
+        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
     port = read_port("CONFLUENCE_CONNECTOR_PORT")
     uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)

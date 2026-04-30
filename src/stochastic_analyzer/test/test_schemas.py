@@ -106,14 +106,13 @@ class TestRankResponse(unittest.TestCase):
 class TestHealthCheck(unittest.TestCase):
 
     def test_valid(self) -> None:
-        h = HealthCheck(status="active", model_loaded=True, device="cuda")
+        h = HealthCheck(status="active", model_loaded=True)
         self.assertEqual(h.status, "active")
         self.assertTrue(h.model_loaded)
-        self.assertEqual(h.device, "cuda")
 
     def test_missing_field_raises(self) -> None:
         with self.assertRaises(ValidationError):
-            HealthCheck(status="active", model_loaded=True)  # missing device
+            HealthCheck(status="active")
 
 
 # ---------------------------------------------------------------------------

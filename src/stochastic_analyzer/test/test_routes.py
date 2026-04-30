@@ -54,10 +54,10 @@ def _make_services(
     )
 
 
-def _make_client(services: Services, device: str = "cpu") -> TestClient:
+def _make_client(services: Services) -> TestClient:
     """Wire up a FastAPI app with the given services and return a test client."""
     app = FastAPI()
-    app.include_router(create_router(services, device=device))
+    app.include_router(create_router(services))
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -68,7 +68,7 @@ def _make_client(services: Services, device: str = "cpu") -> TestClient:
 
 class TestHealthCheck(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = _make_client(_make_services(), device="cuda")
+        self.client = _make_client(_make_services())
 
     def test_returns_200(self) -> None:
         resp = self.client.get("/health")
@@ -77,10 +77,6 @@ class TestHealthCheck(unittest.TestCase):
     def test_response_contains_status_active(self) -> None:
         resp = self.client.get("/health")
         self.assertEqual(resp.json()["status"], "active")
-
-    def test_response_contains_device(self) -> None:
-        resp = self.client.get("/health")
-        self.assertEqual(resp.json()["device"], "cuda")
 
     def test_model_loaded_is_true(self) -> None:
         resp = self.client.get("/health")

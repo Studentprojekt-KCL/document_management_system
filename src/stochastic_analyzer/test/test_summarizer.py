@@ -10,8 +10,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
-
-from gateway.config import LanguageConfig
+from gateway.services.summarizer import LanguageConfig
 from gateway.schemas import InputItem, MetadataTemplate, SummaryResult
 from gateway.services.summarizer import Summarizer, SummarizerConfig, detect_language
 

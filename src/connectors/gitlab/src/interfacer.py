@@ -265,7 +265,7 @@ class GitLab:
                 )
                 new_subdata[project_id] = edit_date
                 continue
-            if edit_date is None: # quick fix dont know if this is wanted behaviour.
+            if edit_date is None:  # quick fix dont know if this is wanted behaviour.
                 continue
             subdata_date_object = self._create_date_object(subdata_project)
             edit_date_object = self._create_date_object(edit_date)

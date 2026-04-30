@@ -93,6 +93,7 @@ CONSHAREPOINT_TENANT_ID=<Azure AD tenant ID>
 CONSHAREPOINT_CLIENT_ID=<client ID of DMIS application registered in Azure AD>
 CONSHAREPOINT_CLIENT_SECRET=<client secret of DMIS application in Azure AD>
 CONSHAREPOINT_STATE_SIGNING_SECRET=<secret string for OAuth state signing>
+CONSHAREPOINT_GRAPH_BASE=<optional; Microsoft Graph root URL, default https://graph.microsoft.com/v1.0>
 
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>

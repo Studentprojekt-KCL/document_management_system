@@ -19,6 +19,7 @@ REQUEST_TIMEOUT = 120
 MAX_CONCURRENT_REQUESTS = 20
 MAX_RETRIES = 3
 UNKNOWN_EXTENSION_SKIP_LOG_LIMIT = 10
+DEFAULT_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
 class _HttpCtx(NamedTuple):
@@ -32,7 +33,7 @@ class _HttpCtx(NamedTuple):
 class SharePoint:
     """SharePoint connector methods using Microsoft Graph API with delta queries."""
 
-    GRAPH_BASE: str = "https://graph.microsoft.com/v1.0"
+    graph_base: str = DEFAULT_GRAPH_BASE
     source_system: str
     file_extensions: list = []
     extension_descriptions: dict = {}
@@ -44,6 +45,12 @@ class SharePoint:
         self.file_extensions = [t.get("extension") for t in file_type_resource]
         self.extension_descriptions = {t.get("extension"): t.get("description") for t in file_type_resource}
         self._unknown_extension_skip_logs = 0
+        raw_graph = read_env_variable("CONSHAREPOINT_GRAPH_BASE", required=False)
+        if isinstance(raw_graph, str):
+            stripped = raw_graph.strip().rstrip("/")
+            self.graph_base = stripped if stripped else DEFAULT_GRAPH_BASE
+        else:
+            self.graph_base = DEFAULT_GRAPH_BASE
 
     def _log_skipped_unknown_extension(self, name: str | None) -> None:
         """Record why a file was skipped when its suffix is not in file_types.json (throttled)."""
@@ -80,7 +87,7 @@ class SharePoint:
     async def _get_sites(self, ctx: _HttpCtx) -> list[dict]:
         """Retrieve all accessible SharePoint sites."""
         sites: list[dict] = []
-        url: str | None = f"{self.GRAPH_BASE}/sites?search=*"
+        url: str | None = f"{self.graph_base}/sites?search=*"
         while url:
             response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
             if response.status_code != httpx.codes.OK:
@@ -93,7 +100,7 @@ class SharePoint:
 
     async def _get_drives(self, ctx: _HttpCtx, site_id: str) -> list[dict]:
         """Retrieve all document library drives for a site."""
-        url = f"{self.GRAPH_BASE}/sites/{site_id}/drives"
+        url = f"{self.graph_base}/sites/{site_id}/drives"
         response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
         if response.status_code == httpx.codes.FORBIDDEN:
             dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
@@ -156,7 +163,7 @@ class SharePoint:
         item_id = item.get("id", "")
         return {
             "metadata": {
-                "unique_pointer": f"{self.GRAPH_BASE}/drives/{drive_id}/items/{item_id}",
+                "unique_pointer": f"{self.graph_base}/drives/{drive_id}/items/{item_id}",
                 "name": name,
                 "size": item.get("size", 0),
                 "type": SOURCE_FILE,
@@ -209,7 +216,7 @@ class SharePoint:
                 drive_id = drive.get("id", "")
                 if not drive_id:
                     continue
-                delta_url = delta_map.get(drive_id, f"{self.GRAPH_BASE}/drives/{drive_id}/root/delta")
+                delta_url = delta_map.get(drive_id, f"{self.graph_base}/drives/{drive_id}/root/delta")
                 drive_tasks.append((drive_id, delta_url))
         return drive_tasks
 

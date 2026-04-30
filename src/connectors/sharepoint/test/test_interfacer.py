@@ -7,9 +7,9 @@ from unittest import IsolatedAsyncioTestCase, mock
 
 import httpx
 
-from interfacer_sharepoint import MAX_RETRIES, SharePoint, _HttpCtx
+from interfacer_sharepoint import DEFAULT_GRAPH_BASE, MAX_RETRIES, SharePoint, _HttpCtx
 
-GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+GRAPH_BASE = DEFAULT_GRAPH_BASE
 
 # _HttpCtx used in tests that call private methods directly.
 # Semaphore limit is effectively unlimited so tests never block.
@@ -83,6 +83,54 @@ class TestSharePoint(IsolatedAsyncioTestCase):
 
     def test_decode_subdata_valid_base64_non_json_returns_empty(self):
         assert self.instance._decode_subdata(base64.urlsafe_b64encode(b"not json").decode()) == {}
+
+    def test_init_graph_base_defaults_when_env_unset(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return None
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == DEFAULT_GRAPH_BASE
+
+    def test_init_graph_base_from_env_strips_whitespace_and_slash(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return " https://graph.microsoft.com/beta/ "
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == "https://graph.microsoft.com/beta"
+
+    def test_init_graph_base_blank_env_uses_default(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return "  \t  "
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == DEFAULT_GRAPH_BASE
 
     # --- file record building ---
 

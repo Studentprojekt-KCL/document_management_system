@@ -8,6 +8,10 @@ The following needs to be exported in local environment:
     CONSHAREPOINT_CLIENT_SECRET=<Client secret of DMIS application in Azure AD>
     CONSHAREPOINT_STATE_SIGNING_SECRET=<Secret string used for OAuth state signing>
 
+Optional:
+
+    CONSHAREPOINT_GRAPH_BASE=<Microsoft Graph API root URL; default https://graph.microsoft.com/v1.0 — omit trailing slash>
+
 # Azure AD App Registration
 
 Register an app in portal.azure.com (Entra ID → App registrations) with:

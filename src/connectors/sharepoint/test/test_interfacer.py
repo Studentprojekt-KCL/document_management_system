@@ -254,9 +254,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         }
         self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
         ctx = _ctx(_mock_response(403))
-        _, records, _ = await self.instance._process_drive(
-            ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta"
-        )
+        _, records, _ = await self.instance._process_drive(ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta")
         assert len(records) == 1
         assert records[0]["content"] == ""
         assert records[0]["metadata"]["file_type"] == ".txt"

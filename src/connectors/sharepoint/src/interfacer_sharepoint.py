@@ -141,7 +141,6 @@ class SharePoint:
             return None
         item_id = item.get("id", "")
         return {
-            "content": None,
             "metadata": {
                 "unique_pointer": f"{self.GRAPH_BASE}/drives/{drive_id}/items/{item_id}",
                 "name": name,
@@ -157,7 +156,24 @@ class SharePoint:
     async def _process_drive(self, ctx: _HttpCtx, drive_id: str, delta_url: str) -> tuple[str, list[dict], str]:
         """Run delta query for one drive. Returns (drive_id, qualifying_records, new_delta_link)."""
         items, new_delta_link = await self._run_delta_query(ctx, delta_url)
-        records = [r for item in items if (r := self._build_file_record(item, drive_id)) is not None]
+        records: list[dict] = []
+        for item in items:
+            record = self._build_file_record(item, drive_id)
+            if record is None:
+                continue
+            pointer = record["metadata"]["unique_pointer"]
+            content_resp = await self._get_with_retry(
+                ctx,
+                f"{pointer}/content",
+                timeout=REQUEST_TIMEOUT,
+                follow_redirects=True,
+            )
+            if content_resp.status_code == httpx.codes.OK:
+                record["content"] = base64.b64encode(content_resp.content).decode("utf-8")
+            else:
+                dms_warning("SharePoint: could not fetch file content for stream indexing")
+                record["content"] = base64.b64encode(b"").decode("utf-8")
+            records.append(record)
         return drive_id, records, new_delta_link
 
     async def _collect_drive_tasks(self, ctx: _HttpCtx, delta_map: dict[str, str]) -> list[tuple[str, str]]:

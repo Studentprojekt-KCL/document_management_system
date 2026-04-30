@@ -103,7 +103,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert record["metadata"]["unique_pointer"] == ("https://graph.microsoft.com/v1.0/drives/drive456/items/item123")
         assert record["metadata"]["clickable_url"] == "https://tenant.sharepoint.com/report.pdf"
         assert record["metadata"]["last_edit_date"] == "2026-01-01T00:00:00Z"
-        assert record["content"] is None
+        assert "content" not in record
 
     def test_build_file_record_unknown_extension_returns_none(self):
         item = {"id": "item123", "name": "script.py", "size": 500}
@@ -219,6 +219,48 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert items == []
         assert delta_link == ""
 
+    # --- _process_drive ---
+
+    async def test_process_drive_encodes_content_when_fetch_ok(self):
+        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
+        item = {
+            "id": "item123",
+            "name": "report.pdf",
+            "size": 2048,
+            "webUrl": "https://sp.com/report.pdf",
+            "lastModifiedDateTime": "2026-01-01T00:00:00Z",
+        }
+        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+        content_resp = _mock_response(200)
+        content_resp.content = b"bytes-from-graph"
+        ctx = _ctx(content_resp)
+        drive_id, records, delta_link = await self.instance._process_drive(
+            ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta"
+        )
+        assert drive_id == "drive456"
+        assert delta_link == new_link
+        assert len(records) == 1
+        assert records[0]["content"] == base64.b64encode(b"bytes-from-graph").decode("utf-8")
+        assert records[0]["metadata"]["name"] == "report.pdf"
+        assert ctx.client.get.call_count == 1
+
+    async def test_process_drive_content_forbidden_yields_empty_base64(self):
+        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
+        item = {
+            "id": "item123",
+            "name": "notes.txt",
+            "size": 10,
+            "webUrl": "https://sp.com/notes.txt",
+        }
+        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+        ctx = _ctx(_mock_response(403))
+        _, records, _ = await self.instance._process_drive(
+            ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta"
+        )
+        assert len(records) == 1
+        assert records[0]["content"] == ""
+        assert records[0]["metadata"]["file_type"] == ".txt"
+
     # --- _collect_drive_tasks ---
 
     async def test_collect_drive_tasks_with_sites(self):
@@ -311,12 +353,16 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         }
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+        content_resp = _mock_response(200)
+        content_resp.content = b"stream file bytes"
+        self.instance._get_with_retry = mock.AsyncMock(return_value=content_resp)
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
         assert "subdata" in chunks[0]
         assert len(chunks) == 2
         assert chunks[1]["metadata"]["name"] == "report.pdf"
+        assert chunks[1]["content"] == base64.b64encode(b"stream file bytes").decode("utf-8")
 
     async def test_stream_files_to_index_drive_exception_is_skipped(self):
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
@@ -344,11 +390,15 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         ]
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(return_value=(items, new_link))
+        content_resp = _mock_response(200)
+        content_resp.content = b"x"
+        self.instance._get_with_retry = mock.AsyncMock(return_value=content_resp)
         chunks = []
         async for chunk in self.instance.stream_files_to_index(None, "token"):
             chunks.append(json.loads(chunk))
         assert len(chunks) == 2
         assert chunks[1]["metadata"]["name"] == "report.pdf"
+        assert "content" in chunks[1]
 
     # --- check_index_needed ---
 

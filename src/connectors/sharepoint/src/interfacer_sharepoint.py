@@ -18,6 +18,7 @@ from shared_functions.variables import SOURCE_FILE
 REQUEST_TIMEOUT = 120
 MAX_CONCURRENT_REQUESTS = 20
 MAX_RETRIES = 3
+UNKNOWN_EXTENSION_SKIP_LOG_LIMIT = 10
 
 
 class _HttpCtx(NamedTuple):
@@ -42,6 +43,18 @@ class SharePoint:
         file_type_resource = get_file_resource()
         self.file_extensions = [t.get("extension") for t in file_type_resource]
         self.extension_descriptions = {t.get("extension"): t.get("description") for t in file_type_resource}
+        self._unknown_extension_skip_logs = 0
+
+    def _log_skipped_unknown_extension(self, name: str | None) -> None:
+        """Record why a file was skipped when its suffix is not in file_types.json (throttled)."""
+        if not hasattr(self, "_unknown_extension_skip_logs"):
+            self._unknown_extension_skip_logs = 0
+        label = repr(name) if isinstance(name, str) else "(unnamed or invalid filename)"
+        if self._unknown_extension_skip_logs < UNKNOWN_EXTENSION_SKIP_LOG_LIMIT:
+            dms_info(f"SharePoint: skipping file not in configured document types: {label}")
+            self._unknown_extension_skip_logs += 1
+            if self._unknown_extension_skip_logs == UNKNOWN_EXTENSION_SKIP_LOG_LIMIT:
+                dms_info("SharePoint: further skips for unsupported extensions are suppressed for this connector run.")
 
     @staticmethod
     async def _get_with_retry(ctx: _HttpCtx, url: str, **kwargs: Any) -> httpx.Response:
@@ -138,6 +151,7 @@ class SharePoint:
         name: str | None = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
         if extension.get("file_type") == "Unknown":
+            self._log_skipped_unknown_extension(name)
             return None
         item_id = item.get("id", "")
         return {
@@ -236,7 +250,10 @@ class SharePoint:
         include_content: bool = False,
         include_last_edit_date: bool = True,
     ) -> dict:
-        """Fetch metadata (and optionally content) for a single file using the provided client."""
+        """Fetch metadata (and optionally content) for a single file using the provided client.
+
+        Returns {} if metadata cannot be read or the filename suffix is not a configured document type.
+        """
         response = await self._get_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
         if response.status_code != httpx.codes.OK:
             dms_warning(f"SharePoint: file metadata request failed with status {response.status_code}")
@@ -245,6 +262,9 @@ class SharePoint:
 
         name = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
+        if extension.get("file_type") == "Unknown":
+            self._log_skipped_unknown_extension(name)
+            return {}
         result: dict[str, Any] = {
             "unique_pointer": unique_pointer,
             "name": name,

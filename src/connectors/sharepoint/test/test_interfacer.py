@@ -325,6 +325,11 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
         assert result == {}
 
+    async def test_get_file_unknown_extension_returns_empty(self):
+        ctx = _ctx(_mock_response(200, {"name": "script.py", "size": 100, "webUrl": "https://sp.com/script.py"}))
+        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
+        assert result == {}
+
     async def test_get_file_exclude_last_edit_date(self):
         ctx = _ctx(_mock_response(200, {"name": "report.pdf", "size": 512, "webUrl": "https://sp.com/report.pdf"}))
         result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1", include_last_edit_date=False)

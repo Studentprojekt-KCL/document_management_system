@@ -21,7 +21,7 @@ class Query:
 
     def __init__(self) -> None:
         """Constructor."""
-        address: str = read_env_variable("SEARCHENG_STOCHAN_URL").rstrip("/")
+        address: str = read_env_variable("SEARCHENG_STOCHAN_URL", required=True).rstrip("/") # type: ignore
         self.clinet = httpx.AsyncClient(base_url=address)
         self.cache = ClassifierCache()
 

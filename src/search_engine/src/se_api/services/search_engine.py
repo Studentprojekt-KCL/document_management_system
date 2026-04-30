@@ -7,6 +7,7 @@ from tantivy import (
     Document,
     Index,
     IndexWriter,
+    Query,
     SchemaBuilder,
     SearchResult,
     Searcher,
@@ -30,8 +31,8 @@ class SearchEngine:
 
     def __init__(self) -> None:
         """Constructor"""
-        self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/") + "/index"
-        self.categories = ["unique_pointer", "content"]
+        self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True).rstrip("/") + "/index" # type: ignore[attr-defined]
+        self.categories = ["unique_pointer", "content", "classification"]
         self.writer = None
 
     def init(self) -> None:
@@ -64,7 +65,26 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.init()
 
-    def query_files(self, q: str, k: int) -> list[str]:
+    def set_classification(self, unique_pointer: str, classification: str) -> dict[str, str]:
+        """Set the classification of a file in the index.
+
+        Args:
+            unique_pointer: pointer for the file.
+            classification: new classification.
+        """
+        searcher = self.index.searcher()
+        result = searcher.search(Query.term_query(self.index.schema, field_name="unique_pointer", field_value=unique_pointer))
+        doc_address = result.hits[0][1]
+        doc = searcher.doc(doc_address)
+        file: dict = {}
+        for category in self.categories:
+            file.update({category: doc[category][0]}) 
+        file.update({"classification": classification})
+        self.add_file(file)
+        file.pop("contnet")
+        return file
+
+    def query_files(self, q: str, k: int) -> tuple[list[str], dict[str, str]]:
         """Query through the files in the index.
 
         Args:
@@ -83,12 +103,25 @@ class SearchEngine:
         searcher: Searcher = self.index.searcher()
         result: SearchResult = searcher.search(query, k)
         pointers: list[str] = []
+        classifications: dict[str, str] = {}
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
-            unique_poinet = doc["unique_pointer"][0]
-            pointers.append(unique_poinet)
+            unique_pointer = doc["unique_pointer"][0]
+            classification = doc["classification"][0]
+            classifications.update({unique_pointer: classification})
+            pointers.append(unique_pointer)
 
-        return pointers
+        return (pointers, classifications)
+
+    def find_matching(self, unique_pointer) -> None:
+        searcher = self.index.searcher()
+        result = searcher.search(Query.term_query(self.index.schema, field_name="unique_pointer", field_value=unique_pointer))
+        doc_address = result.hits[0][1]
+        result = searcher.search(Query.more_like_this_query(doc_address))
+        for score, doc_id in result.hits:
+            doc: Document = searcher.doc(doc_id)
+            unique_pointer = doc["unique_pointer"][0]
+            print(f"{score}: {unique_pointer}")
 
     def open_writer(self) -> None:
         """Init index writer."""

@@ -42,9 +42,9 @@ class Connector:
 
     def __init__(self) -> None:
         """Constructor"""
-        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")
+        address = read_env_variable("SEARCHENG_CONGATEWAY_URL", required=True).rstrip("/") # type: ignore[attr-defined]
         self.client = AsyncClient(base_url=address)
-        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"
+        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True).rstrip("/")}{self.DATA_FILE}" # type: ignore[attr-defined]
         try:
             with shelve.open(self.data_path) as f:
                 self.subdata = f.get("subdata", {})

@@ -51,7 +51,7 @@ class API:
             self.log_level = "info"
 
         self.port: int = read_port("SEARCHENG_BIND_PORT")
-        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR")
+        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR", required=True) # type: ignore[attr-defined]
 
         self.app = FastAPI(lifespan=self.lifespan)
 
@@ -62,6 +62,7 @@ class API:
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
+        self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])
 
     def start(self) -> None:
         """Start the API."""
@@ -102,6 +103,9 @@ class API:
         content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
+
+    async def find_matching(self, pointer: str) -> None:
+        self.handler.find_matching(pointer)
 
     async def query(self, query: str | None = None, count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None

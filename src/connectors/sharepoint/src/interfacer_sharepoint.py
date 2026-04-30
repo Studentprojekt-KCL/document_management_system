@@ -151,7 +151,8 @@ class SharePoint:
     def _build_file_record(self, item: dict, drive_id: str) -> dict | None:
         """Build a streaming file record from a Graph API drive item.
 
-        Returns None if the item is a folder, deletion tombstone, or non-qualifying file type.
+        Returns None if the item is a folder, deletion tombstone, or its suffix is not listed in
+        shared ``file_types.json`` (same allow-list as ``get_files`` and downstream indexing).
         """
         if item.get("deleted") is not None or "folder" in item:
             return None
@@ -259,7 +260,7 @@ class SharePoint:
     ) -> dict:
         """Fetch metadata (and optionally content) for a single file using the provided client.
 
-        Returns {} if metadata cannot be read or the filename suffix is not a configured document type.
+        Returns {} if metadata cannot be read or the suffix is not listed in shared ``file_types.json``.
         """
         response = await self._get_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
         if response.status_code != httpx.codes.OK:

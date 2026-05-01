@@ -125,10 +125,7 @@ class Connector:
             subdata: str | None = None
             data: dict
             async with client.stream(
-                "GET",
-                stream_url,
-                timeout=self.TIMEOUT,
-                params=[("subdata", prev_subdata)] if prev_subdata is not None else None,
+                "POST", stream_url, timeout=self.TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
             ) as stream:
                 async for chunk in stream.aiter_text():
                     raw += chunk

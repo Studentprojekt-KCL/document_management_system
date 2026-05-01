@@ -37,6 +37,10 @@ class Classifier:
         self.client = httpx.AsyncClient(base_url=address)
         self.escalation_threshold = read_float_env_variable("SEARCHENG_CLASSIFIER_ESCALATION_THRESHOLD")
 
+    async def close(self) -> None:
+        """Close services"""
+        await self.client.aclose()
+
     def _build_inputs(self, items: list[dict]) -> list[list[str]]:
         """Build NLI premise-hypothesis pairs for all documents."""
         inputs = []

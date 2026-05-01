@@ -68,9 +68,11 @@ class GitLab:
             }
             for project in projects
         }
+        # NOTE could probably be done better, just need to get it running.
+        projects_dict = {str(project.get("id")): project for project in projects}
 
-        if isinstance(projects, dict):
-            return projects
+        if isinstance(projects_dict, dict):
+            return projects_dict
         return {}
 
     @staticmethod
@@ -248,17 +250,14 @@ class GitLab:
         """Generate base64 encoded subdata from dict."""
         return base64.urlsafe_b64encode(json.dumps(new_subdata).encode("utf-8")).decode()
 
-    def _projects_to_re_index(self, projects: dict[int, str], subdata: str | None = None) -> tuple[list, str]:
+    def _projects_to_re_index(self, projects: dict[str, dict], subdata: str | None = None) -> tuple[list, str]:
         """Determine project needing to be reindexed, together with new subdata."""
         projects_to_index: list = []
         subdata_dict = self._parse_subdata(subdata)
         new_subdata: dict = subdata_dict
-
-        for project in projects:
+        for project_id, project in projects.items():
             if not isinstance(project, dict):
                 continue
-
-            project_id = str(project.get("id"))
             subdata_project = subdata_dict.get(project_id)
             branch = project.get("default_branch")
             edit_date = project.get("last_activity_at")
@@ -267,6 +266,8 @@ class GitLab:
                     (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
                 )
                 new_subdata[project_id] = edit_date
+                continue
+            if edit_date is None:  # quick fix dont know if this is wanted behaviour.
                 continue
             subdata_date_object = self._create_date_object(subdata_project)
             edit_date_object = self._create_date_object(edit_date)
@@ -283,7 +284,6 @@ class GitLab:
     def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
         """Retrieve a structure of files to index."""
         projects = self._get_projects(bearer_token)
-
         return self._projects_to_re_index(projects, subdata)
 
     async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:

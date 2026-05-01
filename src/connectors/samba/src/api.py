@@ -120,7 +120,7 @@ class API:
         response = self.samba_service.grab_files(content, authorization, include_content, include_last_edit_date)
         return JSONResponse(content=response)
 
-    async def stream_files_to_index(self, body: dict[str, str] | None = None) -> StreamingResponse:
+    async def stream_files_to_index(self, body: dict[str, str | None] | None = None) -> StreamingResponse:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         subdata: str | None = body.get("subdata") if body is not None else None
         return StreamingResponse(self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream")

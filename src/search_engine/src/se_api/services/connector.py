@@ -42,9 +42,9 @@ class Connector:
 
     def __init__(self) -> None:
         """Constructor"""
-        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")
+        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")  # type: ignore
         self.client = AsyncClient(base_url=address)
-        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"
+        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"  # type: ignore
         try:
             with shelve.open(self.data_path) as f:
                 self.subdata = f.get("subdata", {})
@@ -125,10 +125,7 @@ class Connector:
             subdata: str | None = None
             data: dict
             async with client.stream(
-                "GET",
-                stream_url,
-                timeout=self.TIMEOUT,
-                params=[("subdata", prev_subdata)] if prev_subdata is not None else None,
+                "POST", stream_url, timeout=self.TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
             ) as stream:
                 async for chunk in stream.aiter_text():
                     raw += chunk

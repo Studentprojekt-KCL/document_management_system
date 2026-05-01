@@ -3,11 +3,13 @@
 import base64
 from threading import Thread
 import queue
+import io
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
 from fastapi import HTTPException
 import httpx
+from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
@@ -190,16 +192,18 @@ class Handler:
 
         index_queue: queue containing all the ready files to index.
         transfer_queue: queue of raw dicts with file data.
-        loop: global event loop.
         """
+        loop = get_event_loop()
         while True:
             file: dict | None = await decode_queue.get()
             if file is None:
                 break
-            flat_file: dict | None = self._decode(file)
-            if flat_file is None:
+            file, raw_content = await loop.run_in_executor(None, self._decode_base64, file)
+            if file is None or raw_content is None:
                 continue
-            await classify_queue.put(flat_file)
+            content = await loop.run_in_executor(None, self._convert_content, raw_content, file)
+            file["content"] = content
+            await classify_queue.put(file)
             decode_queue.task_done()
 
     async def _classify_content(self, classify_queue: Queue, index_queue: queue.Queue):
@@ -259,7 +263,7 @@ class Handler:
             dms_info(f"Batch of {len(batch)} commited, wait time: {round(wait_time, 3)}s, index time: {round(index_time, 3)}s")
             batch = []
 
-    def _decode(self, file: dict) -> dict | None:
+    def _decode_base64(self, file: dict) -> tuple[dict | None, bytes | None]:
         """Decode file content.
 
         Args:
@@ -269,15 +273,27 @@ class Handler:
         flat_file = self._flatten_dict(file)
         content: str | None = flat_file.get("content")
     
-
         if content is None:
             dms_warning("File is missing content.")
-            return None
+            return (None, None)
         content_bytes: bytes = base64.b64decode(content)
-        content = content_bytes.decode("utf-8")
-        flat_file["content"] = content
+        return flat_file, content_bytes
 
-        return flat_file
+    @staticmethod
+    def _convert_content(content: bytes, file: dict) -> str:
+        decoded_content: str | None = None
+        try:
+            md = MarkItDown()
+            stream = io.BytesIO(content)
+            decoded_content = md.convert_stream(stream).text_content
+        except (FileConversionException, UnsupportedFormatException):
+            try:
+                decoded_content = content.decode("utf-8")
+            except UnicodeDecodeError:  
+                decoded_content = ""
+                dms_warning(f"Failed to decode content for {file.get(SearchEngine.UNIQUE_POINTER)}")
+        return decoded_content
+
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

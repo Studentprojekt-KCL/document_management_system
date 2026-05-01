@@ -193,10 +193,6 @@ class SearchEngine:
         if unique_pointer is None:
             dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
             return
-        # Fetch old
-        # Check if modified
-        # If not continue
-        # Else replace the modification recived with the modified
         searcher: Searcher = self.index.searcher()
         matches = searcher.search(Query.term_query(self.index.schema, self.UNIQUE_POINTER, unique_pointer))
         if matches.hits:

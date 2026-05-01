@@ -3,6 +3,7 @@
 import json
 from os import listdir, mkdir, path, remove
 
+from httpx import get
 from tantivy import (
     Document,
     Index,
@@ -32,12 +33,19 @@ class SearchEngine:
     index_path: str
     documents_only_extension: list
 
-    BASE_CATEGORIES: set[str] = {"unique_pointer", "is_document", "classification"}
+    CLASSIFICATION: str = "classification"
+    IS_DOCUMENT: str = "is_document"
+    MODIFIED: str = "modified"
+    UNIQUE_POINTER: str = "unique_pointer"
+
+    BOOLEAN_CATEGORIES: set[str] = {IS_DOCUMENT, MODIFIED}
+    RAW_CATEGORIES: set[str] = {UNIQUE_POINTER, CLASSIFICATION}
 
     def __init__(self) -> None:
         """Constructor"""
         self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True).rstrip("/") + "/index" # type: ignore[attr-defined]
-        self.categories = self.BASE_CATEGORIES.copy()
+        self.categories = self.BOOLEAN_CATEGORIES.copy()
+        self.categories.union(self.RAW_CATEGORIES.copy())
         extentions = get_documents_only_rescource()
         self.documents_only_extension = []
         for extention in extentions:
@@ -51,15 +59,16 @@ class SearchEngine:
         if not path.isdir(self.index_path):
             dms_error(f"{self.index_path} is not a directory.")
             return
-        self.categories = self.BASE_CATEGORIES.copy()
+        self.categories = self.BOOLEAN_CATEGORIES.copy()
+        self.categories.union(self.RAW_CATEGORIES.copy())
         if fields is not None:
             for field in fields:
                 self.categories.add(field)
         schema_builder = SchemaBuilder()
         for category in self.categories:
-            if category == "unique_pointer":
+            if category in self.RAW_CATEGORIES:
                 schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
-            elif category == "is_document":
+            elif category in self.BOOLEAN_CATEGORIES:
                 schema_builder.add_boolean_field(category, stored=True, indexed=True)
             else:
                 schema_builder.add_text_field(category, stored=True)
@@ -82,7 +91,7 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.init(fields)
 
-    def set_classification(self, unique_pointer: str, classification: str) -> dict[str, str]:
+    def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
 
         Args:
@@ -90,16 +99,20 @@ class SearchEngine:
             classification: new classification.
         """
         searcher = self.index.searcher()
-        result = searcher.search(Query.term_query(self.index.schema, field_name="unique_pointer", field_value=unique_pointer))
+        result = searcher.search(Query.term_query(self.index.schema, field_name=self.UNIQUE_POINTER, field_value=unique_pointer))
+        if not result.hits:
+            return None
         doc_address = result.hits[0][1]
         doc = searcher.doc(doc_address)
         file: dict = {}
         for category in self.categories:
             file.update({category: doc[category][0]}) 
-        file.update({"classification": classification})
+        file.update({self.CLASSIFICATION: classification})
+        file.update({self.MODIFIED: True})
+        self.open_writer()
         self.add_file(file)
-        file.pop("contnet")
-        return file
+        self.close_writer()
+        return (unique_pointer, classification)
 
     def query_files(self, content: dict[str, str], count: int) -> tuple[list[str], dict[str, str]]:
         """Query through the files in the index.
@@ -119,7 +132,7 @@ class SearchEngine:
         for field, value in content.items():
             try:
                 sub_queries.append(
-                    (Occur.Must, self.index.parse_query(value, [field if field != "documents_only" else "is_document"]))
+                    (Occur.Must, self.index.parse_query(value, [field if field != "documents_only" else self.IS_DOCUMENT]))
                 )
             except ValueError:
                 dms_warning(f"Failed to create query: {value} for field: {field}")
@@ -134,8 +147,8 @@ class SearchEngine:
         classifications: dict[str, str] = {}
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
-            unique_pointer = doc["unique_pointer"][0]
-            classification = doc["classification"][0]
+            unique_pointer = doc[self.UNIQUE_POINTER][0]
+            classification = doc[self.UNIQUE_POINTER][0]
             classifications.update({unique_pointer: classification})
             pointers.append(unique_pointer)
 
@@ -143,12 +156,12 @@ class SearchEngine:
 
     def find_matching(self, unique_pointer) -> None:
         searcher = self.index.searcher()
-        result = searcher.search(Query.term_query(self.index.schema, field_name="unique_pointer", field_value=unique_pointer))
+        result = searcher.search(Query.term_query(self.index.schema, field_name=self.UNIQUE_POINTER, field_value=unique_pointer))
         doc_address = result.hits[0][1]
         result = searcher.search(Query.more_like_this_query(doc_address))
         for score, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
-            unique_pointer = doc["unique_pointer"][0]
+            unique_pointer = doc[self.CLASSIFICATION][0]
             print(f"{score}: {unique_pointer}")
 
     def open_writer(self) -> None:
@@ -176,13 +189,27 @@ class SearchEngine:
 
         if self.writer is None:
             return
-        unique_pointer: str | None = file.get("unique_pointer")
+        unique_pointer: str | None = file.get(self.UNIQUE_POINTER)
         if unique_pointer is None:
             dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
             return
-        self.writer.delete_documents("unique_pointer", "".join(unique_pointer))
+        # Fetch old
+        # Check if modified
+        # If not continue
+        # Else replace the modification recived with the modified
+        searcher: Searcher = self.index.searcher()
+        matches = searcher.search(Query.term_query(self.index.schema, self.UNIQUE_POINTER, unique_pointer))
+        if matches.hits:
+            doc_id = matches.hits[0][1]
+            modified: bool = bool(searcher.doc(doc_id)[self.MODIFIED][0])
+            if modified:
+                classification: str = searcher.doc(doc_id)[self.CLASSIFICATION][0] 
+                file.update({self.CLASSIFICATION: classification})
+        else:
+            file.update({self.MODIFIED: False})
+        self.writer.delete_documents(self.UNIQUE_POINTER, "".join(unique_pointer))
         extension: str = file.get("file_type", "")
-        file.update({"is_document": extension in self.documents_only_extension})
+        file.update({self.IS_DOCUMENT: extension in self.documents_only_extension})
         self.writer.add_json(json.dumps(file))
 
     def remove_file(self, pointer: str) -> None:
@@ -193,7 +220,7 @@ class SearchEngine:
         """
 
         writer: IndexWriter = self.index.writer()
-        writer.delete_documents("unique_pointer", pointer)
+        writer.delete_documents(self.UNIQUE_POINTER, pointer)
         writer.commit()
         writer.wait_merging_threads()
         dms_info(f"Removed {pointer} from index.")

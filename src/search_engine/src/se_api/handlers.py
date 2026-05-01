@@ -60,7 +60,13 @@ class Handler:
     def find_matching(self, pointer: str) -> None:
         self.search_engine.find_matching(pointer)
 
-    def set_classification(self, change: dict[str, str]) -> dict[str, str]:
+    def grab_searchable_fields(self) -> set:
+        fields = self.search_engine.categories
+        fields.remove("is_document")
+        fields.add("documents_only")
+        return fields
+
+    async def set_classification(self, change: dict[str, str]) -> dict[str, str]:
         """Set the classification of a file.
 
         Args:
@@ -72,7 +78,14 @@ class Handler:
         classification: str | None = change.get("classification")
         if pointer is None or classification is None:
             raise HTTPException(status_code=400)
-        return self.search_engine.set_classification(pointer, classification)
+        if self.search_engine.set_classification(pointer, classification) is None:
+            return {}
+        files = await self.connector.fetch_files([pointer])
+        if files:
+            file: dict = files[0]
+            file.update({"classification": classification})
+            return file
+        return {}
 
     def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
         """Remove missing files from cache and index.
@@ -138,21 +151,21 @@ class Handler:
         await fetch_queue.join()
         for _ in fetch_tasks:
             await fetch_queue.put(None)
-        dms_info(f"Finished fetching, time: {(datetime.now() - start).total_seconds()}s.")
+        dms_info(f"Finished fetching, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
         await decode_queue.join()
         for _ in decode_tasks:
             await decode_queue.put(None)
-        dms_info(f"Finished formating, time: {(datetime.now() - start).total_seconds()}s.")
+        dms_info(f"Finished formating, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
         await classify_queue.join()
         for _ in classify_tasks:
             await classify_queue.put(None)
-        dms_info(f"Finished classifying, time: {(datetime.now() - start).total_seconds()}s.")
+        dms_info(f"Finished classifying, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
         index_queue.join()
         index_queue.put(None)
         indexer_thread.join()
         self.connector.write_subdata()
         self.indexing.release()
-        dms_info(f"Finished indexing, time: {(datetime.now() - start).total_seconds()}s.")
+        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
 
     async def _fetch_files(self, fetch_queue: Queue, transfer_queue: Queue) -> None:
         """Fetch files from stream.
@@ -202,8 +215,6 @@ class Handler:
                 await loop.run_in_executor(None, index_queue.put, batch)
                 batch = []
             classify_queue.task_done()
-            if classify_queue.qsize() % 100 == 0:
-                dms_info(f"Items left: {classify_queue.qsize()}")
         if batch:
             await self.classifier.classify(batch)
             await loop.run_in_executor(None, index_queue.put, batch)
@@ -217,25 +228,35 @@ class Handler:
             task_queue: queue containing all the files to add.
         """
         batch: list[dict] = []
+        start_wait = datetime.now()
         while True:
             files: dict | None = index_queue.get()
             if files is None:
                 break
             batch.extend(files)
             if len(batch) >= self.BATCH_SIZE:
+                end_wait = datetime.now()
+                start = datetime.now()
                 self.search_engine.open_writer()
                 for file in batch:
                     self.search_engine.add_file(file)
-                dms_info(f"Batch of {len(batch)} commited")
                 self.search_engine.close_writer()
+                index_time = (datetime.now() - start).total_seconds()
+                wait_time = (end_wait - start_wait).total_seconds()
+                dms_info(f"Batch of {len(batch)} commited, wait time: {round(wait_time, 3)}s, index time: {round(index_time, 3)}s")
                 batch = []
+                start_wait = datetime.now()
             index_queue.task_done()
         if batch:
+            end_wait = datetime.now()
+            start = datetime.now()
             self.search_engine.open_writer()
             for file in batch:
                 self.search_engine.add_file(file)
-            dms_info(f"Batch of {len(batch)} commited")
             self.search_engine.close_writer()
+            index_time = (datetime.now() - start).total_seconds()
+            wait_time = (end_wait - start_wait).total_seconds()
+            dms_info(f"Batch of {len(batch)} commited, wait time: {round(wait_time, 3)}s, index time: {round(index_time, 3)}s")
             batch = []
 
     def _decode(self, file: dict) -> dict | None:
@@ -247,6 +268,7 @@ class Handler:
         """
         flat_file = self._flatten_dict(file)
         content: str | None = flat_file.get("content")
+    
 
         if content is None:
             dms_warning("File is missing content.")

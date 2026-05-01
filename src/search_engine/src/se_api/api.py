@@ -63,6 +63,7 @@ class API:
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
         self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])
+        self.app.add_api_route("/searchable_fields", self.searchable_fields, methods=["GET"])
 
     def start(self) -> None:
         """Start the API."""
@@ -120,7 +121,7 @@ class API:
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""
-        return self.handler.set_classification(change)
+        return await self.handler.set_classification(change)
 
     @staticmethod
     async def check_health() -> JSONResponse:
@@ -130,6 +131,10 @@ class API:
     async def reset(self) -> None:
         """Reset connector."""
         await self.handler.reset()
+
+    async def searchable_fields(self) -> set:
+        """Retrive all searchable fields."""
+        return self.handler.grab_searchable_fields()
 
     async def file_types(self) -> list:
         """Retrieve all supported file types."""

@@ -27,15 +27,17 @@ class SearchEngine:
     """
 
     index: Index
-    categories: list[str]
+    categories: set[str]
     writer: IndexWriter | None
     index_path: str
     documents_only_extension: list
 
+    BASE_CATEGORIES: set[str] = {"unique_pointer", "is_document", "classification"}
+
     def __init__(self) -> None:
         """Constructor"""
         self.index_path = read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True).rstrip("/") + "/index" # type: ignore[attr-defined]
-        self.categories = ["is_document"]
+        self.categories = self.BASE_CATEGORIES.copy()
         extentions = get_documents_only_rescource()
         self.documents_only_extension = []
         for extention in extentions:
@@ -49,17 +51,19 @@ class SearchEngine:
         if not path.isdir(self.index_path):
             dms_error(f"{self.index_path} is not a directory.")
             return
+        self.categories = self.BASE_CATEGORIES.copy()
         if fields is not None:
-            self.categories.extend(fields)
+            for field in fields:
+                self.categories.add(field)
         schema_builder = SchemaBuilder()
         for category in self.categories:
-            dms_info(f"added field {category}")
             if category == "unique_pointer":
                 schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
             elif category == "is_document":
                 schema_builder.add_boolean_field(category, stored=True, indexed=True)
             else:
                 schema_builder.add_text_field(category, stored=True)
+            dms_info(f"added field {category}")
         schema = schema_builder.build()
         try:
             self.index = Index(schema, path=self.index_path)
@@ -72,11 +76,11 @@ class SearchEngine:
             except ValueError:
                 dms_error(f"Failed loading index directory, path: {self.index_path}.")
 
-    def reset(self) -> None:
+    def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
         for file in listdir(self.index_path):
             remove(f"{self.index_path}/{file}")
-        self.init(None)
+        self.init(fields)
 
     def set_classification(self, unique_pointer: str, classification: str) -> dict[str, str]:
         """Set the classification of a file in the index.

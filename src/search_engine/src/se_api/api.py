@@ -122,13 +122,14 @@ class API:
         """Manualy set the classification of a pointer."""
         return self.handler.set_classification(change)
 
-    async def check_health(self) -> JSONResponse:
+    @staticmethod
+    async def check_health() -> JSONResponse:
         """Respond to health check"""
         return JSONResponse(status_code=200, content={"msg": "healthy"})
 
     async def reset(self) -> None:
         """Reset connector."""
-        self.handler.reset()
+        await self.handler.reset()
 
     async def file_types(self) -> list:
         """Retrieve all supported file types."""

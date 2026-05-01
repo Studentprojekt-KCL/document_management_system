@@ -43,8 +43,6 @@ class Handler:
 
     async def init(self) -> None:
         """Init handler"""
-        self.search_engine.init()
-        await self.query.init()
         fields: list[str] | None = await self.connector.get_fields()
         self.search_engine.init(fields)
 
@@ -52,9 +50,10 @@ class Handler:
         """Clean up"""
         await self.connector.close()
 
-    def reset(self) -> None:
+    async def reset(self) -> None:
         """Reset the connector."""
-        self.search_engine.reset()
+        fields: list[str] | None = await self.connector.get_fields()
+        self.search_engine.reset(fields)
         self.connector.write_subdata({})
         dms_info("Search engine was reset.")
 

@@ -199,10 +199,7 @@ class GitLab:
                 info = zip_file.getinfo(file)
                 if info.is_dir():
                     continue
-                try:
-                    file_content = zip_file.read(file)
-                except UnicodeDecodeError:
-                    file_content = b""
+                file_content = zip_file.read(file)
                 file_name = file_path.name
                 extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
                 base_structure = copy.deepcopy(self.defined_fields)

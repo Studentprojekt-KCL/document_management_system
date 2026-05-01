@@ -145,7 +145,7 @@ class Samba:
         for pointer in pointers:
             path: str = f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}"
             try:
-                with open(path, 'rb') as f:
+                with open(path, "rb") as f:
                     status = os.stat(path)
                     name: str = path.rsplit("/", maxsplit=1)[-1]
                     file = {

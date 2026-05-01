@@ -145,7 +145,7 @@ class Samba:
         for pointer in pointers:
             path: str = f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}"
             try:
-                with open(path, encoding="utf-8") as f:
+                with open(path, 'rb') as f:
                     status = os.stat(path)
                     name: str = path.rsplit("/", maxsplit=1)[-1]
                     file = {
@@ -157,7 +157,7 @@ class Samba:
                     if include_last_edit_date:
                         file["last_edit_date"] = datetime.fromtimestamp(status.st_mtime).isoformat()
                     if include_content:
-                        file["content"] = b64encode(f.read().encode("utf-8")).decode("utf-8")
+                        file["content"] = b64encode(f.read()).decode("utf-8")
                     files.append(file)
             except FileNotFoundError:
                 dms_warning(
@@ -229,7 +229,7 @@ class Samba:
                 break
 
             try:
-                async with aiofiles.open(path, encoding="utf-8") as f:
+                async with aiofiles.open(path, mode="rb") as f:
                     status = await aiofiles.os.stat(path)
                     content = await f.read()
                     name = path.split("/")[-1]
@@ -245,7 +245,7 @@ class Samba:
                             "last_edit_date": datetime.fromtimestamp(status.st_mtime).isoformat(),
                         }
                         | extention_description,
-                        "content": b64encode(content.encode("utf-8")).decode("utf-8"),
+                        "content": b64encode(content).decode("utf-8"),
                     }
                     await output_queue.put(file)
             except UnicodeDecodeError:

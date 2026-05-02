@@ -51,7 +51,7 @@ class API:
             self.log_level = "info"
 
         self.port: int = read_port("SEARCHENG_BIND_PORT")
-        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR", required=True) # type: ignore[attr-defined]
+        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR", required=True)  # type: ignore[attr-defined]
 
         self.app = FastAPI(lifespan=self.lifespan)
 
@@ -105,8 +105,16 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str) -> None:
-        self.handler.find_matching(pointer)
+    async def find_matching(self, pointer: str, count: int | None = None) -> dict:
+        """Look for matching files.
+
+        Args:
+            pointer: file to compare with.
+            count: number of wanted results.
+        Returns: unique pointers and their score.
+        """
+
+        return self.handler.find_matching(pointer, count)
 
     async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None

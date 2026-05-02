@@ -32,7 +32,7 @@ const { state: lastQuery } = useReload('lastQuery', '')
 const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
 const documentsOnlyMode = ref(true)
 
-/* Number of search results to fetch */
+/* Number of search results to fetch, possible to change. */
 const SEARCH_COUNT = 20
 const SEARCH_OFFSET = 0
 

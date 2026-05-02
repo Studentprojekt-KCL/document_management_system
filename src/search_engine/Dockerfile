@@ -8,8 +8,6 @@ COPY src/shared_functions/src /src/shared_functions/src
 COPY src/shared_functions/pyproject.toml /src/shared_functions/pyproject.toml
 
 WORKDIR /src/search_engine
-RUN python -m pip install build
-RUN python -m build
 RUN python -m pip install .
 
 ENTRYPOINT ["se_api"]

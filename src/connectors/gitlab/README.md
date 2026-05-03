@@ -14,17 +14,6 @@ The following needs to be exported in local environment:
 
 # Response structure
 
-## Endpoing: file
+# Calling examples
 
-    {
-        "metadata": {
-        "unique_pointer": <POINTER TO OBJ>,
-        "name": "<FILE NAME>",
-        "size": 6042,
-        "last_edit_date": <EDIT DATE>,
-        "type": <TYPE OF OBJECT>,
-        "source_system": "GitLab",
-        "clickable_url": <CLICKABLE URL TO OBJ>
-    },
-        "content": <FILE CONTENT>
-    }
+    curl <HOST>/auth_user -H 'callback-url: <CALLBACK_URL>'

@@ -41,7 +41,8 @@ class Handler:
     async def init(self) -> None:
         """Init handler"""
         await self.query.init()
-        self.search_engine.init()
+        fields: list[str] | None = await self.connector.get_fields()
+        self.search_engine.init(fields)
 
     async def close(self) -> None:
         """Clean up"""
@@ -87,11 +88,11 @@ class Handler:
             self.search_engine.remove_file(match)
             self.query.cache.remove_classification(match)
 
-    async def preform_search(self, request: str | None, count: int, offset: int) -> list:
+    async def preform_search(self, content: dict, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
-            request: Query to perform.
+            content: query per field.
             count: how many results.
             offset: how deep in to grab the results.
         Returns: matching files or None.
@@ -104,14 +105,11 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        dms_info(f"Preforming search: {request}")
         if not self.indexing.locked():
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
-        if request is None:
-            return []
-        matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
+        matches: list = self.search_engine.query_files(content, count + offset)[offset : count + offset]
         files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
         classifications: dict = await self.query.classify(files)
@@ -213,7 +211,7 @@ class Handler:
                 batch.clear()
             index_queue.task_done()
         if batch:
-            self.search_engine.init()
+            self.search_engine.open_writer()
             for file in batch:
                 self.search_engine.add_file(file)
             dms_info(f"Batch of {len(batch)} commited")

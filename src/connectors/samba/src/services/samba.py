@@ -6,7 +6,7 @@ from os import scandir
 import json
 import os
 from collections.abc import AsyncGenerator
-from base64 import urlsafe_b64decode, urlsafe_b64encode, b64encode
+from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode, b64encode
 from pathlib import Path
 
 from subprocess import CalledProcessError, run
@@ -110,7 +110,7 @@ class Samba:
             index_needed = len(self.changes) != 0
         return {"index_needed": index_needed}
 
-    def grab_files(self, content: dict, include_content: bool, include_last_edit_date: bool) -> list[dict]:
+    def grab_files(self, content: dict, authorization: str, include_content: bool, include_last_edit_date: bool) -> list[dict]:
         """Grab the requested files.
 
         Mounts the share as the requesting user and grabs the requested files.
@@ -121,9 +121,17 @@ class Samba:
             include_last_edit_date: to include the modification date.
         Returns: list of files.
         """
+        username: str | None = None
+        password: str | None = None
+        try:
+            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+        except UnicodeDecodeError:
+            dms_warning("Failed to decode authorization header for base64 decoding.")
+        except UnicodeEncodeError:
+            dms_warning("Failed to encode authorization header after base64 decoding.")
+        except ValueError:
+            dms_warning("Might be too many arguments in authorization header.")
         pointers: list[str] | None = content.get("file_pointers")
-        username: str | None = content.get("username", self.mount_options.user)  # NOTE: DO NOT KEEP
-        password: str | None = content.get("password", self.mount_options.password)  # NOTE: DO NOT KEEP
 
         if pointers is None or username is None or password is None:
             return []
@@ -137,7 +145,7 @@ class Samba:
         for pointer in pointers:
             path: str = f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}"
             try:
-                with open(path, encoding="utf-8") as f:
+                with open(path, "rb") as f:
                     status = os.stat(path)
                     name: str = path.rsplit("/", maxsplit=1)[-1]
                     file = {
@@ -149,7 +157,7 @@ class Samba:
                     if include_last_edit_date:
                         file["last_edit_date"] = datetime.fromtimestamp(status.st_mtime).isoformat()
                     if include_content:
-                        file["content"] = b64encode(f.read().encode("utf-8")).decode("utf-8")
+                        file["content"] = b64encode(f.read()).decode("utf-8")
                     files.append(file)
             except FileNotFoundError:
                 dms_warning(
@@ -221,7 +229,7 @@ class Samba:
                 break
 
             try:
-                async with aiofiles.open(path, encoding="utf-8") as f:
+                async with aiofiles.open(path, mode="rb") as f:
                     status = await aiofiles.os.stat(path)
                     content = await f.read()
                     name = path.split("/")[-1]
@@ -237,7 +245,7 @@ class Samba:
                             "last_edit_date": datetime.fromtimestamp(status.st_mtime).isoformat(),
                         }
                         | extention_description,
-                        "content": b64encode(content.encode("utf-8")).decode("utf-8"),
+                        "content": b64encode(content).decode("utf-8"),
                     }
                     await output_queue.put(file)
             except UnicodeDecodeError:

@@ -6,6 +6,12 @@
 import { ref } from 'vue'
 import { authFetch, API_PATHS } from '@/utils/api'
 
+const normalizeExtensions = (extension) => {
+  if (Array.isArray(extension)) return extension.map((ext) => String(ext))
+  if (typeof extension === 'string' && extension) return [extension]
+  return []
+}
+
 /**
  * Fetches the available connected source systems.
  *
@@ -52,7 +58,7 @@ export function useDocumentsOnlyFilters() {
       documentsOnlyFilters.value = data
         .map((item) => ({
           description: item?.description || '',
-          extension: (item?.extension || []).map((ext) => String(ext)),
+          extension: normalizeExtensions(item?.extension),
           type: item?.type || ''
         }))
         .filter((item) => item.description && item.extension.length > 0)
@@ -60,6 +66,33 @@ export function useDocumentsOnlyFilters() {
     .catch((error) => console.error(`Error fetching documents only filters: ${error}`))
 
   return documentsOnlyFilters
+}
+
+export function useAllFileTypeFilters() {
+  const allFileTypeFilters = ref([])
+
+  authFetch(API_PATHS.allFileTypes)
+    .then((res) => {
+      if (!res.ok) {
+        console.error(`Failed to fetch all file type filters: ${res.statusText}`)
+        return
+      }
+      return res.json()
+    })
+    .then((data) => {
+      if (!Array.isArray(data)) return
+
+      allFileTypeFilters.value = data
+        .map((item) => ({
+          description: item?.description || '',
+          extension: normalizeExtensions(item?.extension),
+          type: item?.type || ''
+        }))
+        .filter((item) => item.description && item.extension.length > 0)
+    })
+    .catch((error) => console.error(`Error fetching all file type filters: ${error}`))
+
+  return allFileTypeFilters
 }
 
 /**

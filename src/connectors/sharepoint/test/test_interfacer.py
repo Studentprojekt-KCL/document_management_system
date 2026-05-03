@@ -7,9 +7,9 @@ from unittest import IsolatedAsyncioTestCase, mock
 
 import httpx
 
-from interfacer_sharepoint import MAX_RETRIES, SharePoint, _HttpCtx
+from interfacer_sharepoint import DEFAULT_GRAPH_BASE, MAX_RETRIES, SharePoint, _HttpCtx
 
-GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+GRAPH_BASE = DEFAULT_GRAPH_BASE
 
 # _HttpCtx used in tests that call private methods directly.
 # Semaphore limit is effectively unlimited so tests never block.
@@ -85,6 +85,54 @@ class TestSharePoint(IsolatedAsyncioTestCase):
     def test_decode_subdata_valid_base64_non_json_returns_empty(self):
         assert self.instance._decode_subdata(base64.urlsafe_b64encode(b"not json").decode()) == {}
 
+    def test_init_graph_base_defaults_when_env_unset(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return None
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == DEFAULT_GRAPH_BASE
+
+    def test_init_graph_base_from_env_strips_whitespace_and_slash(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return " https://graph.microsoft.com/beta/ "
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == "https://graph.microsoft.com/beta"
+
+    def test_init_graph_base_blank_env_uses_default(self):
+        def fake_read_env(name, required=True):
+            if name == "CONSHAREPOINT_GRAPH_BASE":
+                return "  \t  "
+            if name == "CONSHAREPOINT_SYSTEM_NAME":
+                return "SharePoint"
+            return ""
+
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
+            with mock.patch(
+                "interfacer_sharepoint.get_file_resource",
+                return_value=[{"extension": ".pdf", "description": "PDF"}],
+            ):
+                inst = SharePoint()
+        assert inst.graph_base == DEFAULT_GRAPH_BASE
+
     # --- file record building ---
 
     def test_build_file_record_pdf(self):
@@ -104,7 +152,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert record["metadata"]["unique_pointer"] == ("https://graph.microsoft.com/v1.0/drives/drive456/items/item123")
         assert record["metadata"]["clickable_url"] == "https://tenant.sharepoint.com/report.pdf"
         assert record["metadata"]["last_edit_date"] == "2026-01-01T00:00:00Z"
-        assert record["content"] is None
+        assert "content" not in record
 
     def test_build_file_record_unknown_extension_returns_record(self):
         item = {"id": "item123", "name": "script.py", "size": 500}
@@ -222,6 +270,46 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         assert items == []
         assert delta_link == ""
 
+    # --- _process_drive ---
+
+    async def test_process_drive_encodes_content_when_fetch_ok(self):
+        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
+        item = {
+            "id": "item123",
+            "name": "report.pdf",
+            "size": 2048,
+            "webUrl": "https://sp.com/report.pdf",
+            "lastModifiedDateTime": "2026-01-01T00:00:00Z",
+        }
+        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+        content_resp = _mock_response(200)
+        content_resp.content = b"bytes-from-graph"
+        ctx = _ctx(content_resp)
+        drive_id, records, delta_link = await self.instance._process_drive(
+            ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta"
+        )
+        assert drive_id == "drive456"
+        assert delta_link == new_link
+        assert len(records) == 1
+        assert records[0]["content"] == base64.b64encode(b"bytes-from-graph").decode("utf-8")
+        assert records[0]["metadata"]["name"] == "report.pdf"
+        assert ctx.client.get.call_count == 1
+
+    async def test_process_drive_content_forbidden_yields_empty_base64(self):
+        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
+        item = {
+            "id": "item123",
+            "name": "notes.txt",
+            "size": 10,
+            "webUrl": "https://sp.com/notes.txt",
+        }
+        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+        ctx = _ctx(_mock_response(403))
+        _, records, _ = await self.instance._process_drive(ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta")
+        assert len(records) == 1
+        assert records[0]["content"] == ""
+        assert records[0]["metadata"]["file_type"] == ".txt"
+
     # --- _collect_drive_tasks ---
 
     async def test_collect_drive_tasks_with_sites(self):
@@ -284,6 +372,11 @@ class TestSharePoint(IsolatedAsyncioTestCase):
 
     async def test_get_file_non_200_returns_empty(self):
         ctx = _ctx(_mock_response(404))
+        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
+        assert result == {}
+
+    async def test_get_file_unknown_extension_returns_empty(self):
+        ctx = _ctx(_mock_response(200, {"name": "script.py", "size": 100, "webUrl": "https://sp.com/script.py"}))
         result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
         assert result == {}
 

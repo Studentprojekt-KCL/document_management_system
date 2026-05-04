@@ -98,16 +98,18 @@ class Handler:
         Returns: dict containing the unique pointer, classification, and if edited.
         """
 
-        pointer: str | None = change.get("unique_pointer")
-        classification: str | None = change.get("classification")
+        pointer: str | None = change.get(UNIQUE_POINTER)
+        classification: str | None = change.get(CLASSIFICATION)
         if pointer is None or classification is None:
-            raise HTTPException(status_code=400)
+            return {}
+        if classification not in self.classifier.LABELS:
+            return {}
         if self.search_engine.set_classification(pointer, classification) is None:
             return {}
         files = await self.connector.fetch_files([pointer])
         if files:
             file: dict = files[0]
-            file.update({"classification": classification})
+            file.update({CLASSIFICATION: classification})
             return file
         return {}
 

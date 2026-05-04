@@ -2,6 +2,7 @@
 
 import json
 from os import listdir, mkdir, path, remove
+from threading import Lock
 
 from tantivy import (
     Document,
@@ -33,6 +34,7 @@ class SearchEngine:
     writer: IndexWriter | None
     index_path: str
     documents_only_extension: list
+    writer_lock: Lock
 
     def __init__(self) -> None:
         """Constructor"""
@@ -42,6 +44,7 @@ class SearchEngine:
         for extention in extentions:
             self.documents_only_extension.extend(extention.get("extension", []))
         self.writer = None
+        self.writer_lock = Lock()
 
     def init(self, fields: list[str] | None) -> None:
         """Initialize the index schema with the saved categories."""
@@ -179,6 +182,7 @@ class SearchEngine:
 
     def open_writer(self) -> None:
         """Init index writer."""
+        self.writer_lock.acquire()
         if self.writer is not None:
             return
         self.writer = self.index.writer()
@@ -189,6 +193,7 @@ class SearchEngine:
             return
         self.writer.commit()
         self.writer.wait_merging_threads()
+        self.writer_lock.release()
         self.writer = None
 
     def add_file(self, file: dict) -> None:

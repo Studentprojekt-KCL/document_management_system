@@ -2,7 +2,7 @@
 
 TIMEOUT: int = 120
 
-CLASSIFICATION: str = "classification"
+CLASSIFICATION: str = "security_class"
 IS_DOCUMENT: str = "is_document"
 MODIFIED: str = "modified"
 UNIQUE_POINTER: str = "unique_pointer"

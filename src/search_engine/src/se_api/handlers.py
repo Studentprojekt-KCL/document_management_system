@@ -7,7 +7,6 @@ import io
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
-from fastapi import HTTPException
 import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
@@ -291,10 +290,9 @@ class Handler:
                 end_wait = datetime.now()
                 start = datetime.now()
                 unique_files = self._clear_duplicates(batch)
-                self.search_engine.open_writer()
-                for file in unique_files:
-                    self.search_engine.add_file(file)
-                self.search_engine.close_writer()
+                with self.search_engine.open_writer():
+                    for file in unique_files:
+                        self.search_engine.add_file(file)
                 index_time = (datetime.now() - start).total_seconds()
                 wait_time = (end_wait - start_wait).total_seconds()
                 total += len(unique_files)

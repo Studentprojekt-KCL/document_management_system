@@ -1,5 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+from collections.abc import AsyncGenerator
+from contextlib import contextmanager
 import json
 from os import listdir, mkdir, path, remove
 from threading import Lock
@@ -105,9 +107,8 @@ class SearchEngine:
             file.update({category: doc[category][0]})
         file.update({CLASSIFICATION: classification})
         file.update({MODIFIED: True})
-        self.open_writer()
-        self.add_file(file)
-        self.close_writer()
+        with self.open_writer():
+            self.add_file(file)
         return (unique_pointer, classification)
 
     def query_files(self, content: dict[str, str], count: int) -> tuple[list[str], dict[str, str]]:
@@ -180,21 +181,16 @@ class SearchEngine:
                 break
         return matching
 
-    def open_writer(self) -> None:
-        """Init index writer."""
-        self.writer_lock.acquire()
-        if self.writer is not None:
-            return
-        self.writer = self.index.writer()
 
-    def close_writer(self) -> None:
-        """Close the writer."""
-        if self.writer is None:
-            return
+    @contextmanager
+    def open_writer(self):
+        """Init index writer."""
+        self.writer_lock.acquire() 
+        self.writer = self.index.writer()
+        yield
         self.writer.commit()
         self.writer.wait_merging_threads()
         self.writer_lock.release()
-        self.writer = None
 
     def add_file(self, file: dict) -> None:
         """Add file to index.

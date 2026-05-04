@@ -11,6 +11,8 @@ from asyncio import Queue
 from httpx import AsyncClient
 import httpx
 
+from se_api.constants import TIMEOUT
+
 from shared_functions.dmis_logger import dms_error, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -24,8 +26,6 @@ class Connector:
         address: address to connector.
         subdata: connector file status.
     """
-
-    TIMEOUT: int = 120
 
     GET_FILE_ENDPOINT: str = "/get_files"
     GET_FIELDS: str = "/defined_fields"
@@ -42,9 +42,11 @@ class Connector:
 
     def __init__(self) -> None:
         """Constructor"""
-        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")  # type: ignore
+        address = read_env_variable("SEARCHENG_CONGATEWAY_URL", required=True).rstrip("/")  # type: ignore
         self.client = AsyncClient(base_url=address)
-        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"  # type: ignore
+        self.data_path = f"{
+                read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True).rstrip("/") # type: ignore
+        }{self.DATA_FILE}"
         try:
             with shelve.open(self.data_path) as f:
                 self.subdata = f.get("subdata", {})
@@ -79,7 +81,7 @@ class Connector:
         try:
             response = await self.client.get(
                 self.STREAM_ENDPOINT,
-                timeout=Connector.TIMEOUT,
+                timeout=TIMEOUT,
             )
             response.raise_for_status()
             connectors: list[str] = response.json()
@@ -101,16 +103,16 @@ class Connector:
         try:
             response = await self.client.get(
                 self.GET_FIELDS,
-                timeout=Connector.TIMEOUT,
+                timeout=TIMEOUT,
             )
             response.raise_for_status()
             return response.json()
         except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.GET_FILE_ENDPOINT}")
+            dms_warning(f"Request timed out, url: {self.GET_FIELDS}")
         except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.GET_FILE_ENDPOINT}.")
+            dms_warning(f"Failed to parse JSON, url: {self.GET_FIELDS}.")
         except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
+            dms_warning(f"Invalid HTTP response, url: {self.GET_FIELDS}.")
         return None
 
     async def stream(self, stream_url: str) -> AsyncGenerator:
@@ -125,7 +127,7 @@ class Connector:
             subdata: str | None = None
             data: dict
             async with client.stream(
-                "POST", stream_url, timeout=self.TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
+                "POST", stream_url, timeout=TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
             ) as stream:
                 async for chunk in stream.aiter_text():
                     raw += chunk
@@ -166,7 +168,7 @@ class Connector:
                 self.GET_FILE_ENDPOINT,
                 params=[("include_content", False), ("include_last_edit_date", True)],
                 json={"file_pointers": pointers},
-                timeout=Connector.TIMEOUT,
+                timeout=TIMEOUT,
             )
             response.raise_for_status()
             return response.json()

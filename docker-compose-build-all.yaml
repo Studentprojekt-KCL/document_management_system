@@ -37,6 +37,12 @@ services:
     image: connector-github:pr
     build:
       dockerfile: src/connectors/github/Dockerfile
+  connector-confluence:
+    image: connector-confluence:pr
+    build:
+      dockerfile: src/connectors/confluence/Dockerfile
+    environment:
+      CONFLUENCE_CONNECTOR_PORT: ${CONFLUENCE_CONNECTOR_PORT:-8010}
 
   connector-sharepoint:
       image: connector-sharepoint:pr

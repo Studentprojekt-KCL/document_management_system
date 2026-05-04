@@ -13,6 +13,9 @@ setup(
         "requests>=2.32",
         "httpx",
         "markdown-pdf>=1.13.1",
+        "pypdf>=5.0",
+        "tokenizers>=0.20",
         f"shared-functions @ {shared_lib_path}",
+        "pypdf>=5.0",
     ]
 )

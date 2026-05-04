@@ -76,3 +76,9 @@ class SummaryResult(BaseModel):
     """Output schema for a summarized document."""
 
     summary: StrictStr
+
+
+class MergeRequest(BaseModel):
+    """Request schema for merge endpoint, requires at least two pointers."""
+
+    pointers: list[StrictStr] = Field(..., min_length=2)

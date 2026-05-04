@@ -16,5 +16,6 @@ setup(
         "pypdf>=5.0",
         "tokenizers>=0.20",
         f"shared-functions @ {shared_lib_path}",
+        "pypdf>=5.0",
     ]
 )

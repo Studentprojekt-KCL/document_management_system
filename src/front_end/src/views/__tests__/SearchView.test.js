@@ -156,7 +156,6 @@ describe('SearchView', () => {
       emitSearch(wrapper, 'hello world')
       await flushPromises()
 
-      const [url] = mockAuthFetch.mock.calls[0]
       const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body)
       expect(body.content).toBe('hello world')
     })

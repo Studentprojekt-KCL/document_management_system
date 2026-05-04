@@ -7,7 +7,7 @@ import httpx
 
 from se_api.constants import CLASSIFICATION, CONTENT, TIMEOUT
 
-from shared_functions.initialisation_tools import read_env_variable, read_float_env_variable
+from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
 
 
@@ -18,6 +18,7 @@ class Classifier:
 
     MAX_CHARS: int = 2000
     BATCH_SIZE: int = 4
+    ESCALATION_THRESHOLD: float = 0.2
 
     LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
     LABEL_TRIGGERS = [
@@ -28,15 +29,13 @@ class Classifier:
     ]
 
     client: httpx.AsyncClient
-    escalation_threshold: float
     classifications: list[str]
 
     def __init__(self) -> None:
         """Constructor."""
         logging.getLogger("httpx").setLevel(logging.WARNING)
-        address: str = read_env_variable("SEARCHENG_CLASSIFIER_URL", required=True).rstrip("/")  # type: ignore[attr-defined]
+        address: str = read_env_variable("SEARCHENG_CLASSIFIER_URL", required=True).rstrip("/")  # type: ignore
         self.client = httpx.AsyncClient(base_url=address)
-        self.escalation_threshold = read_float_env_variable("SEARCHENG_CLASSIFIER_ESCALATION_THRESHOLD")
 
     async def close(self) -> None:
         """Close services"""
@@ -72,7 +71,7 @@ class Classifier:
             offset = doc_idx * num_labels
             doc_scores = all_scores[offset : offset + num_labels]
             best_index = doc_scores.index(max(doc_scores))
-            best_index = self._escalate(doc_scores, best_index, self.escalation_threshold)
+            best_index = self._escalate(doc_scores, best_index, self.ESCALATION_THRESHOLD)
             item.update({CLASSIFICATION: self.LABELS[best_index]})
 
     async def classify(self, batch: list[dict]) -> None:

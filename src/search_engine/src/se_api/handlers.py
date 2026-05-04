@@ -151,8 +151,8 @@ class Handler:
         files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
         for file in files:
-            classification = classifications.get(file.get("unique_pointer", ""))
-            file.update({"classification": classification})
+            classification = classifications.get(file.get(UNIQUE_POINTER, ""))
+            file.update({CLASSIFICATION: classification})
         return files
 
     async def _handle_new(self) -> None:
@@ -279,13 +279,13 @@ class Handler:
 
         while True:
             files: list[dict] | dict | None = index_queue.get()
-            if files is None:
-                break
-            if isinstance(files, list):
+
+            if files is not None and isinstance(files, list):
                 batch.extend(files)
-            else:
+            elif files is not None:
                 batch.append(files)
-            if len(batch) >= self.BATCH_SIZE:
+
+            if len(batch) >= self.BATCH_SIZE or files is None:
                 end_wait = datetime.now()
                 start = datetime.now()
                 unique_files = self._clear_duplicates(batch)
@@ -304,23 +304,8 @@ class Handler:
                 batch = []
                 start_wait = datetime.now()
             index_queue.task_done()
-        if batch:
-            end_wait = datetime.now()
-            start = datetime.now()
-            unique_files = self._clear_duplicates(batch)
-            self.search_engine.open_writer()
-            for file in unique_files:
-                self.search_engine.add_file(file)
-            self.search_engine.close_writer()
-            index_time = (datetime.now() - start).total_seconds()
-            wait_time = (end_wait - start_wait).total_seconds()
-            total += len(unique_files)
-            dms_info(
-                f"Batch of {len(unique_files)} (total: {total}) commited"
-                + f", wait time: {round(wait_time, 3)}s"
-                + f", index time: {round(index_time, 3)}s"
-            )
-            batch = []
+            if files is None:
+                break
 
     def _decode_base64(self, file: dict) -> tuple[dict | None, bytes | None]:
         """Decode file content.

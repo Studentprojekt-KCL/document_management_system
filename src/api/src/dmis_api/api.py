@@ -8,7 +8,7 @@ from typing import Any
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
-import httpx
+import aiohttp
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.encoders import jsonable_encoder
@@ -29,8 +29,8 @@ class API:
     log_level: str | None = None
     upstream_urls: dict[str, str]
     token_verifier: TokenVerifier
-    http_client: httpx.AsyncClient
     required_scopes: dict[str, list[str]]
+    http_client: aiohttp.ClientSession | None
 
     def __init__(
         self,
@@ -39,12 +39,12 @@ class API:
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
-        self.app = FastAPI()
+        self.app = FastAPI(lifespan=self.lifespan)
 
         self.log_level = log_level
         self.upstream_urls = {key: value.rstrip("/") for key, value in upstream_urls.items()}
         self.token_verifier = token_verifier
-        self.http_client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0))
+        self.http_client = None
 
         self.app.add_exception_handler(
             RequestValidationError,
@@ -68,13 +68,20 @@ class API:
         self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
 
+    def create_http_client(self) -> aiohttp.ClientSession:
+        """Create aiohttp client with timeout."""
+        return aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120.0, sock_connect=10.0))
+
     @asynccontextmanager
-    async def lifespan(self) -> AsyncIterator[None]:
+    async def lifespan(self, _: FastAPI) -> AsyncIterator[None]:
         """Manage teardown."""
+        self.http_client = self.create_http_client()
         try:
             yield
         finally:
-            await self.http_client.aclose()
+            if self.http_client is not None:
+                await self.http_client.close()
+                self.http_client = None
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -119,14 +126,19 @@ class API:
             dms_info(f"API retrieved a GET request ({url}) with incorrect param format: {request.query_params}")
             return JSONResponse(status_code=400)
 
+        headers = {"Authorization": authorization} if authorization else {}
+
+        if self.http_client is None:
+            raise HTTPException(status_code=500)
+
         try:
-            response = await self.http_client.get(url, params=params, headers={"Authorization": authorization})
-            response.raise_for_status()
-            response_data = response.json()
+            async with self.http_client.get(url, params=params, headers=headers) as response:
+                response.raise_for_status()
+                response_data = await response.json()
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except httpx.HTTPError as exc:
+        except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
@@ -143,14 +155,19 @@ class API:
             dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {await request.body()}")
             return JSONResponse(status_code=400, content={})
 
+        headers = {"Authorization": authorization} if authorization else {}
+
+        if self.http_client is None:
+            raise HTTPException(status_code=500)
+
         try:
-            response = await self.http_client.post(url, params=params, json=body, headers={"Authorization": authorization})
-            response.raise_for_status()
-            response_data = response.json()
+            async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
+                response.raise_for_status()
+                response_data = await response.json()
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
-        except httpx.HTTPError as exc:
+        except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 

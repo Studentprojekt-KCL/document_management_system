@@ -12,7 +12,7 @@ import SearchMatches from '@/components/SearchMatches.vue'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary()
-const { pdfError, isGeneratingPDF, generatePDF } = useMdToPdf()
+const { pdfError, mergedHtml, isGeneratingPDF, generatePDF } = useMdToPdf()
 
 const selectedPointer = ref([rerankPointer.value]) // Start with the reranked file selected
 
@@ -38,9 +38,9 @@ const selectedCount = computed(() => selectedPointer.value.length)
           <button
             type="button"
             :disabled="isGeneratingPDF || selectedCount === 0"
-            @click="generatePDF(selectedPointer[0] || rerankPointer)"
+            @click="generatePDF(selectedPointer, rerankPointer.value)"
           >
-            {{ isGeneratingPDF ? 'Generating PDF...' : 'Generate PDF' }}
+            {{ isGeneratingPDF ? 'Generating PDF...' : 'Merge + Generate PDF' }}
           </button>
           <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
         </div>
@@ -59,6 +59,10 @@ const selectedCount = computed(() => selectedPointer.value.length)
       <div v-if="aiSummaryHtml" class="summary-result">
         <h2>Summary Result</h2>
         <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+      </div>
+      <div v-if="mergedHtml" class="merged-html-result">
+        <h2>Merged HTML</h2>
+        <div class="merged-html" v-html="mergedHtml"></div>
       </div>
     </div>
   </div>

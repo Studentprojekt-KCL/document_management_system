@@ -9,21 +9,13 @@
  */
 
 import { ref, computed, watch } from 'vue'
-import {
-  X,
-  StarsIcon,
-  CalendarDays,
-  HardDrive,
-  FileType2,
-  ExternalLink,
-  ShieldCheck,
-  Pencil,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-vue-next'
+import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink, Pencil, CheckCircle, AlertCircle } from 'lucide-vue-next'
 
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { hasRole } from '@/utils/auth'
+import ClassificationEditor from '@/components/ClassificationEditor.vue'
+import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
 import { hasRole } from '@/utils/auth'
 import { saveClassification } from '@/utils/api'
@@ -53,6 +45,79 @@ const {
 /* AI */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
+/* State */
+const isEditingClassification = ref(false)
+const classificationEditorRef = ref(null)
+const localSecurityLevel = ref('')
+
+/* Sync from metadata */
+watch(
+  () => previewSecurityClass.value,
+  (val) => {
+    localSecurityLevel.value = val || ''
+  },
+  { immediate: true }
+)
+
+/* Computed */
+const currentSecurityLevel = computed(() => localSecurityLevel.value)
+
+/* Permissions */
+const canEdit = computed(() => hasRole('admin'))
+
+/* notification */
+const notification = ref({ visible: false, success: true, message: '' })
+let notificationTimer = null
+
+const showNotification = (success, message) => {
+  if (notificationTimer) clearTimeout(notificationTimer)
+
+  notification.value = { visible: true, success, message }
+
+  notificationTimer = setTimeout(() => {
+    notification.value.visible = false
+  }, 4000)
+}
+
+/* Save classification */
+const handleClassificationSave = async (level) => {
+  try {
+    const response = await authFetch(API_PATHS.classification, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unique_pointer: uniquePointer.value,
+        classification: level
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`)
+    }
+
+    emit('update-security', {
+      uniquePointer: uniquePointer.value,
+      level
+    })
+
+    localSecurityLevel.value = level
+    showNotification(true, 'Security classification updated successfully.')
+    isEditingClassification.value = false
+  } catch (err) {
+    showNotification(false, `Update failed: ${err.message}`)
+  } finally {
+    classificationEditorRef.value?.resetSaving()
+  }
+}
+
+/* Reset UI */
+watch(
+  () => [props.selectedFile, props.open],
+  () => {
+    isEditingClassification.value = false
+    notification.value.visible = false
+  }
+)
 /* AI rerank composable */
 const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 /* State */
@@ -152,32 +217,6 @@ watch(
         <span class="tag">{{ previewFileDescription }}</span>
       </div>
 
-      <!-- SECURITY CLASSIFICATION -->
-      <section class="panel-section">
-        <div class="section-header">
-          <p class="section-title"><ShieldCheck :size="15" /> SECURITY CLASSIFICATION</p>
-
-          <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
-            <Pencil :size="14" />
-            Edit
-          </button>
-        </div>
-
-        <div class="classification-display">
-          <span :class="['classification-badge', `badge-${(currentSecurityLevel || 'none').toLowerCase()}`]">
-            {{ currentSecurityLevel || 'Not classified' }}
-          </span>
-        </div>
-        <div v-if="isEditingClassification">
-          <ClassificationEditor
-            ref="classificationEditorRef"
-            :current-level="currentSecurityLevel"
-            @save="handleClassificationSave"
-            @cancel="isEditingClassification = false"
-          />
-        </div>
-      </section>
-
       <!-- Technical Metadata section -->
       <section class="panel-section">
         <p class="section-title">TECHNICAL METADATA</p>
@@ -196,7 +235,13 @@ watch(
           </div>
           <div class="meta-cell">
             <span>Security Class</span>
-            <p>{{ currentSecurityLevel || 'Unknown' }}</p>
+            <div class="security-class-row">
+              <p>{{ currentSecurityLevel || 'Unknown' }}</p>
+              <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
+                <Pencil :size="14" />
+                Edit
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -234,6 +279,14 @@ watch(
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
+      <!-- MODAL -->
+      <ClassificationEditor
+        ref="classificationEditorRef"
+        :visible="isEditingClassification"
+        :current-level="currentSecurityLevel"
+        @save="handleClassificationSave"
+        @cancel="isEditingClassification = false"
+      />
 
       <!-- Rerank (similarity) section -->
       <section class="panel-section">
@@ -511,15 +564,8 @@ watch(
   cursor: not-allowed;
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.6rem;
-}
-
 .edit-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.35rem 0.7rem;
@@ -530,51 +576,19 @@ watch(
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  margin-left: auto;
+}
+
+.security-class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .edit-btn:hover {
   border-color: #7c3aed;
   color: #7c3aed;
   background: #faf5ff;
-}
-
-.classification-display {
-  margin-top: 0.25rem;
-}
-
-.classification-badge {
-  display: inline-block;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.badge-public {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
-}
-.badge-internal {
-  background: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
-}
-.badge-sensitive {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-.badge-confidential {
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-}
-.badge-none {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
 }
 
 .notification {

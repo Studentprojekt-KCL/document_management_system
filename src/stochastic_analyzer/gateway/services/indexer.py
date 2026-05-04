@@ -4,6 +4,10 @@ import hashlib
 from base64 import b64decode
 from dataclasses import dataclass
 from http import HTTPStatus
+from io import BytesIO
+
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 import httpx
 
@@ -184,10 +188,16 @@ class Indexer:
 
             texts, valid = [], []
             for f in batch:
+                name = f.get("metadata", {}).get("name", "?")
                 try:
-                    content = b64decode(f["content"]).decode("utf-8")[: self.max_chars]
-                except (UnicodeDecodeError, ValueError, KeyError):
-                    dms_warning(f"Failed to decode: {f.get('metadata', {}).get('name', '?')}")
+                    raw = b64decode(f["content"])
+                    if raw.startswith(b"%PDF-"):
+                        content = "\n".join(p.extract_text() or "" for p in PdfReader(BytesIO(raw)).pages)
+                    else:
+                        content = raw.decode("utf-8")
+                    content = content[: self.max_chars]
+                except (UnicodeDecodeError, ValueError, KeyError, PdfReadError):
+                    dms_warning(f"Failed to decode: {name}")
                     continue
                 if not content.strip():
                     continue

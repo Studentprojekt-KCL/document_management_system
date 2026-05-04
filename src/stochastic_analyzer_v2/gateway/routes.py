@@ -50,4 +50,10 @@ def create_router(
             raise HTTPException(status_code=500)
         return result
 
+    @router.post("/merge", response_model=SummaryResult)
+    async def merge(payload: PointerRequest) -> SummaryResult:
+        items = await connector.get_file_contents(payload.pointers)
+        result = await summarizer.merge(items)
+        return result
+
     return router

@@ -32,7 +32,7 @@ MERGE_STAGE_ONE_PROMPT = """Extract the main content of the following document a
 {content}
 </document>
 
-Write 2 to 4 short paragraphs in your own words. Preserve key details, names, dates, and arguments. 
+Write 2 short paragraphs in your own words. Preserve key details, names, dates, and arguments. 
 Do not use bullet points. No preamble."""
 
 
@@ -44,4 +44,4 @@ MERGE_STAGE_TWO_PROMPT = """Merge the following {doc_count} document extracts in
 
 Write a single coherent document in flowing prose that integrates all {doc_count} extracts. 
 Cover every extract; do not let any one dominate. Use paragraph breaks where natural. 
-No bullet points, no preamble, no section headers."""
+No bullet points, no preamble, no section headers. Keep it minimal and use fewer than 200 words"""

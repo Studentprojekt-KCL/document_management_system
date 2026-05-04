@@ -1,8 +1,9 @@
 """Summarize logic."""
 
 import aiohttp
+import asyncio
 
-from gateway.model_instructions import SUMMARIZER_SYSTEM_PROMPT, SUMMARIZE_PROMPT
+from gateway.model_instructions import SUMMARIZER_SYSTEM_PROMPT, SUMMARIZE_PROMPT, MERGE_STAGE_ONE_PROMPT, MERGE_STAGE_TWO_PROMPT
 from gateway.schemas import InputItem, SummaryResult
 
 from shared_functions.dmis_logger import dms_warning
@@ -35,6 +36,15 @@ class Summarizer:
             dms_warning("No response recieved")
             return None
         return SummaryResult(summary=result)
+
+    async def merge(self, items: list[InputItem]) -> SummaryResult | None:
+        """Handle merging multiple documents into one amazing new document."""
+        tasks = [self._call_llm(MERGE_STAGE_ONE_PROMPT.format(content=item.content)) for item in items]
+        extracts = [e for e in await asyncio.gather(*tasks) if e is not None]
+        combined = "\n\n".join(extracts)
+        prompt = MERGE_STAGE_TWO_PROMPT.format(doc_count=len(extracts), combined_summaries=combined)
+        result = await self._call_llm(prompt)
+        return SummaryResult(summary=result) if result else None
 
     async def _call_llm(self, prompt: str) -> str | None:
         """Send the prompt to an LLM and return response text."""

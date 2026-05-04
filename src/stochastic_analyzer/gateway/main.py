@@ -17,10 +17,15 @@ from gateway.routes import Services, create_router
 from gateway.services.classifier import Classifier
 from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
+from gateway.services.merger import Merger
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
+from gateway.services.token_counter import TokenCounter, MergeLimits
 
-from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.initialisation_tools import (
+    read_env_variable,
+    read_port,
+)
 
 
 def _parse_log_level() -> str:
@@ -76,12 +81,14 @@ class API:
         services = Services(
             connector=Connector.from_env(self.http_client),
             summarizer=Summarizer.from_env(self.http_client),
+            merger=Merger.from_env(self.http_client),
             classifier=Classifier.from_env(self.http_client),
             pdf_converter=PdfConverter(),
             indexer=Indexer.from_env(self.http_client),
+            token_counter=TokenCounter.from_env(),
         )
 
-        self.app.include_router(create_router(services))
+        self.app.include_router(create_router(services, MergeLimits.from_env()))
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
     @asynccontextmanager

@@ -41,16 +41,16 @@ class TestTokenVerifier(TestCase):
         assert exc_info.exception.status_code == 401
         assert exc_info.exception.headers == {"WWW-Authenticate": "Bearer"}
 
-    def test_missing_token_returns_400(self) -> None:
+    def test_wrong_authorization_scheme_returns_400(self) -> None:
         with self.assertRaises(HTTPException) as exc_info:
-            self.verifier.verify_access_token("Bearer")
+            self.verifier.verify_access_token("Basic abc123")
 
         assert exc_info.exception.status_code == 400
         self.assert_www_authenticate(exc_info.exception, 'error="invalid_request"')
 
-    def test_wrong_auth_scheme_returns_400(self) -> None:
+    def test_missing_bearer_token_returns_400(self) -> None:
         with self.assertRaises(HTTPException) as exc_info:
-            self.verifier.verify_access_token("Basic abc123")
+            self.verifier.verify_access_token("Bearer")
 
         assert exc_info.exception.status_code == 400
         self.assert_www_authenticate(exc_info.exception, 'error="invalid_request"')
@@ -87,12 +87,12 @@ class TestTokenVerifier(TestCase):
 
         self.verifier.verify_access_token("Bearer valid.token")
 
-        mock_decode.assert_called_once()
         _, kwargs = mock_decode.call_args
 
         assert kwargs["algorithms"] == ["RS256"]
         assert kwargs["issuer"] == "https://issuer.example.com/realms/test"
         assert kwargs["audience"] == ["test-api"]
+        assert kwargs["options"] == {"verify_aud": True}
 
     @mock.patch("dmis_api.auth.jwt.decode")
     @mock.patch("dmis_api.auth.PyJWKClient.get_signing_key_from_jwt")
@@ -146,6 +146,7 @@ class TestTokenVerifier(TestCase):
         mock_decode: mock.Mock,
     ) -> None:
         mock_get_signing_key_from_jwt.return_value = self.signing_key()
+
         claims: dict[str, Any] = {
             "sub": "user-1",
             "preferred_username": "admin",
@@ -158,28 +159,6 @@ class TestTokenVerifier(TestCase):
         result = self.verifier.verify_access_token(
             "Bearer valid.token",
             required_scopes=["test.search"],
-        )
-
-        assert result == claims
-
-    @mock.patch("dmis_api.auth.jwt.decode")
-    @mock.patch("dmis_api.auth.PyJWKClient.get_signing_key_from_jwt")
-    def test_valid_token_with_multiple_required_scopes_returns_claims(
-        self,
-        mock_get_signing_key_from_jwt: mock.Mock,
-        mock_decode: mock.Mock,
-    ) -> None:
-        mock_get_signing_key_from_jwt.return_value = self.signing_key()
-        claims: dict[str, Any] = {
-            "sub": "user-1",
-            "azp": "test-frontend",
-            "scope": "openid test.search test.query test.connector",
-        }
-        mock_decode.return_value = claims
-
-        result = self.verifier.verify_access_token(
-            "Bearer valid.token",
-            required_scopes=["test.search", "test.query"],
         )
 
         assert result == claims

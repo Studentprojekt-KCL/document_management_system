@@ -1,7 +1,7 @@
 """Summarize logic."""
 
-import aiohttp
 import asyncio
+import aiohttp
 
 from gateway.model_instructions import SUMMARIZER_SYSTEM_PROMPT, SUMMARIZE_PROMPT, MERGE_STAGE_ONE_PROMPT, MERGE_STAGE_TWO_PROMPT
 from gateway.schemas import InputItem, SummaryResult

@@ -22,6 +22,7 @@ from shared_functions.initialisation_tools import read_env_variable, read_port
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
+
 class API:
     """Management class for main API."""
 
@@ -282,6 +283,7 @@ class API:
             required_scopes=self.required_scopes["congateway"],
         )
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
+
 
 # pylint: disable=too-many-locals
 def run() -> None:

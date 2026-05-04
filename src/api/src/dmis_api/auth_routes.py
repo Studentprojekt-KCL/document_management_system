@@ -9,6 +9,7 @@ import httpx
 from fastapi import Cookie, Form
 from fastapi.responses import JSONResponse
 
+
 class AuthRoutes:
     """Authentication route handlers."""
 
@@ -109,11 +110,7 @@ class AuthRoutes:
         if not claims:
             return self._unauthenticated_response()
 
-        client_roles = (
-            claims.get("resource_access", {})
-            .get(self.dmisapi_client_id, {})
-            .get("roles", [])
-        )
+        client_roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
         realm_roles = claims.get("realm_access", {}).get("roles", [])
 
         return JSONResponse(

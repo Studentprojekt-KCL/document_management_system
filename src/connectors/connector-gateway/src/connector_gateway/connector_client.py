@@ -4,6 +4,7 @@ import asyncio
 import json
 import httpx
 
+from fastapi.responses import RedirectResponse
 from shared_functions.dmis_logger import dms_error, dms_warning
 
 
@@ -129,7 +130,7 @@ class ConnectorClient:
             if not isinstance(connector_url, str):
                 dms_error(f"Sourcesystem is missing connector_url for {source_system}")
                 return []
-            response = await self.http_client.get(f"{connector_url.rstrip('/')}/defined_fields")
+            response = await self.http_client.get(f"{connector_url}/defined_fields")
             try:
                 list_object = response.json()
                 defined_fields.extend(list_object)
@@ -145,3 +146,26 @@ class ConnectorClient:
                 {"name": source_system["name"], "endpoint": f"/auth_user&source_system={source_system['name'].lower()}"}
             )
         return auth_user_endpoints
+
+    def _set_callback_url(self, referer: str) -> str:
+        """takes referer header in original request and sets the auth_callback endpoint"""
+        return f"{self._slice_url_to_host_and_proto(referer)}/auth_callback"
+
+    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
+        """redirects user to source system for authentication"""
+        auth_url = ""
+        for system in self.source_systems:
+            if system["name"].lower() == source_system.lower():
+                auth_url = f"{system["connector_url"]}/auth_user"
+                break
+        if not isinstance(auth_url, str):
+            return
+        get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
+        try:
+            response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
+            return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
+        except httpx.TimeoutException:
+            dms_warning("Request timed out")
+        except httpx.HTTPError:
+            dms_warning(f"Failed to connect to connector, url: {auth_url} ")
+        return None

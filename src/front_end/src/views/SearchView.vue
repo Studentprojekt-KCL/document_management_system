@@ -53,15 +53,17 @@ const searchPayload = (query, documentsOnly) => {
 }
 
 /* Performs a search when the SearchBar emits a search event */
-const handleSearch = async ({ query, documentsOnly }) => {
+const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
   documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
   error.value = ''
-  matches.value = []
-  selectedFile.value = ''
-  selectedMatch.value = null
-  isPreviewOpen.value = false
+  if (resetPreview) {
+    matches.value = []
+    selectedFile.value = ''
+    selectedMatch.value = null
+    isPreviewOpen.value = false
+  }
 
   if (!query || !query.trim()) {
     error.value = 'Please enter a search term.'
@@ -160,6 +162,17 @@ const handleFilterChange = (filters) => {
     return typeMatch && securityMatch
   })
 }
+// searching a second time automatically to update the security levels
+const refreshCurrentSearch = async () => {
+  // prevents empty search.
+  if (!lastQuery.value || !lastQuery.value.trim()) return
+
+  await handleSearch({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false
+  })
+}
 </script>
 
 <template>
@@ -181,6 +194,7 @@ const handleFilterChange = (filters) => {
       :selected-match="selectedMatch"
       :matches="matches"
       @close="closePreview"
+      @update-security="refreshCurrentSearch"
     />
   </section>
 </template>

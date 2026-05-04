@@ -13,7 +13,6 @@ import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Cookie
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from shared_functions.dmis_logger import dms_warning, dms_info
@@ -64,18 +63,6 @@ class API:
         self.app.add_exception_handler(
             RequestValidationError,
             self.validation_exception_handler,
-        )
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[
-                "http://localhost:8080",
-                "http://127.0.0.1:8080",
-                "http://localhost:5174",
-                "http://127.0.0.1:5174",
-            ],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
         )
 
         searcheng_scope_raw = read_env_variable("DMISAPI_SEARCHENG_SCOPE", required=False)

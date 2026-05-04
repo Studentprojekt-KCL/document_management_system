@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from contextlib import contextmanager
 import json
 from os import listdir, mkdir, path, remove
@@ -181,11 +181,10 @@ class SearchEngine:
                 break
         return matching
 
-
     @contextmanager
-    def open_writer(self):
+    def open_writer(self) -> Generator:
         """Init index writer."""
-        self.writer_lock.acquire() 
+        self.writer_lock.acquire()
         self.writer = self.index.writer()
         yield
         self.writer.commit()

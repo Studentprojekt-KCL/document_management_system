@@ -35,6 +35,7 @@ IP_SEARCH_ENGINE=<IP address for search-engine container>
 IP_DMISAPI=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
 IP_CONGITLAB=<IP address for connector-gitlab container>
+IP_CONGITHUB=<IP address for connector-github container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
@@ -75,6 +76,20 @@ CONGITLAB_MINIO_USERNAME=<username>
 CONGITLAB_MINIO_PASSWORD=<password>
 CONGITLAB_BIND_ADDR=<bind address>
 CONGITLAB_SYSTEM_NAME:<system name>
+CONGITLAB_GITLAB_CLIENT_ID=<OAuth App client ID>
+CONGITLAB_GITLAB_CLIENT_SECRET=<OAuth App client secret>
+CONGITLAB_STATE_SIGNING_SECRET=<random HMAC secret>
+
+# connector-github
+CONGITHUB_BIND_PORT=<port number>
+CONGITHUB_BIND_ADDR=<bind address>
+CONGITHUB_GITHUB_API_URL=<GitHub API base URL>        # e.g. https://api.github.com/
+CONGITHUB_GITHUB_BASE_URL=<GitHub base URL>           # e.g. https://github.com
+CONGITHUB_GITHUB_SYSTEM_NAME=<source system name>
+CONGITHUB_GITHUB_API_VERSION=<API version>            # e.g. 2022-11-28
+CONGITHUB_CLIENT_ID=<GitHub OAuth App client ID>
+CONGITHUB_CLIENT_SECRET=<GitHub OAuth App client secret>
+CONGITHUB_STATE_SIGNING_SECRET=<random HMAC secret>
 
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>

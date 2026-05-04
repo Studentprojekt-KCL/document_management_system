@@ -43,20 +43,64 @@ const selectedFilters = ref({
   security: []
 })
 
-const searchPayload = (query, documentsOnly) => {
+const quoteTerm = (value) => `"${String(value).replace(/"/g, '\\"')}"`
+
+const buildFilterQuery = (values) => values.map(quoteTerm).join(' OR ')
+
+const searchPayload = (query, documentsOnly, filters) => {
   const payload = {
     content: query
   }
+
   if (documentsOnly) {
     payload.documents_only = 'true'
   }
+
+  if (filters.security.length > 0) {
+    payload.security_class = buildFilterQuery(filters.security)
+  }
+
+  const typeValues = [...new Set(filters.type.flatMap((group) => group.split('|').filter(Boolean)))]
+  if (typeValues.length > 0) {
+    payload.file_type = buildFilterQuery(typeValues)
+  }
+
+  if (filters.source.length > 0) {
+    payload.source = buildFilterQuery(filters.source)
+  }
+
   return payload
+}
+
+const applyLocalFilters = (resultArray, filters) => {
+  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
+    return resultArray
+  }
+
+  return resultArray.filter((match) => {
+    const filetype = resolveDocumentExtension(match).toLowerCase()
+    const securityClass = resolveSecurityClass(match).toLowerCase()
+
+    const typeMatch =
+      filters.type.length === 0 ||
+      filters.type.some((selected) => {
+        const extensions = selected.split('|')
+        return extensions.some((ext) => filetype === ext.toLowerCase())
+      })
+
+    const securityMatch =
+      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+
+    return typeMatch && securityMatch
+  })
 }
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
+  const normalizedQuery = query?.trim() || ''
+
   documentsOnlyMode.value = documentsOnly
-  lastQuery.value = query
+  lastQuery.value = normalizedQuery
 
   error.value = ''
   if (resetPreview) {
@@ -66,7 +110,7 @@ const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
     isPreviewOpen.value = false
   }
 
-  if (!query || !query.trim()) {
+  if (!normalizedQuery) {
     error.value = 'Please enter a search term.'
     return
   }
@@ -77,7 +121,7 @@ const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
       count: String(SEARCH_COUNT),
       offset: String(SEARCH_OFFSET)
     })
-    const payload = searchPayload(query, documentsOnly)
+    const payload = searchPayload(normalizedQuery, documentsOnly, selectedFilters.value)
 
     const res = await authFetch(`${API_PATHS.search}?${params.toString()}`, {
       method: 'POST',
@@ -95,7 +139,7 @@ const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
     const resultArray = Array.isArray(data) ? data : data.results || data.matches || []
 
     allMatches.value = resultArray
-    matches.value = resultArray
+    matches.value = applyLocalFilters(resultArray, selectedFilters.value)
 
     if (matches.value.length === 0) {
       error.value = 'No matching files found.'
@@ -132,36 +176,7 @@ const closePreview = () => {
 /* Handle changes to search filters  */
 const handleFilterChange = (filters) => {
   selectedFilters.value = filters
-  // If no filters → show everything
-  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
-    matches.value = allMatches.value
-    return
-  }
-  matches.value = allMatches.value.filter((match) => {
-    const filetype = resolveDocumentExtension(match).toLowerCase()
-    const securityClass = resolveSecurityClass(match).toLowerCase()
-    // const source = (match.source || '').toLowerCase()
-
-    // TYPE FILTER
-    const typeMatch =
-      filters.type.length === 0 ||
-      filters.type.some((selected) => {
-        // Split the group string from json file (e.g., ".docx|.doc|.odt") and check if filetype is in it
-        const extensions = selected.split('|')
-        return extensions.some((ext) => filetype === ext.toLowerCase())
-      })
-
-    // SOURCE FILTER
-    //const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
-
-    // SECURITY FILTER
-    const securityMatch =
-      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
-
-    // add sourceMatch later
-    // return typeMatch && sourceMatch && securityMatch
-    return typeMatch && securityMatch
-  })
+  matches.value = applyLocalFilters(allMatches.value, filters)
 }
 // searching a second time automatically to update the security levels
 const refreshCurrentSearch = async () => {

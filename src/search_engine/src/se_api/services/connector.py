@@ -108,11 +108,11 @@ class Connector:
             response.raise_for_status()
             return response.json()
         except httpx.TimeoutException:
-            dms_warning(f"Request timed out, url: {self.GET_FILE_ENDPOINT}")
+            dms_warning(f"Request timed out, url: {self.GET_FIELDS}")
         except JSONDecodeError:
-            dms_warning(f"Failed to parse JSON, url: {self.GET_FILE_ENDPOINT}.")
+            dms_warning(f"Failed to parse JSON, url: {self.GET_FIELDS}.")
         except httpx.HTTPError:
-            dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
+            dms_warning(f"Invalid HTTP response, url: {self.GET_FIELDS}.")
         return None
 
     async def stream(self, stream_url: str) -> AsyncGenerator:

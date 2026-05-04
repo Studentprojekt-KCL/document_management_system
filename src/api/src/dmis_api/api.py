@@ -87,6 +87,7 @@ class API:
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
         self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
+
     def create_http_client(self) -> aiohttp.ClientSession:
         """Create aiohttp client with timeout."""
         return aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120.0, sock_connect=10.0))

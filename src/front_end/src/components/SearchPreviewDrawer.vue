@@ -15,7 +15,7 @@ import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
 import { hasRole } from '@/utils/auth'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
-import { saveClassification } from '@/utils/api'
+import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
 
 /* Props */
@@ -80,14 +80,25 @@ const showNotification = (success, message) => {
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
-    await saveClassification(uniquePointer.value, level)
+    const response = await authFetch(API_PATHS.classification, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unique_pointer: uniquePointer.value,
+        classification: level
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`)
+    }
+
     emit('update-security', {
       uniquePointer: uniquePointer.value,
       level
     })
 
     localSecurityLevel.value = level
-
     showNotification(true, 'Security classification updated successfully.')
     isEditingClassification.value = false
   } catch (err) {

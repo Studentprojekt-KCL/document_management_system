@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+import pytest
 from unittest import TestCase, mock
 
 from interfacer import GitLab
@@ -78,14 +79,15 @@ class TestGitLab(TestCase):
         self.instance.file_extensions = [".txt"]
         self.instance.extension_descriptions = {".txt": "text file"}
 
-    def test_execute_request(self):
-        """Test _execute_request method."""
-        assert self.instance._execute_get_request(url="", headers={}) == self.CORRECT_DATA
+    async def test_execute_request(self):
+        """Test execute_request method."""
+        assert await self.instance.execute_get_request(url="", headers={}) == self.CORRECT_DATA
 
-    def test_get_file(self):
+    async def test_get_file(self):
         """Test get_file method."""
         self.instance.source_system = "system"
-        assert self.instance.get_file("test_url", include_content=True) == {
+        result = await self.instance.get_file("test_url", include_content=True)
+        assert result == {
             "unique_pointer": "test_url",
             "name": "test_file.txt",
             "size": 0,

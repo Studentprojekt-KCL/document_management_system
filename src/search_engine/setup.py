@@ -10,6 +10,7 @@ setup(
         "fastapi[standard]>=0.128",
         "tantivy>=0.25",
         "httpx>=0.28",
+        "markitdown[pptx, docx, xlsx, xls, pdf]>=0.1.5",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

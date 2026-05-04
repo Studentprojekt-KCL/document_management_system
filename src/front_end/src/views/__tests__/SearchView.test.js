@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 
 /* ── Mock dependencies ── */
 
@@ -23,7 +23,6 @@ vi.mock('@/composables/useSearchMetadata', () => ({
 
 /* Mock useReload */
 vi.mock('@/composables/useReload', () => {
-  const { ref } = require('vue')
   return {
     useReload: (key, defaultValue) => ({
       state: ref(defaultValue),

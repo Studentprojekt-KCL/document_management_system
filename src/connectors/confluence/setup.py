@@ -1,17 +1,15 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 from pathlib import Path
+
 from setuptools import setup
 
-shared_lib_path = (Path(__file__).parent / "../shared_functions").resolve().as_uri()
-
+shared_lib_path = (Path(__file__).parent / "../../shared_functions").resolve().as_uri()
 
 setup(
     install_requires=[
         "fastapi[standard]>=0.128",
-        "aiohttp>=3.12",
-        "uvicorn>=0.30",
-        "pyjwt[crypto]",
+        "httpx>=0.28",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

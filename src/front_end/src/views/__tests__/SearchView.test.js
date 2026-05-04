@@ -150,14 +150,15 @@ describe('SearchView', () => {
       expect(mockAuthFetch.mock.calls[0][0]).toContain('/search')
     })
 
-    it('encodes the query parameter', async () => {
+    it('sends the query in the request body', async () => {
       mockSuccessResponse()
       const wrapper = mountView()
       emitSearch(wrapper, 'hello world')
       await flushPromises()
 
       const [url] = mockAuthFetch.mock.calls[0]
-      expect(url).toContain('hello%20world')
+      const body = JSON.parse(mockAuthFetch.mock.calls[0][1].body)
+      expect(body.content).toBe('hello world')
     })
 
     it('passes results to SearchMatches after successful search', async () => {

@@ -14,5 +14,6 @@ setup(
         "httpx",
         "markdown-pdf>=1.13.1",
         f"shared-functions @ {shared_lib_path}",
+        "pypdf>=5.0",
     ]
 )

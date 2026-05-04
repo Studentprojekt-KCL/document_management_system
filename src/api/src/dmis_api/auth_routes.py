@@ -90,7 +90,7 @@ class AuthRoutes:
             response = await resp.json()
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
             dms_warning(f"Recieved response which could not be JSON decoded from {self.ad_token_url}, (err: {err})")
-            raise HTTPException(status_code=502) # pylint: disable=W0707
+            raise HTTPException(status_code=502)  # pylint: disable=W0707
         if resp.status != 200:
             dms_warning(f"Recieved unexpected response code ({resp.status}) from {self.ad_token_url}")
             raise HTTPException(status_code=502)

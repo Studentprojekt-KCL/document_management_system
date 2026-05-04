@@ -14,9 +14,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
 from interfacer_sharepoint import SharePoint
+
 from shared_functions.dmis_logger import dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
 from shared_functions.signing_tools import sign_encode_state, validate_decode_state
+
+MS_LOGIN_BASE = "https://login.microsoftonline.com"
 
 
 class API:
@@ -91,7 +94,7 @@ class API:
         payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
         signed_state = sign_encode_state(payload, self.state_secret)
 
-        auth_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/authorize"
+        auth_url = f"{MS_LOGIN_BASE}/{self.tenant_id}/oauth2/v2.0/authorize"
         params = {
             "client_id": self.client_id,
             "redirect_uri": str(request.url_for("callback")),
@@ -112,7 +115,7 @@ class API:
         if not validation_status:
             return JSONResponse(content="ERROR", status_code=403)
 
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        token_url = f"{MS_LOGIN_BASE}/{self.tenant_id}/oauth2/v2.0/token"
         async with httpx.AsyncClient(cookies={}) as client:
             token_resp = await client.post(
                 token_url,
@@ -133,7 +136,7 @@ class API:
 
     async def refresh_token(self, refresh_token: Annotated[str | None, Header()] = None) -> JSONResponse:
         """Refresh a Microsoft access token using a refresh token."""
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        token_url = f"{MS_LOGIN_BASE}/{self.tenant_id}/oauth2/v2.0/token"
         async with httpx.AsyncClient(cookies={}) as client:
             response = await client.post(
                 token_url,

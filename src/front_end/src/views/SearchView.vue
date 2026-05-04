@@ -32,12 +32,26 @@ const { state: lastQuery } = useReload('lastQuery', '')
 const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
 const documentsOnlyMode = ref(true)
 
+/* Number of search results to fetch, possible to change. */
+const SEARCH_COUNT = 20
+const SEARCH_OFFSET = 0
+
 /* Filters so it can access matches */
 const selectedFilters = ref({
   source: [],
   type: [],
   security: []
 })
+
+const searchPayload = (query, documentsOnly) => {
+  const payload = {
+    content: query
+  }
+  if (documentsOnly) {
+    payload.documents_only = 'true'
+  }
+  return payload
+}
 
 /* Performs a search when the SearchBar emits a search event */
 const handleSearch = async ({ query, documentsOnly }) => {
@@ -57,7 +71,17 @@ const handleSearch = async ({ query, documentsOnly }) => {
 
   isSearching.value = true
   try {
-    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}&documents_only=${documentsOnly}`)
+    const params = new URLSearchParams({
+      count: String(SEARCH_COUNT),
+      offset: String(SEARCH_OFFSET)
+    })
+    const payload = searchPayload(query, documentsOnly)
+
+    const res = await authFetch(`${API_PATHS.search}?${params.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
     console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`

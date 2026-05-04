@@ -20,7 +20,6 @@ import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/us
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useReload } from '@/composables/useReload'
 
-
 /* Reactive state variables for search results and UI state */
 const error = ref('')
 const isSearching = ref(false)
@@ -175,7 +174,6 @@ const refreshCurrentSearch = async () => {
     resetPreview: false
   })
 }
-
 </script>
 
 <template>

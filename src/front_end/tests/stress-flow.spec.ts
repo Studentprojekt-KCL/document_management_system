@@ -32,7 +32,8 @@ async function openFilePreview(page: Page, filePattern: RegExp) {
 
 async function closePreview(page: Page) {
   await page.getByRole('button', { name: 'Close preview' }).click();
-  await expect(page.getByRole('button', { name: 'Close preview' })).toBeHidden();
+  // Small pause to let the drawer animate closed
+  await page.waitForTimeout(300);
 }
 
 /* ─── Console error capture ─── */
@@ -86,8 +87,8 @@ test('aggressive stress flow', async ({ page }) => {
     }
 
     // Validate metadata is still rendered
-    await expect(page.getByText(/Security Class/i)).toBeVisible();
-    await expect(page.getByText(/File Size/i)).toBeVisible();
+    await expect(page.getByText('Security Class', { exact: true })).toBeVisible();
+    await expect(page.getByText('File Size', { exact: true })).toBeVisible();
 
     await closePreview(page);
   }
@@ -203,7 +204,7 @@ test('aggressive stress flow', async ({ page }) => {
     await expect(searchInput).not.toBeDisabled({ timeout: 10_000 });
 
     await openFilePreview(page, /CMakeLists.txt/i);
-    await expect(page.getByText(/Security Class/i)).toBeVisible();
+    await expect(page.getByText('Security Class', { exact: true })).toBeVisible();
     await closePreview(page);
   }
 

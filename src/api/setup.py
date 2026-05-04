@@ -9,7 +9,7 @@ shared_lib_path = (Path(__file__).parent / "../shared_functions").resolve().as_u
 setup(
     install_requires=[
         "fastapi[standard]>=0.128",
-        "httpx>=0.28",
+        "aiohttp>=3.12",
         "uvicorn>=0.30",
         "pyjwt[crypto]",
         f"shared-functions @ {shared_lib_path}",

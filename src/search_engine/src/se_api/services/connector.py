@@ -28,12 +28,12 @@ class Connector:
     TIMEOUT: int = 120
 
     GET_FILE_ENDPOINT: str = "/get_files"
+    GET_FIELDS: str = "/defined_fields"
     STREAM_ENDPOINT: str = "/stream_files_to_index"
     DATA_FILE: str = "/data"
 
     subdata: dict[str, str | None]
 
-    index_needed_bool: str
     url_files_to_index: str
     url_get_files: str
     data_path: str
@@ -42,9 +42,9 @@ class Connector:
 
     def __init__(self) -> None:
         """Constructor"""
-        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")
+        address = read_env_variable("SEARCHENG_CONGATEWAY_URL").rstrip("/")  # type: ignore
         self.client = AsyncClient(base_url=address)
-        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"
+        self.data_path = f"{read_env_variable("SEARCHENG_WORKING_DIRECTORY").rstrip("/")}{self.DATA_FILE}"  # type: ignore
         try:
             with shelve.open(self.data_path) as f:
                 self.subdata = f.get("subdata", {})
@@ -93,6 +93,26 @@ class Connector:
             dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
         return fetch_queue
 
+    async def get_fields(self) -> list[str] | None:
+        """Fetch fields from connector.
+
+        Returns: list of fields
+        """
+        try:
+            response = await self.client.get(
+                self.GET_FIELDS,
+                timeout=Connector.TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            dms_warning(f"Request timed out, url: {self.GET_FILE_ENDPOINT}")
+        except JSONDecodeError:
+            dms_warning(f"Failed to parse JSON, url: {self.GET_FILE_ENDPOINT}.")
+        except httpx.HTTPError:
+            dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
+        return None
+
     async def stream(self, stream_url: str) -> AsyncGenerator:
         """Open stream connection to connector.
 
@@ -105,10 +125,7 @@ class Connector:
             subdata: str | None = None
             data: dict
             async with client.stream(
-                "GET",
-                stream_url,
-                timeout=self.TIMEOUT,
-                params=[("subdata", prev_subdata)] if prev_subdata is not None else None,
+                "POST", stream_url, timeout=self.TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
             ) as stream:
                 async for chunk in stream.aiter_text():
                     raw += chunk

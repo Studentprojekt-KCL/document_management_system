@@ -27,11 +27,14 @@ def authorize_and_get_token(authorization: str | None, ad_issuer: str, openid_co
     except jwt.exceptions.DecodeError:
         return False, {}
 
-    claims = jwt.decode(
-        token,
-        signing_key.key,
-        algorithms=["RS256"],
-        issuer=ad_issuer,
-        options={"verify_aud": False},
-    )
+    try:
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=ad_issuer,
+            options={"verify_aud": False},
+        )
+    except jwt.exceptions.ExpiredSignatureError:
+        return False, {}
     return True, claims

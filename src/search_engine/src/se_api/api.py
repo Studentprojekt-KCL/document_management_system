@@ -152,6 +152,13 @@ class API:
         """Retrieve file types labeled as documents only."""
         return self.documents_only_rescource
 
+    async def get_classifications(self) -> list[str]:
+        """Get classifications.
+
+        Returns: list of classifications labels.
+        """
+        return self.handler.get_classifications()
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

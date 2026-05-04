@@ -5,7 +5,7 @@ import logging
 
 import httpx
 
-from se_api.constants import CLASSIFICATION, TIMEOUT
+from se_api.constants import CLASSIFICATION, CONTENT, TIMEOUT
 
 from shared_functions.initialisation_tools import read_env_variable, read_float_env_variable
 from shared_functions.dmis_logger import dms_warning
@@ -47,7 +47,7 @@ class Classifier:
         inputs = []
         for item in items:
             doc_name = item.get("name", "Unknown Document")
-            content = item.get("content", "")[: self.MAX_CHARS]
+            content = item.get(CONTENT, "")[: self.MAX_CHARS]
             rich_context = f"Name: {doc_name}. Content: {content}"
 
             for trigger in self.LABEL_TRIGGERS:

@@ -14,7 +14,7 @@ from tantivy import (
     Searcher,
 )
 
-from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
+from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, CONTENT, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_documents_only_rescource
@@ -204,7 +204,7 @@ class SearchEngine:
             return
         unique_pointer: str | None = file.get(UNIQUE_POINTER)
         if unique_pointer is None:
-            dms_warning(f"File is missing unique pointer: {file.update({"content": ""})}.")
+            dms_warning(f"File is missing unique pointer: {file.update({CONTENT: ""})}.")
             return
         searcher: Searcher = self.index.searcher()
         matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))

@@ -11,6 +11,7 @@ from fastapi import HTTPException
 import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
+from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, UNIQUE_POINTER
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
@@ -59,6 +60,15 @@ class Handler:
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
         dms_info("Search engine was reset.")
+
+    def get_classifications(self) -> list[str]:
+        """Get list of classifications.
+
+        Returns: list of classifications.
+        """
+        classifications = self.classifier.LABELS
+        classifications.append("Pending")
+        return classifications
 
     def find_matching(self, pointer: str, count: int | None = None) -> dict:
         """Grab pointers for matching files.
@@ -159,7 +169,9 @@ class Handler:
         indexer_thread.start()
 
         fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, decode_queue)) for _ in range(self.FETCH_WORKERS)]
-        decode_tasks: list = [create_task(self._decode_content(decode_queue, classify_queue)) for _ in range(self.DECODE_WORKERS)]
+        decode_tasks: list = [
+            create_task(self._decode_content(decode_queue, classify_queue, index_queue)) for _ in range(self.DECODE_WORKERS)
+        ]
         classify_tasks: list = [
             create_task(self._classify_content(classify_queue, index_queue)) for _ in range(self.CLASSIFY_WORKERS)
         ]
@@ -209,7 +221,7 @@ class Handler:
                 dms_warning(f"Failed to connect to {stream_url}.")
             fetch_queue.task_done()
 
-    async def _decode_content(self, decode_queue: Queue, classify_queue: Queue) -> None:
+    async def _decode_content(self, decode_queue: Queue, classify_queue: Queue, index_queue: queue.Queue) -> None:
         """Format and transfer file to search engine indexing queue.
 
         index_queue: queue containing all the ready files to index.
@@ -223,8 +235,9 @@ class Handler:
             file, raw_content = await loop.run_in_executor(None, self._decode_base64, file)
             if file is None or raw_content is None:
                 continue
-            content = await loop.run_in_executor(None, self._convert_content, raw_content, file.get("file_type"))
-            file["content"] = content
+            file[CONTENT] = await loop.run_in_executor(None, self._convert_content, raw_content)
+            file[CLASSIFICATION] = "Pending"
+            await loop.run_in_executor(None, index_queue.put, file)
             await classify_queue.put(file)
             decode_queue.task_done()
 
@@ -259,25 +272,32 @@ class Handler:
             task_queue: queue containing all the files to add.
         """
         batch: list[dict] = []
+        unique_files: list[dict]
         total: int = 0
+
         start_wait = datetime.now()
+
         while True:
-            files: dict | None = index_queue.get()
+            files: list[dict] | dict | None = index_queue.get()
             if files is None:
                 break
-            batch.extend(files)
+            if isinstance(files, list):
+                batch.extend(files)
+            else:
+                batch.append(files)
             if len(batch) >= self.BATCH_SIZE:
                 end_wait = datetime.now()
                 start = datetime.now()
+                unique_files = self._clear_duplicates(batch)
                 self.search_engine.open_writer()
-                for file in batch:
+                for file in unique_files:
                     self.search_engine.add_file(file)
                 self.search_engine.close_writer()
                 index_time = (datetime.now() - start).total_seconds()
                 wait_time = (end_wait - start_wait).total_seconds()
-                total += len(batch)
+                total += len(unique_files)
                 dms_info(
-                    f"Batch of {len(batch)} (total: {total}) commited"
+                    f"Batch of {len(unique_files)} (total: {total}) commited"
                     + f", wait time: {round(wait_time, 3)}s"
                     + f", index time: {round(index_time, 3)}s"
                 )
@@ -287,15 +307,16 @@ class Handler:
         if batch:
             end_wait = datetime.now()
             start = datetime.now()
+            unique_files = self._clear_duplicates(batch)
             self.search_engine.open_writer()
-            for file in batch:
+            for file in unique_files:
                 self.search_engine.add_file(file)
             self.search_engine.close_writer()
             index_time = (datetime.now() - start).total_seconds()
             wait_time = (end_wait - start_wait).total_seconds()
-            total += len(batch)
+            total += len(unique_files)
             dms_info(
-                f"Batch of {len(batch)} (total: {total}) commited"
+                f"Batch of {len(unique_files)} (total: {total}) commited"
                 + f", wait time: {round(wait_time, 3)}s"
                 + f", index time: {round(index_time, 3)}s"
             )
@@ -317,7 +338,8 @@ class Handler:
         content_bytes: bytes = base64.b64decode(content)
         return flat_file, content_bytes
 
-    def _convert_content(self, content: bytes, file_type: str | None) -> str:
+    @staticmethod
+    def _convert_content(content: bytes) -> str:
         """Try to convert content into markdown.
 
         Args:
@@ -326,8 +348,7 @@ class Handler:
         Returns: File content as markdown, str
         """
 
-        decoded_content: str | None = None
-        if file_type in self.search_engine.documents_only_extension:
+        if Handler._is_convertable(content):
             try:
                 md = MarkItDown()
                 stream = io.BytesIO(content)
@@ -357,3 +378,28 @@ class Handler:
             else:
                 flat.update({key: str(val)})
         return flat
+
+    @staticmethod
+    def _clear_duplicates(files: list[dict]) -> list[dict]:
+        """Remove any duplicates from the list.
+
+        Args:
+            files: original file list.
+        Returns: list with the latest files.
+        """
+        latest_files: list[dict] = []
+        latest_pointers: list[str] = []
+        for file in files[::-1]:
+            pointer: str | None = file.get(UNIQUE_POINTER)
+            if pointer is None or pointer in latest_pointers:
+                continue
+            latest_pointers.append(pointer)
+            latest_files.append(file)
+        return latest_files
+
+    @staticmethod
+    def _is_convertable(content: bytes) -> bool:
+        for convertable in CONVERTABLE_TYPES:
+            if content[: int(len(convertable) / 2)].hex() == convertable:
+                return True
+        return False

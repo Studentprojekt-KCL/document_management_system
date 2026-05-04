@@ -13,6 +13,3 @@ package-dir = {"" = "src"}
 
 [project.scripts]
 dmis_api = "dmis_api.api:run"
-
-[tool.ruff.lint]
-ignore = ["PLR0913"]

@@ -24,9 +24,9 @@ class AuthRoutes:
     def __init__(self, token_verifier: Any) -> None:
         self.token_verifier = token_verifier
         self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
-        self.ad_logout_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
+        self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-        self.dmisapi_redirect_uri = read_env_variable("DMISAPI_REDIRECT_URI")
+        self.frontend_url = read_env_variable("DMISAPI_FRONTEND_URL").rstrip("/")
 
         self._session = None
 
@@ -90,8 +90,8 @@ class AuthRoutes:
             response = await resp.json()
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
             dms_warning(f"Recieved response which could not be JSON decoded from {self.ad_token_url}, (err: {err})")
-            raise HTTPException(status_code=502)  # pylint: disable=W0707
-        if resp.status != 200:
+            raise HTTPException(status_code=502) from err  # pylint: disable=W0707
+        if resp.status != 200:  # noqa
             dms_warning(f"Recieved unexpected response code ({resp.status}) from {self.ad_token_url}")
             raise HTTPException(status_code=502)
         if not isinstance(response, dict) or "access_token" not in response:
@@ -148,7 +148,7 @@ class AuthRoutes:
                 "grant_type": "authorization_code",
                 "client_id": self.dmisapi_client_id,
                 "code": code,
-                "redirect_uri": self.dmisapi_redirect_uri,
+                "redirect_uri": f"{self.frontend_url}/auth/callback",
                 "code_verifier": code_verifier,
             }
         )
@@ -185,9 +185,7 @@ class AuthRoutes:
 
     async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Generate logout URL from AD and clear authentication cookies."""
-        post_logout_redirect_uri = (
-            self.dmisapi_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
-        )  # TODO, this might be a bit dangerous, think about how to solve.
+        post_logout_redirect_uri = self.frontend_url + "/"
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,

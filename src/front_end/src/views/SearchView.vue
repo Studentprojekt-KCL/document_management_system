@@ -179,14 +179,20 @@ const refreshCurrentSearch = async () => {
 <template>
   <!-- Search View Section -->
   <section class="search-view">
-    <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
+    <!-- Static header: search bar + filters -->
+    <div class="search-static">
+      <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
+      <SearchFiltersCard
+        :selectedFilters="selectedFilters"
+        :documentsOnly="documentsOnlyMode"
+        @update:filters="handleFilterChange"
+      />
+    </div>
 
-    <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
-
-    <!-- Search Matches Component -->
-    <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+    <!-- Scrollable results -->
+    <div class="search-results-scroll">
+      <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+    </div>
 
     <!-- Search Preview Drawer Component -->
     <SearchPreviewDrawer
@@ -202,6 +208,21 @@ const refreshCurrentSearch = async () => {
 
 <style scoped>
 .search-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
   padding: 1rem;
+  box-sizing: border-box;
+}
+
+.search-static {
+  flex-shrink: 0;
+}
+
+.search-results-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 </style>

@@ -43,12 +43,13 @@ import TheFooter from '@/components/TheFooter.vue'
 .layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .main {
   display: flex;
   flex: 1;
+  min-height: 0;
 }
 
 .content {
@@ -56,5 +57,6 @@ import TheFooter from '@/components/TheFooter.vue'
   padding: 2rem;
   background: #f5f6fa;
   overflow-y: auto;
+  min-height: 0;
 }
 </style>

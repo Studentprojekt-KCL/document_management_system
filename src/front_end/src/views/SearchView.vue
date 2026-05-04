@@ -30,6 +30,11 @@ const { state: selectedFile } = useReload('selectedFile', '')
 const { state: selectedMatch } = useReload('selectedMatch', null)
 const { state: lastQuery } = useReload('lastQuery', '')
 const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
+const documentsOnlyMode = ref(true)
+
+/* Number of search results to fetch, possible to change. */
+const SEARCH_COUNT = 20
+const SEARCH_OFFSET = 0
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -38,15 +43,28 @@ const selectedFilters = ref({
   security: []
 })
 
+const searchPayload = (query, documentsOnly) => {
+  const payload = {
+    content: query
+  }
+  if (documentsOnly) {
+    payload.documents_only = 'true'
+  }
+  return payload
+}
+
 /* Performs a search when the SearchBar emits a search event */
-const handleSearch = async (query) => {
+const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
+  documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
   error.value = ''
-  matches.value = []
-  selectedFile.value = ''
-  selectedMatch.value = null
-  isPreviewOpen.value = false
+  if (resetPreview) {
+    matches.value = []
+    selectedFile.value = ''
+    selectedMatch.value = null
+    isPreviewOpen.value = false
+  }
 
   if (!query || !query.trim()) {
     error.value = 'Please enter a search term.'
@@ -55,8 +73,18 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await authFetch(`${API_PATHS.search}?query=${encodeURIComponent(query)}`)
+    const params = new URLSearchParams({
+      count: String(SEARCH_COUNT),
+      offset: String(SEARCH_OFFSET)
+    })
+    const payload = searchPayload(query, documentsOnly)
 
+    const res = await authFetch(`${API_PATHS.search}?${params.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return
@@ -77,6 +105,14 @@ const handleSearch = async (query) => {
     error.value = `Search error: ${String(e)}`
   } finally {
     isSearching.value = false
+  }
+}
+
+/* Should send down a new request to the backend if the user press the button */
+const handleDocumentsOnlyChange = (documentsOnly) => {
+  documentsOnlyMode.value = documentsOnly
+  if (lastQuery.value && lastQuery.value.trim()) {
+    handleSearch({ query: lastQuery.value, documentsOnly })
   }
 }
 
@@ -127,16 +163,27 @@ const handleFilterChange = (filters) => {
     return typeMatch && securityMatch
   })
 }
+// searching a second time automatically to update the security levels
+const refreshCurrentSearch = async () => {
+  // prevents empty search.
+  if (!lastQuery.value || !lastQuery.value.trim()) return
+
+  await handleSearch({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false
+  })
+}
 </script>
 
 <template>
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
@@ -148,6 +195,7 @@ const handleFilterChange = (filters) => {
       :selected-match="selectedMatch"
       :matches="matches"
       @close="closePreview"
+      @update-security="refreshCurrentSearch"
     />
   </section>
 </template>

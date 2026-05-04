@@ -41,6 +41,8 @@ class Handler:
     async def init(self) -> None:
         """Init handler"""
         await self.query.init()
+        fields: list[str] | None = await self.connector.get_fields()
+        self.search_engine.init(fields)
 
     async def close(self) -> None:
         """Clean up"""
@@ -49,10 +51,9 @@ class Handler:
 
     def reset(self) -> None:
         """Reset the connector."""
-        self.search_engine = SearchEngine()
-        self.connector = Connector()
+        self.search_engine.reset()
+        self.connector.write_subdata({})
         self.query.reset()
-        self.query = Query()
         dms_info("Search engine was reset.")
 
     def set_classification(self, change: dict[str, str]) -> dict[str, str]:
@@ -87,11 +88,11 @@ class Handler:
             self.search_engine.remove_file(match)
             self.query.cache.remove_classification(match)
 
-    async def preform_search(self, request: str | None, count: int, offset: int) -> list:
+    async def preform_search(self, content: dict, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
         Args:
-            request: Query to perform.
+            content: query per field.
             count: how many results.
             offset: how deep in to grab the results.
         Returns: matching files or None.
@@ -104,14 +105,11 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        dms_info(f"Preforming search: {request}")
         if not self.indexing.locked():
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
-        if request is None:
-            return []
-        matches: list = self.search_engine.query_files(request, offset + count)[offset : count + offset]
+        matches: list = self.search_engine.query_files(content, count + offset)[offset : count + offset]
         files: list[dict] = await self.connector.fetch_files(matches)
         self.clean_misses(matches, files)
         classifications: dict = await self.query.classify(files)
@@ -148,6 +146,7 @@ class Handler:
         index_queue.join()
         index_queue.put(None)
         indexer_thread.join()
+        self.connector.write_subdata()
         self.indexing.release()
         dms_info(f"Finished indexing of new files, time: {(datetime.now() - start).total_seconds()}s.")
 
@@ -189,6 +188,36 @@ class Handler:
             await loop.run_in_executor(None, index_queue.put, flat_file)
             transfer_queue.task_done()
 
+    def _add_file(self, index_queue: queue.Queue) -> None:
+        """Wait for formatted file and add it to the search engine.
+
+        Args:
+            task_queue: queue containing all the files to add.
+        """
+
+        batch: list[dict] = []
+
+        while True:
+            file: dict | None = index_queue.get()
+            if file is None:
+                break
+            batch.append(file)
+            if len(batch) >= self.BATCH_SIZE:
+                self.search_engine.open_writer()
+                for file in batch:
+                    self.search_engine.add_file(file)
+                dms_info(f"Batch of {len(batch)} commited")
+                self.search_engine.close_writer()
+                batch.clear()
+            index_queue.task_done()
+        if batch:
+            self.search_engine.open_writer()
+            for file in batch:
+                self.search_engine.add_file(file)
+            dms_info(f"Batch of {len(batch)} commited")
+            self.search_engine.close_writer()
+            batch.clear()
+
     def _decode(self, file: dict) -> dict | None:
         """Decode file content.
 
@@ -207,36 +236,6 @@ class Handler:
         flat_file["content"] = content
 
         return flat_file
-
-    def _add_file(self, index_queue: queue.Queue) -> None:
-        """Wait for formatted file and add it to the search engine.
-
-        Args:
-            task_queue: queue containing all the files to add.
-        """
-
-        batch: list[dict] = []
-
-        while True:
-            file: dict | None = index_queue.get()
-            if file is None:
-                break
-            batch.append(file)
-            if len(batch) >= self.BATCH_SIZE:
-                self.search_engine.init()
-                for file in batch:
-                    self.search_engine.add_file(file)
-                dms_info(f"Batch of {len(batch)} commited")
-                self.search_engine.close()
-                batch.clear()
-            index_queue.task_done()
-        if batch:
-            self.search_engine.init()
-            for file in batch:
-                self.search_engine.add_file(file)
-            dms_info(f"Batch of {len(batch)} commited")
-            self.search_engine.close()
-            batch.clear()
 
     def _flatten_dict(self, d: dict) -> dict:
         """Flatten the dict.

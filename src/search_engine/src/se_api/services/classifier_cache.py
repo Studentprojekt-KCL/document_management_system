@@ -2,7 +2,6 @@
 
 from asyncio import Event, get_running_loop, wait_for
 import dbm
-from os import path, remove
 import shelve
 
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
@@ -21,8 +20,8 @@ class ClassifierCache:
 
     def __init__(self) -> None:
         """Constructor"""
-        cache_directory: str = read_env_variable("SEARCHENG_CACHE_DIRECTORY")
-        self.cache_file: str = f"{cache_directory.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
+        work_dir: str = read_env_variable("SEARCHENG_WORKING_DIRECTORY", required=True)  # type: ignore
+        self.cache_file: str = f"{work_dir.rstrip('/')}/{ClassifierCache.CACHE_FILE}"
         try:
             with shelve.open(self.cache_file) as f:
                 self.cache = f.get("classification", {})
@@ -34,10 +33,11 @@ class ClassifierCache:
         loop = get_running_loop()
         self.sync_thread = loop.create_task(self._cache_sync())
 
-    def delete_cache_file(self) -> None:
-        """Delete the cache file."""
-        if path.exists(self.cache_file):
-            remove(self.cache_file)
+    def reset(self) -> None:
+        """Reset the cache."""
+        with shelve.open(self.cache_file) as f:
+            f["classification"] = {}
+        self.cache = {}
 
     async def close(self) -> None:
         """Clean up"""

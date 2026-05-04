@@ -4,10 +4,15 @@ import hashlib
 from base64 import b64decode
 from dataclasses import dataclass
 from http import HTTPStatus
+from io import BytesIO
+
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 import httpx
 
 from shared_functions.dmis_logger import dms_warning
+from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable
 
 
 def _to_uuid(pointer: str) -> str:
@@ -49,6 +54,26 @@ class Indexer:
         self.batch_size = config.batch_size
         self.max_chars = config.max_chars
         self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Indexer":
+        """Construct an Indexer from environment variables.
+
+        Reads (required):
+            STOCHAN_EMBEDDING_URL: URL for the TEI embedding container.
+            STOCHAN_QDRANT_URL: URL for the Qdrant vector database.
+
+        Reads (optional):
+            INDEX_BATCH_SIZE: Documents embedded per batch (default 8).
+            STOCHAN_INDEX_MAX_CHARS: Max characters per document (default 2000).
+        """
+        config = IndexerConfig(
+            embedding_url=read_env_variable("STOCHAN_EMBEDDING_URL"),
+            qdrant_url=read_env_variable("STOCHAN_QDRANT_URL"),
+            batch_size=read_int_env_variable("STOCHAN_INDEX_BATCH_SIZE"),
+            max_chars=read_int_env_variable("STOCHAN_INDEX_MAX_CHARS"),
+        )
+        return cls(config=config, client=client)
 
     async def index(self, connector_url: str) -> dict:
         """Run the full indexing pipeline.
@@ -163,10 +188,16 @@ class Indexer:
 
             texts, valid = [], []
             for f in batch:
+                name = f.get("metadata", {}).get("name", "?")
                 try:
-                    content = b64decode(f["content"]).decode("utf-8")[: self.max_chars]
-                except (UnicodeDecodeError, ValueError, KeyError):
-                    dms_warning(f"Failed to decode: {f.get('metadata', {}).get('name', '?')}")
+                    raw = b64decode(f["content"])
+                    if raw.startswith(b"%PDF-"):
+                        content = "\n".join(p.extract_text() or "" for p in PdfReader(BytesIO(raw)).pages)
+                    else:
+                        content = raw.decode("utf-8")
+                    content = content[: self.max_chars]
+                except (UnicodeDecodeError, ValueError, KeyError, PdfReadError):
+                    dms_warning(f"Failed to decode: {name}")
                     continue
                 if not content.strip():
                     continue

@@ -19,11 +19,6 @@ tee src/connectors/connector-gateway/source_systems.json > /dev/null <<'EOF'
     "name": "Gitlab",
     "connector_url": "http://connector-gitlab.dev.dms-lookup.com",
     "source_system_url": "https://gitlab.dms-lookup.com"
-  },
-  {
-    "name": "Github",
-    "connector_url": "http://connector-github.dev.dms-lookup.com",
-    "source_system_url": "https://github.com"
   }
 ]
 EOF

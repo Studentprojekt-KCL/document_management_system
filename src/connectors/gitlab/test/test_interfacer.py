@@ -63,6 +63,17 @@ class TestGitLab(TestCase):
         mock_session = mock.Mock()
         mock_session.get.side_effect = self.get_side_effect
         self.instance.base = ""
+        self.instance.defined_fields = {
+            "unique_pointer": None,
+            "name": None,
+            "size": None,
+            "last_edit_date": None,
+            "type": None,
+            "source_system": None,
+            "content": None,
+            "file_type": None,
+            "file_type_description": None,
+        }
         self.instance.session = mock_session
         self.instance.file_extensions = [".txt"]
         self.instance.extension_descriptions = {".txt": "text file"}
@@ -70,22 +81,6 @@ class TestGitLab(TestCase):
     def test_execute_request(self):
         """Test _execute_request method."""
         assert self.instance._execute_get_request(url="", headers={}) == self.CORRECT_DATA
-
-    def test_check_index_needed_no_sudata(self):
-        """Test check_index_needed method without current subdata."""
-        pointers = self.instance.check_index_needed(None)
-        assert "index_needed" in pointers.keys()
-        assert pointers.get("index_needed") == True
-
-    def test_check_index_needed_false(self):
-        """Test check_index_needed method with current subdata."""
-        pointers = self.instance.check_index_needed("MTk3MC0wMS0wMVQwMDowMDowMC4wMDBa")
-        assert pointers.get("index_needed") == False
-
-    def test_check_index_needed_old_subdata(self):
-        """Test check_index_needed method with old subdata."""
-        pointers = self.instance.check_index_needed("MTk2OC0wMS0wMVQwMDowMDowMC4wMDBa")
-        assert pointers.get("index_needed") == True
 
     def test_get_file(self):
         """Test get_file method."""

@@ -31,33 +31,20 @@ class API:
     upstream_urls: dict[str, str]
     token_verifier: TokenVerifier
     required_scopes: dict[str, list[str]]
-    http_client: aiohttp.ClientSession | None
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
         upstream_urls: dict[str, str],
-        token_verifier: TokenVerifier,
-        keycloak_token_url: str,
-        dmisapi_client_id: str,
-        dmisapi_redirect_uri: str,
-        keycloak_logout_url: str,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
         self.app = FastAPI(lifespan=self.lifespan)
 
         self.log_level = log_level
-        self.upstream_urls = {key: value.rstrip("/") for key, value in upstream_urls.items()}
-        self.token_verifier = token_verifier
-        self.auth_routes = AuthRoutes(
-            token_verifier=self.token_verifier,
-            http_client=self.http_client,
-            keycloak_token_url=keycloak_token_url,
-            keycloak_logout_url=keycloak_logout_url,
-            dmisapi_client_id=dmisapi_client_id,
-            dmisapi_redirect_uri=dmisapi_redirect_uri,
-        )
+        self.upstream_urls = upstream_urls
+
+        self.token_verifier = TokenVerifier()
+        self.auth_routes = AuthRoutes(token_verifier=self.token_verifier)
         self.http_client = None
 
         self.app.add_exception_handler(
@@ -99,6 +86,7 @@ class API:
         try:
             yield
         finally:
+            await self.auth_routes.close_session()
             if self.http_client is not None:
                 await self.http_client.close()
                 self.http_client = None
@@ -289,52 +277,24 @@ class API:
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
 
-# pylint: disable=too-many-locals
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
 
-    bind_address = read_env_variable("DMISAPI_BIND_ADDR")
-    port = read_port("DMISAPI_BIND_PORT")
-    keycloak_issuer = read_env_variable("DMISAPI_AD_URL")
-    keycloak_jwks_url = read_env_variable("DMISAPI_AD_JWKS_URL")
-    audience_raw = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
-    expected_audience = [value.strip() for value in audience_raw.split(",") if value.strip()] if audience_raw else None
-    allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
     upstream_urls = {
-        "searcheng": read_env_variable("DMISAPI_SEARCHENG_URL"),
-        "stochan": read_env_variable("DMISAPI_STOCHAN_URL"),
-        "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL"),
+        "searcheng": read_env_variable("DMISAPI_SEARCHENG_URL").rstrip("/"),
+        "stochan": read_env_variable("DMISAPI_STOCHAN_URL").rstrip("/"),
+        "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL").rstrip("/"),
     }
-    dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-    dmisapi_redirect_uri = read_env_variable("DMISAPI_REDIRECT_URI")
-    keycloak_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
-    keycloak_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
 
     log_level = "debug" if args.dev else None
-
-    token_verifier = TokenVerifier(
-        issuer=keycloak_issuer,
-        jwks_url=keycloak_jwks_url,
-        expected_audience=expected_audience,
-        allowed_azp=allowed_azp or None,
-    )
-
-    api = API(
-        upstream_urls=upstream_urls,
-        token_verifier=token_verifier,
-        keycloak_token_url=keycloak_token_url,
-        dmisapi_client_id=dmisapi_client_id,
-        dmisapi_redirect_uri=dmisapi_redirect_uri,
-        keycloak_logout_url=keycloak_logout_url,
-        log_level=log_level,
-    )
+    api = API(upstream_urls=upstream_urls, log_level=log_level)
 
     uvicorn.run(
         api.app,
-        host=bind_address,
-        port=port,
+        host=read_env_variable("DMISAPI_BIND_ADDR"),
+        port=read_port("DMISAPI_BIND_PORT"),
         log_level=log_level,
     )

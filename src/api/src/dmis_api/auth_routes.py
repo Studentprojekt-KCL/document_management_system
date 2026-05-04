@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 from urllib.parse import urlencode
+from json.decoder import JSONDecodeError
 
-import httpx
-from fastapi import Cookie, Form
+import aiohttp
+from fastapi import Cookie, Form, HTTPException
 from fastapi.responses import JSONResponse
+
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_warning
 
 
 class AuthRoutes:
@@ -15,31 +19,34 @@ class AuthRoutes:
 
     ACCESS_COOKIE_MAX_AGE = 3600
     REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
+    _session: aiohttp.ClientSession | None
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        token_verifier: Any,
-        http_client: httpx.AsyncClient,
-        keycloak_token_url: str,
-        keycloak_logout_url: str,
-        dmisapi_client_id: str,
-        dmisapi_redirect_uri: str,
-    ) -> None:
+    def __init__(self, token_verifier: Any) -> None:
         self.token_verifier = token_verifier
-        self.http_client = http_client
-        self.keycloak_token_url = keycloak_token_url
-        self.keycloak_logout_url = keycloak_logout_url
-        self.dmisapi_client_id = dmisapi_client_id
-        self.dmisapi_redirect_uri = dmisapi_redirect_uri
+        self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
+        self.ad_logout_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
+        self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+        self.dmisapi_redirect_uri = read_env_variable("DMISAPI_REDIRECT_URI")
+
+        self._session = None
+
+    async def close_session(self) -> None:
+        """Tear down session."""
+        if self._session is not None:
+            self._session.close()
+
+    async def get_session(self) -> aiohttp.ClientSession:
+        """Set up AIO http clinet if not initialized."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
 
     def _verify_cookie_token(self, access_token: str | None) -> dict[str, Any] | None:
         """Verify access token from cookie and return claims."""
         if not access_token:
             return None
-        try:
-            return self.token_verifier.verify_access_token(f"Bearer {access_token}")
-        except httpx.HTTPError:
-            return None
+
+        return self.token_verifier.verify_access_token(f"Bearer {access_token}")
 
     def _set_cookie(
         self,
@@ -71,28 +78,32 @@ class AuthRoutes:
         if isinstance(id_token, str):
             self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE)
 
-    async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any] | None:
-        """Request tokens from Keycloak using provided form data."""
+    async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
+        """Request tokens from AD provider using provided form data."""
         try:
-            resp = await self.http_client.post(
-                self.keycloak_token_url,
+            session = await self.get_session()
+            resp = await session.post(
+                self.ad_token_url,
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPError:
-            return None
+            response = await resp.json()
+        except (JSONDecodeError, aiohttp.ContentTypeError) as err:
+            dms_warning(f"Recieved response which could not be JSON decoded from {self.ad_token_url}, (err: {err})")
+            raise HTTPException(status_code=502) # pylint: disable=W0707
+        if resp.status != 200:
+            dms_warning(f"Recieved unexpected response code ({resp.status}) from {self.ad_token_url}")
+            raise HTTPException(status_code=502)
+        if not isinstance(response, dict) or "access_token" not in response:
+            raise HTTPException(status_code=502)
 
-    def _unauthenticated_response(self) -> JSONResponse:
-        """Return a standardized unauthenticated response."""
-        return JSONResponse(status_code=401, content={"authenticated": False})
+        return response
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Check if user is authenticated."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
-            return self._unauthenticated_response()
+            raise HTTPException(status_code=401)
 
         return JSONResponse(
             status_code=200,
@@ -108,7 +119,7 @@ class AuthRoutes:
         """Return authenticated user details and roles."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
-            return self._unauthenticated_response()
+            raise HTTPException(status_code=401)
 
         client_roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
         realm_roles = claims.get("realm_access", {}).get("roles", [])
@@ -131,7 +142,7 @@ class AuthRoutes:
         code: str = Form(...),
         code_verifier: str = Form(...),
     ) -> JSONResponse:
-        """Exchange authorization code for tokens via Keycloak."""
+        """Exchange authorization code for tokens via provided AD."""
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
@@ -141,18 +152,6 @@ class AuthRoutes:
                 "code_verifier": code_verifier,
             }
         )
-
-        if not token_data:
-            return JSONResponse(
-                status_code=502,
-                content={"message": "Token exchange failed"},
-            )
-
-        if not token_data.get("access_token"):
-            return JSONResponse(
-                status_code=502,
-                content={"message": "No access token returned"},
-            )
 
         response = JSONResponse(
             status_code=200,
@@ -177,18 +176,6 @@ class AuthRoutes:
             }
         )
 
-        if not token_data:
-            return JSONResponse(
-                status_code=401,
-                content={"message": "Refresh failed"},
-            )
-
-        if not token_data.get("access_token"):
-            return JSONResponse(
-                status_code=401,
-                content={"message": "No access token returned"},
-            )
-
         response = JSONResponse(
             status_code=200,
             content={"message": "Session refreshed"},
@@ -197,8 +184,10 @@ class AuthRoutes:
         return response
 
     async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Generate Keycloak logout URL and clear authentication cookies."""
-        post_logout_redirect_uri = self.dmisapi_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
+        """Generate logout URL from AD and clear authentication cookies."""
+        post_logout_redirect_uri = (
+            self.dmisapi_redirect_uri.rsplit("/auth/callback", 1)[0] + "/"
+        )  # TODO, this might be a bit dangerous, think about how to solve.
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,
@@ -207,7 +196,7 @@ class AuthRoutes:
         if id_token:
             params["id_token_hint"] = id_token
 
-        logout_url = f"{self.keycloak_logout_url}?{urlencode(params)}"
+        logout_url = f"{self.ad_logout_url}?{urlencode(params)}"
         response = JSONResponse(
             status_code=200,
             content={"logout_url": logout_url},

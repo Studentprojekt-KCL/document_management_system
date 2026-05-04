@@ -17,7 +17,6 @@ const handleEntraIdLogin = async () => {
   isLoading.value = true
   const { verifier, challenge } = await createPkcePair()
 
-  //temporarily store for keycloack call usage.
   localStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
 
   const state = generateState()

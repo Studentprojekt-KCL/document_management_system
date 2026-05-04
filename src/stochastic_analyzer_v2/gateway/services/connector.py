@@ -1,8 +1,11 @@
 """File for managing the content and metadata retreival from the connector"""
 
 from base64 import b64decode
+from io import BytesIO
 
 import aiohttp
+from markitdown import MarkItDown, FileConversionException, UnsupportedFormatException
+
 
 from gateway.schemas import InputItem, MetadataTemplate
 
@@ -14,6 +17,7 @@ class Connector:
     """Fetches file content from connector gateway."""
 
     TIMEOUT: int = 120
+    _converter = MarkItDown()
 
     def __init__(self) -> None:
         self.url = read_env_variable("STOCHAN_CONGATEWAY_URL").rstrip("/")
@@ -44,7 +48,7 @@ class Connector:
 
         items = []
         for entry in data:
-            content = self._decode(entry.get("content"))
+            content = self._extract_text(entry.get("content"))
             if content is None:
                 continue
             items.append(
@@ -56,12 +60,23 @@ class Connector:
         return items
 
     @staticmethod
-    def _decode(encoded: str | None) -> str | None:
+    def _extract_text(encoded: str | None) -> str | None:
+        """Decode payload and extract text. Tries markitdown first, falls back to utf-8."""
         if encoded is None:
-            dms_warning("Empty content cant be decoded")
             return None
         try:
-            return b64decode(encoded).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
-            dms_warning("decoding failed")
+            raw = b64decode(encoded)
+        except ValueError as err:
+            dms_warning(f"Base64 decode failed: {err}")
+            return None
+
+        try:
+            return Connector._converter.convert_stream(BytesIO(raw)).text_content
+        except (FileConversionException, UnsupportedFormatException):
+            pass
+
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            dms_warning("Could not extract text from content")
             return None

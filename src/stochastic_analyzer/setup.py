@@ -13,6 +13,7 @@ setup(
         "requests>=2.32",
         "httpx",
         "markdown-pdf>=1.13.1",
+        "markitdown[pptx, docx, xlsx, xls, pdf]>=0.1.5",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

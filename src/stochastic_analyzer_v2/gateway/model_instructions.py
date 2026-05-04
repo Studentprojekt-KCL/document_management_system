@@ -1,16 +1,5 @@
 """Instructions for neural networks/LLMs."""
 
-# For classifications
-LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
-
-# These label triggers have been tweaked for hours, only touch if absolutly certain
-LABEL_TRIGGERS = [
-    "public open-source documentation",
-    "internal employee policy or guidelines",
-    "sensitive financial review or performance data",
-    "confidential strategic project plan",
-]
-
 # LLM preprompts and instructions
 SUMMARIZER_SYSTEM_PROMPT = """You are a summarization engine.
 

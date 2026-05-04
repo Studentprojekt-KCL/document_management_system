@@ -179,7 +179,7 @@ const refreshCurrentSearch = async () => {
 <template>
   <!-- Search View Section -->
   <section class="search-view">
-    <!-- Static header: search bar + filters -->
+    <!-- Static search bar and filters -->
     <div class="search-static">
       <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
       <SearchFiltersCard

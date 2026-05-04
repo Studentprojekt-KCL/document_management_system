@@ -6,7 +6,7 @@ Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
 ``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
 
 Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
+``ConfluenceInterfacer``). Requires ``CONFLUENCE_BIND_PORT`` and ``CONFLUENCE_ADDRESS``;
 optional MinIO env vars for uploads.
 """
 
@@ -29,7 +29,7 @@ from shared_functions.initialisation_tools import read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
-# When compose interpolates unset ${CONFLUENCE_CONNECTOR_PORT} to "", it overrides Dockerfile ENV;
+# When compose interpolates unset ${CONFLUENCE_BIND_PORT} to "", it overrides Dockerfile ENV;
 # treat blank like unset so preview stacks still boot (override per env in real deployments).
 _CONF_PORT_FALLBACK = 8010
 
@@ -200,7 +200,7 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    if not (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip():
-        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
-    port = read_port("CONFLUENCE_CONNECTOR_PORT")
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)
+    if not (os.environ.get("CONFLUENCE_BIND_PORT") or "").strip():
+        os.environ["CONFLUENCE_BIND_PORT"] = str(_CONF_PORT_FALLBACK)
+    port = read_port("CONFLUENCE_BIND_PORT")
+    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port) #change host to env variable

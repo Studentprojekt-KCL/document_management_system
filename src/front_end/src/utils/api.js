@@ -15,6 +15,7 @@ export const API_PATHS = {
   summarize: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/summarize`,
   rerank: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/rerank`,
   classifications: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/classifications`,
+  classification: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/classification`,
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,

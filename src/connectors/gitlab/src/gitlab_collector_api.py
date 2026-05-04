@@ -15,7 +15,6 @@ from fastapi.encoders import jsonable_encoder
 from interfacer import GitLab
 import requests
 
-from shared_functions.boto_tools import upload_file
 from shared_functions.dmis_logger import dms_info
 from shared_functions.initialisation_tools import read_port, read_env_variable
 from shared_functions.signing_tools import sign_encode_state, validate_decode_state
@@ -39,10 +38,8 @@ class API:
         self.state_secret = read_env_variable("CONGITLAB_STATE_SIGNING_SECRET")
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
 
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
@@ -60,10 +57,6 @@ class API:
         content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
-
-    async def index_needed_bool(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> Any:
-        """Endpoint returning status if new index is needed."""
-        return self.gitlab_instance.check_index_needed(subdata, x_gitlab_token)
 
     async def get_files(
         self,
@@ -86,17 +79,15 @@ class API:
             file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date
         )
 
-    async def files_to_index(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> dict:
-        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
-        OBS; this method will be depricated."""
-        content = self.gitlab_instance.files_to_index(subdata, x_gitlab_token)
-        url = upload_file(content, "gitlab_content.json")
-        return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
-
     async def stream_files_to_index(
-        self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
+        self, body: dict[str, str] | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
     ) -> StreamingResponse:
-        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
+        Body should be structured {'subdata': <SUBDATA>}.
+        """
+        subdata: str | None
+        subdata = body.get("subdata") if isinstance(body, dict) else None
+
         return StreamingResponse(
             self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
         )

@@ -17,7 +17,16 @@ from tantivy import (
     Searcher,
 )
 
-from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, CONTENT, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
+from se_api.constants import (
+    BOOLEAN_CATEGORIES,
+    CLASSIFICATION,
+    CONTENT,
+    COOKED_CATEGORIES,
+    IS_DOCUMENT,
+    MODIFIED,
+    RAW_CATEGORIES,
+    UNIQUE_POINTER,
+)
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_documents_only_rescource
@@ -57,6 +66,7 @@ class SearchEngine:
             return
         self.categories = BOOLEAN_CATEGORIES
         self.categories = self.categories.union(RAW_CATEGORIES)
+        self.categories = self.categories.union(COOKED_CATEGORIES)
         if fields is not None:
             for field in fields:
                 self.categories.add(field)
@@ -190,6 +200,28 @@ class SearchEngine:
         self.writer.commit()
         self.writer.wait_merging_threads()
         self.writer_lock.release()
+
+    def grab_file(self, unique_pointer: str) -> dict:
+        """Grab a file from the index.
+
+        Args:
+            unique_pointer: the file pointer.
+        Returns: file dict.
+        """
+        file: dict = {}
+        searcher: Searcher = self.index.searcher()
+        matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        if matches.hits:
+            doc_id = matches.hits[0][1]
+            doc = searcher.doc(doc_id)
+            for category in self.categories:
+                try:
+                    file[category] = doc[category][0]
+                except IndexError:
+                    file[category] = "N/A"
+            return file
+        dms_warning(f"Failed to fetch content from index: {unique_pointer}")
+        return file
 
     def add_file(self, file: dict) -> None:
         """Add file to index.

@@ -17,11 +17,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.initialisation_tools import read_port
+from shared_functions.initialisation_tools import read_port, read_env_variable
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
-from shared_functions.initialisation_tools import read_port, read_env_variable
 
 class GetFilesBody(BaseModel):
     """JSON body for ``POST /get_files``."""
@@ -42,7 +41,7 @@ class API:
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
@@ -90,11 +89,15 @@ class API:
 
     async def stream_files_to_index(
         self,
-        subdata: str | None = None,
+        body: dict[str, str] | None = None,
         x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
         x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
     ) -> StreamingResponse:
-        """Stream JSON chunks of pages to index (DMS ``/stream_files_to_index``)."""
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
+        Body should be structured {'subdata': <SUBDATA>}."""
+
+        subdata: str | None = body.get("subdata") if isinstance(body, dict) else None
+
         token = self._token(x_confluence_token) if x_confluence_email and x_confluence_token else None
         email = x_confluence_email.strip() if x_confluence_email else None
 
@@ -103,6 +106,7 @@ class API:
                 yield chunk
 
         return StreamingResponse(stream(), media_type="application/octet-stream")
+
 
 def run() -> None:
     """Start Confluence connector API."""
@@ -114,4 +118,9 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    uvicorn.run(api.app, host=read_env_variable("CONCONFLUENCE_BIND_ADDR"), log_level=api.log_level, port=read_port("CONCONFLUENCE_BIND_PORT"))
+    uvicorn.run(
+        api.app,
+        host=read_env_variable("CONCONFLUENCE_BIND_ADDR"),
+        log_level=api.log_level,
+        port=read_port("CONCONFLUENCE_BIND_PORT"),
+    )

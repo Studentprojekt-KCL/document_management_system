@@ -8,9 +8,9 @@ from collections.abc import Sequence
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 
 from se_api.handlers import Handler
 from shared_functions.initialisation_tools import read_env_variable, read_port

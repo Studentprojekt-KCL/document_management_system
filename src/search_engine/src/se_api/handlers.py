@@ -11,7 +11,7 @@ from datetime import datetime
 import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
-from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, UNIQUE_POINTER
+from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, MAX_QUEUE_LENGTH, UNIQUE_POINTER
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
@@ -34,7 +34,7 @@ class Handler:
     FETCH_WORKERS: int = 8
     DECODE_WORKERS: int = 8
     CLASSIFY_WORKERS: int = 8
-    BATCH_SIZE: int = 1000
+    BATCH_SIZE: int = 500
     indexing: Lock
 
     def __init__(self) -> None:
@@ -163,9 +163,9 @@ class Handler:
         dms_info("Starting indexing of new files.")
         start = datetime.now()
         fetch_queue: Queue = await self.connector.connector_fetch()
-        decode_queue: Queue = Queue()
+        decode_queue: Queue = Queue(MAX_QUEUE_LENGTH)
         classify_queue: Queue = Queue()
-        index_queue: queue.Queue = queue.Queue()
+        index_queue: queue.Queue = queue.Queue(MAX_QUEUE_LENGTH)
         indexer_thread: Thread = Thread(target=self._index_file, args=(index_queue, classify_queue))
 
         indexer_thread.start()
@@ -279,13 +279,17 @@ class Handler:
                         self.search_engine.add_file(file)
                 for file in unique_files:
                     unique_pointer = file.get(UNIQUE_POINTER, "")
+                    if unique_pointer in finnished:
+                        continue
                     pending.append(unique_pointer)
                     asyncio.run(classify_queue.put(unique_pointer))
+                    del file
                 index_time = (datetime.now() - start).total_seconds()
                 wait_time = (end_wait - start_wait).total_seconds()
                 total += len(unique_files)
                 dms_info(
-                    f"Batch of {len(unique_files)} (total: {total}) commited"
+                    f"Batch of {len(unique_files)} (total: {total}," 
+                    + f" pending: {len(pending)}, finnished: {len(finnished)}) commited"
                     + f", wait time: {round(wait_time, 3)}s"
                     + f", index time: {round(index_time, 3)}s"
                 )

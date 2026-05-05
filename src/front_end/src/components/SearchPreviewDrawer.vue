@@ -85,7 +85,7 @@ const handleClassificationSave = async (level) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         unique_pointer: uniquePointer.value,
-        classification: level
+        security_class: level
       })
     })
 

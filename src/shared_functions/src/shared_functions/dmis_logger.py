@@ -26,7 +26,7 @@ def dms_error(msg: str, *_: Any, **__: Any) -> None:
     if not isinstance(log_service, str):
         os._exit(1)
     _res = requests.post(
-        log_service,
+        f"{log_service.rstrip('/')}/logs",
         json={
             "service": gethostname(),  # Probably not the best solution
             "message": msg,
@@ -55,7 +55,7 @@ def dms_warning(msg: str, *_: Any, **__: Any) -> None:
     if not isinstance(log_service, str):
         return
     _res = requests.post(
-        log_service,
+        f"{log_service.rstrip('/')}/logs",
         json={
             "service": gethostname(),  # Probably not the best solution
             "message": msg,
@@ -83,7 +83,7 @@ def dms_info(msg: str, *_: Any, **__: Any) -> None:
     if not isinstance(log_service, str):
         return
     _res = requests.post(
-        log_service,
+        f"{log_service.rstrip('/')}/logs",
         json={
             "service": gethostname(),  # Probably not the best solution
             "message": msg,

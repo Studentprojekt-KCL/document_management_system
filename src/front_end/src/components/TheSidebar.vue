@@ -9,19 +9,26 @@
  * <TheSidebar />
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
-import { hasRole } from '@/utils/auth'
+import { getCurrentUser } from '@/utils/authClient'
 
-/* Router instances for navigation and route info */
 const router = useRouter()
 const route = useRoute()
 
-/* State for sidebar collapse/expand */
 const isOpen = ref(false)
+const authInfo = ref(null)
 
-/* Define all possible menu items with their respective icons and paths */
+/* get info about user from /auth/me endpoint using authClient helper */
+const loadAuthInfo = async () => {
+  authInfo.value = await getCurrentUser()
+}
+
+/* Reload user info on route change */
+watch(() => route.fullPath, loadAuthInfo, { immediate: true })
+
+/* all available items on the sidebar */
 const menuItems = [
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
@@ -30,27 +37,22 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-/* Check if the user has admin role */
+/* Checks if user is admin */
 const isAdmin = computed(() => {
-  route.fullPath
-  return hasRole('admin')
+  const clientRoles = authInfo.value?.user?.client_roles ?? []
+  const realmRoles = authInfo.value?.user?.realm_roles ?? []
+  return clientRoles.includes('admin') || realmRoles.includes('admin')
 })
 
-/* Compute visible menu items based on user role */
+/* Show all itmes fro admin otherwise only search */
 const visibleMenuItems = computed(() => {
-  if (isAdmin.value) {
-    return menuItems
-  }
-  // else if when we get another role higher than user
-  else {
-    return menuItems.filter((item) => item.id === 'search')
-  }
+  const searchOnly = menuItems.filter((item) => item.id === 'search')
+  return isAdmin.value ? menuItems : searchOnly
 })
 
-/* Compute the active menu item based on current route */
+/* Compute the active menu item */
 const activeItem = computed(() => {
-  const currentPath = route.path
-  const found = menuItems.find((item) => item.path === currentPath)
+  const found = menuItems.find((item) => item.path === route.path)
   return found ? found.id : 'search'
 })
 

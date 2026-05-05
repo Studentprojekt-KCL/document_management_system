@@ -8,8 +8,10 @@ from fastapi.responses import Response, JSONResponse
 from gateway.services.classifier import Classifier, LABELS
 from gateway.services.connector import Connector
 from gateway.services.summarizer import Summarizer
+from gateway.services.merger import Merger
 from gateway.services.summarizer_pdf import PdfConverter
 from gateway.services.indexer import Indexer
+from gateway.services.token_counter import TokenCounter, MergeLimits
 
 from gateway.schemas import (
     RankResponse,
@@ -17,6 +19,7 @@ from gateway.schemas import (
     HealthCheck,
     ClassificationResult,
     PointerRequest,
+    MergeRequest,
     SummaryResult,
     InputItem,
 )
@@ -30,9 +33,11 @@ class Services:
 
     connector: Connector
     summarizer: Summarizer
+    merger: Merger
     classifier: Classifier
     pdf_converter: PdfConverter
     indexer: Indexer
+    token_counter: TokenCounter
 
 
 async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
@@ -53,7 +58,45 @@ async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> S
     return result
 
 
-def create_router(services: Services) -> APIRouter:
+async def _generate_merge(merger: Merger, items: list[InputItem]) -> SummaryResult:
+    """Merge documents or raise 500."""
+    result = await merger.merge(items)
+    if result is None:
+        dms_warning("Merge returned no result.")
+        raise HTTPException(status_code=500, detail="Merge failed.")
+    return result
+
+
+def _enforce_token_limits(
+    items: list[InputItem],
+    counter: TokenCounter,
+    max_doc_tokens: int,
+    max_total_tokens: int,
+) -> None:
+    """Reject merge batches that exceed per-document or combined token limits."""
+    counts = [counter.count(item.content) for item in items]
+
+    for item, count in zip(items, counts, strict=True):
+        if count > max_doc_tokens:
+            name = item.metadata.name or item.metadata.unique_pointer or "unknown"
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Document '{name}' exceeds the per-document limit " f"({count:,} > {max_doc_tokens:,} tokens)."),
+            )
+
+    total = sum(counts)
+    if total > max_total_tokens:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Combined document size exceeds the merge limit "
+                f"({total:,} > {max_total_tokens:,} tokens). "
+                f"Try merging fewer documents."
+            ),
+        )
+
+
+def create_router(services: Services, merge_limits: MergeLimits) -> APIRouter:
     """Create router with pre-constructed service dependencies.
 
     Args:
@@ -124,17 +167,27 @@ def create_router(services: Services) -> APIRouter:
         result = await _generate_summary(services.summarizer, items)
         return result.model_dump()
 
+    @router.post("/merge", response_model=SummaryResult)
+    async def merge_documents(payload: MergeRequest) -> dict:
+        items = await _retrieve_documents(services.connector, payload.pointers)
+        _enforce_token_limits(
+            items,
+            services.token_counter,
+            merge_limits.max_doc_tokens,
+            merge_limits.max_total_tokens,
+        )
+        result = await _generate_merge(services.merger, items)
+        return result.model_dump()
+
     @router.get("/classifications")
     def classifications() -> Response:
         """Endpoint for retrieving existing classifications."""
         return JSONResponse(content=LABELS, status_code=200)
 
     @router.post("/md-to-pdf")
-    async def md_pdf_converter(payload: PointerRequest) -> Response:
-        """Endpoint to summarize documents and return result as PDF."""
-        items = await _retrieve_documents(services.connector, payload.pointers)
-        result = await _generate_summary(services.summarizer, items)
-        pdf: bytes = services.pdf_converter.convert(result.summary)
+    async def md_pdf_converter(payload: SummaryResult) -> Response:
+        """Endpoint to convert markdown to PDF."""
+        pdf: bytes = services.pdf_converter.convert(payload.summary)
         return Response(
             content=pdf,
             status_code=200,

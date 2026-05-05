@@ -129,14 +129,8 @@ class API:
     @staticmethod
     async def get_defined_fields() -> list[str]:
         """Get defined fields"""
-        return [
-            "unique_pointer",
-            "name",
-            "size",
-            "source_system",
-            "last_edit_date",
-            "content"
-        ]
+        return ["unique_pointer", "name", "size", "source_system", "last_edit_date", "content"]
+
 
 def run() -> None:
     """Connector entrypoint."""

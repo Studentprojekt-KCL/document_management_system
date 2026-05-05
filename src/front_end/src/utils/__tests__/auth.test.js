@@ -1,3 +1,4 @@
+/* auth module tests */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const TEST_CLIENT_ID = 'dms-frontend'

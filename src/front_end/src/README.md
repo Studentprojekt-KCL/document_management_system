@@ -1,6 +1,6 @@
 # Frontend Source code Structure
 
-Describtion of the frotend code (`./front_end/src/`) structure 
+Describtion of the frotend code (`./front_end/src/`) structure
 
 ## Folder layout
 
@@ -39,19 +39,13 @@ Describtion of the frotend code (`./front_end/src/`) structure
 Tests use **Vitest** + **Vue Test Utils** with `jsdom` as the DOM environment.
 
 Install dependencies:
-```bash
-npm install -D vitest @vue/test-utils jsdom
-```
+``` npm install -D vitest @vue/test-utils jsdom ```
 
 Run all tests:
-```bash
-npm run test
-```
+``` npm run test ```
 
 Run tests in watch mode:
-```bash
-npm run test:watch
-```
+``` npm run test:watch ```
 
 ### Test file locations
 
@@ -71,18 +65,23 @@ Test files live in `__tests__/` folders next to the code they test:
 |     Area    |           File                | Tests |
 |-------------|-------------------------------|-------|
 | Utils       | `auth.test.js`                |   18  |
+| Utils       |  `api.test.js`                |   13  |
+| Utils       |  `authSync.test.js`           |   15  |
+| Utils       |  `config.test.js`             |   12  |
 | Composables | `useSearchMetadata.test.js`   |   51  |
 | Composables | `useFilters.test.js`          |   14  |
+| Composables | `useAIRerank.test.js`         |   11  |
+| Composables | `useAISummary.test.js`        |   12  |
+| Composables | `useAuthSession.test.js`      |   12  |
+| Composables | `useReload.test.js`           |   10  |
 | Components  | `SearchBar.test.js`           |   16  |
-| Components  | `SearchMatches.test.js`       |   18  |
+| Components  | `SearchMatches.test.js`       |   23  |
 | Components  | `ClassificationEditor.test.js`|   19  |
-| Components  | `SearchPreviewDrawer.test.js` |   27  |
-| Views       | `SearchView.test.js`          |   29  |
-| **Total**   | |         **192**                     |
+| Components  | `SearchPreviewDrawer.test.js` |   20  |
+| Views       | `SearchView.test.js`          |   23  |
+| Views       | `MergeFilesView.test.js`      |   14  |
+| **Total**   | |         **260**                     |
 
 ### If questions
-
-- Ask frontend team :D
-### If questions 
 
 - Ask frontend team :D

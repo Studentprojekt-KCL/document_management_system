@@ -1,56 +1,47 @@
 # Component Test
 
-## ClassificationEditor.test.js — 16 tests
+## ClassificationEditor.test.js — 19 tests
 
-- Renders/hides modal based on visible prop
-- Renders all four security levels
-- Pre-selects current level on open
-- Click to select/deselect levels
-- Correct color classes per level
-- Save emits with selected level
-- Save blocked when nothing selected
-- Save button shows "Saving..." state
-- Cancel via button and backdrop click
-- resetSaving() exposed method works
-- Re-syncs to new level when re-opened
+- Renders and hides modal based on visible prop.
+- Displays modal title, description, and all four security level options.
+- Pre-selects current level upon opening.
+- Selects and deselects levels via click; applies corresponding color classes.
+- Save function emits selected level; disables and blocks save when no level is selected.
+- Save button displays "Saving..." state upon click.
+- Cancel function emits via button and backdrop click; ignores modal body clicks.
+- Exposes resetSaving() method to revert button state.
+- Syncs to new currentLevel upon modal re-opening.
 
-## SearchPreviewDrawer.test.js — 22 tests
+## SearchPreviewDrawer.test.js — 20 tests
 
-- Drawer open/close rendering and backdrop
-- Title, type tag, header text
-- Metadata cells (created, size, format, security)
-- Edit button visible for admin, hidden for non-admin
-- Opens ClassificationEditor on edit click
-- Close via button and backdrop
-- Open file link with correct href
-- AI summary button present
-- Save flow: correct API call, success toast, error toast, network error toast
-- Editor closes after successful save
-- State resets on document change and drawer close
+- Renders drawer and backdrop; applies open class based on prop.
+- Emits close event via backdrop click or X button.
+- Displays metadata: preview title, file description tag, created date, file size, and security class.
+- Security section: Displays classification badge; conditionally renders edit button based on admin role.
+- Opens ClassificationEditor upon edit button click.
+- Renders footer link to open file in external source.
+- Displays "Generate AI Summary" button when summary is absent.
+- Displays "Find Similar Files" button when rerank results are absent.
+- State reset: Hides classification editor and notifications upon selectedFile change.
 
 ## SearchBar.test.js — 16 tests
 
-- Renders input, button, icon
-- Placeholder changes when loading
-- Input disabled when loading
-- Button disabled when empty, whitespace, or loading
-- Button enabled when text entered
-- Emits search with trimmed query on submit
-- Emits on Enter key
-- Does not emit on empty/whitespace
-- Clears input after successful search
-- Can emit multiple searches in sequence
+- Renders search input, button, and icon.
+- Toggles placeholder text based on loading state.
+- Disables input and button during loading state.
+- Disables button for empty or whitespace-only inputs; enables on valid text.
+- Emits search event with trimmed query and documentsOnly: true on form submit or Enter key.
+- Blocks search emit on empty or whitespace queries.
+- Clears input field upon successful search submission.
+- Processes and emits multiple sequential searches.
 
-## SearchMatches.test.js — 18 tests
+## SearchMatches.test.js — 23 tests
 
-- Loading state shows "Searching…"
-- No results message with query text
-- Empty state when no query
-- Renders correct number of cards
-- Results count singular/plural
-- Displays title, type, date, source for each match
-- Security badges with correct text and color classes
-- Click emits select with raw match data
-- Highlights selected card with active class
-- Handles matches with missing fields
-- Shows "Unknown" for missing security class
+- Renders list of result items and match titles.
+- Conditionally displays "Searching…", result count labels (singular/plural), or "No results" message.
+- Hides result count when loading or when query is empty.
+- Default mode: Emits select with raw match data on card click; applies active class to selected card.
+- Selectable mode: Blocks default select emit; emits update:selectedPointers to add/remove pointers; applies selected class.
+- Badge mode (security): Displays security class text and corresponding CSS class; defaults to "Unknown" if missing.
+- Badge mode (score): Displays score percentage; defaults to "N/A" if missing.
+- Renders external links with target="_blank" and stops click propagation to prevent card selection.

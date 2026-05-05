@@ -1,48 +1,112 @@
 # Composables Tests
 
-## useSearchMetadata
+## useAIRerank.js — 11 tests
 
-* resolveFilename
-  * Extracts filename from different structures (metadata.name, direct name)
-  * Handles missing, empty, or whitespace-only values
-  * Generates fallback names (result-{index})
+- Returns all expected reactive keys and methods.
+- aiRerankResultsComputed filters results to match the current rerankPointer.
+- generateAIRerank (Success):
+  - Sends POST request to /api/rerank with correct pointer payload.
+  - Toggles isReranking state during fetch.
+  - Maps API response to include rank and formatted scorePercent.
+  - Stores rerankPointer and rerankFilename upon success.
+  - Clears rerankError on successful fetch.
 
-* resolveDocumentType
-  * Detects document type based on file extension or sourceType
-  * Supports PDF, Word, Excel, Text, and Markdown
-  * Case-insensitive matching
-  * Graceful fallback when no match is found
+- generateAIRerank (Error):
+  - Sets rerankError on non-ok HTTP responses.
+  - Sets rerankError on network failures.
+  - Resets isReranking state after errors.
 
-* resolveSource
-  * Extracts source system from metadata or root object
-  * Handles missing or null values
+- generateAIRerank (No Pointer):
+  - Resets state and aborts fetch if no uniquePointer is available.
 
-* resolveDateOnly
-  * Extracts date (YYYY-MM-DD) from ISO timestamps
-  * Handles timezone formats and plain dates
-  * Returns empty string if unavailable
+- Edge Cases:
+  - Handles missing ranked_results gracefully.
+  - Defaults null scores to 0.
 
-* resolveLink
-  * Extracts clickable URLs from metadata or root level
-  * Handles missing or null inputs
+## useAISummary.js — 12 tests
 
-* resolveSecurityClass
-  * Extracts document classification (e.g., Public, Confidential)
-  * Handles missing values safely
+- Returns all expected reactive keys and methods.
+- aiSummaryHtml computed property returns HTML only when summaryPointer matches uniquePointer.
+- generateAISummary (Single/Default):
+  - Sends POST request to /api/summarize with the current uniquePointer.
+  - Toggles isGeneratingSummary state during fetch.
+  - Parses markdown to HTML using globalThis.marked.
 
-## useFilters
+- generateAISummary (Multiple Pointers):
+  - Merges and deduplicates provided pointers with sourcePointer.
+  - Filters out empty or whitespace-only pointers.
+  - Falls back to uniquePointer if the provided pointer array is empty.
 
-### useSourceFilters
+- generateAISummary (Response Handling):
+  - Processes non-JSON (text/plain) responses by reading raw text.
 
-* Starts as empty array
-* Calls the correct endpoint
-* Populates with fetched data
-* Stays empty on failed response
-* Stays empty on network error
-* Creates a new ref per call (not shared)
+- generateAISummary (Errors):
+  - Sets summaryError on non-ok HTTP responses.
+  - Sets summaryError on network failures.
+  - Resets isGeneratingSummary state after errors.
 
-### useSecurityFilters
+- generateAISummary (No Pointers):
+  - Resets state and aborts fetch if no valid pointers are found.
 
-* Same six scenarios as above
-* Plus: verifies the exact error messages logged on failure
-* Plus: confirms each call creates an independent ref (this is actually a limitation worth knowing — it means two components calling useSecurityFilters() will each make their own API call)
+- Edge Case:
+  - Falls back to rendering raw text if globalThis.marked is unavailable.
+
+## useAuthSession.js — 12 tests
+
+- Initialization: Attempts to become leader on mount and sets leader if successful.
+- Activity Tracking: Registers window event listeners (mousemove, keydown, click, scroll) on mount and broadcasts activity on user interaction. Registers storage listener for cross-tab logout sync.
+- Cleanup: Removes all event listeners on unmount.
+- Watchdog: Tries to become leader if the current leader is detected as dead; ignores if leader is alive.
+- Leader Loop:
+  - Refreshes token if expired and user is active.
+  - Triggers logout and broadcasts logout event if user is inactive.
+  - Does nothing if not the leader or if no token exists.
+  - Logs out if token refresh fails.
+  - Proactively refreshes the token before expiration.
+- Logout Sync: Redirects to / when a logout event is detected from another tab via storage events.
+
+## useReload.js — 10 tests
+
+- State Management:
+  - Initializes with a default value if localStorage is empty.
+  - Restores primitives, arrays, booleans, and complex objects from localStorage.
+  - Persists state changes (primitives and objects) back to localStorage.
+  - Maintains reactivity when state is updated.
+- Clear Function: Resets state to default and removes the key from localStorage.
+- Isolation: Ensures independent keys do not interfere with each other.
+- clearAllSearchState: Removes all predefined search-related keys from localStorage without affecting unrelated keys.
+
+## useSearchMetadata.js — 30 tests
+
+- Pure Functions:
+  - resolveFilename: Returns metadata name, fallback name, or indexed default.
+  - resolveDocumentType: Returns metadata or entry-level type description.
+  - resolveDocumentExtension: Returns metadata or entry-level file extension.
+  - resolveSource: Returns metadata or entry-level source system.
+  - resolveDateOnly: Extracts date portion from ISO strings or falls back to metadata.
+  - resolveLink: Returns metadata or entry-level clickable URL.
+  - resolveSecurityClass: Returns metadata or entry-level security classification.
+- Composable Computed Properties:
+  - Returns all mapped fields correctly from a provided selectedMatch (e.g., title, size, description, date, source, link, pointer).
+  - Returns empty strings or defaults when selectedMatch is null.
+- normalizeMatches:
+  - Normalizes an array of match objects to extract titles and map missing data.
+  - Preserves the original raw match reference.
+  - Assigns indexed filenames for missing names.
+  - Returns empty arrays for empty or undefined inputs.
+
+## useFilters.js — 11 tests
+
+- useSourceFilters:
+  - Initializes with an empty array.
+  - Fetches data from /api/connector/connected_source_systems.
+  - Populates ref on successful fetch.
+  - Retains empty array on non-ok responses or network errors (logs errors).
+  - Creates a new, unshared ref on each call.
+- useSecurityFilters:
+  - Initializes with an empty array.
+  - Fetches data from /api/stochastic-analyzer/classifications.
+  - Populates ref on successful fetch.
+  - Retains empty array on non-ok responses or network errors.
+  - Logs specific error messages for failed fetches.
+  - Creates a new, unshared ref on each call.

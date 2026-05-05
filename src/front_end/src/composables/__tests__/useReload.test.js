@@ -1,3 +1,4 @@
+/* useReload Tests */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useReload, clearAllSearchState } from '@/composables/useReload'
 

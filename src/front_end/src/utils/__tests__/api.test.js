@@ -1,3 +1,4 @@
+/* api module tests */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /* Mock config before importing api */

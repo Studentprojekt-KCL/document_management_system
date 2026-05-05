@@ -1,3 +1,4 @@
+/* config module tests */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 describe('config.js', () => {

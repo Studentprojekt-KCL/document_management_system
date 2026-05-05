@@ -36,5 +36,13 @@ export default [
       }
     }
   },
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly'
+      }
+    }
+  },
   eslintConfigPrettier
 ]

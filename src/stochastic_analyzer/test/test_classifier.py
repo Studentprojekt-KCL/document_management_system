@@ -33,7 +33,7 @@ def _make_item(
     )
 
 
-def _make_classifier(url: str = "http://tei", threshold: float = 0.05) -> Classifier:
+def _make_classifier(url: str = "http://tei-inference-server", threshold: float = 0.05) -> Classifier:
     """Return a Classifier with a mock async HTTP client."""
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     return Classifier(url=url, escalation_threshold=threshold, client=mock_client)
@@ -76,7 +76,7 @@ class TestClassifierInit(unittest.TestCase):
     def test_client_is_stored(self) -> None:
         """Constructor stores the injected client."""
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        c = Classifier(url="http://tei", escalation_threshold=0.05, client=mock_client)
+        c = Classifier(url="http://tei-inference-server", escalation_threshold=0.05, client=mock_client)
         self.assertIs(c.client, mock_client)
 
     def test_class_level_defaults_are_valid(self) -> None:

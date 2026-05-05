@@ -17,7 +17,16 @@ from tantivy import (
     Searcher,
 )
 
-from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, CONTENT, COOKED_CATEGORIES, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
+from se_api.constants import (
+    BOOLEAN_CATEGORIES,
+    CLASSIFICATION,
+    CONTENT,
+    COOKED_CATEGORIES,
+    IS_DOCUMENT,
+    MODIFIED,
+    RAW_CATEGORIES,
+    UNIQUE_POINTER,
+)
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_documents_only_rescource
@@ -193,6 +202,12 @@ class SearchEngine:
         self.writer_lock.release()
 
     def grab_file(self, unique_pointer: str) -> dict:
+        """Grab a file from the index.
+
+        Args:
+            unique_pointer: the file pointer.
+        Returns: file dict.
+        """
         file: dict = {}
         searcher: Searcher = self.index.searcher()
         matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))

@@ -171,9 +171,7 @@ class Handler:
         indexer_thread.start()
 
         fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, decode_queue)) for _ in range(self.FETCH_WORKERS)]
-        decode_tasks: list = [
-            create_task(self._decode_content(decode_queue, index_queue)) for _ in range(self.DECODE_WORKERS)
-        ]
+        decode_tasks: list = [create_task(self._decode_content(decode_queue, index_queue)) for _ in range(self.DECODE_WORKERS)]
         classify_tasks: list = [
             create_task(self._classify_content(classify_queue, index_queue)) for _ in range(self.CLASSIFY_WORKERS)
         ]
@@ -242,7 +240,6 @@ class Handler:
             await loop.run_in_executor(None, index_queue.put, file)
             decode_queue.task_done()
 
-
     def _index_file(self, index_queue: queue.Queue, classify_queue: Queue) -> None:
         """Wait for formatted file and index it.
 
@@ -250,8 +247,6 @@ class Handler:
             task_queue: queue containing all the files to add.
         """
         batch: list[dict] = []
-        unique_files: list[dict]
-        total: int = 0
 
         pending: list[str] = []
         finnished: list[str] = []
@@ -283,16 +278,15 @@ class Handler:
                         continue
                     pending.append(unique_pointer)
                     asyncio.run(classify_queue.put(unique_pointer))
-                    del file
                 index_time = (datetime.now() - start).total_seconds()
                 wait_time = (end_wait - start_wait).total_seconds()
-                total += len(unique_files)
                 dms_info(
-                    f"Batch of {len(unique_files)} (total: {total}," 
-                    + f" pending: {len(pending)}, finnished: {len(finnished)}) commited"
-                    + f", wait time: {round(wait_time, 3)}s"
-                    + f", index time: {round(index_time, 3)}s"
+                    f"Batch of {len(unique_files)} commited: "
+                    + f"pending: {len(pending)}, finnished: {len(finnished)}"
+                    + f" (wait time: {round(wait_time, 3)}s"
+                    + f", index time: {round(index_time, 3)}s)"
                 )
+                del unique_files
                 batch = []
                 start_wait = datetime.now()
             index_queue.task_done()

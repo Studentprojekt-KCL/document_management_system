@@ -303,7 +303,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
       </a>
       <!-- If no preview link, see if it has a unique pointer we can copy -->
       <div v-else-if="hasUniquePointer" class="file-reference-card">
-        <p class="file-reference-label">No clickable link is available for {{ sourceSystem }}.</p>
+        <p class="file-reference-label">No clickable link is available for {{ previewTitle }} in {{ sourceSystem }}.</p>
         <code class="file-reference-value">{{ uniquePointer }}</code>
         <button class="open-file-btn copy-reference-btn" type="button" @click="handleCopyUniquePointer">
           <Copy :size="14" />

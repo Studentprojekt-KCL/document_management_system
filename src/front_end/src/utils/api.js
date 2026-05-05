@@ -17,7 +17,8 @@ export const API_PATHS = {
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
-
+  merge: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/merge`,
+  mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`,
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,
@@ -28,13 +29,6 @@ export const API_PATHS = {
 /**
  * Shared fetch wrapper for backend API calls.
  * Uses cookie-based auth via credentials: 'include'.
-  allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
-  merge: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/merge`,
-  mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`
-}
-
-/**
- * Fetch wrapper that automatically attaches the Bearer token from sessionStorage.
  *
  * @param {string} url
  * @param {RequestInit} [options]
@@ -49,5 +43,6 @@ export function apiFetch(url, options = {}) {
     }
   })
 }
-// causes all previos authFetch calls into apiFetch
+
+/* causes all previos authFetch calls into apiFetch */
 export const authFetch = apiFetch

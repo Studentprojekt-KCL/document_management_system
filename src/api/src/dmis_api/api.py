@@ -81,7 +81,6 @@ class API:
         finally:
             if self.http_client is not None:
                 await self.http_client.close()
-                self.http_client = None
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""

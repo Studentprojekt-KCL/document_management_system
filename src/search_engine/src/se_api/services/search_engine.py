@@ -191,6 +191,19 @@ class SearchEngine:
         self.writer.wait_merging_threads()
         self.writer_lock.release()
 
+    def grab_file(self, unique_pointer: str) -> dict:
+        file: dict = {}
+        searcher: Searcher = self.index.searcher()
+        matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        if matches.hits:
+            doc_id = matches.hits[0][1]
+            doc = searcher.doc(doc_id)
+            for category in self.categories:
+                file[category] = doc[category][0]
+            return file
+        dms_warning(f"Failed to fetch content from index: {unique_pointer}")
+        return file
+
     def add_file(self, file: dict) -> None:
         """Add file to index.
 

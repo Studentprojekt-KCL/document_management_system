@@ -6,6 +6,7 @@ import fastapi
 from fastapi import Header
 from fastapi.responses import RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
+from refreshservice_client import RefreshServiceClient
 
 from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable, read_port
 
@@ -16,9 +17,15 @@ class API:
     app = fastapi.FastAPI()
 
     def __init__(self) -> None:
+        self.timeout: int = int(read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"))
+
         self.down_stream_client = ConnectorClient(
             read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True),  # type: ignore
-            read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"),
+            self.timeout
+        )
+        self.refrsh_client = RefreshServiceClient(
+            read_env_variable("CONGATEWAY_REFRESH_SERVICE_URL"),
+            self.timeout
         )
 
         # Endpints

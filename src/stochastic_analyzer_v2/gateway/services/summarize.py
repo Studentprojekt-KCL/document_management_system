@@ -41,6 +41,13 @@ class Summarizer:
         """Handle merging multiple documents into one amazing new document."""
         tasks = [self._call_llm(MERGE_STAGE_ONE_PROMPT.format(content=item.content)) for item in items]
         extracts = [e for e in await asyncio.gather(*tasks) if e is not None]
+
+        if not extracts:
+            dms_warning("Extracts in stage 1 failed.")
+            return None
+        if len(extracts) == 1:
+            return SummaryResult(summary=extracts[0])
+
         combined = "\n\n".join(extracts)
         prompt = MERGE_STAGE_TWO_PROMPT.format(doc_count=len(extracts), combined_summaries=combined)
         result = await self._call_llm(prompt)

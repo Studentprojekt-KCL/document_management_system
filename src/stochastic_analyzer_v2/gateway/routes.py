@@ -52,8 +52,17 @@ def create_router(
 
     @router.post("/merge", response_model=SummaryResult)
     async def merge(payload: PointerRequest) -> SummaryResult:
+        if len(payload.pointers) < 2:
+            dms_warning("merge requires minimum 2 pointers.")
+            raise HTTPException(status_code=400)
         items = await connector.get_file_contents(payload.pointers)
+        if not items:
+            dms_warning("document retreival failure")
+            raise HTTPException(status_code=502)
         result = await summarizer.merge(items)
+        if result is None:
+            dms_warning("merge failed")
+            raise HTTPException(status_code=500)
         return result
 
     return router

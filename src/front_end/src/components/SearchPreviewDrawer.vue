@@ -17,8 +17,6 @@ import { hasRole } from '@/utils/auth'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
-import { hasRole } from '@/utils/auth'
-import { saveClassification } from '@/utils/api'
 
 /* Props */
 const props = defineProps({
@@ -120,68 +118,6 @@ watch(
 )
 /* AI rerank composable */
 const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
-/* State */
-const isEditingClassification = ref(false)
-const classificationEditorRef = ref(null)
-const localSecurityLevel = ref('')
-
-/* Sync from metadata */
-watch(
-  () => previewSecurityClass.value,
-  (val) => {
-    localSecurityLevel.value = val || ''
-  },
-  { immediate: true }
-)
-
-/* Computed */
-const currentSecurityLevel = computed(() => localSecurityLevel.value)
-
-/* Permissions */
-const canEdit = computed(() => hasRole('admin'))
-
-/* notification */
-const notification = ref({ visible: false, success: true, message: '' })
-let notificationTimer = null
-
-const showNotification = (success, message) => {
-  if (notificationTimer) clearTimeout(notificationTimer)
-
-  notification.value = { visible: true, success, message }
-
-  notificationTimer = setTimeout(() => {
-    notification.value.visible = false
-  }, 4000)
-}
-
-/* Save classification */
-const handleClassificationSave = async (level) => {
-  try {
-    await saveClassification(uniquePointer.value, level)
-    emit('update-security', {
-      uniquePointer: uniquePointer.value,
-      level
-    })
-
-    localSecurityLevel.value = level
-
-    showNotification(true, 'Security classification updated successfully.')
-    isEditingClassification.value = false
-  } catch (err) {
-    showNotification(false, `Update failed: ${err.message}`)
-  } finally {
-    classificationEditorRef.value?.resetSaving()
-  }
-}
-
-/* Reset UI */
-watch(
-  () => [props.selectedFile, props.open],
-  () => {
-    isEditingClassification.value = false
-    notification.value.visible = false
-  }
-)
 </script>
 
 <template>

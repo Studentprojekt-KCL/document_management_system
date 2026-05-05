@@ -23,6 +23,8 @@ from urllib.parse import urljoin
 
 import httpx
 
+from shared_functions.initialisation_tools import read_env_variable
+
 PROJECT = "project"
 SOURCE_FILE = "source_file"
 
@@ -43,9 +45,9 @@ class ConfluenceInterfacer:
 
     def __init__(self) -> None:
         self.session = httpx.AsyncClient(timeout=120.0)
-        self.address = os.environ.get("CONFLUENCE_ADDRESS", "").rstrip("/")
+        self.address = read_env_variable("CONCONFLUENCE_CONFLUENCE_ADDR", "").rstrip("/")
         self.base = self._api_base(self.address)
-        self.max_concurrency = int(os.environ.get("CONFLUENCE_MAX_CONCURRENCY", "20"))
+        self.max_concurrency = 20
 
     @staticmethod
     def _api_base(address: str) -> str:
@@ -55,13 +57,11 @@ class ConfluenceInterfacer:
             return f"{address}/rest/api/"
         return f"{address}/wiki/rest/api/"
 
-    def _resolve_auth(self, email: str | None, api_token: str | None) -> tuple[str, str] | None:
+    def _resolve_auth(self, email: str | None, api_token: str | None) -> tuple[str, str] | None: #TODO, remove this function
         """Resolve (email, token) from arguments or environment."""
-        e = (email or os.environ.get("CONFLUENCE_EMAIL") or "").strip()
-        raw = api_token or os.environ.get("CONFLUENCE_API_TOKEN")
-        t = (raw or "").removeprefix("Bearer ").strip() if raw else ""
-        if e and t:
-            return e, t
+        token = (api_token or "").removeprefix("Bearer ").strip() if api_token else ""
+        if email and token:
+            return email, token
         return None
 
     @staticmethod

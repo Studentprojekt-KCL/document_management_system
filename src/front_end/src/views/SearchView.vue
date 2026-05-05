@@ -18,18 +18,17 @@ import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
 import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useReload } from '@/composables/useReload'
 
 /* Reactive state variables for search results and UI state */
+const matches = ref([])
+const allMatches = ref([])
+const selectedFile = ref('')
+const selectedMatch = ref(null)
+const lastQuery = ref('')
+const isPreviewOpen = ref(false)
+
 const error = ref('')
 const isSearching = ref(false)
-/* Persistant across reloads */
-const { state: matches } = useReload('searchMatches', [])
-const { state: allMatches } = useReload('searchAllMatches', [])
-const { state: selectedFile } = useReload('selectedFile', '')
-const { state: selectedMatch } = useReload('selectedMatch', null)
-const { state: lastQuery } = useReload('lastQuery', '')
-const { state: isPreviewOpen } = useReload('isPreviewOpen', false)
 const documentsOnlyMode = ref(true)
 
 /* Number of search results to fetch, possible to change. */

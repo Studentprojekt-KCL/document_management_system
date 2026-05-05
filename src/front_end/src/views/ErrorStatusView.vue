@@ -4,7 +4,6 @@
  * A button that either goes back to the previous page or redirects to login if the error is 401 and the user is not logged in.
  */
 import { useRouter } from 'vue-router'
-import { isLoggedIn } from '@/utils/auth'
 
 /* Props for error code, title, and description. */
 const props = defineProps({
@@ -26,7 +25,7 @@ const router = useRouter()
 
 /* Helper functions to determine login status and whether to redirect to login. */
 const isUnauthorized = () => Number(props.code) === 401
-const shouldGoToLogin = () => isUnauthorized() && !isLoggedIn()
+const shouldGoToLogin = () => isUnauthorized()
 
 /* Function to handle the button click - either go back or redirect to login. */
 const goBack = () => {

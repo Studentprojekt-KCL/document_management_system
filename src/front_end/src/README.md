@@ -19,14 +19,18 @@ This folder (`./front_end/src/`) contains the frotend code for the application.
 ## Architecture guideline
 
 - Keep **reusable UI** in `components/`.
-- Keep **page scaffolding** in `layouts/`.
 - Keep **URL-mapped pages** in `views/`.
-- Keep routing logic centralized in `router/index.js`.
+- Put cross-component logic in `composables/`.
+- Put pure helpers in `utils/`.
+- Keep route declarations and guards in `router/`.
+
 
 ## Naming conventions
 
-- Please use `PascalCase` for Vue SFC files (e.g., `MainLayout.vue`, `SearchFiltersCard.vue`).
-- Use descriptive names that reflect role (`MainLayout`, `SettingsView`, `SearchBar`, etc).
+- Use `PascalCase` for Vue Single File Components (e.g., `MainLayout.vue`, `SearchFiltersCard.vue`).
+- Use descriptive names that reflect intent and scope (e.g. `MainLayout`, `SettingsView`, `SearchBar` ).
+- Keep composable and utils names in camelCase (e.g. `useFilters.js` etc.).
+
 
 ## When adding new code
 
@@ -36,6 +40,15 @@ This folder (`./front_end/src/`) contains the frotend code for the application.
 - New route mapping -> update `router/index.js`
 
 
+## Contribution Checklist
+
+1. Keep changes small and feature-focused.
+2. Reuse existing composables and utility helpers when possible.
+3. Run lint before committing.
+4. Update this structure document when introducing new top-level source folders.
+
+
 ### If questions 
 
 - Ask frontend team :D
+

@@ -25,7 +25,7 @@ def _make_lang_config(sample_size: int = 100, threshold: int = 2) -> LanguageCon
 
 def _make_config(
     url: str = "http://gpu-server",
-    model: str = "ministral",
+    model: str = "ministral-3:14B",
     timeout: int = 30,
     lang_config: LanguageConfig | None = None,
 ) -> SummarizerConfig:

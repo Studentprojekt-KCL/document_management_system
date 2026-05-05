@@ -29,7 +29,7 @@ services:
       dockerfile: src/connectors/gitlab/Dockerfile
 
   connector-samba:
-    image: connector-samba
+    image: connector-samba:pr
     build:
       dockerfile: src/connectors/samba/Dockerfile
 

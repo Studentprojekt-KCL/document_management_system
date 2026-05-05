@@ -151,7 +151,3 @@ class TestPdfConverter(unittest.TestCase):
         self.converter.convert(md)
 
         mock_section_cls.assert_called_once_with(md)
-
-
-if __name__ == "__main__":
-    unittest.main()

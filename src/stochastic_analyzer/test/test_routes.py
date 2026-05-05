@@ -4,7 +4,8 @@ Unit tests for the gateway API routes.
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from gateway.services.token_counter import MergeLimits
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -43,6 +44,8 @@ def _make_services(
     classifier=None,
     pdf_converter=None,
     indexer=None,
+    merger=None,
+    token_counter=None,
 ) -> Services:
     """Return a Services dataclass with AsyncMock defaults for each service."""
     return Services(
@@ -51,13 +54,16 @@ def _make_services(
         classifier=classifier or AsyncMock(),
         pdf_converter=pdf_converter or MagicMock(),
         indexer=indexer or AsyncMock(),
+        merger=merger or AsyncMock(),
+        token_counter=token_counter or MagicMock(),
     )
 
 
 def _make_client(services: Services) -> TestClient:
     """Wire up a FastAPI app with the given services and return a test client."""
+    merge_limits = MergeLimits(max_doc_tokens=10_000, max_total_tokens=50_000)
     app = FastAPI()
-    app.include_router(create_router(services))
+    app.include_router(create_router(services, merge_limits))
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -316,86 +322,32 @@ class TestRerankEndpoint(unittest.TestCase):
 
 
 class TestMdToPdfEndpoint(unittest.TestCase):
-    def test_returns_pdf_content_type(self) -> None:
-        connector = AsyncMock()
-        connector.get_file_contents.return_value = [_make_item()]
-
-        summarizer = AsyncMock()
-        summarizer.summarize.return_value = SummaryResult(summary="Summary text.")
-
-        pdf_converter = MagicMock()
+    def _make_pdf_client(self, pdf_converter=None) -> TestClient:
+        pdf_converter = pdf_converter or MagicMock()
         pdf_converter.convert.return_value = b"%PDF-fake-bytes"
+        return _make_client(_make_services(pdf_converter=pdf_converter))
 
-        client = _make_client(
-            _make_services(
-                connector=connector,
-                summarizer=summarizer,
-                pdf_converter=pdf_converter,
-            )
-        )
-        resp = client.post("/md-to-pdf", json={"pointers": [GITLAB_POINTER]})
+    def test_returns_pdf_content_type(self) -> None:
+        client = self._make_pdf_client()
+        resp = client.post("/md-to-pdf", json={"summary": "Summary text."})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.headers["content-type"], "application/pdf")
 
     def test_returns_pdf_bytes(self) -> None:
-        connector = AsyncMock()
-        connector.get_file_contents.return_value = [_make_item()]
-
-        summarizer = AsyncMock()
-        summarizer.summarize.return_value = SummaryResult(summary="Summary text.")
-
-        pdf_converter = MagicMock()
-        pdf_converter.convert.return_value = b"%PDF-fake-bytes"
-
-        client = _make_client(
-            _make_services(
-                connector=connector,
-                summarizer=summarizer,
-                pdf_converter=pdf_converter,
-            )
-        )
-        resp = client.post("/md-to-pdf", json={"pointers": [GITLAB_POINTER]})
+        client = self._make_pdf_client()
+        resp = client.post("/md-to-pdf", json={"summary": "Summary text."})
         self.assertEqual(resp.content, b"%PDF-fake-bytes")
 
-    def test_returns_502_when_connector_fails(self) -> None:
-        connector = AsyncMock()
-        connector.get_file_contents.return_value = []
-
-        client = _make_client(_make_services(connector=connector))
-        resp = client.post("/md-to-pdf", json={"pointers": [GITLAB_POINTER]})
-        self.assertEqual(resp.status_code, 502)
-
-    def test_returns_500_when_summarizer_fails(self) -> None:
-        connector = AsyncMock()
-        connector.get_file_contents.return_value = [_make_item()]
-
-        summarizer = AsyncMock()
-        summarizer.summarize.return_value = None
-
-        client = _make_client(_make_services(connector=connector, summarizer=summarizer))
-        resp = client.post("/md-to-pdf", json={"pointers": [GITLAB_POINTER]})
+    def test_returns_500_when_converter_fails(self) -> None:
+        pdf_converter = MagicMock()
+        pdf_converter.convert.side_effect = Exception("converter error")
+        client = _make_client(_make_services(pdf_converter=pdf_converter))
+        resp = client.post("/md-to-pdf", json={"summary": "Summary text."})
         self.assertEqual(resp.status_code, 500)
 
     def test_pdf_converter_called_with_summary_text(self) -> None:
-        connector = AsyncMock()
-        connector.get_file_contents.return_value = [_make_item()]
-
-        summarizer = AsyncMock()
-        summarizer.summarize.return_value = SummaryResult(summary="The summary.")
-
         pdf_converter = MagicMock()
         pdf_converter.convert.return_value = b"%PDF"
-
-        client = _make_client(
-            _make_services(
-                connector=connector,
-                summarizer=summarizer,
-                pdf_converter=pdf_converter,
-            )
-        )
-        client.post("/md-to-pdf", json={"pointers": [GITLAB_POINTER]})
+        client = _make_client(_make_services(pdf_converter=pdf_converter))
+        client.post("/md-to-pdf", json={"summary": "The summary."})
         pdf_converter.convert.assert_called_once_with("The summary.")
-
-
-if __name__ == "__main__":
-    unittest.main()

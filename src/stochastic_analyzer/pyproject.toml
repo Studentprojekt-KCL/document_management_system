@@ -13,3 +13,6 @@ packages = ["gateway", "gateway.services"]
 
 [project.scripts]
 gateway = "gateway.main:start"
+
+[project.optional-dependencies]
+test = ["httpx"]

@@ -488,7 +488,3 @@ class TestIndex(unittest.IsolatedAsyncioTestCase):
 
         mock_warn.assert_called_once()
         self.assertEqual(result["indexed"], 1)  # only the good file
-
-
-if __name__ == "__main__":
-    unittest.main()

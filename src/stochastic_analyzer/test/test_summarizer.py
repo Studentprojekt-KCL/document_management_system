@@ -24,7 +24,7 @@ def _make_lang_config(sample_size: int = 100, threshold: int = 2) -> LanguageCon
 
 
 def _make_config(
-    url: str = "http://llm",
+    url: str = "http://gpu-server",
     model: str = "ministral",
     timeout: int = 30,
     lang_config: LanguageConfig | None = None,
@@ -38,7 +38,7 @@ def _make_config(
 
 
 def _make_summarizer(
-    url: str = "http://llm",
+    url: str = "http://gpu-server",
     threshold: int = 2,
 ) -> Summarizer:
     """Return a Summarizer with a mock async HTTP client."""
@@ -50,7 +50,7 @@ def _make_summarizer(
 def _make_item(
     content: str = "Some document content.",
     name: str | None = "doc.pdf",
-    author: str | None = "Alice",
+    author: str | None = "Ali",
     pointer: str | None = "ptr-001",
 ) -> InputItem:
     return InputItem(
@@ -341,7 +341,3 @@ class TestSummarize(unittest.IsolatedAsyncioTestCase):
         _mock_llm_response(s.client, "some text")
         result = await s.summarize([_make_item()])
         self.assertIsInstance(result, SummaryResult)
-
-
-if __name__ == "__main__":
-    unittest.main()

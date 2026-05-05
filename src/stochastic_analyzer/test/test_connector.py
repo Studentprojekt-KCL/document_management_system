@@ -47,7 +47,6 @@ def _mock_error(mock_client: AsyncMock, error: Exception) -> None:
 
 GITLAB_POINTER = "https://gitlab.dms-lookup.com/api/v4/projects/7/repository/files/doc.txt"
 
-
 # ---------------------------------------------------------------------------
 # Constructor
 # ---------------------------------------------------------------------------
@@ -293,7 +292,3 @@ class TestGetFileMetadata(unittest.IsolatedAsyncioTestCase):
         _mock_response(c.client, metadata)
         result = await c.get_file_metadata(["ptr-1", "ptr-2"])
         self.assertEqual(len(result), 2)
-
-
-if __name__ == "__main__":
-    unittest.main()

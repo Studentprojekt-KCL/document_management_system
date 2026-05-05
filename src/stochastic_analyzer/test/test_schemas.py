@@ -20,7 +20,6 @@ from gateway.schemas import (
 
 GITLAB_POINTER = "https://gitlab.dms-lookup.com/api/v4/projects/7/repository/files/doc.txt"
 
-
 # ---------------------------------------------------------------------------
 # FileMetadata
 # ---------------------------------------------------------------------------
@@ -268,7 +267,3 @@ class TestSummaryResult(unittest.TestCase):
     def test_strict_str_rejects_int(self) -> None:
         with self.assertRaises(ValidationError):
             SummaryResult(summary=123)
-
-
-if __name__ == "__main__":
-    unittest.main()

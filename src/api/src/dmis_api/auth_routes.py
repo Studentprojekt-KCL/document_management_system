@@ -26,7 +26,6 @@ class AuthRoutes:
         self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
         self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-        self.frontend_url = read_env_variable("DMISAPI_FRONTEND_URL").rstrip("/")
 
         self._session = None
 

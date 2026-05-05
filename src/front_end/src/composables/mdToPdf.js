@@ -64,7 +64,7 @@ export function useMdToPdf(props = {}) {
       const pdfResponse = await authFetch(API_PATHS.mdToPDF, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary: mergedHtml })
+        body: JSON.stringify({ summary: mergedMarkdown.value })
       })
 
       if (!pdfResponse.ok) {

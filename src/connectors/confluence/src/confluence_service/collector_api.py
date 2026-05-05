@@ -17,8 +17,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.boto_tools import upload_file
-from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
@@ -45,7 +43,6 @@ class API:
 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:

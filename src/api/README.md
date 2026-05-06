@@ -17,7 +17,6 @@
     DMISAPI_AD_TOKEN_URL=<URL to AD>
     DMISAPI_AD_LOGOUT_URL=<URL to AD login>
     DMISAPI_AD_CLIENT_ID=<Client id in AD>
-    DMISAPI_FRONTEND_URL=<Frontend URL>
 
 ## Optional environmental variables
     DMISAPI_AD_AUDIENCE=<Expected audience (aud claim) for this API, comma separated if multiple>

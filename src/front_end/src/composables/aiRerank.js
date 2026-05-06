@@ -38,10 +38,11 @@ export function useAIRerank(props = {}) {
     aiRerankResults.value = []
 
     try {
-      const response = await authFetch(API_PATHS.rerank, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pointers: [uniquePointer.value] })
+      const rerankUrl = new URL(API_PATHS.rerank, window.location.origin)
+      rerankUrl.searchParams.set('pointer', uniquePointer.value)
+
+      const response = await authFetch(rerankUrl, {
+        method: 'GET'
       })
 
       if (!response.ok) {
@@ -49,7 +50,7 @@ export function useAIRerank(props = {}) {
       }
 
       const data = await response.json()
-      const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
+      const rankedResults = Array.isArray(data) ? data : []
       aiRerankResults.value = mapRankedResults(rankedResults)
       rerankPointer.value = uniquePointer.value
       rerankFilename.value = filename

@@ -161,18 +161,13 @@ class SearchEngine:
 
         return (pointers, classifications)
 
-    def find_matching(self, unique_pointer: str, count: int | None) -> dict:
+    def find_matching(self, unique_pointer: str) -> dict:
         """Search for matching files.
 
         Args:
             unique_pointer: file to match with.
-            count: number of wanted results.
         Returns: unique pointers and their score.
         """
-        if count is not None and count < 0:
-            dms_warning(f"Recived count below 0 as an argument in 'find_matching', {count}")
-            return {}
-
         matching: dict = {}
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
@@ -184,11 +179,10 @@ class SearchEngine:
         for score, doc_id in result.hits:
             if original_score is None:
                 original_score = score
+                continue
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
             matching.update({unique_pointer: score / original_score})
-            if count is not None and len(matching) == count:
-                break
         return matching
 
     @contextmanager

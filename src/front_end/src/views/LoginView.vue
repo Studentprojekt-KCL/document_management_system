@@ -2,16 +2,19 @@
 /**
  * LoginView.vue - View for handling user login with placeholder for Microsoft Entra ID.
  * Includes PKCE (Proof Key for Code Exchange) for secure authentication.
+ * We send code to mainAPI for exchange to tokens.
  */
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
 import { FRONTEND_AD_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
 
+/* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)
 
 /* Initiates the Microsoft Entra ID login flow using PKCE. */
 const handleEntraIdLogin = async () => {
+  isLoading.value = true
   const { verifier, challenge } = await createPkcePair()
 
   localStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)

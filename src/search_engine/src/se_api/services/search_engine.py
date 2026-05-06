@@ -17,7 +17,16 @@ from tantivy import (
     Searcher,
 )
 
-from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, CONTENT, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
+from se_api.constants import (
+    BOOLEAN_CATEGORIES,
+    CLASSIFICATION,
+    CONTENT,
+    COOKED_CATEGORIES,
+    IS_DOCUMENT,
+    MODIFIED,
+    RAW_CATEGORIES,
+    UNIQUE_POINTER,
+)
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_documents_only_rescource
@@ -57,6 +66,7 @@ class SearchEngine:
             return
         self.categories = BOOLEAN_CATEGORIES
         self.categories = self.categories.union(RAW_CATEGORIES)
+        self.categories = self.categories.union(COOKED_CATEGORIES)
         if fields is not None:
             for field in fields:
                 self.categories.add(field)
@@ -151,18 +161,13 @@ class SearchEngine:
 
         return (pointers, classifications)
 
-    def find_matching(self, unique_pointer: str, count: int | None) -> dict:
+    def find_matching(self, unique_pointer: str) -> dict:
         """Search for matching files.
 
         Args:
             unique_pointer: file to match with.
-            count: number of wanted results.
         Returns: unique pointers and their score.
         """
-        if count is not None and count < 0:
-            dms_warning(f"Recived count below 0 as an argument in 'find_matching', {count}")
-            return {}
-
         matching: dict = {}
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
@@ -174,11 +179,10 @@ class SearchEngine:
         for score, doc_id in result.hits:
             if original_score is None:
                 original_score = score
+                continue
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
             matching.update({unique_pointer: score / original_score})
-            if count is not None and len(matching) == count:
-                break
         return matching
 
     @contextmanager
@@ -190,6 +194,28 @@ class SearchEngine:
         self.writer.commit()
         self.writer.wait_merging_threads()
         self.writer_lock.release()
+
+    def grab_file(self, unique_pointer: str) -> dict:
+        """Grab a file from the index.
+
+        Args:
+            unique_pointer: the file pointer.
+        Returns: file dict.
+        """
+        file: dict = {}
+        searcher: Searcher = self.index.searcher()
+        matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        if matches.hits:
+            doc_id = matches.hits[0][1]
+            doc = searcher.doc(doc_id)
+            for category in self.categories:
+                try:
+                    file[category] = doc[category][0]
+                except IndexError:
+                    file[category] = "N/A"
+            return file
+        dms_warning(f"Failed to fetch content from index: {unique_pointer}")
+        return file
 
     def add_file(self, file: dict) -> None:
         """Add file to index.

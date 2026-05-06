@@ -313,7 +313,7 @@ class Samba:
             "-t",
             "cifs",
             "-o",
-            f"username={username},password={password},iocharset=utf8,port={self.share_host.port}",
+            f"username={username},password={password},port={self.share_host.port}",
             self.share_host.share.replace("\\", "/"),
             path,
         ]

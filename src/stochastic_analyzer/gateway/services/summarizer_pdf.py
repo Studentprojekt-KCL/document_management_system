@@ -1,20 +1,33 @@
-"""Batch document summarization via external Ministral LLM."""
+"""Markdown to PDF conversion."""
 
 from io import BytesIO
+
 from markdown_pdf import MarkdownPdf, Section
 
 
-def md_to_pdf(md: str) -> bytes:
-    """Convert markdownn to pdf.
+class PdfConverter:
+    """Converts markdown text to PDF bytes.
 
-    Args:
-        md: markdown string
-    Retruns: PDF file as bytes.
+    Attributes:
+        toc_level: Table of contents depth.
     """
-    pdf = MarkdownPdf(toc_level=2, optimize=True)
-    pdf.add_section(Section(md))
-    out = BytesIO()
-    pdf.save_bytes(out)
-    result = out.getvalue()
-    out.close()
-    return result
+
+    def __init__(self, toc_level: int = 2) -> None:
+        self.toc_level = toc_level
+
+    def convert(self, md: str) -> bytes:
+        """Convert markdown string to PDF bytes.
+
+        Args:
+            md: Markdown string.
+
+        Returns:
+            PDF file as bytes.
+        """
+        pdf = MarkdownPdf(toc_level=self.toc_level, optimize=True)
+        pdf.add_section(Section(md))
+        out = BytesIO()
+        pdf.save_bytes(out)
+        result = out.getvalue()
+        out.close()
+        return result

@@ -16,20 +16,24 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveFilename, resolveSecurityClass, TYPE_FILTERS } from '@/composables/useSearchMetadata'
+import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
+import { authFetch, API_PATHS } from '@/utils/api'
 
 /* Reactive state variables for search results and UI state */
 const matches = ref([])
 const allMatches = ref([])
 const selectedFile = ref('')
 const selectedMatch = ref(null)
-const error = ref('')
-const isSearching = ref(false)
 const lastQuery = ref('')
 const isPreviewOpen = ref(false)
-const access_token = sessionStorage.getItem('access_token')
-/* Base URL for API requests, configurable via environment variable */
-const API_BASE_URL = window.__ENV__.API_BASE_URL.replace(/\/$/, '')
+
+const error = ref('')
+const isSearching = ref(false)
+const documentsOnlyMode = ref(true)
+
+/* Number of search results to fetch, possible to change. */
+const SEARCH_COUNT = 20
+const SEARCH_OFFSET = 0
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -38,15 +42,28 @@ const selectedFilters = ref({
   security: []
 })
 
+const searchPayload = (query, documentsOnly) => {
+  const payload = {
+    content: query
+  }
+  if (documentsOnly) {
+    payload.documents_only = 'true'
+  }
+  return payload
+}
+
 /* Performs a search when the SearchBar emits a search event */
-const handleSearch = async (query) => {
+const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
+  documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
   error.value = ''
-  matches.value = []
-  selectedFile.value = ''
-  selectedMatch.value = null
-  isPreviewOpen.value = false
+  if (resetPreview) {
+    matches.value = []
+    selectedFile.value = ''
+    selectedMatch.value = null
+    isPreviewOpen.value = false
+  }
 
   if (!query || !query.trim()) {
     error.value = 'Please enter a search term.'
@@ -55,12 +72,18 @@ const handleSearch = async (query) => {
 
   isSearching.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`, {
-      headers: {
-        Authorization: `Bearer ${access_token}`
-      }
+    const params = new URLSearchParams({
+      count: String(SEARCH_COUNT),
+      offset: String(SEARCH_OFFSET)
     })
+    const payload = searchPayload(query, documentsOnly)
 
+    const res = await authFetch(`${API_PATHS.search}?${params.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return
@@ -84,13 +107,19 @@ const handleSearch = async (query) => {
   }
 }
 
+/* Should send down a new request to the backend if the user press the button */
+const handleDocumentsOnlyChange = (documentsOnly) => {
+  documentsOnlyMode.value = documentsOnly
+  if (lastQuery.value && lastQuery.value.trim()) {
+    handleSearch({ query: lastQuery.value, documentsOnly })
+  }
+}
+
 /* Handles selection of a search result match, updating state and opening the preview drawer */
 const selectMatch = (match) => {
   if (!match) return
 
   selectedMatch.value = match
-  selectedFile.value = resolveFilename(match)
-
   isPreviewOpen.value = true
 }
 
@@ -100,45 +129,48 @@ const closePreview = () => {
 }
 
 /* Handle changes to search filters  */
-// TODO: add source & security filtering.
 const handleFilterChange = (filters) => {
   selectedFilters.value = filters
-  console.log('Filter changed:', filters)
   // If no filters → show everything
   if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
     matches.value = allMatches.value
     return
   }
   matches.value = allMatches.value.filter((match) => {
-    const filename = (match.filename || match.name || '').toLowerCase()
+    const filetype = resolveDocumentExtension(match).toLowerCase()
     const securityClass = resolveSecurityClass(match).toLowerCase()
     // const source = (match.source || '').toLowerCase()
 
     // TYPE FILTER
     const typeMatch =
       filters.type.length === 0 ||
-      filters.type.some((filterLabel) => {
-        // Find the TYPE_KEYWORDS entry that matches the selected filter
-        const keywordsEntry = Object.entries(TYPE_FILTERS).find(([docType]) => docType === filterLabel)
-
-        if (!keywordsEntry) return false
-
-        const [, keywords] = keywordsEntry
-
-        // Only match filename against the keywords for this filter
-        return keywords.some((kw) => filename.endsWith(kw))
+      filters.type.some((selected) => {
+        // Split the group string from json file (e.g., ".docx|.doc|.odt") and check if filetype is in it
+        const extensions = selected.split('|')
+        return extensions.some((ext) => filetype === ext.toLowerCase())
       })
 
     // SOURCE FILTER
-    // const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
+    //const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
 
     // SECURITY FILTER
     const securityMatch =
       filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
-    // add sourceMatch and secuirtyMatch later
-    // return typeMatch && sourceMatch && secuirtyMatch
+    // add sourceMatch later
+    // return typeMatch && sourceMatch && securityMatch
     return typeMatch && securityMatch
+  })
+}
+// searching a second time automatically to update the security levels
+const refreshCurrentSearch = async () => {
+  // prevents empty search.
+  if (!lastQuery.value || !lastQuery.value.trim()) return
+
+  await handleSearch({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false
   })
 }
 </script>
@@ -147,10 +179,10 @@ const handleFilterChange = (filters) => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" />
+    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" @update:filters="handleFilterChange" />
+    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
@@ -162,6 +194,7 @@ const handleFilterChange = (filters) => {
       :selected-match="selectedMatch"
       :matches="matches"
       @close="closePreview"
+      @update-security="refreshCurrentSearch"
     />
   </section>
 </template>

@@ -8,43 +8,32 @@
  * @example usage:
  * <TheHeader />
  */
-
 import { Bell, LogOut } from 'lucide-vue-next'
+import { logout } from '@/utils/auth'
+import { useRoute, useRouter } from 'vue-router'
 
-/* Keycloak attributes */
-const KEYCLOAK_BASE = window.__ENV__.KEYCLOAK_BASE_URL
-const REALM = window.__ENV__.KEYCLOAK_REALM
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+/* Logo redirects to search page, page reloads if already on search page */
+const router = useRouter()
+const route = useRoute()
 
-/* Handles user logout by clearing session storage and redirecting to login page. */
-const handleLogout = () => {
-  const idToken = sessionStorage.getItem('id_token')
-  const postLogoutRedirectUri = `${window.location.origin}/`
-
-  sessionStorage.removeItem('access_token')
-  sessionStorage.removeItem('id_token')
-  sessionStorage.removeItem('pkce_verifier')
-  sessionStorage.removeItem('oidc_state')
-
-  localStorage.setItem('logout-event', Date.now().toString())
-
-  if (idToken) {
-    const logoutUrl =
-      `${KEYCLOAK_BASE}/realms/${REALM}/protocol/openid-connect/logout` +
-      `?id_token_hint=${encodeURIComponent(idToken)}` +
-      `&post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri)}` +
-      `&client_id=${encodeURIComponent(CLIENT_ID)}`
-
-    window.location.assign(logoutUrl)
+const navigateToSearch = async () => {
+  if (route.name === 'Search') {
+    window.location.reload()
     return
   }
+  router.push('/search')
+}
+
+/* Handles user logout by clearing local storage and redirecting to login page. */
+const handleLogout = () => {
+  logout()
 }
 </script>
 
 <template>
   <!--- Main Header container-->
   <header class="header">
-    <img src="@/assets/logo.png" alt="Logo" class="logo-image" />
+    <img src="@/assets/newLogo.png" alt="Logo" class="logo-image" @click="navigateToSearch" />
 
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
@@ -72,9 +61,12 @@ const handleLogout = () => {
 }
 
 .logo-image {
-  width: 140px;
+  width: 190px;
   height: auto;
   object-fit: contain;
+  border-radius: 10px;
+  margin-left: 1.3rem;
+  cursor: pointer;
 }
 
 .spacer {

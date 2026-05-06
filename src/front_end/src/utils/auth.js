@@ -1,34 +1,56 @@
-/**
- * Decode the payload of a JSON Web Token (JWT).
- *
- * @param {string} token - The JWT string.
- * @returns {Object|null} The decoded payload, or null if decoding fails.
- */
+import { LOCAL_KEY_LOGOUT_EVENT } from '@/utils/config'
+import { apiFetch, API_PATHS } from '@/utils/api'
+import { getCurrentUser } from '@/utils/authClient'
 
-const CLIENT_ID = window.__ENV__.KEYCLOAK_CLIENT_ID
+export async function hasRole(role) {
+  const authInfo = await getCurrentUser()
+  if (!authInfo?.authenticated) return false
 
-/* Read the JSON Web Token */
-function decodeJwtPayload(token) {
+  const clientRoles = authInfo.user?.client_roles ?? []
+  const realmRoles = authInfo.user?.realm_roles ?? []
+
+  return clientRoles.includes(role) || realmRoles.includes(role)
+}
+
+export async function refreshSession() {
   try {
-    const base64Url = token.split('.')[1]
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
+    const response = await apiFetch(API_PATHS.authRefresh, {
+      method: 'POST'
+    })
+
+    return response.ok
+  } catch (err) {
+    console.error('Error refreshing session:', err)
+    return false
   }
 }
 
-/* Check if the user has a specific role */
-export function hasRole(role) {
-  const token = sessionStorage.getItem('access_token')
-  if (!token) return false
+export async function logout() {
+  localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
 
-  const payload = decodeJwtPayload(token)
-  if (!payload) return false
+  localStorage.removeItem('pkce_verifier')
+  localStorage.removeItem('oidc_state')
 
-  const clientRoles = payload?.resource_access?.[CLIENT_ID]?.roles ?? []
-  const realmRoles = payload?.realm_access?.roles ?? []
+  try {
+    const response = await apiFetch(API_PATHS.authLogout, {
+      method: 'POST'
+    })
 
-  return clientRoles.includes(role) || realmRoles.includes(role)
+    if (!response.ok) {
+      window.location.href = '/'
+      return
+    }
+
+    const data = await response.json()
+
+    if (data.logout_url) {
+      window.location.href = data.logout_url
+      return
+    }
+
+    window.location.href = '/'
+  } catch (err) {
+    console.error('Logout failed:', err)
+    window.location.href = '/'
+  }
 }

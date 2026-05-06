@@ -8,11 +8,28 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import {
+  X,
+  StarsIcon,
+  CalendarDays,
+  HardDrive,
+  FileType2,
+  ExternalLink,
+  Pencil,
+  CheckCircle,
+  AlertCircle,
+  Copy
+} from 'lucide-vue-next'
+
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { hasRole } from '@/utils/auth'
+import ClassificationEditor from '@/components/ClassificationEditor.vue'
+import { authFetch, API_PATHS } from '@/utils/api'
+import { useAIRerank } from '@/composables/aiRerank'
 
-/* Props received from parent component (SearchView) */
+/* Props */
 const props = defineProps({
   open: { type: Boolean, default: false },
   selectedFile: { type: String, default: '' },
@@ -20,14 +37,109 @@ const props = defineProps({
   matches: { type: Array, default: () => [] }
 })
 
-/* Emit event to parent component to signal closing the preview drawer */
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'update-security'])
 
-/* Use custom composable to extract metadata for the selected file */
-const { previewTitle, previewType, previewCreatedAt, previewSize, previewLink, previewSecurityClass } = useSearchMetadata(props)
+/* Metadata */
+const {
+  previewTitle,
+  previewFileDescription,
+  sourceSystem,
+  previewCreatedAt,
+  previewSize,
+  previewLink,
+  previewSecurityClass,
+  uniquePointer
+} = useSearchMetadata(props)
 
-/* AI summary composable */
+/* AI */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
+
+/* State */
+const isEditingClassification = ref(false)
+const classificationEditorRef = ref(null)
+const localSecurityLevel = ref('')
+
+/* Sync from metadata */
+watch(
+  () => previewSecurityClass.value,
+  (val) => {
+    localSecurityLevel.value = val || ''
+  },
+  { immediate: true }
+)
+
+/* Computed */
+const currentSecurityLevel = computed(() => localSecurityLevel.value)
+const hasUniquePointer = computed(() => Boolean(uniquePointer.value))
+
+/* Permissions */
+const canEdit = computed(() => hasRole('admin'))
+
+/* notification */
+const notification = ref({ visible: false, success: true, message: '' })
+let notificationTimer = null
+
+const showNotification = (success, message) => {
+  if (notificationTimer) clearTimeout(notificationTimer)
+
+  notification.value = { visible: true, success, message }
+
+  notificationTimer = setTimeout(() => {
+    notification.value.visible = false
+  }, 4000)
+}
+
+const handleCopyUniquePointer = async () => {
+  if (!uniquePointer.value) {
+    showNotification(false, 'No file reference is available for this result.')
+    return
+  }
+  await navigator.clipboard.writeText(uniquePointer.value)
+  showNotification(true, 'File reference copied to clipboard.')
+}
+
+/* Save classification */
+const handleClassificationSave = async (level) => {
+  try {
+    const response = await authFetch(API_PATHS.classification, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unique_pointer: uniquePointer.value,
+        classification: level
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`)
+    }
+
+    emit('update-security', {
+      uniquePointer: uniquePointer.value,
+      level
+    })
+
+    localSecurityLevel.value = level
+    showNotification(true, 'Security classification updated successfully.')
+    isEditingClassification.value = false
+  } catch (err) {
+    showNotification(false, `Update failed: ${err.message}`)
+  } finally {
+    classificationEditorRef.value?.resetSaving()
+  }
+}
+
+/* Reset UI */
+watch(
+  () => [props.selectedFile, props.open],
+  () => {
+    isEditingClassification.value = false
+    notification.value.visible = false
+  }
+)
+
+/* AI rerank composable */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -45,10 +157,22 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 
     <!-- Main content area of the preview drawer -->
     <div class="preview-body">
+      <!-- notification -->
+      <Transition name="notification-fade">
+        <div
+          v-if="notification.visible"
+          :class="['notification', notification.success ? 'notification-success' : 'notification-error']"
+        >
+          <CheckCircle v-if="notification.success" :size="16" />
+          <AlertCircle v-else :size="16" />
+          <span>{{ notification.message }}</span>
+        </div>
+      </Transition>
+
       <h3 class="preview-title">{{ previewTitle }}</h3>
 
       <div class="tag-row">
-        <span class="tag">{{ previewType }}</span>
+        <span class="tag">{{ previewFileDescription }}</span>
       </div>
 
       <!-- Technical Metadata section -->
@@ -61,15 +185,21 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           </div>
           <div class="meta-cell">
             <span>File Size</span>
-            <p><HardDrive :size="13" /> {{ previewSize }}</p>
+            <p><HardDrive :size="13" /> {{ previewSize }} B</p>
           </div>
           <div class="meta-cell">
             <span>Format</span>
-            <p><FileType2 :size="13" /> {{ previewType }}</p>
+            <p><FileType2 :size="13" /> {{ previewFileDescription }}</p>
           </div>
           <div class="meta-cell">
             <span>Security Class</span>
-            <p>{{ previewSecurityClass || 'Unknown' }}</p>
+            <div class="security-class-row">
+              <p>{{ currentSecurityLevel || 'Unknown' }}</p>
+              <button v-if="canEdit" class="edit-btn" @click="isEditingClassification = true">
+                <Pencil :size="14" />
+                Edit
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -77,8 +207,21 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
       <!-- AI Summary section -->
       <section class="panel-section">
         <p class="section-title">AI SUMMARY</p>
-        <div v-if="aiSummaryHtml" class="meta-cell meta-cell-summary">
-          <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+        <div v-if="aiSummaryHtml">
+          <div class="meta-cell meta-cell-summary">
+            <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+          </div>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isGeneratingSummary"
+            @click="generateAISummary"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isGeneratingSummary ? 'Generating summary...' : 'Regenerate Summary' }}
+            </p>
+          </button>
         </div>
         <button
           v-else
@@ -94,16 +237,83 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </button>
       </section>
+      <!-- MODAL -->
+      <ClassificationEditor
+        ref="classificationEditorRef"
+        :visible="isEditingClassification"
+        :current-level="currentSecurityLevel"
+        @save="handleClassificationSave"
+        @cancel="isEditingClassification = false"
+      />
+
+      <!-- Rerank (similarity) section -->
+      <section class="panel-section">
+        <p class="section-title">SIMILARITY</p>
+        <div v-if="aiRerankResultsComputed.length">
+          <ul>
+            <li v-for="result in aiRerankResultsComputed" :key="result.pointer" class="meta-cell meta-cell-rerank">
+              <p>{{ result.rank }}. {{ result.name }}<br />Score: {{ result.scorePercent }}</p>
+            </li>
+          </ul>
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            :disabled="isReranking"
+            @click="generateAIRerank"
+          >
+            <p>
+              <StarsIcon :size="13" />
+              {{ isReranking ? 'Finding matches...' : 'Regenerate Similar Files' }}
+            </p>
+            <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+          </button>
+          <!-- Possibility to merge files button -->
+          <button
+            class="meta-cell meta-cell-summary summary-regenerate-button"
+            type="button"
+            @click="$router.push({ name: 'MergeFiles' })"
+          >
+            <p>
+              <ExternalLink :size="13" />
+              Merge Files
+            </p>
+          </button>
+        </div>
+        <button
+          v-else
+          class="meta-cell meta-cell-summary summary-cell-button"
+          type="button"
+          :disabled="isReranking"
+          @click="generateAIRerank(previewTitle)"
+        >
+          <p>
+            <StarsIcon :size="13" />
+            {{ isReranking ? 'Finding matches...' : 'Find Similar Files' }}
+          </p>
+          <p v-if="rerankError" class="error">Error finding matches: {{ rerankError }}</p>
+        </button>
+      </section>
     </div>
 
     <div class="preview-footer">
+      <!-- First see if there is a preview link, for eg. GitLab -->
       <a v-if="previewLink" class="open-file-btn" :href="previewLink" target="_blank" rel="noopener noreferrer">
         <ExternalLink :size="14" />
-        Open file
+        Open file in {{ sourceSystem }}
       </a>
+      <!-- If no preview link, see if it has a unique pointer we can copy -->
+      <div v-else-if="hasUniquePointer" class="file-reference-card">
+        <p class="file-reference-label">No clickable link is available for {{ previewTitle }} in {{ sourceSystem }}.</p>
+        <code class="file-reference-value">{{ uniquePointer }}</code>
+        <button class="open-file-btn copy-reference-btn" type="button" @click="handleCopyUniquePointer">
+          <Copy :size="14" />
+          Copy file reference
+        </button>
+      </div>
+      <!-- If neither, display no file reference available -->
       <button v-else class="open-file-btn" type="button" disabled>
         <ExternalLink :size="14" />
-        No file link available
+        No file reference available
       </button>
     </div>
   </aside>
@@ -173,6 +383,9 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   margin-top: 2rem;
   text-align: center;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .tag-row {
@@ -198,6 +411,8 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   font-weight: 700;
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  margin: 0;
 }
 
 .meta-grid {
@@ -234,6 +449,19 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   overflow: hidden;
 }
 
+.meta-cell-rerank {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.meta-cell-rerank p {
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+}
+
 .summary-markdown {
   padding: 1rem 1.5rem;
 }
@@ -256,9 +484,55 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
   cursor: wait;
 }
 
+.summary-regenerate-button {
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+
+.summary-regenerate-button + .summary-regenerate-button {
+  margin-left: 1rem;
+}
+
+.summary-regenerate-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.summary-regenerate-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
 .preview-footer {
   border-top: 1px solid #eef2f7;
   padding: 0.85rem 1rem 1rem;
+}
+
+.file-reference-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.file-reference-label {
+  margin: 0;
+}
+
+.file-reference-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.file-reference-value {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  word-break: break-all;
 }
 
 .open-file-btn {
@@ -284,5 +558,67 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 .open-file-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d8dee7;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.security-class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.edit-btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #faf5ff;
+}
+
+.notification {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.notification-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.notification-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.notification-fade-enter-active,
+.notification-fade-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.notification-fade-enter-from,
+.notification-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

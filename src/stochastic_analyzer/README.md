@@ -17,13 +17,11 @@ $ gateway --dev
 
 Configuration is done through environment variables.
 
-- `BIND` — Address to bind to.
-- `PORT` — Port to host on.
-- `TEI_URL` — URL for the TEI reranker container.
-- `CLASSIFIER_URL` — URL for the TEI classifier container.
-- `MINISTRAL_URL` — URL for the Ministral LLM container.
-- `MINISTRAL_MODEL` — Model identifier for Ministral.
-- `DEVICE` — Compute device identifier (optional, defaults to `external`).
+- `STOCHAN_BIND_ADDR` — Address to bind to.
+- `STOCHAN_BIND_PORT` — Port to host on.
+- `STOCHAN_CLASSIFIER_URL` — URL for the TEI classifier container.
+- `STOCHAN_LLM_URL` — URL for the Ministral LLM container.
+- `STOCHAN_LLM_MODEL` — Model identifier for Ministral.
 
 Optional flags:
 
@@ -168,7 +166,7 @@ Classifies documents into security levels (Public, Internal, Sensitive, Confiden
 ```json
 [
   {
-    "name": "Q3_Projections",
+    "unique_pointer": "Q3_Projections",
     "Security-class": "Confidential"
   }
 ]

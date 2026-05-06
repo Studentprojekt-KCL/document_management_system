@@ -24,9 +24,8 @@ const props = defineProps({
 const router = useRouter()
 
 /* Helper functions to determine login status and whether to redirect to login. */
-const isLoggedIn = () => !!sessionStorage.getItem('access_token')
 const isUnauthorized = () => Number(props.code) === 401
-const shouldGoToLogin = () => isUnauthorized() && !isLoggedIn()
+const shouldGoToLogin = () => isUnauthorized()
 
 /* Function to handle the button click - either go back or redirect to login. */
 const goBack = () => {

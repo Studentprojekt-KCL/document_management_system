@@ -13,7 +13,8 @@ from fastapi.encoders import jsonable_encoder
 
 from log_api.database import Database
 from log_api.models import Log
-from initialisation_tools import read_port, read_env_variable
+
+from shared_functions.initialisation_tools import read_port, read_env_variable
 
 
 class API:
@@ -28,8 +29,8 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.port = read_port("LOGGER_PORT")
-        self.bind = read_env_variable("LOGGER_BIND_ADDRESS")
+        self.port = read_port("LOGAPI_BIND_PORT")
+        self.bind = read_env_variable("LOGAPI_BIND_ADDR")
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--dev", action="store_true")
@@ -50,7 +51,7 @@ class API:
 
     def start(self) -> None:
         """Start the api."""
-        uvicorn.run(self.app, host=self.bind, log_level=self.log_level)
+        uvicorn.run(self.app, host=self.bind, log_level=self.log_level, port=self.port)
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""

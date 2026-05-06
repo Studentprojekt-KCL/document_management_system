@@ -1,40 +1,51 @@
+# Run instructions
 
-### 3. Start the API
+## Required environment variables
 
-dmis_api --dev
+    DMISAPI_BIND_ADDR=<addr api will bind to>
+    DMISAPI_BIND_PORT=<port api will bind to>
 
-### 4. Test request to API:
+    DMISAPI_SEARCHENG_URL=<URL pointing to search engine>
+    DMISAPI_STOCHAN_URL=<URL pointing to stochastic analyzer>
+    DMISAPI_CONGATEWAY_URL=<URL pointing to gateway connector>
+    DMISAPI_LOGAPI_URL=<URL pointing to the log API>
 
-curl "http://127.0.0.1:8001/docs"
+    DMISAPI_AD_URL=<URL pointing to the the identity of the provider (realmn)>
+    DMISAPI_AD_JWKS_URL=<JWT public keys endpoint for signature verification>
+    DMISAPI_AD_ALLOWED_AZP=<Allowed authorized party (azp claim), comma separated if multiple>
 
-Expected "200 ok" code
+    DMISAPI_AD_TOKEN_URL=<URL to AD>
+    DMISAPI_AD_LOGOUT_URL=<URL to AD login>
+    DMISAPI_AD_CLIENT_ID=<Client id in AD>
 
-## Run with Docker
+## Optional environmental variables
+    DMISAPI_AD_AUDIENCE=<Expected audience (aud claim) for this API, comma separated if multiple>
+    DMISAPI_SEARCHENG_SCOPE=<Required scope name(s) for search engine endpoints, space-separated if multiple>
+    DMISAPI_STOCHAN_SCOPE=<Required scope name(s) for stochastic analyzer endpoints, space-separated if multiple>
+    DMISAPI_CONGATEWAY_SCOPE=<Required scope name(s) for connector endpoints, space-separated if multiple>
 
-Create .env in src/api/src
 
-  DMIS_SEARCH_API_URL=<DMIS_SEARCH_API>
-  DMIS_QUERY_API_URL=<DMIS_QUERY_API>
-  API_PORT=XXXX
-  API_BIND_ADDRESS=<BIND_ADDR>
+## In python venv
+
+    pip install src/api
+    dmis_api --dev
+
+## Using docker
 
 ### 1. Build the image from the project root:
 
-sudo docker build -t dmis_api -f src/api/Dockerfile .
+    sudo docker build -t dmis_api -f src/api/Dockerfile .
 
 ### 2. Run the container
 
-sudo docker run --rm -p 8001:8001 --env-file src/api/src/.env dmis_api
+    sudo docker run --rm -p <PORT_TO_EXPOSE>:<DMISAPI_BIND_PORT> --env-file src/api/src/.env dmis_api
 
-### 3. Test the API's
+# Make request to API
 
-#### Testing main API endpoint
-curl "http://127.0.0.1:8001/docs"
+## Search engine endpoint
 
-#### Testing search API endpoint
-curl "http://127.0.0.1:8001/search?query=test"
+    curl -H 'Authorization: Bearer <ACCESS_TOKEN>' '<API_HOST>/search_engine/search?query=<QUERY>'
 
-#### Testing summary API endpoint
-curl -X POST "http://127.0.0.1:8001/summary" \
-  -H "Content-Type: application/json" \
-  -d '{"file_pointer":"THEFILEPOINTER"}'
+## Summary endpoint
+
+    curl -X 'POST' -H 'Authorization: Bearer <ACCESS_TOKEN>' '<API_HOST>/stochastic-analyzer/summarize' -H 'accept: application/json' -d '{"pointers": ["<UNIQUE_FILE_POINTER>"]}'

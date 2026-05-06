@@ -3,15 +3,19 @@ on:
   pull_request:
     branches: ["develop"]
 
+env:
+  COMPOSE_FILE: "docker-compose-build-all.yaml"
+  
 jobs:
   build:
     permissions:
       contents: read
-    runs-on: self-hosted
+    runs-on: development
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Build docker images in .
-        working-directory: .
-        run: docker compose -f docker-compose-build-all.yaml build --pull
+      - name: Build docker images in repo
+        run: docker compose -f $COMPOSE_FILE build --pull
+        

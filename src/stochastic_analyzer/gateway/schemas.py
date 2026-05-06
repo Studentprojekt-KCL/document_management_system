@@ -4,17 +4,31 @@ from typing import Literal
 from pydantic import BaseModel, Field, StrictStr
 
 
-class ScoredPointer(BaseModel):
-    """A pointer with its relevance score."""
+class FileMetadata(BaseModel):
+    """File metadata enriched with a similarity score, as returned to the frontend.
+
+    Optional fields mirror the connector response shape; missing fields
+    are accepted gracefully rather than raising validation errors.
+    """
 
     score: float
-    pointer: StrictStr
+    unique_pointer: StrictStr
+    name: StrictStr | None = None
+    size: StrictStr | None = None
+    type: StrictStr | None = None
+    source_system: StrictStr | None = None
+    file_type: StrictStr | None = None
+    file_type_description: StrictStr | None = None
+    last_edit_date: StrictStr | None = None
+    clickable_url: StrictStr | None = None
+
+    model_config = {"extra": "ignore"}
 
 
 class RankResponse(BaseModel):
-    """Returned response."""
+    """Returned response for similarity search, ordered by descending score."""
 
-    ranked_results: list[ScoredPointer]
+    ranked_results: list[FileMetadata]
 
 
 class HealthCheck(BaseModel):
@@ -22,7 +36,6 @@ class HealthCheck(BaseModel):
 
     status: str
     model_loaded: bool
-    device: str
 
 
 class MetadataTemplate(BaseModel):
@@ -59,14 +72,13 @@ class PointerRequest(BaseModel):
     pointers: list[StrictStr] = Field(..., min_length=1)
 
 
-class RerankRequest(BaseModel):
-    """Request schema for pointer-based reranking."""
-
-    reference: StrictStr = Field(...)
-    pointers: list[StrictStr] = Field(..., min_length=1)
-
-
 class SummaryResult(BaseModel):
     """Output schema for a summarized document."""
 
     summary: StrictStr
+
+
+class MergeRequest(BaseModel):
+    """Request schema for merge endpoint, requires at least two pointers."""
+
+    pointers: list[StrictStr] = Field(..., min_length=2)

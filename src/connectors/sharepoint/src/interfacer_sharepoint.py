@@ -110,8 +110,8 @@ class SharePoint:
         """Retrieve all document library drives for a site."""
         url = f"{self.graph_base}/sites/{site_id}/drives"
         response = await self._request_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
-        if response.status_code == httpx.codes.FORBIDDEN:
-            dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
+        if response.status_code in (httpx.codes.FORBIDDEN, httpx.codes.NOT_FOUND):
+            dms_info(f"SharePoint: drive listing unavailable ({response.status_code}), skipping site")
             return []
         if response.status_code != httpx.codes.OK:
             dms_warning(f"SharePoint: drive listing failed with status {response.status_code}")
@@ -320,29 +320,3 @@ class SharePoint:
             return list(
                 await asyncio.gather(*[self._get_file(ctx, ptr, include_content, include_last_edit_date) for ptr in pointers])
             )
-
-    async def _check_drive_delta(self, ctx: _HttpCtx, delta_link: str) -> bool:
-        """Return True if this drive has changes or its delta token is invalid/expired."""
-        response = await self._request_with_retry(ctx, delta_link, timeout=REQUEST_TIMEOUT)
-        if response.status_code != httpx.codes.OK:
-            return True
-        return bool(response.json().get("value"))
-
-    async def check_index_needed(self, subdata: str | None, token: str | None = None) -> dict[str, bool]:
-        """Check whether any files have changed since the last sync."""
-        delta_map = self._decode_subdata(subdata)
-        if not delta_map:
-            return {"index_needed": True}
-        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
-        async with httpx.AsyncClient(cookies={}) as client:
-            ctx = _HttpCtx(client, sem, token)
-            results = await asyncio.gather(
-                *[
-                    self._check_drive_delta(ctx, f"{self.graph_base}/drives/{drive_id}/root/delta?token={tok}")
-                    for drive_id, tok in delta_map.items()
-                ],
-                return_exceptions=True,
-            )
-        if any(r is True or isinstance(r, BaseException) for r in results):
-            return {"index_needed": True}
-        return {"index_needed": False}

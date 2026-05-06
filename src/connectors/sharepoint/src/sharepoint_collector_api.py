@@ -37,7 +37,6 @@ class API:
         self.sharepoint_instance = SharePoint()
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
@@ -52,12 +51,6 @@ class API:
             errors = {"detail": str(exc)}
         content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
-
-    async def index_needed_bool(
-        self, subdata: str | None = None, x_sharepoint_token: Annotated[str | None, Header()] = None
-    ) -> Any:
-        """Endpoint returning whether a new index is needed."""
-        return await self.sharepoint_instance.check_index_needed(subdata, x_sharepoint_token)
 
     async def get_files(
         self,

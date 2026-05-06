@@ -252,13 +252,16 @@ class TestSharePointGraphDiscovery(SharePointTestCase, IsolatedAsyncioTestCase):
 
         self.assertEqual(await self.sharepoint._get_sites(http_context()), [{"id": "site-a"}])
 
-    async def test_get_drives_returns_document_libraries_and_treats_forbidden_as_inaccessible(self) -> None:
-        """403 means this user cannot list that site's drives, not that the whole sync failed."""
+    async def test_get_drives_returns_libraries_and_treats_forbidden_or_missing_sites_as_skippable(self) -> None:
+        """403/404 means this site has no listable drives for this user, not that the whole sync failed."""
         self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": [{"id": "drive-a"}]}))
         self.assertEqual(await self.sharepoint._get_drives(http_context(), "site-a"), [{"id": "drive-a"}])
 
         self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(403))
         self.assertEqual(await self.sharepoint._get_drives(http_context(), "site-b"), [])
+
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(404))
+        self.assertEqual(await self.sharepoint._get_drives(http_context(), "site-c"), [])
 
     async def test_run_delta_query_accumulates_pages_until_delta_link(self) -> None:
         """Delta queries may return nextLink pages before the final reusable deltaLink."""
@@ -495,52 +498,3 @@ class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
         self.assertEqual(drive_id, "drive-a")
         self.assertEqual([record["metadata"]["name"] for record in records], ["report.pdf"])
         self.assertEqual(parse_qs(urlparse(delta_link).query)["token"], ["next"])
-
-
-class TestSharePointIndexNeeded(SharePointTestCase, IsolatedAsyncioTestCase):
-    """The check_index_needed public contract."""
-
-    async def test_check_index_needed_requires_index_when_subdata_is_missing_or_invalid(self) -> None:
-        """No trustworthy delta state means a sync is needed."""
-        self.assertEqual(await self.sharepoint.check_index_needed(None), {"index_needed": True})
-        self.assertEqual(await self.sharepoint.check_index_needed("bad-subdata"), {"index_needed": True})
-
-    async def test_check_index_needed_returns_false_when_all_drives_have_empty_deltas(self) -> None:
-        """If every stored delta token is valid and empty, the existing index is current."""
-        subdata = SharePoint._encode_subdata({"drive-a": "token-a", "drive-b": "token-b"})
-        self.sharepoint._check_drive_delta = mock.AsyncMock(side_effect=[False, False])
-
-        with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
-            result = await self.sharepoint.check_index_needed(subdata, TOKEN)
-
-        self.assertEqual(result, {"index_needed": False})
-        checked_urls = [call.args[1] for call in self.sharepoint._check_drive_delta.await_args_list]
-        self.assertEqual(
-            checked_urls,
-            [
-                graph_url("/drives/drive-a/root/delta?token=token-a"),
-                graph_url("/drives/drive-b/root/delta?token=token-b"),
-            ],
-        )
-
-    async def test_check_index_needed_returns_true_for_changes_expired_tokens_or_exceptions(self) -> None:
-        """Any uncertainty should trigger a fresh index rather than risk stale search data."""
-        subdata = SharePoint._encode_subdata({"drive-a": "token-a", "drive-b": "token-b"})
-
-        for outcomes in ([False, True], [RuntimeError("timeout"), False]):
-            self.sharepoint._check_drive_delta = mock.AsyncMock(side_effect=outcomes)
-            with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
-                self.assertEqual(await self.sharepoint.check_index_needed(subdata, TOKEN), {"index_needed": True})
-
-    async def test_check_drive_delta_treats_graph_errors_as_changed(self) -> None:
-        """A non-200 delta response usually means the stored delta token is invalid or expired."""
-        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(410))
-        self.assertTrue(await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old")))
-
-        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": []}))
-        self.assertFalse(
-            await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old"))
-        )
-
-        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": [{"id": "changed"}]}))
-        self.assertTrue(await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old")))

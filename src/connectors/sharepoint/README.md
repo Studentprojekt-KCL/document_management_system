@@ -31,7 +31,6 @@ Authentication is per-user OAuth 2.0 managed by the connector:
 
 | Endpoint                 | Method | Description                                                   |
 | ------------------------ | ------ | ------------------------------------------------------------- |
-| `/index_needed_bool`     | GET    | Returns whether any files have changed since the last sync    |
 | `/stream_files_to_index` | GET    | Streams NDJSON — subdata header followed by one file per line |
 | `/get_files`             | POST   | Fetches specific files by unique pointer                      |
 | `/auth_user`             | GET    | Redirects user to Microsoft OAuth login                       |

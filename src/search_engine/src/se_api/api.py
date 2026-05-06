@@ -106,7 +106,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str, count: int | None = None) -> dict:
+    async def find_matching(self, pointer: str) -> list[dict]:
         """Look for matching files.
 
         Args:
@@ -115,7 +115,7 @@ class API:
         Returns: unique pointers and their score.
         """
 
-        return self.handler.find_matching(pointer, count)
+        return await self.handler.find_matching(pointer)
 
     async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None

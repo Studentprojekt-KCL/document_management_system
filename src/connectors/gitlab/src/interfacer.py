@@ -13,8 +13,7 @@ import binascii
 import asyncio
 import copy
 
-import requests
-import httpx
+import aiohttp
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
@@ -30,7 +29,7 @@ class GitLab:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     NUM_WORKERS: int = 10
-    session: requests.Session
+    _session: aiohttp.ClientSession | None
     source_system: str
     project_information: dict | None = None
     blame_cache: dict = {}
@@ -40,7 +39,7 @@ class GitLab:
 
     def __init__(self, address: str) -> None:
         """Constructor."""
-        self.session = requests.session()
+        self._session = None
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
@@ -51,16 +50,27 @@ class GitLab:
             key: None for key in determine_file_type("", self.file_extensions, self.extension_descriptions)
         }
 
+    async def get_session(self) -> aiohttp.ClientSession:
+        """Set up AIO http clinet if not initialized."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close_session(self) -> None:
+        """Tear down session."""
+        if self._session is not None:
+            self._session.close()
+
     @staticmethod
     def _construct_request_headers(bearer_token: str | None = None) -> dict:
         if isinstance(bearer_token, str):
             return {"Authorization": f"Bearer {bearer_token}"}
         return {}
 
-    def _get_projects(self, bearer_token: str | None = None) -> dict:
+    async def _get_projects(self, bearer_token: str | None = None) -> dict:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
+        projects = await self.execute_get_request(url, self._construct_request_headers(bearer_token))
         self.project_information = {
             str(project.get("id")): {
                 "web_url": project.get("web_url"),
@@ -84,7 +94,7 @@ class GitLab:
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
+    async def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -98,9 +108,13 @@ class GitLab:
         """
         project_id = self._get_project_id(url)
         if self.project_information is None or project_id not in self.project_information:
-            self._get_projects(bearer_token)
+            await self._get_projects(bearer_token)
 
-        project_information = self.project_information.get(project_id)  # type: ignore
+        if not isinstance(self.project_information, dict):
+            dms_info(f"Was not able to generate clickable link for {url}")
+            return ""
+        project_information = self.project_information.get(project_id)
+
         if not isinstance(project_information, dict):
             dms_info(f"Was not able to generate clickable link for {url}")
             return ""
@@ -108,7 +122,7 @@ class GitLab:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(
+    async def get_file(
         self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True
     ) -> dict:
         """Retrieve information about file.
@@ -123,9 +137,11 @@ class GitLab:
         """
         file: dict | list = {}
         if include_content:
-            file = self._execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
+            file = await self.execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
         else:
-            content: dict = self._execute_head_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
+            content: dict = await self.execute_head_request(
+                urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token)
+            )
             lower_content = {key.lower(): value for key, value in content.items()}
             file_name_str = lower_content.get("x-gitlab-file-name")
             file_path_str = lower_content.get("x-gitlab-file-path")
@@ -155,20 +171,20 @@ class GitLab:
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
-                self.blame_cache[url] = self._execute_get_request(url, self._construct_request_headers(bearer_token))
+                self.blame_cache[url] = await self.execute_get_request(url, self._construct_request_headers(bearer_token))
             blame = self.blame_cache.get(url)
             if isinstance(blame, list):
                 base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):
-            base_structure |= {"clickable_url": self._get_clickable_url(url, file_path)}
+            base_structure |= {"clickable_url": await self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(
+    async def get_files(
         self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False
     ) -> list:
         """Retrieve wanted information about each file in a list of files.
@@ -184,7 +200,7 @@ class GitLab:
         """
         files: list = []
         for url in urls:
-            files.append(self.get_file(url, bearer_token, include_content, include_last_edit_date))
+            files.append(await self.get_file(url, bearer_token, include_content, include_last_edit_date))
 
         return files
 
@@ -278,21 +294,21 @@ class GitLab:
 
         return projects_to_index, encoded_subdata
 
-    def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
+    async def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
         """Retrieve a structure of files to index."""
-        projects = self._get_projects(bearer_token)
+        projects = await self._get_projects(bearer_token)
         return self._projects_to_re_index(projects, subdata)
 
     async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
         """Download all artifacts from tast_queue and put in zip_queue."""
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as session:
             while True:
                 task_data = await task_queue.get()
                 if task_data is None:
                     break
                 url, project_id = task_data
-                async with client.stream("GET", url) as response:
-                    data = await response.aread()
+                async with session.get(url) as response:
+                    data = await response.read()
                     await zip_queue.put({"data": data, "project_id": project_id})
                 task_queue.task_done()
 
@@ -320,7 +336,7 @@ class GitLab:
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        pointers_to_projects, new_subdata = self._project_urls(subdata, bearer_token)
+        pointers_to_projects, new_subdata = await self._project_urls(subdata, bearer_token)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 
@@ -350,28 +366,52 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    def _execute_get_request(self, url: str, headers: dict) -> dict | list:
-        """Execute GET request to supplied URL, JSON content in response expected."""
-        try:
-            response = self.session.get(url, timeout=120, headers=headers)
-            content = response.json()
-        except requests.exceptions.JSONDecodeError:
-            dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
-            return {}
-        except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-        if response.status_code != 200:  # noqa: PLR2004
-            dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
-        return content
+    async def execute_get_request(self, url: str, headers: dict | None = None) -> dict:
+        """Execute GET request to supplied URL."""
+        if headers is None:
+            headers = {}
 
-    def _execute_head_request(self, url: str, headers: dict) -> dict:
+        session = await self.get_session()
+        async with session.get(url, headers=headers) as resp:
+            try:
+                resp.raise_for_status()
+                response = await resp.json()
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response
+
+    async def execute_head_request(self, url: str, headers: dict | None = None) -> dict:
         """Execute HEAD request to supplied URL."""
-        try:
-            content = self.session.head(url, headers=headers)
-            content.raise_for_status()
-        except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-        except requests.HTTPError:
-            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {content.status_code})")
-            return {}
-        return dict(content.headers)
+        if headers is None:
+            headers = {}
+
+        session = await self.get_session()
+        async with session.head(url, headers=headers) as resp:
+            try:
+                resp.raise_for_status()
+                response = dict(resp.headers)
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response
+
+    async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None) -> dict:
+        """Execute POST request to supplied URL."""
+        if headers is None:
+            headers = {}
+        if data is None:
+            data = {}
+
+        session = await self.get_session()
+        async with session.post(url, headers=headers, json=data) as resp:
+            try:
+                response = await resp.json()
+                resp.raise_for_status()
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response

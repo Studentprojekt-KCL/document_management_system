@@ -9,7 +9,18 @@
  */
 
 import { ref, computed, watch } from 'vue'
-import { X, StarsIcon, CalendarDays, HardDrive, FileType2, ExternalLink, Pencil, CheckCircle, AlertCircle } from 'lucide-vue-next'
+import {
+  X,
+  StarsIcon,
+  CalendarDays,
+  HardDrive,
+  FileType2,
+  ExternalLink,
+  Pencil,
+  CheckCircle,
+  AlertCircle,
+  Copy
+} from 'lucide-vue-next'
 
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
@@ -43,6 +54,9 @@ const {
 /* AI */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
+/* Rerank */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
+
 /* State */
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
@@ -59,6 +73,7 @@ watch(
 
 /* Computed */
 const currentSecurityLevel = computed(() => localSecurityLevel.value)
+const hasUniquePointer = computed(() => Boolean(uniquePointer.value))
 
 /* Permissions */
 const canEdit = computed(() => hasRole('admin'))
@@ -77,6 +92,15 @@ const showNotification = (success, message) => {
   }, 4000)
 }
 
+const handleCopyUniquePointer = async () => {
+  if (!uniquePointer.value) {
+    showNotification(false, 'No file reference is available for this result.')
+    return
+  }
+  await navigator.clipboard.writeText(uniquePointer.value)
+  showNotification(true, 'File reference copied to clipboard.')
+}
+
 /* Save classification */
 const handleClassificationSave = async (level) => {
   try {
@@ -85,7 +109,7 @@ const handleClassificationSave = async (level) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         unique_pointer: uniquePointer.value,
-        classification: level
+        security_class: level
       })
     })
 
@@ -95,7 +119,7 @@ const handleClassificationSave = async (level) => {
 
     emit('update-security', {
       uniquePointer: uniquePointer.value,
-      level
+      security_class: level
     })
 
     localSecurityLevel.value = level
@@ -116,8 +140,6 @@ watch(
     notification.value.visible = false
   }
 )
-/* AI rerank composable */
-const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>
@@ -274,13 +296,24 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
     </div>
 
     <div class="preview-footer">
+      <!-- First see if there is a preview link, for eg. GitLab -->
       <a v-if="previewLink" class="open-file-btn" :href="previewLink" target="_blank" rel="noopener noreferrer">
         <ExternalLink :size="14" />
         Open file in {{ sourceSystem }}
       </a>
+      <!-- If no preview link, see if it has a unique pointer we can copy -->
+      <div v-else-if="hasUniquePointer" class="file-reference-card">
+        <p class="file-reference-label">No clickable link is available for {{ previewTitle }} in {{ sourceSystem }}.</p>
+        <code class="file-reference-value">{{ uniquePointer }}</code>
+        <button class="open-file-btn copy-reference-btn" type="button" @click="handleCopyUniquePointer">
+          <Copy :size="14" />
+          Copy file reference
+        </button>
+      </div>
+      <!-- If neither, display no file reference available -->
       <button v-else class="open-file-btn" type="button" disabled>
         <ExternalLink :size="14" />
-        No file link available
+        No file reference available
       </button>
     </div>
   </aside>
@@ -473,6 +506,33 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 .preview-footer {
   border-top: 1px solid #eef2f7;
   padding: 0.85rem 1rem 1rem;
+}
+
+.file-reference-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.file-reference-label {
+  margin: 0;
+}
+
+.file-reference-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.file-reference-value {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  word-break: break-all;
 }
 
 .open-file-btn {

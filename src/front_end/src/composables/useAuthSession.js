@@ -1,12 +1,11 @@
 import { onMounted, onUnmounted } from 'vue'
-import { refreshToken, logout, getAccessToken, isTokenExpired } from '@/utils/auth.js'
-
+import { refreshSession, logout } from '@/utils/auth.js'
+import { isAuthenticated } from '@/utils/authClient.js'
 import { tryBecomeLeader, isLeader, setLeader, broadcastActivity, getLastActivity, broadcastLogout } from '@/utils/authSync.js'
 
 export function useAuthSession() {
   let leaderLoop = null
   let watchdogLoop = null
-  let lastRefresh = Date.now()
   let heartbeatLoop = null
 
   const TIME_LIMIT = 60 * 60 * 1000
@@ -19,9 +18,11 @@ export function useAuthSession() {
   }
 
   // LOGOUT
-  const triggerLogout = () => {
+  const triggerLogout = async (reason = 'unknown') => {
+    console.log('Logout triggered: ', reason)
+    console.trace()
     broadcastLogout()
-    logout()
+    await logout()
   }
   // syncs logout forcing tabs to change window.
   const syncLogout = (e) => {
@@ -39,38 +40,26 @@ export function useAuthSession() {
       if (!isLeader()) return
 
       const now = Date.now()
-      const token = getAccessToken()
       const lastActivity = getLastActivity()
-
       const isActive = now - lastActivity < TIME_LIMIT
-
-      if (!token) return
 
       // inactivity logout
       if (!isActive) {
-        triggerLogout()
+        await triggerLogout('inactive')
         return
       }
 
-      if (isTokenExpired(token)) {
-        try {
-          await refreshToken()
-          lastRefresh = now
-        } catch {
-          triggerLogout()
-        }
+      const stillAuthed = await isAuthenticated()
+      if (!stillAuthed) {
+        await triggerLogout('auth-check-failed')
         return
       }
 
-      if (now - lastRefresh > REFRESH_TIME) {
-        try {
-          await refreshToken()
-          lastRefresh = now
-        } catch {
-          triggerLogout()
-        }
+      const refreshed = await refreshSession()
+      if (!refreshed) {
+        await triggerLogout('refresh-failed')
       }
-    }, 5000)
+    }, REFRESH_TIME)
   }
 
   // watchdog on all tabs
@@ -80,7 +69,6 @@ export function useAuthSession() {
 
     watchdogLoop = setInterval(() => {
       const leader = JSON.parse(localStorage.getItem('auth-leader') || '{}')
-
       const leaderDead = !leader.id || Date.now() - (leader.ts || 0) > LEADER_TIMEOUT
 
       if (leaderDead) {
@@ -114,14 +102,14 @@ export function useAuthSession() {
     heartbeatLoop = null
   }
 
-  // Cycle
   onMounted(() => {
     window.addEventListener('mousemove', updateActivity)
     window.addEventListener('keydown', updateActivity)
     window.addEventListener('click', updateActivity)
     window.addEventListener('scroll', updateActivity)
-
     window.addEventListener('storage', syncLogout)
+
+    broadcastActivity()
 
     // initial leader attempt
     if (tryBecomeLeader()) {

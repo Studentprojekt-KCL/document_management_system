@@ -44,7 +44,7 @@ class API:
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
 
-    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+    def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
         if isinstance(exc, RequestValidationError):
             errors = {"detail": exc.errors(), "body": exc.body}
@@ -80,7 +80,7 @@ class API:
             file_pointers.get("file_pointers", []), x_sharepoint_token, include_content, include_last_edit_date
         )
 
-    async def stream_files_to_index(
+    def stream_files_to_index(
         self, subdata: str | None = None, x_sharepoint_token: Annotated[str | None, Header()] = None
     ) -> StreamingResponse:
         """Endpoint streaming all qualifying documents for indexing."""

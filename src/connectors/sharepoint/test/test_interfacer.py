@@ -423,7 +423,7 @@ class TestSharePoint(IsolatedAsyncioTestCase):
         self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
         self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
 
-        async def _set_content(_, record):
+        def _set_content(_, record):
             record["content"] = base64.b64encode(b"bytes").decode("utf-8")
 
         self.instance._fetch_record_content = mock.AsyncMock(side_effect=_set_content)

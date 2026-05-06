@@ -144,7 +144,7 @@ class SharePoint:
             result = json.loads(decoded)
             if isinstance(result, dict):
                 return result
-        except (binascii.Error, gzip.BadGzipFile, json.JSONDecodeError, OSError, UnicodeDecodeError):
+        except (binascii.Error, json.JSONDecodeError, OSError, UnicodeDecodeError):
             dms_info("SharePoint: could not decode subdata, starting fresh")
         return {}
 

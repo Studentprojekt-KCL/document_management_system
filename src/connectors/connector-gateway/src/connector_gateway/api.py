@@ -4,7 +4,7 @@ import uvicorn
 import fastapi
 
 from fastapi import Header
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
 
 from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable, read_port
@@ -62,10 +62,10 @@ class API:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
 
-    async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
-        """returns redirect to source system to authenitacte"""
+    async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | JSONResponse | None:
+        """GitLab/GitHub OAuth: proxied redirect. Confluence: JSON auth contract (Issue #478)."""
         if not isinstance(source_system, str):
-            return
+            return None
         return await self.down_stream_client.get_auth_redirect(source_system, referer)
 
 

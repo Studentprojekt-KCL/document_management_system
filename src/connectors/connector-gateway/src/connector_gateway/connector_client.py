@@ -4,7 +4,7 @@ import asyncio
 import json
 import httpx
 
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from shared_functions.dmis_logger import dms_error, dms_warning
 
 
@@ -137,7 +137,7 @@ class ConnectorClient:
         auth_user_endpoints: list[dict] = []
         for source_system in self.source_systems:
             auth_user_endpoints.append(
-                {"name": source_system["name"], "endpoint": f"/auth_user&source_system={source_system['name'].lower()}"}
+                {"name": source_system["name"], "endpoint": f"/auth_user?source_system={source_system['name'].lower()}"}
             )
         return auth_user_endpoints
 
@@ -145,21 +145,49 @@ class ConnectorClient:
         """takes referer header in original request and sets the auth_callback endpoint"""
         return f"{self._slice_url_to_host_and_proto(referer)}/auth_callback"
 
-    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
-        """redirects user to source system for authentication"""
+    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | JSONResponse | None:
+        """Proxies downstream ``GET /auth_user``.
+
+        OAuth-style connectors answer with ``3xx`` and ``Location``. Token-style connectors answer with
+        JSON (``Content-Type: application/json``) — the gateway must not assume every connector redirects.
+        """
         auth_url = ""
         for system in self.source_systems:
             if system["name"].lower() == source_system.lower():
                 auth_url = f"{system["connector_url"]}/auth_user"
                 break
-        if not isinstance(auth_url, str):
-            return
+        if not auth_url:
+            return None
         get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
         try:
             response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
-            return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
         except httpx.TimeoutException:
             dms_warning("Request timed out")
+            return None
         except httpx.HTTPError:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
+            return None
+
+        if response.status_code in (301, 302, 303, 307, 308):
+            location = response.headers.get("location")
+            if not location:
+                dms_warning(f"Downstream /auth_user returned {response.status_code} without Location for {auth_url}")
+                return None
+            return RedirectResponse(url=location, status_code=response.status_code)
+
+        content_type = response.headers.get("content-type", "")
+        base_ct = content_type.split(";", 1)[0].strip().lower()
+
+        if response.status_code == 200 and base_ct == "application/json":
+            try:
+                payload = response.json()
+            except json.JSONDecodeError:
+                dms_warning(f"Downstream /auth_user returned non-JSON body despite content-type / body shape for {auth_url}")
+                return None
+            if isinstance(payload, dict):
+                return JSONResponse(content=payload, status_code=200)
+            dms_warning(f"Downstream /auth_user JSON was not an object for {auth_url}")
+            return None
+
+        dms_warning(f"Unexpected /auth_user response from {auth_url} (status {response.status_code}, content-type {content_type!r})")
         return None

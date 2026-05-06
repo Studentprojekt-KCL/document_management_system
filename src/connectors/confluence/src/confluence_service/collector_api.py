@@ -6,7 +6,8 @@ Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
 ``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
 
 Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
+``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata (same path name as
+OAuth connectors; GitLab redirects, Confluence does not). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
 optional MinIO env vars for uploads.
 """
 
@@ -59,6 +60,8 @@ class API:
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        # Same route name as GitLab connector; GitLab redirects to OAuth — Confluence declares header-based auth (#478).
+        self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
@@ -77,6 +80,24 @@ class API:
         if self.log_level == "debug":
             content = jsonable_encoder(errors)
         return JSONResponse(status_code=422, content=content)
+
+    async def auth_user(self) -> JSONResponse:
+        """Declare manual api-token auth (no OAuth redirect). Same ``/auth_user`` route as OAuth connectors (#478).
+
+        Gateway may send extra headers for other connectors; this handler ignores them."""
+        return JSONResponse(
+            status_code=200,
+            content={
+                "type": "api_token",
+                "method": "manual",
+                "header_names": ["X-Confluence-Email", "X-Confluence-Token"],
+                "labels": {
+                    "X-Confluence-Email": "Confluence Email",
+                    "X-Confluence-Token": "Confluence API Token",
+                },
+                "help_url": "https://id.atlassian.com/manage-profile/security/api-tokens",
+            },
+        )
 
     @staticmethod
     def _token(x_confluence_token: str | None) -> str | None:

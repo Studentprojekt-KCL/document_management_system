@@ -42,18 +42,27 @@ const selectedFilters = ref({
   security: []
 })
 
-const searchPayload = (query, documentsOnly) => {
+const searchPayload = (query, documentsOnly, file_type, source_system, security_class) => {
   const payload = {
     content: query
   }
   if (documentsOnly) {
     payload.documents_only = 'true'
   }
+  if (file_type) {
+    payload.file_type = file_type.split('|').join(' ')
+  }
+  if (source_system) {
+    payload.source_system = source_system
+  }
+  if (security_class) {
+    payload.security_class = security_class
+  }
   return payload
 }
 
-/* Performs a search when the SearchBar emits a search event */
-const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
+/* Performs a search when the SearchBar emits a search event and includes filter parameters if any */
+const handleSearch = async ({ query, documentsOnly, file_type, source_system, security_class, resetPreview = true }) => {
   documentsOnlyMode.value = documentsOnly
   lastQuery.value = query
 
@@ -76,7 +85,7 @@ const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
       count: String(SEARCH_COUNT),
       offset: String(SEARCH_OFFSET)
     })
-    const payload = searchPayload(query, documentsOnly)
+    const payload = searchPayload(query, documentsOnly, file_type, source_system, security_class)
 
     const res = await authFetch(`${API_PATHS.search}?${params.toString()}`, {
       method: 'POST',
@@ -111,7 +120,13 @@ const handleSearch = async ({ query, documentsOnly, resetPreview = true }) => {
 const handleDocumentsOnlyChange = (documentsOnly) => {
   documentsOnlyMode.value = documentsOnly
   if (lastQuery.value && lastQuery.value.trim()) {
-    handleSearch({ query: lastQuery.value, documentsOnly })
+    handleSearch({
+      query: lastQuery.value,
+      documentsOnly,
+      file_type: selectedFilters.value.type.join(' '),
+      source_system: selectedFilters.value.source.join(' '),
+      security_class: selectedFilters.value.security.join(' ')
+    })
   }
 }
 
@@ -145,7 +160,7 @@ const handleFilterChange = (filters) => {
     const typeMatch =
       filters.type.length === 0 ||
       filters.type.some((selected) => {
-        // Split the group string from json file (e.g., ".docx|.doc|.odt") and check if filetype is in it
+        // Split the group string from json file (e.g., ".docx .doc .odt") and check if filetype is in it
         const extensions = selected.split('|')
         return extensions.some((ext) => filetype === ext.toLowerCase())
       })
@@ -160,6 +175,33 @@ const handleFilterChange = (filters) => {
     return typeMatch && sourceMatch && securityMatch
   })
 }
+
+/* Sends down a new request to the backend if the user changes the filters */
+const handleFilterChangeAndSearch = async (filters) => {
+  selectedFilters.value = filters
+  if (lastQuery.value && lastQuery.value.trim()) {
+    await handleSearch({
+      query: lastQuery.value,
+      documentsOnly: documentsOnlyMode.value,
+      file_type: filters.type.join(' '),
+      source_system: filters.source.join(' '),
+      security_class: filters.security.join(' ')
+    })
+  }
+  // Apply filter AFTER server results are loaded
+  handleFilterChange(filters)
+}
+
+const handleBarSearch = async ({ query, documentsOnly }) => {
+  await handleSearch({
+    query,
+    documentsOnly,
+    file_type: selectedFilters.value.type.join(' '),
+    source_system: selectedFilters.value.source.join(' '),
+    security_class: selectedFilters.value.security.join(' ')
+  })
+}
+
 // searching a second time automatically to update the security levels
 const refreshCurrentSearch = async () => {
   // prevents empty search.
@@ -168,7 +210,9 @@ const refreshCurrentSearch = async () => {
   await handleSearch({
     query: lastQuery.value,
     documentsOnly: documentsOnlyMode.value,
-    resetPreview: false
+    source_system: selectedFilters.value.source.join(' '),
+    file_type: selectedFilters.value.type.join(' '),
+    security_class: selectedFilters.value.security.join(' ')
   })
 }
 </script>
@@ -177,10 +221,14 @@ const refreshCurrentSearch = async () => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleSearch" @documents-only-change="handleDocumentsOnlyChange" />
+    <SearchBar :loading="isSearching" @search="handleBarSearch" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
-    <SearchFiltersCard :selectedFilters="selectedFilters" :documentsOnly="documentsOnlyMode" @update:filters="handleFilterChange" />
+    <SearchFiltersCard
+      :selectedFilters="selectedFilters"
+      :documentsOnly="documentsOnlyMode"
+      @update:filters="handleFilterChangeAndSearch"
+    />
 
     <!-- Search Matches Component -->
     <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />

@@ -1,29 +1,36 @@
 # Frontend Source code Structure
 
-Describtion of the frotend code (`./front_end/src/`) structure
+This folder (`./front_end/src/`) contains the frotend code for the application. 
 
 ## Folder layout
 
-- `main.js` — App entry point; mounts Vue app and wires router/global styles.
-- `App.vue` — Root component wrapper.
-- `style.css` — Global styles that are shared across views/components.
-- `assets/` — Static frontend assets used by Vue components, currently just the company logo and DMS pic.
-- `components/` — Reusable UI building blocks (e.g., `Header.vue`, `Footer.vue`, `Sidebar.vue`, search widgets). This will contain more as we continue to deveolp
-- `layouts/` — Page shell composition (top-level layout wrapper that assemble common components). Currently this only contain one file (`MainLayout.vue`) which combines the `Header.vue`, `Footer.vue`, `Sidebar.vue`.
-- `router/` — Route definitions and navigation setup. This is the code that help su to redirect to new pages.
-- `views/` — Route-level pages (e.g., `SearchView.vue`, `SourcesView.vue`, `ComplianceView.vue`, `SettingsView.vue`).
+- `main.js`: Entry point that creates and mounts the Vue app.
+- `App.vue`: Root application component wrapper.
+- `style.css`: Global styles that are shared across views/components.
+- `assets/`: Static frontend assets used in the UI, eg. the company logo and DMS pic.
+- `components/`: Reusable building blocks and feature components. (e.g., `Header.vue`, `Footer.vue`, `Sidebar.vue`, search widgets).
+- `composables/`: Reusable stateful logic (for example metadata, AI summary, rerank).
+- `layouts/`: Page shell composition (top-level layout wrapper that assemble common components). Currently this only contain one file (`MainLayout.vue`) which combines the `Header.vue`, `Footer.vue`, `Sidebar.vue`.
+- `router/`: Route configuration and navigation guards. This is the code that help us to redirect to new pages.
+- `utils/`: Shared utility functions (for example API and auth helpers).
+- `views/`: Route-level pages (e.g., `SearchView.vue`, `SourcesView.vue`, `ComplianceView.vue`, `SettingsView.vue`).
+
 
 ## Architecture guideline
 
 - Keep **reusable UI** in `components/`.
-- Keep **page scaffolding** in `layouts/`.
 - Keep **URL-mapped pages** in `views/`.
-- Keep routing logic centralized in `router/index.js`.
+- Put cross-component logic in `composables/`.
+- Put pure helpers in `utils/`.
+- Keep route declarations and guards in `router/`.
+
 
 ## Naming conventions
 
-- Please use `PascalCase` for Vue SFC files (e.g., `MainLayout.vue`, `SearchFiltersCard.vue`).
-- Use descriptive names that reflect role (`MainLayout`, `SettingsView`, `SearchBar`, etc).
+- Use `PascalCase` for Vue Single File Components (e.g., `MainLayout.vue`, `SearchFiltersCard.vue`).
+- Use descriptive names that reflect intent and scope (e.g. `MainLayout`, `SettingsView`, `SearchBar` ).
+- Keep composable and utils names in camelCase (e.g. `useFilters.js` etc.).
+
 
 ## When adding new code
 
@@ -83,5 +90,15 @@ Test files live in `__tests__/` folders next to the code they test:
 | **Total**   | |         **260**                     |
 
 ### If questions
+## Contribution Checklist
+
+1. Keep changes small and feature-focused.
+2. Reuse existing composables and utility helpers when possible.
+3. Run lint before committing.
+4. Update this structure document when introducing new top-level source folders.
+
+
+### If questions 
 
 - Ask frontend team :D
+

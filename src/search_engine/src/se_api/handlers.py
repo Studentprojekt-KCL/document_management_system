@@ -1,16 +1,18 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
+import asyncio
 import base64
 from threading import Thread
 import queue
 import io
+from copy import deepcopy
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
 import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
-from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, UNIQUE_POINTER
+from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, MAX_QUEUE_LENGTH, UNIQUE_POINTER
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
@@ -33,7 +35,7 @@ class Handler:
     FETCH_WORKERS: int = 8
     DECODE_WORKERS: int = 8
     CLASSIFY_WORKERS: int = 8
-    BATCH_SIZE: int = 1000
+    BATCH_SIZE: int = 500
     indexing: Lock
 
     def __init__(self) -> None:
@@ -65,11 +67,11 @@ class Handler:
 
         Returns: list of classifications.
         """
-        classifications = self.classifier.LABELS
+        classifications = deepcopy(self.classifier.LABELS)
         classifications.append("Pending")
         return classifications
 
-    def find_matching(self, pointer: str, count: int | None = None) -> dict:
+    async def find_matching(self, pointer: str) -> list[dict]:
         """Grab pointers for matching files.
 
         Args:
@@ -77,7 +79,13 @@ class Handler:
             count: number of results.
         Returns: the matching pointers and their scores.
         """
-        return self.search_engine.find_matching(pointer, count)
+        matches = self.search_engine.find_matching(pointer)
+
+        files = await self.connector.fetch_files(list(matches.keys()))
+        for file in files:
+            unique_pointer = file.get(UNIQUE_POINTER, "")
+            file.update({"score": matches.get(unique_pointer, 0)})
+        return files
 
     def grab_searchable_fields(self) -> set:
         """Grab searchable fields.
@@ -162,17 +170,15 @@ class Handler:
         dms_info("Starting indexing of new files.")
         start = datetime.now()
         fetch_queue: Queue = await self.connector.connector_fetch()
-        decode_queue: Queue = Queue()
+        decode_queue: Queue = Queue(MAX_QUEUE_LENGTH)
         classify_queue: Queue = Queue()
-        index_queue: queue.Queue = queue.Queue()
-        indexer_thread: Thread = Thread(target=self._index_file, args=(index_queue,))
+        index_queue: queue.Queue = queue.Queue(MAX_QUEUE_LENGTH)
+        indexer_thread: Thread = Thread(target=self._index_file, args=(index_queue, classify_queue))
 
         indexer_thread.start()
 
         fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, decode_queue)) for _ in range(self.FETCH_WORKERS)]
-        decode_tasks: list = [
-            create_task(self._decode_content(decode_queue, classify_queue, index_queue)) for _ in range(self.DECODE_WORKERS)
-        ]
+        decode_tasks: list = [create_task(self._decode_content(decode_queue, index_queue)) for _ in range(self.DECODE_WORKERS)]
         classify_tasks: list = [
             create_task(self._classify_content(classify_queue, index_queue)) for _ in range(self.CLASSIFY_WORKERS)
         ]
@@ -222,7 +228,7 @@ class Handler:
                 dms_warning(f"Failed to connect to {stream_url}.")
             fetch_queue.task_done()
 
-    async def _decode_content(self, decode_queue: Queue, classify_queue: Queue, index_queue: queue.Queue) -> None:
+    async def _decode_content(self, decode_queue: Queue, index_queue: queue.Queue) -> None:
         """Format and transfer file to search engine indexing queue.
 
         index_queue: queue containing all the ready files to index.
@@ -239,8 +245,60 @@ class Handler:
             file[CONTENT] = await loop.run_in_executor(None, self._convert_content, raw_content)
             file[CLASSIFICATION] = "Pending"
             await loop.run_in_executor(None, index_queue.put, file)
-            await classify_queue.put(file)
             decode_queue.task_done()
+
+    def _index_file(self, index_queue: queue.Queue, classify_queue: Queue) -> None:
+        """Wait for formatted file and index it.
+
+        Args:
+            task_queue: queue containing all the files to add.
+        """
+        batch: list[dict] = []
+
+        pending: list[str] = []
+        finnished: list[str] = []
+
+        start_wait = datetime.now()
+
+        while True:
+            data: dict | None = index_queue.get()
+
+            if data is not None:
+                unique_pointer: str = data.get(UNIQUE_POINTER, "")
+                if unique_pointer in pending:
+                    pending.remove(unique_pointer)
+                    finnished.append(unique_pointer)
+                    batch.append(data)
+                if unique_pointer not in finnished:
+                    batch.append(data)
+
+            if len(batch) >= self.BATCH_SIZE or data is None:
+                end_wait = datetime.now()
+                start = datetime.now()
+                unique_files = self._clear_duplicates(batch)
+                with self.search_engine.open_writer():
+                    for file in unique_files:
+                        self.search_engine.add_file(file)
+                for file in unique_files:
+                    unique_pointer = file.get(UNIQUE_POINTER, "")
+                    if unique_pointer in finnished:
+                        continue
+                    pending.append(unique_pointer)
+                    asyncio.run(classify_queue.put(unique_pointer))
+                index_time = (datetime.now() - start).total_seconds()
+                wait_time = (end_wait - start_wait).total_seconds()
+                dms_info(
+                    f"Batch of {len(unique_files)} commited: "
+                    + f"pending: {len(pending)}, finnished: {len(finnished)}"
+                    + f" (wait time: {round(wait_time, 3)}s"
+                    + f", index time: {round(index_time, 3)}s)"
+                )
+                del unique_files
+                batch = []
+                start_wait = datetime.now()
+            index_queue.task_done()
+            if data is None:
+                break
 
     async def _classify_content(self, classify_queue: Queue, index_queue: queue.Queue) -> None:
         """Classify the file content.
@@ -252,60 +310,20 @@ class Handler:
         batch: list[dict] = []
         loop = get_event_loop()
         while True:
-            file: dict | None = await classify_queue.get()
-            if file is None:
+            pointer: str | None = await classify_queue.get()
+            if pointer is None:
                 break
-            batch.append(file)
+            batch.append(self.search_engine.grab_file(pointer))
             if len(batch) >= Classifier.BATCH_SIZE:
                 await self.classifier.classify(batch)
-                await loop.run_in_executor(None, index_queue.put, batch)
+                for file in batch:
+                    await loop.run_in_executor(None, index_queue.put, file)
                 batch = []
             classify_queue.task_done()
         if batch:
             await self.classifier.classify(batch)
             await loop.run_in_executor(None, index_queue.put, batch)
             batch = []
-
-    def _index_file(self, index_queue: queue.Queue) -> None:
-        """Wait for formatted file and index it.
-
-        Args:
-            task_queue: queue containing all the files to add.
-        """
-        batch: list[dict] = []
-        unique_files: list[dict]
-        total: int = 0
-
-        start_wait = datetime.now()
-
-        while True:
-            files: list[dict] | dict | None = index_queue.get()
-
-            if files is not None and isinstance(files, list):
-                batch.extend(files)
-            elif files is not None:
-                batch.append(files)
-
-            if len(batch) >= self.BATCH_SIZE or files is None:
-                end_wait = datetime.now()
-                start = datetime.now()
-                unique_files = self._clear_duplicates(batch)
-                with self.search_engine.open_writer():
-                    for file in unique_files:
-                        self.search_engine.add_file(file)
-                index_time = (datetime.now() - start).total_seconds()
-                wait_time = (end_wait - start_wait).total_seconds()
-                total += len(unique_files)
-                dms_info(
-                    f"Batch of {len(unique_files)} (total: {total}) commited"
-                    + f", wait time: {round(wait_time, 3)}s"
-                    + f", index time: {round(index_time, 3)}s"
-                )
-                batch = []
-                start_wait = datetime.now()
-            index_queue.task_done()
-            if files is None:
-                break
 
     def _decode_base64(self, file: dict) -> tuple[dict | None, bytes | None]:
         """Decode file content.

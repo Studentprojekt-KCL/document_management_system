@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from json.decoder import JSONDecodeError
 
 import aiohttp
-from fastapi import Cookie, Form, HTTPException
+from fastapi import Cookie, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from shared_functions.initialisation_tools import read_env_variable
@@ -26,7 +26,6 @@ class AuthRoutes:
         self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
         self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-        self.frontend_url = read_env_variable("DMISAPI_FRONTEND_URL").rstrip("/")
 
         self._session = None
 
@@ -139,16 +138,18 @@ class AuthRoutes:
 
     async def code_exchange(
         self,
+        request: Request,
         code: str = Form(...),
         code_verifier: str = Form(...),
     ) -> JSONResponse:
         """Exchange authorization code for tokens via provided AD."""
+        origin = request.headers.get("Origin")
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
                 "client_id": self.dmisapi_client_id,
                 "code": code,
-                "redirect_uri": f"{self.frontend_url}/auth/callback",
+                "redirect_uri": f"{origin}/auth/callback",
                 "code_verifier": code_verifier,
             }
         )
@@ -183,9 +184,9 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, id_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def logout_auth(self, request: Request, id_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Generate logout URL from AD and clear authentication cookies."""
-        post_logout_redirect_uri = self.frontend_url + "/"
+        post_logout_redirect_uri = request.headers.get("Origin") + "/"
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,

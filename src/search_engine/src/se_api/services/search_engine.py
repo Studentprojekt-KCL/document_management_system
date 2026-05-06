@@ -42,7 +42,6 @@ class SearchEngine:
 
     index: Index
     categories: set[str]
-    writer: IndexWriter | None
     index_path: str
     documents_only_extension: list
     writer_lock: Lock
@@ -117,8 +116,8 @@ class SearchEngine:
             file.update({category: doc[category][0]})
         file.update({CLASSIFICATION: classification})
         file.update({MODIFIED: True})
-        with self.open_writer():
-            self.add_file(file)
+        with self.open_writer() as writer:
+            self.add_file(file, writer)
         return (unique_pointer, classification)
 
     def query_files(self, content: dict[str, str], count: int) -> tuple[list[str], dict[str, str]]:
@@ -192,13 +191,13 @@ class SearchEngine:
         return matching
 
     @contextmanager
-    def open_writer(self) -> Generator:
+    def open_writer(self) -> Generator[IndexWriter]:
         """Init index writer."""
         self.writer_lock.acquire()
-        self.writer = self.index.writer()
-        yield
-        self.writer.commit()
-        self.writer.wait_merging_threads()
+        writer: IndexWriter = self.index.writer()
+        yield writer
+        writer.commit()
+        writer.wait_merging_threads()
         self.writer_lock.release()
 
     def grab_file(self, unique_pointer: str) -> dict:
@@ -223,7 +222,7 @@ class SearchEngine:
         dms_warning(f"Failed to fetch content from index: {unique_pointer}")
         return file
 
-    def add_file(self, file: dict) -> None:
+    def add_file(self, file: dict, writer: IndexWriter) -> None:
         """Add file to index.
 
         Requiers init call before and after.
@@ -232,8 +231,6 @@ class SearchEngine:
             file: file dict
         """
 
-        if self.writer is None:
-            return
         unique_pointer: str | None = file.get(UNIQUE_POINTER)
         if unique_pointer is None:
             dms_warning(f"File is missing unique pointer: {file.update({CONTENT: ""})}.")
@@ -252,10 +249,10 @@ class SearchEngine:
                 file.update({MODIFIED: False})
         else:
             file.update({MODIFIED: False})
-        self.writer.delete_documents_by_query(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        writer.delete_documents_by_query(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
         extension: str = file.get("file_type", "")
         file.update({IS_DOCUMENT: extension in self.documents_only_extension})
-        self.writer.add_json(json.dumps(file))
+        writer.add_json(json.dumps(file))
 
     def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
@@ -264,9 +261,8 @@ class SearchEngine:
             pointer: unique pointer.
         """
 
-        writer: IndexWriter = self.index.writer()
-        writer.delete_documents(UNIQUE_POINTER, pointer)
-        writer.commit()
-        writer.wait_merging_threads()
-        dms_info(f"Removed {pointer} from index.")
-        self.index.reload()
+        with self.open_writer() as writer:
+            writer.delete_documents(UNIQUE_POINTER, pointer)
+            writer.commit()
+            writer.wait_merging_threads()
+            dms_info(f"Removed {pointer} from index.")

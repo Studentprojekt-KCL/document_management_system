@@ -13,7 +13,7 @@ import httpx
 
 from se_api.constants import TIMEOUT
 
-from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 

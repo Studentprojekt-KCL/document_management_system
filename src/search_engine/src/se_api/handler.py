@@ -12,6 +12,7 @@ import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 
 from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, MAX_QUEUE_LENGTH, UNIQUE_POINTER
+from se_api.index_pipeline import index_pipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
@@ -160,48 +161,8 @@ class Handler:
     async def _handle_new(self) -> None:
         """Grab connector stream output and pipe it into search engine."""
         await self.indexing.acquire()
-        dms_info("Starting indexing of new files.")
-        start = datetime.now()
-        fetch_queue: Queue = await self.connector.connector_fetch()
-        decode_queue: Queue = Queue(MAX_QUEUE_LENGTH)
-        classify_queue: Queue = Queue()
-        index_queue: queue.Queue = queue.Queue(MAX_QUEUE_LENGTH)
-        indexer_thread: Thread = Thread(target=self._index_file, args=(index_queue, classify_queue))
-
-        indexer_thread.start()
-
-        fetch_tasks: list = [create_task(self._fetch_files(fetch_queue, decode_queue)) for _ in range(self.FETCH_WORKERS)]
-        decode_tasks: list = [create_task(self._decode_content(decode_queue, index_queue)) for _ in range(self.DECODE_WORKERS)]
-        classify_tasks: list = [
-            create_task(self._classify_content(classify_queue, index_queue)) for _ in range(self.CLASSIFY_WORKERS)
-        ]
-
-        # Wait for fetching job to finish.
-        await fetch_queue.join()
-        for _ in fetch_tasks:
-            await fetch_queue.put(None)
-        dms_info(f"Finished fetching, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for decode job to finish.
-        await decode_queue.join()
-        for _ in decode_tasks:
-            await decode_queue.put(None)
-        dms_info(f"Finished formating, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for classify job to finish.
-        await classify_queue.join()
-        for _ in classify_tasks:
-            await classify_queue.put(None)
-        dms_info(f"Finished classifying, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for index job to finish.
-        index_queue.join()
-        index_queue.put(None)
-        indexer_thread.join()
-
-        self.connector.write_subdata()
+        await index_pipeline(self.search_engine, self.connector, self.classifier)
         self.indexing.release()
-        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
 
     async def _fetch_files(self, fetch_queue: Queue, transfer_queue: Queue) -> None:
         """Fetch files from stream.
@@ -269,9 +230,9 @@ class Handler:
                 end_wait = datetime.now()
                 start = datetime.now()
                 unique_files = self._clear_duplicates(batch)
-                with self.search_engine.open_writer():
+                with self.search_engine.open_writer() as writer:
                     for file in unique_files:
-                        self.search_engine.add_file(file)
+                        self.search_engine.add_file(file, writer)
                 for file in unique_files:
                     unique_pointer = file.get(UNIQUE_POINTER, "")
                     if unique_pointer in finnished:

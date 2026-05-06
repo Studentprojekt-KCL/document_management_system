@@ -5,6 +5,7 @@ import base64
 from threading import Thread
 import queue
 import io
+from copy import deepcopy
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
@@ -66,7 +67,7 @@ class Handler:
 
         Returns: list of classifications.
         """
-        classifications = self.classifier.LABELS
+        classifications = deepcopy(self.classifier.LABELS)
         classifications.append("Pending")
         return classifications
 

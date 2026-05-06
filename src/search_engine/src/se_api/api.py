@@ -60,6 +60,7 @@ class API:
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
+        self.app.add_api_route("/classifications", self.get_classifications, methods=["GET"])
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
         self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])

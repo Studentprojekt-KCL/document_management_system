@@ -122,6 +122,9 @@ class ConfluenceInterfacer:
         endpoint: str,
         params: dict[str, Any] | None,
         email: str | None,
+        text = unescape(text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
         api_token: str | None,
     ) -> list[dict[str, Any]]:
         """Collect all paginated results by following ``_links.next``."""
@@ -169,7 +172,7 @@ class ConfluenceInterfacer:
         spaces: list[dict[str, Any]] = []
         for space in results:
             if not isinstance(space, dict):
-                continue
+                continuehttps://tenant.atlassian.net/
             key = space.get("key")
             if not isinstance(key, str):
                 continue
@@ -180,14 +183,14 @@ class ConfluenceInterfacer:
                     "key": key,
                     "name": space.get("name"),
                     "type": PROJECT,
-                    "clickable_url": (urljoin(self.address + "/", webui.lstrip("/")) if isinstance(webui, str) else None),
+                    "clickable_url": (urljoin(self.address + "/wiki", webui.lstrip("/")) if isinstance(webui, str) else None),
                 }
             )
         return spaces
 
     async def _pages_in_space(
         self,
-        space_key: str,
+        space_key: str,https://tenant.atlassian.net/
         email: str | None = None,
         api_token: str | None = None,
     ) -> list[dict[str, Any]]:
@@ -204,7 +207,7 @@ class ConfluenceInterfacer:
         for space in await self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
-                continue
+                continuehttps://tenant.atlassian.net/
             pages = await self._pages_in_space(key, email, api_token)
             latest = datetime.min.replace(tzinfo=timezone.utc)
             for page in pages:

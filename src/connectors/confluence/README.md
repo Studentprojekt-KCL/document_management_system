@@ -1,6 +1,6 @@
 The following should be exported in local environment:
 
-    CONFLUENCE_CONNECTOR_PORT=<CONNECTOR_PORT>
+    CONFLUENCE_BIND_PORT=<CONNECTOR_PORT>
     CONFLUENCE_ADDRESS=<CONFLUENCE_BASE_URL>          # e.g. https://tenant.atlassian.net
     CONFLUENCE_MAX_CONCURRENCY=<MAX_PARALLEL_CALLS>   # optional, default 20
 

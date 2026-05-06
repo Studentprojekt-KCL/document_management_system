@@ -5,6 +5,7 @@ import base64
 from threading import Thread
 import queue
 import io
+from copy import deepcopy
 
 from asyncio import Lock, Queue, create_task, get_event_loop
 from datetime import datetime
@@ -67,11 +68,11 @@ class Handler:
 
         Returns: list of classifications.
         """
-        classifications = self.classifier.LABELS
+        classifications = deepcopy(self.classifier.LABELS)
         classifications.append("Pending")
         return classifications
 
-    def find_matching(self, pointer: str, count: int | None = None) -> dict:
+    async def find_matching(self, pointer: str) -> list[dict]:
         """Grab pointers for matching files.
 
         Args:
@@ -79,7 +80,13 @@ class Handler:
             count: number of results.
         Returns: the matching pointers and their scores.
         """
-        return self.search_engine.find_matching(pointer, count)
+        matches = self.search_engine.find_matching(pointer)
+
+        files = await self.connector.fetch_files(list(matches.keys()))
+        for file in files:
+            unique_pointer = file.get(UNIQUE_POINTER, "")
+            file.update({"score": matches.get(unique_pointer, 0)})
+        return files
 
     def grab_searchable_fields(self) -> set:
         """Grab searchable fields.

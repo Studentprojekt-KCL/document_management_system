@@ -104,6 +104,13 @@ class AuthRoutes:
         if not claims:
             raise HTTPException(status_code=401)
 
+        client_roles = self._get_client_roles(claims)
+        if not client_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="User does not belong to dms-frontend-dev",
+            )
+
         return JSONResponse(
             status_code=200,
             content={
@@ -113,6 +120,11 @@ class AuthRoutes:
                 },
             },
         )
+
+    def _get_client_roles(self, claims: dict[str, Any]) -> list[str]:
+        """Extract client roles for configured client."""
+        roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
+        return roles if isinstance(roles, list) else []
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Return authenticated user details and roles."""

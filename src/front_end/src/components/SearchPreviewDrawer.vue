@@ -8,7 +8,7 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   X,
   StarsIcon,
@@ -57,6 +57,12 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 /* Rerank */
 const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 
+/* EDIT */
+const canEdit = ref(false)
+onMounted(async () => {
+  canEdit.value = await hasRole('admin')
+})
+
 /* State */
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
@@ -74,9 +80,6 @@ watch(
 /* Computed */
 const currentSecurityLevel = computed(() => localSecurityLevel.value)
 const hasUniquePointer = computed(() => Boolean(uniquePointer.value))
-
-/* Permissions */
-const canEdit = computed(() => hasRole('admin'))
 
 /* notification */
 const notification = ref({ visible: false, success: true, message: '' })

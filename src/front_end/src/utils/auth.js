@@ -4,12 +4,13 @@ import { getCurrentUser } from '@/utils/authClient'
 
 export async function hasRole(role) {
   const authInfo = await getCurrentUser()
-  if (!authInfo?.authenticated) return false
+  if (!authInfo?.authenticated) {
+    return false
+  }
 
   const clientRoles = authInfo.user?.client_roles ?? []
-  const realmRoles = authInfo.user?.realm_roles ?? []
 
-  return clientRoles.includes(role) || realmRoles.includes(role)
+  return clientRoles.includes(role)
 }
 
 export async function refreshSession() {

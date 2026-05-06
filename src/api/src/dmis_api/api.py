@@ -39,7 +39,6 @@ class API:
     ) -> None:
         """Constructor."""
         self.app = FastAPI(lifespan=self.lifespan)
-
         self.log_level = log_level
         self.upstream_urls = upstream_urls
 

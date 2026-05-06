@@ -116,16 +116,27 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
   }
 }
 
+const searchParams = () => ({
+  file_type: selectedFilters.value.type.join(' '),
+  source_system: selectedFilters.value.source.join(' '),
+  security_class: selectedFilters.value.security.join(' ')
+})
+
+const searchWithFilters = async ({ query, documentsOnly }) => {
+  await handleSearch({
+    query,
+    documentsOnly,
+    ...searchParams()
+  })
+}
+
 /* Should send down a new request to the backend if the user press the button */
 const handleDocumentsOnlyChange = (documentsOnly) => {
   documentsOnlyMode.value = documentsOnly
   if (lastQuery.value && lastQuery.value.trim()) {
-    handleSearch({
+    searchWithFilters({
       query: lastQuery.value,
-      documentsOnly,
-      file_type: selectedFilters.value.type.join(' '),
-      source_system: selectedFilters.value.source.join(' '),
-      security_class: selectedFilters.value.security.join(' ')
+      documentsOnly
     })
   }
 }
@@ -192,27 +203,15 @@ const handleFilterChangeAndSearch = async (filters) => {
   handleFilterChange(filters)
 }
 
-const handleBarSearch = async ({ query, documentsOnly }) => {
-  await handleSearch({
-    query,
-    documentsOnly,
-    file_type: selectedFilters.value.type.join(' '),
-    source_system: selectedFilters.value.source.join(' '),
-    security_class: selectedFilters.value.security.join(' ')
-  })
-}
-
 // searching a second time automatically to update the security levels
 const refreshCurrentSearch = async () => {
   // prevents empty search.
   if (!lastQuery.value || !lastQuery.value.trim()) return
 
-  await handleSearch({
+  await searchWithFilters({
     query: lastQuery.value,
     documentsOnly: documentsOnlyMode.value,
-    source_system: selectedFilters.value.source.join(' '),
-    file_type: selectedFilters.value.type.join(' '),
-    security_class: selectedFilters.value.security.join(' ')
+    resetPreview: false
   })
 }
 </script>
@@ -221,7 +220,7 @@ const refreshCurrentSearch = async () => {
   <!-- Search View Section -->
   <section class="search-view">
     <!-- Search Bar Component -->
-    <SearchBar :loading="isSearching" @search="handleBarSearch" @documents-only-change="handleDocumentsOnlyChange" />
+    <SearchBar :loading="isSearching" @search="searchWithFilters" @documents-only-change="handleDocumentsOnlyChange" />
 
     <!-- Search Filters Component -->
     <SearchFiltersCard
@@ -231,7 +230,14 @@ const refreshCurrentSearch = async () => {
     />
 
     <!-- Search Matches Component -->
-    <SearchMatches :matches="matches" :loading="isSearching" :selected="selectedFile" :query="lastQuery" @select="selectMatch" />
+    <SearchMatches
+      :matches="matches"
+      :loading="isSearching"
+      :selected="selectedFile"
+      :query="lastQuery"
+      @select="selectMatch"
+      @update-security="refreshCurrentSearch"
+    />
 
     <!-- Search Preview Drawer Component -->
     <SearchPreviewDrawer

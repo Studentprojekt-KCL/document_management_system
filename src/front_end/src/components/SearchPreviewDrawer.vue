@@ -106,7 +106,7 @@ const handleClassificationSave = async (level) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         unique_pointer: uniquePointer.value,
-        classification: level
+        security_class: level
       })
     })
 
@@ -116,7 +116,7 @@ const handleClassificationSave = async (level) => {
 
     emit('update-security', {
       uniquePointer: uniquePointer.value,
-      level
+      security_class: level
     })
 
     localSecurityLevel.value = level

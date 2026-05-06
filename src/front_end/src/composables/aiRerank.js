@@ -53,7 +53,7 @@ export function useAIRerank(props = {}) {
       }
 
       const data = await response.json()
-      const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
+      const rankedResults = Array.isArray(data) ? data : []
       aiRerankResults.value = mapRankedResults(rankedResults)
       rerankPointer.value = uniquePointer.value
       rerankFilename.value = filename

@@ -2,8 +2,6 @@ import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
-const DEFAULT_RERANK_COUNT = 5
-
 export function useAIRerank(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
@@ -42,7 +40,6 @@ export function useAIRerank(props = {}) {
     try {
       const rerankUrl = new URL(API_PATHS.rerank, window.location.origin)
       rerankUrl.searchParams.set('pointer', uniquePointer.value)
-      rerankUrl.searchParams.set('count', String(DEFAULT_RERANK_COUNT))
 
       const response = await authFetch(rerankUrl, {
         method: 'GET'

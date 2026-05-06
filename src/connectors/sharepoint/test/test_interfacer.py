@@ -1,510 +1,546 @@
-"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law.
+
+Contract tests for the SharePoint interfacer.
+"""
+
+# Tests intentionally exercise private helpers so failures point at a precise
+# connector responsibility instead of a broad end-to-end symptom.
+# pylint: disable=protected-access
 
 import asyncio
 import base64
+import gzip
 import json
-from unittest import IsolatedAsyncioTestCase, mock
+from unittest import IsolatedAsyncioTestCase, TestCase, mock
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from interfacer_sharepoint import DEFAULT_GRAPH_BASE, MAX_RETRIES, SharePoint, _HttpCtx
+from interfacer_sharepoint import MAX_RETRIES, SharePoint, _HttpCtx
 
-GRAPH_BASE = DEFAULT_GRAPH_BASE
-
-# _HttpCtx used in tests that call private methods directly.
-# Semaphore limit is effectively unlimited so tests never block.
-_CTX = _HttpCtx(client=None, sem=asyncio.Semaphore(100), token="token")
+GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+TOKEN = "access-token"
 
 
-def _mock_response(status_code, data=None):
-    response = mock.MagicMock()
-    response.status_code = status_code
-    response.headers = {}
-    if data is not None:
-        response.json.return_value = data
-    return response
+def graph_url(path: str) -> str:
+    """Return a Microsoft Graph URL for a slash-prefixed path."""
+    return f"{GRAPH_BASE}{path}"
 
 
-def _mock_client_ctx(*responses):
-    """Context-manager mock of httpx.AsyncClient for public methods that own the client."""
-    client = mock.AsyncMock()
-    client.__aenter__ = mock.AsyncMock(return_value=client)
-    client.__aexit__ = mock.AsyncMock(return_value=None)
-    if len(responses) == 1:
-        client.get.return_value = responses[0]
-    else:
-        client.get.side_effect = list(responses)
-    return client
+def response(status_code: int = 200, payload: dict | None = None, content: bytes = b"") -> mock.MagicMock:
+    """Build the small httpx.Response surface used by the SharePoint connector."""
+    res = mock.MagicMock(spec=httpx.Response)
+    res.status_code = status_code
+    res.headers = {}
+    res.content = content
+    res.json.return_value = payload if payload is not None else {}
+    return res
 
 
-def _mock_client(*responses):
-    """Plain mock httpx.AsyncClient for methods that receive ctx as a parameter."""
-    client = mock.AsyncMock(spec=httpx.AsyncClient)
-    if len(responses) == 1:
-        client.get.return_value = responses[0]
-    else:
-        client.get.side_effect = list(responses)
-    return client
+def http_context(client: mock.AsyncMock | None = None) -> _HttpCtx:
+    """Create a request context with a permissive semaphore for unit tests."""
+    return _HttpCtx(client or mock.AsyncMock(spec=httpx.AsyncClient), asyncio.Semaphore(100), TOKEN)
 
 
-def _ctx(*responses):
-    """Build an _HttpCtx with a mock client loaded with the given responses."""
-    return _HttpCtx(client=_mock_client(*responses), sem=asyncio.Semaphore(100), token="token")
+def async_client_context(client: mock.AsyncMock) -> mock.MagicMock:
+    """Wrap a mocked AsyncClient in the async context manager API."""
+    manager = mock.MagicMock()
+    manager.__aenter__ = mock.AsyncMock(return_value=client)
+    manager.__aexit__ = mock.AsyncMock(return_value=None)
+    return manager
 
 
-class TestSharePoint(IsolatedAsyncioTestCase):
-    """Unit tests for the SharePoint interfacer."""
+class SharePointTestCase(TestCase):
+    """Base class that constructs SharePoint without reading process environment."""
 
-    def setUp(self):
-        with mock.patch("interfacer_sharepoint.SharePoint.__init__", return_value=None):
-            self.instance = SharePoint()
-        self.instance.graph_base = GRAPH_BASE
-        self.instance.source_system = "SharePoint"
-        self.instance.file_extensions = [".pdf", ".docx", ".txt", ".md"]
-        self.instance.extension_descriptions = {
+    def setUp(self) -> None:
+        with mock.patch.object(SharePoint, "__init__", return_value=None):
+            self.sharepoint = SharePoint()
+        self.sharepoint.graph_base = GRAPH_BASE
+        self.sharepoint.source_system = "SharePoint"
+        self.sharepoint.file_extensions = [".pdf", ".docx", ".txt", ".md"]
+        self.sharepoint.extension_descriptions = {
             ".pdf": "PDF",
-            ".docx": "Word",
-            ".txt": "Text",
-            ".md": "Text",
+            ".docx": "Word document",
+            ".txt": "Text document",
+            ".md": "Markdown document",
         }
 
-    # --- subdata encoding/decoding ---
 
-    def test_encode_decode_subdata_roundtrip(self):
-        delta_map = {"drive_abc": "xyz"}
+class TestSharePointConfiguration(TestCase):
+    """Constructor and subdata serialization behavior."""
+
+    def test_init_normalizes_graph_base_and_loads_file_type_metadata(self) -> None:
+        """Graph base URLs should be usable even when env values include whitespace or a trailing slash."""
+
+        def fake_read_env(name: str, *_args, **_kwargs) -> str:
+            return {
+                "CONSHAREPOINT_GRAPH_BASE": " https://graph.microsoft.com/beta/ ",
+                "CONSHAREPOINT_SYSTEM_NAME": "Company SharePoint",
+            }[name]
+
+        file_types = [{"extension": ".pdf", "description": "PDF document"}]
+        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env), mock.patch(
+            "interfacer_sharepoint.get_file_resource", return_value=file_types
+        ):
+            sharepoint = SharePoint()
+
+        self.assertEqual(sharepoint.graph_base, "https://graph.microsoft.com/beta")
+        self.assertEqual(sharepoint.source_system, "Company SharePoint")
+        self.assertEqual(sharepoint.file_extensions, [".pdf"])
+        self.assertEqual(sharepoint.extension_descriptions, {".pdf": "PDF document"})
+
+    def test_subdata_round_trips_delta_tokens_as_gzip_base64_json(self) -> None:
+        """The indexer can persist and pass back a compact per-drive delta-token map."""
+        delta_map = {"drive-a": "token-a", "drive-b": "token-b"}
+
         encoded = SharePoint._encode_subdata(delta_map)
-        decoded = self.instance._decode_subdata(encoded)
-        assert decoded == delta_map
 
-    def test_decode_subdata_none_returns_empty(self):
-        assert self.instance._decode_subdata(None) == {}
+        self.assertEqual(SharePoint._decode_subdata(encoded), delta_map)
+        raw_json = gzip.decompress(base64.urlsafe_b64decode(encoded)).decode("utf-8")
+        self.assertEqual(json.loads(raw_json), delta_map)
 
-    def test_decode_subdata_invalid_base64_returns_empty(self):
-        assert self.instance._decode_subdata("!!!not-valid!!!") == {}
+    def test_decode_subdata_treats_missing_or_invalid_values_as_a_fresh_sync(self) -> None:
+        """Bad caller state must not crash sync decisions or streaming."""
+        self.assertEqual(SharePoint._decode_subdata(None), {})
+        self.assertEqual(SharePoint._decode_subdata("not-valid-base64"), {})
+        self.assertEqual(SharePoint._decode_subdata(base64.urlsafe_b64encode(b"not gzip").decode("utf-8")), {})
 
-    def test_decode_subdata_valid_base64_non_json_returns_empty(self):
-        assert self.instance._decode_subdata(base64.urlsafe_b64encode(b"not json").decode()) == {}
 
-    def test_init_graph_base_defaults_when_env_unset(self):
-        def fake_read_env(name, required=True):
-            if name == "CONSHAREPOINT_GRAPH_BASE":
-                return None
-            if name == "CONSHAREPOINT_SYSTEM_NAME":
-                return "SharePoint"
-            return ""
+class TestSharePointRecordBuilding(SharePointTestCase):
+    """Mapping Microsoft Graph drive items to DMIS file records."""
 
-        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
-            with mock.patch(
-                "interfacer_sharepoint.get_file_resource",
-                return_value=[{"extension": ".pdf", "description": "PDF"}],
-            ):
-                inst = SharePoint()
-        assert inst.graph_base == DEFAULT_GRAPH_BASE
-
-    def test_init_graph_base_from_env_strips_whitespace_and_slash(self):
-        def fake_read_env(name, required=True):
-            if name == "CONSHAREPOINT_GRAPH_BASE":
-                return " https://graph.microsoft.com/beta/ "
-            if name == "CONSHAREPOINT_SYSTEM_NAME":
-                return "SharePoint"
-            return ""
-
-        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
-            with mock.patch(
-                "interfacer_sharepoint.get_file_resource",
-                return_value=[{"extension": ".pdf", "description": "PDF"}],
-            ):
-                inst = SharePoint()
-        assert inst.graph_base == "https://graph.microsoft.com/beta"
-
-    def test_init_graph_base_blank_env_uses_default(self):
-        def fake_read_env(name, required=True):
-            if name == "CONSHAREPOINT_GRAPH_BASE":
-                return "  \t  "
-            if name == "CONSHAREPOINT_SYSTEM_NAME":
-                return "SharePoint"
-            return ""
-
-        with mock.patch("interfacer_sharepoint.read_env_variable", side_effect=fake_read_env):
-            with mock.patch(
-                "interfacer_sharepoint.get_file_resource",
-                return_value=[{"extension": ".pdf", "description": "PDF"}],
-            ):
-                inst = SharePoint()
-        assert inst.graph_base == DEFAULT_GRAPH_BASE
-
-    # --- file record building ---
-
-    def test_build_file_record_pdf(self):
+    def test_build_file_record_maps_graph_item_to_index_metadata(self) -> None:
+        """A driveItem file becomes a metadata-only record that later receives content."""
         item = {
-            "id": "item123",
-            "name": "report.pdf",
+            "id": "item-123",
+            "name": "Quarterly Report.pdf",
             "size": 2048,
-            "webUrl": "https://tenant.sharepoint.com/report.pdf",
-            "lastModifiedDateTime": "2026-01-01T00:00:00Z",
+            "webUrl": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
+            "lastModifiedDateTime": "2026-05-01T10:20:30Z",
         }
-        record = self.instance._build_file_record(item, "drive456")
-        assert record is not None
-        assert record["metadata"]["file_type"] == ".pdf"
-        assert record["metadata"]["file_type_description"] == "PDF"
-        assert record["metadata"]["name"] == "report.pdf"
-        assert record["metadata"]["size"] == 2048
-        assert record["metadata"]["unique_pointer"] == ("https://graph.microsoft.com/v1.0/drives/drive456/items/item123")
-        assert record["metadata"]["clickable_url"] == "https://tenant.sharepoint.com/report.pdf"
-        assert record["metadata"]["last_edit_date"] == "2026-01-01T00:00:00Z"
-        assert "content" not in record
 
-    def test_build_file_record_unknown_extension_returns_record(self):
-        item = {"id": "item123", "name": "script.py", "size": 500}
-        record = self.instance._build_file_record(item, "drive456")
-        assert record is not None
-        assert record["metadata"]["file_type"] == "Unknown"
+        record = self.sharepoint._build_file_record(item, "drive-456")
 
-    def test_build_file_record_folder_returns_none(self):
-        item = {"id": "folder1", "name": "Documents", "size": 0, "folder": {"childCount": 3}}
-        assert self.instance._build_file_record(item, "drive456") is None
-
-    def test_build_file_record_deleted_tombstone_returns_none(self):
-        item = {"id": "item123", "name": "old.pdf", "deleted": {}}
-        assert self.instance._build_file_record(item, "drive456") is None
-
-    def test_build_file_record_markdown(self):
-        item = {"id": "itemMd", "name": "notes.md", "size": 100, "webUrl": "https://sp.com/notes.md"}
-        record = self.instance._build_file_record(item, "drive1")
-        assert record is not None
-        assert record["metadata"]["file_type"] == ".md"
-
-    # --- _get_with_retry ---
-
-    async def test_get_with_retry_succeeds_on_first_attempt(self):
-        resp = _mock_response(200, {"value": []})
-        ctx = _ctx(resp)
-        result = await self.instance._get_with_retry(ctx, "https://example.com")
-        assert result.status_code == 200
-        assert ctx.client.get.call_count == 1
-
-    async def test_get_with_retry_retries_on_429(self):
-        rate_limited = _mock_response(429)
-        rate_limited.headers = {"Retry-After": "1"}
-        success = _mock_response(200, {"value": []})
-        ctx = _ctx(rate_limited, success)
-        with mock.patch("asyncio.sleep") as mock_sleep:
-            result = await self.instance._get_with_retry(ctx, "https://example.com")
-        assert result.status_code == 200
-        assert ctx.client.get.call_count == 2
-        mock_sleep.assert_called_once_with(1)
-
-    async def test_get_with_retry_exhausts_retries(self):
-        rate_limited = _mock_response(429)
-        rate_limited.headers = {"Retry-After": "1"}
-        ctx = _ctx(*[rate_limited] * MAX_RETRIES)
-        with mock.patch("asyncio.sleep"):
-            result = await self.instance._get_with_retry(ctx, "https://example.com")
-        assert result.status_code == 429
-        assert ctx.client.get.call_count == MAX_RETRIES
-
-    # --- _get_sites ---
-
-    async def test_get_sites_success(self):
-        ctx = _ctx(_mock_response(200, {"value": [{"id": "site1"}, {"id": "site2"}]}))
-        sites = await self.instance._get_sites(ctx)
-        assert [s["id"] for s in sites] == ["site1", "site2"]
-
-    async def test_get_sites_pagination(self):
-        page1 = _mock_response(
-            200,
+        self.assertIsNotNone(record)
+        self.assertEqual(
+            record,
             {
-                "value": [{"id": "site1"}],
-                "@odata.nextLink": f"{GRAPH_BASE}/sites?$skiptoken=page2",
+                "metadata": {
+                    "unique_pointer": graph_url("/drives/drive-456/items/item-123"),
+                    "name": "Quarterly Report.pdf",
+                    "size": 2048,
+                    "type": "source_file",
+                    "source_system": "SharePoint",
+                    "last_edit_date": "2026-05-01T10:20:30Z",
+                    "clickable_url": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
+                    "file_type": ".pdf",
+                    "file_type_description": "PDF",
+                }
             },
         )
-        page2 = _mock_response(200, {"value": [{"id": "site2"}]})
-        ctx = _ctx(page1, page2)
-        sites = await self.instance._get_sites(ctx)
-        assert [s["id"] for s in sites] == ["site1", "site2"]
 
-    async def test_get_sites_non_200_returns_empty(self):
-        ctx = _ctx(_mock_response(403))
-        sites = await self.instance._get_sites(ctx)
-        assert sites == []
+    def test_build_file_record_keeps_unknown_extensions_indexable(self) -> None:
+        """Unknown extensions are still useful search records, just labelled as Unknown."""
+        record = self.sharepoint._build_file_record({"id": "item-1", "name": "build.lock", "size": 12}, "drive-1")
 
-    # --- _get_drives ---
+        self.assertIsNotNone(record)
+        self.assertEqual(record["metadata"]["file_type"], "Unknown")
+        self.assertEqual(record["metadata"]["file_type_description"], "Unknown")
 
-    async def test_get_drives_success(self):
-        ctx = _ctx(_mock_response(200, {"value": [{"id": "drive1"}, {"id": "drive2"}]}))
-        drives = await self.instance._get_drives(ctx, "site1")
-        assert len(drives) == 2
+    def test_build_file_record_ignores_non_file_delta_items(self) -> None:
+        """Folder entries and delete tombstones are not documents to index."""
+        folder = {"id": "folder-1", "name": "Documents", "folder": {"childCount": 4}}
+        deleted_file = {"id": "file-1", "name": "old.pdf", "deleted": {}}
 
-    async def test_get_drives_non_200_returns_empty(self):
-        ctx = _ctx(_mock_response(404))
-        drives = await self.instance._get_drives(ctx, "site1")
-        assert drives == []
+        self.assertIsNone(self.sharepoint._build_file_record(folder, "drive-1"))
+        self.assertIsNone(self.sharepoint._build_file_record(deleted_file, "drive-1"))
 
-    # --- _run_delta_query ---
 
-    async def test_run_delta_query_single_page(self):
-        new_link = f"{GRAPH_BASE}/drives/d1/root/delta?token=new"
-        ctx = _ctx(_mock_response(200, {"value": [{"id": "item1"}, {"id": "item2"}], "@odata.deltaLink": new_link}))
-        items, delta_link = await self.instance._run_delta_query(ctx, f"{GRAPH_BASE}/drives/d1/root/delta")
-        assert len(items) == 2
-        assert delta_link == new_link
+class TestSharePointHttp(IsolatedAsyncioTestCase):
+    """HTTP retry and request composition behavior."""
 
-    async def test_run_delta_query_pagination(self):
-        new_link = f"{GRAPH_BASE}/drives/d1/root/delta?token=new"
-        page1 = _mock_response(
+    async def test_request_with_retry_adds_bearer_token_and_returns_success(self) -> None:
+        """All Graph requests should carry the per-user OAuth token."""
+        client = mock.AsyncMock(spec=httpx.AsyncClient)
+        client.get.return_value = response(200, {"value": []})
+
+        result = await SharePoint._request_with_retry(http_context(client), "https://example.test/files")
+
+        self.assertEqual(result.status_code, httpx.codes.OK)
+        client.get.assert_awaited_once_with(
+            "https://example.test/files",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        )
+
+    async def test_request_with_retry_uses_caller_supplied_headers_without_overwriting_them(self) -> None:
+        """Callers can pass special Graph headers when an endpoint requires them."""
+        client = mock.AsyncMock(spec=httpx.AsyncClient)
+        client.get.return_value = response(200, {"value": []})
+
+        await SharePoint._request_with_retry(http_context(client), "https://example.test/files", headers={"Prefer": "delta"})
+
+        client.get.assert_awaited_once_with("https://example.test/files", headers={"Prefer": "delta"})
+
+    async def test_request_with_retry_respects_retry_after_for_429(self) -> None:
+        """429 responses should be retried according to Retry-After before giving up."""
+        rate_limited = response(429)
+        rate_limited.headers = {"Retry-After": "2"}
+        client = mock.AsyncMock(spec=httpx.AsyncClient)
+        client.get.side_effect = [rate_limited, response(200, {"ok": True})]
+
+        with mock.patch("interfacer_sharepoint.asyncio.sleep", new=mock.AsyncMock()) as sleep:
+            result = await SharePoint._request_with_retry(http_context(client), "https://example.test/files")
+
+        self.assertEqual(result.status_code, httpx.codes.OK)
+        self.assertEqual(client.get.await_count, 2)
+        sleep.assert_awaited_once_with(2)
+
+    async def test_request_with_retry_returns_final_429_after_retry_budget_is_exhausted(self) -> None:
+        """The caller, not the retry helper, decides how to handle persistent throttling."""
+        client = mock.AsyncMock(spec=httpx.AsyncClient)
+        client.get.side_effect = [response(429) for _ in range(MAX_RETRIES)]
+
+        with mock.patch("interfacer_sharepoint.asyncio.sleep", new=mock.AsyncMock()):
+            result = await SharePoint._request_with_retry(http_context(client), "https://example.test/files")
+
+        self.assertEqual(result.status_code, httpx.codes.TOO_MANY_REQUESTS)
+        self.assertEqual(client.get.await_count, MAX_RETRIES)
+
+
+class TestSharePointGraphDiscovery(SharePointTestCase, IsolatedAsyncioTestCase):
+    """Microsoft Graph discovery and delta query behavior."""
+
+    async def test_get_sites_uses_microsoft_search_and_paginates(self) -> None:
+        """Accessible SharePoint sites come from POST /search/query across all pages."""
+        first_page = response(
+            200,
+            {"value": [{"hitsContainers": [{"hits": [{"resource": {"id": "site-a"}}], "moreResultsAvailable": True}]}]},
+        )
+        second_page = response(
             200,
             {
-                "value": [{"id": "item1"}],
-                "@odata.nextLink": f"{GRAPH_BASE}/drives/d1/root/delta?$skiptoken=p2",
+                "value": [
+                    {
+                        "hitsContainers": [
+                            {"hits": [{"resource": {"id": "site-b"}}, {"resource": {}}], "moreResultsAvailable": False}
+                        ]
+                    }
+                ]
             },
         )
-        page2 = _mock_response(200, {"value": [{"id": "item2"}], "@odata.deltaLink": new_link})
-        ctx = _ctx(page1, page2)
-        items, delta_link = await self.instance._run_delta_query(ctx, f"{GRAPH_BASE}/drives/d1/root/delta")
-        assert [i["id"] for i in items] == ["item1", "item2"]
-        assert delta_link == new_link
+        self.sharepoint._request_with_retry = mock.AsyncMock(side_effect=[first_page, second_page])
 
-    async def test_run_delta_query_non_200_returns_empty(self):
-        ctx = _ctx(_mock_response(410))
-        items, delta_link = await self.instance._run_delta_query(ctx, f"{GRAPH_BASE}/drives/d1/root/delta")
-        assert items == []
-        assert delta_link == ""
+        sites = await self.sharepoint._get_sites(http_context())
 
-    # --- _process_drive ---
+        self.assertEqual(sites, [{"id": "site-a"}, {"id": "site-b"}])
+        self.assertEqual(self.sharepoint._request_with_retry.await_count, 2)
+        first_call = self.sharepoint._request_with_retry.await_args_list[0]
+        second_call = self.sharepoint._request_with_retry.await_args_list[1]
+        self.assertEqual(first_call.args[1], graph_url("/search/query"))
+        self.assertEqual(first_call.kwargs["method"], "post")
+        self.assertEqual(first_call.kwargs["json"]["requests"][0]["from"], 0)
+        self.assertEqual(second_call.kwargs["json"]["requests"][0]["from"], 500)
 
-    async def test_process_drive_encodes_content_when_fetch_ok(self):
-        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
-        item = {
-            "id": "item123",
-            "name": "report.pdf",
-            "size": 2048,
-            "webUrl": "https://sp.com/report.pdf",
-            "lastModifiedDateTime": "2026-01-01T00:00:00Z",
-        }
-        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
-        content_resp = _mock_response(200)
-        content_resp.content = b"bytes-from-graph"
-        ctx = _ctx(content_resp)
-        drive_id, records, delta_link = await self.instance._process_drive(
-            ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta"
+    async def test_get_sites_returns_collected_sites_when_a_later_page_fails(self) -> None:
+        """A transient later-page failure should not discard already discovered sites."""
+        page = response(
+            200,
+            {"value": [{"hitsContainers": [{"hits": [{"resource": {"id": "site-a"}}], "moreResultsAvailable": True}]}]},
         )
-        assert drive_id == "drive456"
-        assert delta_link == new_link
-        assert len(records) == 1
-        assert records[0]["content"] == base64.b64encode(b"bytes-from-graph").decode("utf-8")
-        assert records[0]["metadata"]["name"] == "report.pdf"
-        assert ctx.client.get.call_count == 1
+        self.sharepoint._request_with_retry = mock.AsyncMock(side_effect=[page, response(503)])
 
-    async def test_process_drive_content_forbidden_yields_empty_base64(self):
-        new_link = f"{GRAPH_BASE}/drives/drive456/root/delta?token=new"
+        self.assertEqual(await self.sharepoint._get_sites(http_context()), [{"id": "site-a"}])
+
+    async def test_get_drives_returns_document_libraries_and_treats_forbidden_as_inaccessible(self) -> None:
+        """403 means this user cannot list that site's drives, not that the whole sync failed."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": [{"id": "drive-a"}]}))
+        self.assertEqual(await self.sharepoint._get_drives(http_context(), "site-a"), [{"id": "drive-a"}])
+
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(403))
+        self.assertEqual(await self.sharepoint._get_drives(http_context(), "site-b"), [])
+
+    async def test_run_delta_query_accumulates_pages_until_delta_link(self) -> None:
+        """Delta queries may return nextLink pages before the final reusable deltaLink."""
+        final_delta = graph_url("/drives/drive-a/root/delta?token=new-token")
+        self.sharepoint._request_with_retry = mock.AsyncMock(
+            side_effect=[
+                response(
+                    200,
+                    {
+                        "value": [{"id": "item-a"}],
+                        "@odata.nextLink": graph_url("/drives/drive-a/root/delta?$skiptoken=next"),
+                    },
+                ),
+                response(200, {"value": [{"id": "item-b"}], "@odata.deltaLink": final_delta}),
+            ]
+        )
+
+        items, delta_link = await self.sharepoint._run_delta_query(http_context(), graph_url("/drives/drive-a/root/delta"))
+
+        self.assertEqual(items, [{"id": "item-a"}, {"id": "item-b"}])
+        self.assertEqual(delta_link, final_delta)
+
+    async def test_run_delta_query_returns_partial_items_without_delta_link_when_graph_fails(self) -> None:
+        """The caller can still decide what to do with partial records when a later page fails."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(
+            side_effect=[
+                response(200, {"value": [{"id": "item-a"}], "@odata.nextLink": "next-page"}),
+                response(410),
+            ]
+        )
+
+        self.assertEqual(await self.sharepoint._run_delta_query(http_context(), "first-page"), ([{"id": "item-a"}], ""))
+
+    async def test_collect_drive_tasks_builds_fresh_and_incremental_delta_urls(self) -> None:
+        """Every accessible drive becomes one delta task, using stored tokens when present."""
+        self.sharepoint._get_sites = mock.AsyncMock(return_value=[{"id": "site-a"}, {"id": "site-b"}])
+        self.sharepoint._get_drives = mock.AsyncMock(
+            side_effect=[
+                [{"id": "drive-a"}, {"id": "drive-b"}],
+                [{"id": "drive-c"}, {"id": ""}],
+            ]
+        )
+
+        tasks = await self.sharepoint._collect_drive_tasks(http_context(), {"drive-b": "old-token"})
+
+        self.assertEqual(
+            tasks,
+            [
+                ("drive-a", graph_url("/drives/drive-a/root/delta")),
+                ("drive-b", graph_url("/drives/drive-b/root/delta?token=old-token")),
+                ("drive-c", graph_url("/drives/drive-c/root/delta")),
+            ],
+        )
+
+    async def test_collect_drive_tasks_skips_malformed_sites_and_failed_drive_lists(self) -> None:
+        """A bad site entry or inaccessible site should not block other sites in the same sync."""
+        self.sharepoint._get_sites = mock.AsyncMock(return_value=[{}, {"id": ""}, {"id": "site-a"}, {"id": "site-b"}])
+        self.sharepoint._get_drives = mock.AsyncMock(side_effect=[ConnectionError("timeout"), [{"id": "drive-b"}]])
+
+        tasks = await self.sharepoint._collect_drive_tasks(http_context(), {})
+
+        self.assertEqual(tasks, [("drive-b", graph_url("/drives/drive-b/root/delta"))])
+        self.sharepoint._get_drives.assert_has_awaits(
+            [mock.call(mock.ANY, "site-a"), mock.call(mock.ANY, "site-b")],
+            any_order=True,
+        )
+
+
+class TestSharePointFileFetching(SharePointTestCase, IsolatedAsyncioTestCase):
+    """Direct file retrieval and content download behavior."""
+
+    async def test_get_file_returns_metadata_and_optional_content(self) -> None:
+        """get_files consumers can request a stable metadata object plus base64 content."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(
+            side_effect=[
+                response(
+                    200,
+                    {
+                        "name": "Plan.docx",
+                        "size": 128,
+                        "webUrl": "https://tenant.sharepoint.com/Plan.docx",
+                        "lastModifiedDateTime": "2026-05-02T12:00:00Z",
+                    },
+                ),
+                response(200, content=b"document bytes"),
+            ]
+        )
+
+        result = await self.sharepoint._get_file(http_context(), graph_url("/drives/drive-a/items/item-a"), include_content=True)
+
+        self.assertEqual(
+            result,
+            {
+                "unique_pointer": graph_url("/drives/drive-a/items/item-a"),
+                "name": "Plan.docx",
+                "size": 128,
+                "type": "source_file",
+                "source_system": "SharePoint",
+                "clickable_url": "https://tenant.sharepoint.com/Plan.docx",
+                "file_type": ".docx",
+                "file_type_description": "Word document",
+                "last_edit_date": "2026-05-02T12:00:00Z",
+                "content": base64.b64encode(b"document bytes").decode("utf-8"),
+            },
+        )
+
+    async def test_get_file_allows_callers_to_omit_last_edit_date(self) -> None:
+        """The API endpoint exposes include_last_edit_date for lighter responses."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"name": "notes.md"}))
+
+        result = await self.sharepoint._get_file(
+            http_context(),
+            graph_url("/drives/drive-a/items/item-a"),
+            include_last_edit_date=False,
+        )
+
+        self.assertNotIn("last_edit_date", result)
+
+    async def test_get_file_returns_empty_dict_when_metadata_is_unavailable(self) -> None:
+        """A missing or forbidden pointer is represented as an empty result."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(404))
+
+        self.assertEqual(await self.sharepoint._get_file(http_context(), graph_url("/drives/drive-a/items/missing")), {})
+
+    async def test_fetch_record_content_sets_base64_content_or_none_without_changing_metadata(self) -> None:
+        """Streamed records should always keep a predictable content field."""
+        successful = {"metadata": {"unique_pointer": graph_url("/drives/drive-a/items/item-a"), "name": "Plan.docx"}}
+        failed = {"metadata": {"unique_pointer": graph_url("/drives/drive-a/items/item-b"), "name": "Secret.docx"}}
+        self.sharepoint._request_with_retry = mock.AsyncMock(side_effect=[response(200, content=b"bytes"), response(403)])
+
+        await self.sharepoint._fetch_record_content(http_context(), successful)
+        await self.sharepoint._fetch_record_content(http_context(), failed)
+
+        self.assertEqual(successful["content"], base64.b64encode(b"bytes").decode("utf-8"))
+        self.assertIsNone(failed["content"])
+        self.assertEqual(failed["metadata"]["name"], "Secret.docx")
+
+
+class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
+    """The stream_files_to_index public contract."""
+
+    async def collect_stream(self, subdata: str | None = None) -> list[dict]:
+        """Collect the connector's byte stream into decoded JSON chunks."""
+        return [json.loads(chunk.decode("utf-8")) async for chunk in self.sharepoint.stream_files_to_index(subdata, TOKEN)]
+
+    async def test_stream_yields_subdata_header_before_file_records_and_fetches_content(self) -> None:
+        """Indexers receive the next delta state first, then fully shaped file records."""
         item = {
-            "id": "item123",
-            "name": "notes.txt",
-            "size": 10,
-            "webUrl": "https://sp.com/notes.txt",
+            "id": "item-a",
+            "name": "Plan.docx",
+            "size": 128,
+            "webUrl": "https://tenant.sharepoint.com/Plan.docx",
+            "lastModifiedDateTime": "2026-05-02T12:00:00Z",
         }
-        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
-        ctx = _ctx(_mock_response(403))
-        _, records, _ = await self.instance._process_drive(ctx, "drive456", f"{GRAPH_BASE}/drives/drive456/root/delta")
-        assert len(records) == 1
-        assert records[0]["content"] == ""
-        assert records[0]["metadata"]["file_type"] == ".txt"
+        delta_link = graph_url("/drives/drive-a/root/delta?token=new-token")
+        self.sharepoint._collect_drive_tasks = mock.AsyncMock(return_value=[("drive-a", graph_url("/drives/drive-a/root/delta"))])
+        self.sharepoint._process_drive = mock.AsyncMock(
+            return_value=("drive-a", [self.sharepoint._build_file_record(item, "drive-a")], delta_link)
+        )
 
-    # --- _collect_drive_tasks ---
+        def add_content(_ctx: _HttpCtx, record: dict) -> None:
+            record["content"] = "base64-content"
 
-    async def test_collect_drive_tasks_with_sites(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}])
-        self.instance._get_drives = mock.AsyncMock(return_value=[{"id": "drive1"}])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {})
-        assert tasks == [("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")]
+        self.sharepoint._fetch_record_content = mock.AsyncMock(side_effect=add_content)
+        with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
+            chunks = await self.collect_stream()
 
-    async def test_collect_drive_tasks_uses_stored_delta_link(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}])
-        self.instance._get_drives = mock.AsyncMock(return_value=[{"id": "drive1"}])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {"drive1": "stored"})
-        assert tasks == [("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta?token=stored")]
+        self.assertEqual(len(chunks), 2)
+        self.assertIn("subdata", chunks[0])
+        self.assertEqual(SharePoint._decode_subdata(chunks[0]["subdata"]), {"drive-a": "new-token"})
+        self.assertEqual(chunks[1]["metadata"]["name"], "Plan.docx")
+        self.assertEqual(chunks[1]["content"], "base64-content")
 
-    async def test_collect_drive_tasks_multiple_sites(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}, {"id": "site2"}])
-        self.instance._get_drives = mock.AsyncMock(return_value=[{"id": "driveA"}])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {})
-        assert len(tasks) == 2
-        assert all(drive_id == "driveA" for drive_id, _ in tasks)
+    async def test_stream_uses_stored_subdata_when_collecting_drive_tasks(self) -> None:
+        """Incremental sync state should be decoded before drive tasks are prepared."""
+        previous_subdata = SharePoint._encode_subdata({"drive-a": "old-token"})
+        self.sharepoint._collect_drive_tasks = mock.AsyncMock(return_value=[])
+        self.sharepoint._process_drive = mock.AsyncMock()
+        self.sharepoint._fetch_record_content = mock.AsyncMock()
 
-    async def test_collect_drive_tasks_no_sites_returns_empty(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {})
-        assert tasks == []
+        with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
+            chunks = await self.collect_stream(previous_subdata)
 
-    async def test_collect_drive_tasks_skips_empty_site_id(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[{"id": ""}, {"id": "site1"}])
-        self.instance._get_drives = mock.AsyncMock(return_value=[{"id": "drive1"}])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {})
-        assert len(tasks) == 1
-        assert tasks[0][0] == "drive1"
+        self.assertEqual(len(chunks), 1)
+        self.sharepoint._collect_drive_tasks.assert_awaited_once()
+        self.assertEqual(self.sharepoint._collect_drive_tasks.await_args.args[1], {"drive-a": "old-token"})
 
-    async def test_collect_drive_tasks_site_exception_is_skipped(self):
-        self.instance._get_sites = mock.AsyncMock(return_value=[{"id": "site1"}, {"id": "site2"}])
-        self.instance._get_drives = mock.AsyncMock(side_effect=[ConnectionError("timeout"), [{"id": "drive2"}]])
-        tasks = await self.instance._collect_drive_tasks(_CTX, {})
-        assert len(tasks) == 1
-        assert tasks[0][0] == "drive2"
+    async def test_stream_skips_failed_drives_and_keeps_successful_drive_delta_tokens(self) -> None:
+        """One bad drive should not prevent records or subdata from other drives."""
+        good_record = self.sharepoint._build_file_record({"id": "item-a", "name": "ok.pdf"}, "drive-good")
+        self.sharepoint._collect_drive_tasks = mock.AsyncMock(
+            return_value=[
+                ("drive-bad", graph_url("/drives/drive-bad/root/delta")),
+                ("drive-good", graph_url("/drives/drive-good/root/delta")),
+            ]
+        )
+        self.sharepoint._process_drive = mock.AsyncMock(
+            side_effect=[
+                ConnectionError("network failure"),
+                ("drive-good", [good_record], graph_url("/drives/drive-good/root/delta?token=good-token")),
+            ]
+        )
 
-    # --- _get_file ---
+        def add_content(_ctx: _HttpCtx, record: dict) -> None:
+            record["content"] = "ok"
 
-    async def test_get_file_metadata_only(self):
-        ctx = _ctx(
-            _mock_response(
-                200,
-                {
-                    "name": "report.pdf",
-                    "size": 1024,
-                    "webUrl": "https://tenant.sharepoint.com/report.pdf",
-                    "lastModifiedDateTime": "2026-01-01T00:00:00Z",
-                },
+        self.sharepoint._fetch_record_content = mock.AsyncMock(side_effect=add_content)
+
+        with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
+            chunks = await self.collect_stream()
+
+        self.assertEqual(SharePoint._decode_subdata(chunks[0]["subdata"]), {"drive-good": "good-token"})
+        self.assertEqual([chunk["metadata"]["name"] for chunk in chunks[1:]], ["ok.pdf"])
+
+    async def test_process_drive_filters_delta_items_before_streaming(self) -> None:
+        """Only real file items are returned from a drive delta page."""
+        self.sharepoint._run_delta_query = mock.AsyncMock(
+            return_value=(
+                [
+                    {"id": "folder-a", "name": "Folder", "folder": {}},
+                    {"id": "deleted-a", "name": "deleted.pdf", "deleted": {}},
+                    {"id": "item-a", "name": "report.pdf"},
+                ],
+                graph_url("/drives/drive-a/root/delta?token=next"),
             )
         )
-        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
-        assert result["name"] == "report.pdf"
-        assert result["file_type"] == ".pdf"
-        assert result["last_edit_date"] == "2026-01-01T00:00:00Z"
-        assert "content" not in result
 
-    async def test_get_file_non_200_returns_empty(self):
-        ctx = _ctx(_mock_response(404))
-        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
-        assert result == {}
+        drive_id, records, delta_link = await self.sharepoint._process_drive(
+            http_context(),
+            "drive-a",
+            graph_url("/drives/drive-a/root/delta"),
+        )
 
-    async def test_get_file_unknown_extension_returns_empty(self):
-        ctx = _ctx(_mock_response(200, {"name": "script.py", "size": 100, "webUrl": "https://sp.com/script.py"}))
-        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1")
-        assert result == {}
+        self.assertEqual(drive_id, "drive-a")
+        self.assertEqual([record["metadata"]["name"] for record in records], ["report.pdf"])
+        self.assertEqual(parse_qs(urlparse(delta_link).query)["token"], ["next"])
 
-    async def test_get_file_exclude_last_edit_date(self):
-        ctx = _ctx(_mock_response(200, {"name": "report.pdf", "size": 512, "webUrl": "https://sp.com/report.pdf"}))
-        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1", include_last_edit_date=False)
-        assert "last_edit_date" not in result
 
-    async def test_get_file_with_content(self):
-        meta_resp = _mock_response(200, {"name": "doc.docx", "size": 512, "webUrl": "https://sp.com/doc.docx"})
-        content_resp = _mock_response(200)
-        content_resp.content = b"file bytes"
-        ctx = _ctx(meta_resp, content_resp)
-        result = await self.instance._get_file(ctx, f"{GRAPH_BASE}/drives/d1/items/i1", include_content=True)
-        assert result["content"] == base64.b64encode(b"file bytes").decode("utf-8")
+class TestSharePointIndexNeeded(SharePointTestCase, IsolatedAsyncioTestCase):
+    """The check_index_needed public contract."""
 
-    # --- _fetch_record_content ---
+    async def test_check_index_needed_requires_index_when_subdata_is_missing_or_invalid(self) -> None:
+        """No trustworthy delta state means a sync is needed."""
+        self.assertEqual(await self.sharepoint.check_index_needed(None), {"index_needed": True})
+        self.assertEqual(await self.sharepoint.check_index_needed("bad-subdata"), {"index_needed": True})
 
-    async def test_fetch_record_content_success(self):
-        content_resp = _mock_response(200)
-        content_resp.content = b"file bytes"
-        ctx = _ctx(content_resp)
-        record = {"content": None, "metadata": {"unique_pointer": f"{GRAPH_BASE}/drives/d1/items/i1", "name": "doc.pdf"}}
-        await self.instance._fetch_record_content(ctx, record)
-        assert record["content"] == base64.b64encode(b"file bytes").decode("utf-8")
+    async def test_check_index_needed_returns_false_when_all_drives_have_empty_deltas(self) -> None:
+        """If every stored delta token is valid and empty, the existing index is current."""
+        subdata = SharePoint._encode_subdata({"drive-a": "token-a", "drive-b": "token-b"})
+        self.sharepoint._check_drive_delta = mock.AsyncMock(side_effect=[False, False])
 
-    async def test_fetch_record_content_non_200_leaves_content_none(self):
-        ctx = _ctx(_mock_response(403))
-        record = {"content": None, "metadata": {"unique_pointer": f"{GRAPH_BASE}/drives/d1/items/i1", "name": "doc.pdf"}}
-        await self.instance._fetch_record_content(ctx, record)
-        assert record["content"] is None
+        with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
+            result = await self.sharepoint.check_index_needed(subdata, TOKEN)
 
-    # --- stream_files_to_index ---
+        self.assertEqual(result, {"index_needed": False})
+        checked_urls = [call.args[1] for call in self.sharepoint._check_drive_delta.await_args_list]
+        self.assertEqual(
+            checked_urls,
+            [
+                graph_url("/drives/drive-a/root/delta?token=token-a"),
+                graph_url("/drives/drive-b/root/delta?token=token-b"),
+            ],
+        )
 
-    async def test_stream_files_to_index_yields_subdata_then_records(self):
-        new_link = f"{GRAPH_BASE}/drives/drive1/root/delta?token=new"
-        item = {
-            "id": "item1",
-            "name": "report.pdf",
-            "size": 2048,
-            "webUrl": "https://sp.com/report.pdf",
-            "lastModifiedDateTime": "2026-01-01T00:00:00Z",
-        }
-        self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
-        self.instance._run_delta_query = mock.AsyncMock(return_value=([item], new_link))
+    async def test_check_index_needed_returns_true_for_changes_expired_tokens_or_exceptions(self) -> None:
+        """Any uncertainty should trigger a fresh index rather than risk stale search data."""
+        subdata = SharePoint._encode_subdata({"drive-a": "token-a", "drive-b": "token-b"})
 
-        def _set_content(_, record):
-            record["content"] = base64.b64encode(b"bytes").decode("utf-8")
+        for outcomes in ([False, True], [RuntimeError("timeout"), False]):
+            self.sharepoint._check_drive_delta = mock.AsyncMock(side_effect=outcomes)
+            with mock.patch("interfacer_sharepoint.httpx.AsyncClient", return_value=async_client_context(mock.AsyncMock())):
+                self.assertEqual(await self.sharepoint.check_index_needed(subdata, TOKEN), {"index_needed": True})
 
-        self.instance._fetch_record_content = mock.AsyncMock(side_effect=_set_content)
-        chunks = []
-        async for chunk in self.instance.stream_files_to_index(None, "token"):
-            chunks.append(json.loads(chunk))
-        assert "subdata" in chunks[0]
-        assert len(chunks) == 2
-        assert chunks[1]["metadata"]["name"] == "report.pdf"
-        assert chunks[1]["content"] == base64.b64encode(b"bytes").decode("utf-8")
+    async def test_check_drive_delta_treats_graph_errors_as_changed(self) -> None:
+        """A non-200 delta response usually means the stored delta token is invalid or expired."""
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(410))
+        self.assertTrue(await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old")))
 
-    async def test_stream_files_to_index_drive_exception_is_skipped(self):
-        self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
-        self.instance._run_delta_query = mock.AsyncMock(side_effect=ConnectionError("network failure"))
-        self.instance._fetch_record_content = mock.AsyncMock()
-        chunks = []
-        async for chunk in self.instance.stream_files_to_index(None, "token"):
-            chunks.append(json.loads(chunk))
-        assert len(chunks) == 1
-        assert "subdata" in chunks[0]
-        assert chunks[0]["subdata"] == SharePoint._encode_subdata({})
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": []}))
+        self.assertFalse(
+            await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old"))
+        )
 
-    async def test_stream_files_to_index_no_drives_yields_only_subdata(self):
-        self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[])
-        self.instance._fetch_record_content = mock.AsyncMock()
-        chunks = []
-        async for chunk in self.instance.stream_files_to_index(None, "token"):
-            chunks.append(json.loads(chunk))
-        assert len(chunks) == 1
-        assert "subdata" in chunks[0]
-
-    async def test_stream_files_to_index_passes_all_file_types(self):
-        new_link = f"{GRAPH_BASE}/drives/drive1/root/delta?token=new"
-        items = [
-            {"id": "i1", "name": "report.pdf", "size": 100, "webUrl": "https://sp.com/report.pdf"},
-            {"id": "i2", "name": "script.py", "size": 200, "webUrl": "https://sp.com/script.py"},
-        ]
-        self.instance._collect_drive_tasks = mock.AsyncMock(return_value=[("drive1", f"{GRAPH_BASE}/drives/drive1/root/delta")])
-        self.instance._run_delta_query = mock.AsyncMock(return_value=(items, new_link))
-        self.instance._fetch_record_content = mock.AsyncMock()
-        chunks = []
-        async for chunk in self.instance.stream_files_to_index(None, "token"):
-            chunks.append(json.loads(chunk))
-        assert len(chunks) == 3
-        names = {c["metadata"]["name"] for c in chunks[1:]}
-        assert names == {"report.pdf", "script.py"}
-
-    # --- check_index_needed ---
-
-    async def test_check_index_needed_no_subdata(self):
-        result = await self.instance.check_index_needed(None)
-        assert result == {"index_needed": True}
-
-    async def test_check_index_needed_parallel_no_changes(self):
-        delta_map = {"drive_a": "a", "drive_b": "b"}
-        subdata = SharePoint._encode_subdata(delta_map)
-        empty = _mock_response(200, {"value": []})
-        with mock.patch("httpx.AsyncClient", return_value=_mock_client_ctx(empty, empty)):
-            result = await self.instance.check_index_needed(subdata)
-        assert result == {"index_needed": False}
-
-    async def test_check_index_needed_parallel_one_drive_changed(self):
-        delta_map = {"drive_abc": "xyz"}
-        subdata = SharePoint._encode_subdata(delta_map)
-        with mock.patch(
-            "httpx.AsyncClient",
-            return_value=_mock_client_ctx(_mock_response(200, {"value": [{"id": "changed_item"}]})),
-        ):
-            result = await self.instance.check_index_needed(subdata)
-        assert result == {"index_needed": True}
-
-    async def test_check_index_needed_expired_token_returns_index_needed(self):
-        delta_map = {"drive_abc": "xyz"}
-        subdata = SharePoint._encode_subdata(delta_map)
-        with mock.patch("httpx.AsyncClient", return_value=_mock_client_ctx(_mock_response(410))):
-            result = await self.instance.check_index_needed(subdata)
-        assert result == {"index_needed": True}
-
-    async def test_check_index_needed_parallel_drive_exception(self):
-        delta_map = {"drive_abc": "xyz"}
-        subdata = SharePoint._encode_subdata(delta_map)
-        self.instance._check_drive_delta = mock.AsyncMock(side_effect=ConnectionError("timeout"))
-        result = await self.instance.check_index_needed(subdata)
-        assert result == {"index_needed": True}
+        self.sharepoint._request_with_retry = mock.AsyncMock(return_value=response(200, {"value": [{"id": "changed"}]}))
+        self.assertTrue(await self.sharepoint._check_drive_delta(http_context(), graph_url("/drives/drive-a/root/delta?token=old")))

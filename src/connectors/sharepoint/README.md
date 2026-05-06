@@ -2,21 +2,18 @@ The following needs to be exported in local environment:
 
     CONSHAREPOINT_BIND_ADDR=<BIND_ADDRESS>
     CONSHAREPOINT_BIND_PORT=<CONNECTOR_PORT>
-    CONSHAREPOINT_GRAPH_BASE=<Graph API base URL>               # Should almost always be "https://graph.microsoft.com/v1.0"
+    CONSHAREPOINT_GRAPH_BASE=https://graph.microsoft.com/v1.0  # Required; omit trailing slash
     CONSHAREPOINT_SYSTEM_NAME=<Name to display in frontend for this SharePoint instance (e.g. 'SharePoint')>
     CONSHAREPOINT_TENANT_ID=<Azure AD tenant ID — found in Azure portal: Entra ID → Overview>
     CONSHAREPOINT_CLIENT_ID=<Client ID of DMIS application registered in Azure AD>
     CONSHAREPOINT_CLIENT_SECRET=<Client secret of DMIS application in Azure AD>
     CONSHAREPOINT_STATE_SIGNING_SECRET=<Secret string used for OAuth state signing>
 
-Optional:
-
-    CONSHAREPOINT_GRAPH_BASE=<Microsoft Graph API root URL; default https://graph.microsoft.com/v1.0 — omit trailing slash>
-
 # Azure AD App Registration
 
 Register an app in portal.azure.com (Entra ID → App registrations) with:
-- Delegated API permissions: `Sites.Read.All`, `Files.Read.All`, `offline_access`
+
+- Delegated API permissions: `Sites.Read.All`, `offline_access`
 - Redirect URI pointing to: `http(s)://<connector-host>/callback`
 
 `Sites.Read.All` requires admin consent in enterprise/education tenants.
@@ -32,14 +29,14 @@ Authentication is per-user OAuth 2.0 managed by the connector:
 
 # Endpoints
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/index_needed_bool` | GET | Returns whether any files have changed since the last sync |
-| `/stream_files_to_index` | GET | Streams NDJSON — subdata header followed by one file per line |
-| `/get_files` | POST | Fetches specific files by unique pointer |
-| `/auth_user` | GET | Redirects user to Microsoft OAuth login |
-| `/callback` | GET | Exchanges authorization code for access and refresh tokens |
-| `/refresh_token` | GET | Renews an access token using a refresh token |
+| Endpoint                 | Method | Description                                                   |
+| ------------------------ | ------ | ------------------------------------------------------------- |
+| `/index_needed_bool`     | GET    | Returns whether any files have changed since the last sync    |
+| `/stream_files_to_index` | GET    | Streams NDJSON — subdata header followed by one file per line |
+| `/get_files`             | POST   | Fetches specific files by unique pointer                      |
+| `/auth_user`             | GET    | Redirects user to Microsoft OAuth login                       |
+| `/callback`              | GET    | Exchanges authorization code for access and refresh tokens    |
+| `/refresh_token`         | GET    | Renews an access token using a refresh token                  |
 
 # Response structure
 

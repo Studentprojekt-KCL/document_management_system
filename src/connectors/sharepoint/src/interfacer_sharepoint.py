@@ -16,14 +16,9 @@ from shared_functions.file_type_logic import determine_file_type, get_file_resou
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.variables import SOURCE_FILE
 
-HTTP_OK = httpx.codes.OK
-HTTP_FORBIDDEN = httpx.codes.FORBIDDEN
-HTTP_TOO_MANY_REQUESTS = httpx.codes.TOO_MANY_REQUESTS
 REQUEST_TIMEOUT = 120
 MAX_CONCURRENT_REQUESTS = 20
 MAX_RETRIES = 3
-UNKNOWN_EXTENSION_SKIP_LOG_LIMIT = 10
-DEFAULT_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
 class _HttpCtx(NamedTuple):
@@ -44,33 +39,15 @@ class SharePoint:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.graph_base = read_env_variable("CONSHAREPOINT_GRAPH_BASE")
+        self.graph_base = read_env_variable("CONSHAREPOINT_GRAPH_BASE").strip().rstrip("/")
         self.source_system = read_env_variable("CONSHAREPOINT_SYSTEM_NAME")
         file_type_resource = get_file_resource()
         self.file_extensions = [t.get("extension") for t in file_type_resource]
         self.extension_descriptions = {t.get("extension"): t.get("description") for t in file_type_resource}
-        self._unknown_extension_skip_logs = 0
-        raw_graph = read_env_variable("CONSHAREPOINT_GRAPH_BASE", required=False)
-        if isinstance(raw_graph, str):
-            stripped = raw_graph.strip().rstrip("/")
-            self.graph_base = stripped if stripped else DEFAULT_GRAPH_BASE
-        else:
-            self.graph_base = DEFAULT_GRAPH_BASE
-
-    def _log_skipped_unknown_extension(self, name: str | None) -> None:
-        """Record why a file was skipped when its suffix is not in file_types.json (throttled)."""
-        if not hasattr(self, "_unknown_extension_skip_logs"):
-            self._unknown_extension_skip_logs = 0
-        label = repr(name) if isinstance(name, str) else "(unnamed or invalid filename)"
-        if self._unknown_extension_skip_logs < UNKNOWN_EXTENSION_SKIP_LOG_LIMIT:
-            dms_info(f"SharePoint: skipping file not in configured document types: {label}")
-            self._unknown_extension_skip_logs += 1
-            if self._unknown_extension_skip_logs == UNKNOWN_EXTENSION_SKIP_LOG_LIMIT:
-                dms_info("SharePoint: further skips for unsupported extensions are suppressed for this connector run.")
 
     @staticmethod
-    async def _get_with_retry(ctx: _HttpCtx, url: str, **kwargs: Any) -> httpx.Response:
-        """GET with semaphore-limited concurrency and 429 Retry-After handling.
+    async def _request_with_retry(ctx: _HttpCtx, url: str, method: str = "get", **kwargs: Any) -> httpx.Response:
+        """HTTP request with semaphore-limited concurrency and 429 Retry-After handling.
 
         The semaphore is released before sleeping so the slot is not held during backoff.
         Returns the final response after retries are exhausted; caller handles non-200.
@@ -80,7 +57,7 @@ class SharePoint:
         last_response: httpx.Response
         for attempt in range(MAX_RETRIES):
             async with ctx.sem:
-                last_response = await ctx.client.get(url, **kwargs)
+                last_response = await getattr(ctx.client, method)(url, **kwargs)
             if last_response.status_code != httpx.codes.TOO_MANY_REQUESTS:
                 return last_response
             raw = last_response.headers.get("Retry-After", "5")
@@ -90,23 +67,49 @@ class SharePoint:
         return last_response
 
     async def _get_sites(self, ctx: _HttpCtx) -> list[dict]:
-        """Retrieve all accessible SharePoint sites."""
+        """Retrieve all SharePoint sites accessible to the authenticated user via Microsoft Search.
+
+        Uses POST /search/query so only sites the user can actually access are returned,
+        avoiding the 403 noise that comes from enumerating all tenant sites with sites?search=*.
+        """
+        url = f"{self.graph_base}/search/query"
         sites: list[dict] = []
-        url: str | None = f"{self.graph_base}/sites?search=*"
-        while url:
-            response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
+        page_size = 500
+        from_index = 0
+
+        while True:
+            body = {
+                "requests": [
+                    {
+                        "entityTypes": ["site"],
+                        "query": {"queryString": "*"},
+                        "from": from_index,
+                        "size": page_size,
+                    }
+                ]
+            }
+            response = await self._request_with_retry(ctx, url, method="post", json=body, timeout=REQUEST_TIMEOUT)
             if response.status_code != httpx.codes.OK:
-                dms_warning(f"SharePoint: site listing failed with status {response.status_code}")
+                dms_warning(f"SharePoint: site search failed with status {response.status_code}")
                 break
-            data = response.json()
-            sites.extend(data.get("value", []))
-            url = data.get("@odata.nextLink")
+            containers = response.json().get("value", [{}])[0].get("hitsContainers", [])
+            if not containers:
+                break
+            container = containers[0]
+            for hit in container.get("hits", []):
+                resource = hit.get("resource", {})
+                if resource.get("id"):
+                    sites.append(resource)
+            if not container.get("moreResultsAvailable", False):
+                break
+            from_index += page_size
+
         return sites
 
     async def _get_drives(self, ctx: _HttpCtx, site_id: str) -> list[dict]:
         """Retrieve all document library drives for a site."""
         url = f"{self.graph_base}/sites/{site_id}/drives"
-        response = await self._get_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
+        response = await self._request_with_retry(ctx, url, timeout=REQUEST_TIMEOUT)
         if response.status_code == httpx.codes.FORBIDDEN:
             dms_info("SharePoint: drive listing denied (403) — site not accessible to this user")
             return []
@@ -121,7 +124,7 @@ class SharePoint:
         delta_link: str = ""
         current_url: str | None = url
         while current_url:
-            response = await self._get_with_retry(ctx, current_url, timeout=REQUEST_TIMEOUT)
+            response = await self._request_with_retry(ctx, current_url, timeout=REQUEST_TIMEOUT)
             if response.status_code != httpx.codes.OK:
                 dms_warning(f"SharePoint: delta query failed with status {response.status_code}")
                 break
@@ -162,6 +165,8 @@ class SharePoint:
             return None
         name: str | None = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
+        if extension.get("file_type") == "Unknown":
+            dms_info(f"SharePoint: indexing file with unrecognised extension: {repr(name)}")
         item_id = item.get("id", "")
         return {
             "metadata": {
@@ -178,9 +183,10 @@ class SharePoint:
 
     async def _fetch_record_content(self, ctx: _HttpCtx, record: dict) -> None:
         """Fetch file bytes and base64-encode them into record['content'] in-place."""
+        record["content"] = None
         content_url = f"{record['metadata']['unique_pointer']}/content"
-        response = await self._get_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
-        if response.status_code == HTTP_OK:
+        response = await self._request_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+        if response.status_code == httpx.codes.OK:
             record["content"] = base64.b64encode(response.content).decode("utf-8")
         else:
             dms_warning(f"SharePoint: could not fetch content for {record['metadata'].get('name')}")
@@ -191,21 +197,8 @@ class SharePoint:
         records: list[dict] = []
         for item in items:
             record = self._build_file_record(item, drive_id)
-            if record is None:
-                continue
-            pointer = record["metadata"]["unique_pointer"]
-            content_resp = await self._get_with_retry(
-                ctx,
-                f"{pointer}/content",
-                timeout=REQUEST_TIMEOUT,
-                follow_redirects=True,
-            )
-            if content_resp.status_code == httpx.codes.OK:
-                record["content"] = base64.b64encode(content_resp.content).decode("utf-8")
-            else:
-                dms_warning("SharePoint: could not fetch file content for stream indexing")
-                record["content"] = base64.b64encode(b"").decode("utf-8")
-            records.append(record)
+            if record is not None:
+                records.append(record)
         return drive_id, records, new_delta_link
 
     async def _collect_drive_tasks(self, ctx: _HttpCtx, delta_map: dict[str, str]) -> list[tuple[str, str]]:
@@ -213,9 +206,10 @@ class SharePoint:
 
         Site pagination is sequential; _get_drives calls for all sites run in parallel.
         """
-        sites = [site for site in await self._get_sites(ctx) if site.get("id")]
+        sites = await self._get_sites(ctx)
+        site_ids = [site_id for site in sites if isinstance(site_id := site.get("id"), str) and site_id]
         drives_results = await asyncio.gather(
-            *[self._get_drives(ctx, site["id"]) for site in sites],
+            *[self._get_drives(ctx, site_id) for site_id in site_ids],
             return_exceptions=True,
         )
         drive_tasks: list[tuple[str, str]] = []
@@ -277,9 +271,9 @@ class SharePoint:
     ) -> dict:
         """Fetch metadata (and optionally content) for a single file using the provided client.
 
-        Returns {} if metadata cannot be read or the suffix is not listed in shared ``file_types.json``.
+        Returns {} if metadata cannot be read.
         """
-        response = await self._get_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
+        response = await self._request_with_retry(ctx, unique_pointer, timeout=REQUEST_TIMEOUT)
         if response.status_code != httpx.codes.OK:
             dms_warning(f"SharePoint: file metadata request failed with status {response.status_code}")
             return {}
@@ -288,8 +282,7 @@ class SharePoint:
         name = item.get("name")
         extension = determine_file_type(name, self.file_extensions, self.extension_descriptions)
         if extension.get("file_type") == "Unknown":
-            self._log_skipped_unknown_extension(name)
-            return {}
+            dms_info(f"SharePoint: fetching file with unrecognised extension: {repr(name)}")
         result: dict[str, Any] = {
             "unique_pointer": unique_pointer,
             "name": name,
@@ -304,7 +297,7 @@ class SharePoint:
 
         if include_content:
             content_url = f"{unique_pointer}/content"
-            content_response = await self._get_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+            content_response = await self._request_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
             if content_response.status_code == httpx.codes.OK:
                 result["content"] = base64.b64encode(content_response.content).decode("utf-8")
             else:
@@ -330,7 +323,7 @@ class SharePoint:
 
     async def _check_drive_delta(self, ctx: _HttpCtx, delta_link: str) -> bool:
         """Return True if this drive has changes or its delta token is invalid/expired."""
-        response = await self._get_with_retry(ctx, delta_link, timeout=REQUEST_TIMEOUT)
+        response = await self._request_with_retry(ctx, delta_link, timeout=REQUEST_TIMEOUT)
         if response.status_code != httpx.codes.OK:
             return True
         return bool(response.json().get("value"))

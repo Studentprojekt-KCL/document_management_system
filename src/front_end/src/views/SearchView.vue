@@ -16,7 +16,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import { resolveDocumentExtension, resolveSecurityClass } from '@/composables/useSearchMetadata'
+import { resolveDocumentExtension, resolveSecurityClass, resolveSource } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
 /* Reactive state variables for search results and UI state */
@@ -139,7 +139,7 @@ const handleFilterChange = (filters) => {
   matches.value = allMatches.value.filter((match) => {
     const filetype = resolveDocumentExtension(match).toLowerCase()
     const securityClass = resolveSecurityClass(match).toLowerCase()
-    // const source = (match.source || '').toLowerCase()
+    const source = resolveSource(match).toLowerCase()
 
     // TYPE FILTER
     const typeMatch =
@@ -151,15 +151,13 @@ const handleFilterChange = (filters) => {
       })
 
     // SOURCE FILTER
-    //const sourceMatch = filters.source.length === 0 || filters.source.some((s) => source.includes(s.toLowerCase()))
+    const sourceMatch = filters.source.length === 0 || filters.source.some((selected) => source === selected.toLowerCase())
 
     // SECURITY FILTER
     const securityMatch =
       filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
 
-    // add sourceMatch later
-    // return typeMatch && sourceMatch && securityMatch
-    return typeMatch && securityMatch
+    return typeMatch && sourceMatch && securityMatch
   })
 }
 // searching a second time automatically to update the security levels

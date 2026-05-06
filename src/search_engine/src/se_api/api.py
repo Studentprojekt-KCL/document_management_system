@@ -60,6 +60,7 @@ class API:
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
+        self.app.add_api_route("/classifications", self.get_classifications, methods=["GET"])
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
         self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])
@@ -105,7 +106,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str, count: int | None = None) -> dict:
+    async def find_matching(self, pointer: str) -> list[dict]:
         """Look for matching files.
 
         Args:
@@ -114,7 +115,7 @@ class API:
         Returns: unique pointers and their score.
         """
 
-        return self.handler.find_matching(pointer, count)
+        return await self.handler.find_matching(pointer)
 
     async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None

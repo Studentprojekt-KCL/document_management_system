@@ -11,8 +11,8 @@ export const FRONTEND_DMISAPI_BASE_URL = window.__ENV__.FRONTEND_DMISAPI_BASE_UR
 export const API_PATHS = {
   search: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/search`,
   summarize: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/summarize`,
-  rerank: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/rerank`,
-  classifications: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/classifications`,
+  rerank: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/find_matching`,
+  classifications: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/classifications`,
   classification: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/classification`,
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,

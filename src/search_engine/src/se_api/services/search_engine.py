@@ -1,10 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 import json
 from os import listdir, mkdir, path, remove
-from threading import Lock
+from asyncio import Lock
 
 from tantivy import (
     Document,
@@ -91,6 +91,7 @@ class SearchEngine:
                 self.index = Index(schema, path=self.index_path)
             except ValueError:
                 dms_error(f"Failed loading index directory, path: {self.index_path}.")
+        self.index.config_reader(reload_policy="manual")
 
     def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
@@ -98,7 +99,7 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.init(fields)
 
-    def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
+    async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
 
         Args:
@@ -116,7 +117,7 @@ class SearchEngine:
             file.update({category: doc[category][0]})
         file.update({CLASSIFICATION: classification})
         file.update({MODIFIED: True})
-        with self.open_writer() as writer:
+        async with self.open_writer() as writer:
             self.add_file(file, writer)
         return (unique_pointer, classification)
 
@@ -160,7 +161,7 @@ class SearchEngine:
 
         return (pointers, classifications)
 
-    def find_matching(self, unique_pointer: str) -> dict:
+    async def find_matching(self, unique_pointer: str) -> dict:
         """Search for matching files.
 
         Args:
@@ -168,30 +169,38 @@ class SearchEngine:
         Returns: unique pointers and their score.
         """
         matching: dict = {}
-        searcher = self.index.searcher()
-        result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
-        if not result.hits:
-            return {}
-        doc_address = result.hits[0][1]
-        result = searcher.search(Query.more_like_this_query(doc_address))
-        original_score: int | None = None
-        for score, doc_id in result.hits:
-            if original_score is None:
-                original_score = score
-                continue
-            doc: Document = searcher.doc(doc_id)
-            unique_pointer = doc[UNIQUE_POINTER][0]
-            matching.update({unique_pointer: score / original_score})
+        async with self.open_searcher() as searcher:
+            result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
+            if not result.hits:
+                return {}
+            doc_address = result.hits[0][1]
+            result = searcher.search(Query.more_like_this_query(doc_address))
+            original_score: int | None = None
+            for score, doc_id in result.hits:
+                if original_score is None:
+                    original_score = score
+                    continue
+                doc: Document = searcher.doc(doc_id)
+                unique_pointer = doc[UNIQUE_POINTER][0]
+                matching.update({unique_pointer: score / original_score})
         return matching
 
-    @contextmanager
-    def open_writer(self) -> Generator[IndexWriter]:
+    @asynccontextmanager
+    async def open_writer(self) -> AsyncGenerator[IndexWriter]:
         """Init index writer."""
-        self.writer_lock.acquire()
+        await self.writer_lock.acquire()
         writer: IndexWriter = self.index.writer()
         yield writer
         writer.commit()
         writer.wait_merging_threads()
+        self.index.reload()
+        self.writer_lock.release()
+
+    @asynccontextmanager
+    async def open_searcher(self) -> AsyncGenerator[Searcher]:
+        await self.writer_lock.acquire()
+        self.index.reload()
+        yield self.index.searcher()
         self.writer_lock.release()
 
     def grab_file(self, unique_pointer: str) -> dict:
@@ -248,14 +257,14 @@ class SearchEngine:
         file.update({IS_DOCUMENT: extension in self.documents_only_extension})
         writer.add_json(json.dumps(file))
 
-    def remove_file(self, pointer: str) -> None:
+    async def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
 
         Args:
             pointer: unique pointer.
         """
 
-        with self.open_writer() as writer:
+        async with self.open_writer() as writer:
             writer.delete_documents(UNIQUE_POINTER, pointer)
             writer.commit()
             writer.wait_merging_threads()

@@ -143,6 +143,7 @@ class Connector:
                         continue
                     yield data
             self.subdata[stream_url] = subdata
+        dms_info(f"Finished streaming: {stream_url}")
 
     async def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.

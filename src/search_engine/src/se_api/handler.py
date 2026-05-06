@@ -1,18 +1,10 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-import asyncio
-import base64
-from threading import Thread
-import queue
-import io
 from copy import deepcopy
 
-from asyncio import Lock, Queue, create_task, get_event_loop
-from datetime import datetime
-import httpx
-from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
+from asyncio import Lock, get_event_loop
 
-from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, MAX_QUEUE_LENGTH, UNIQUE_POINTER
+from se_api.constants import CLASSIFICATION, UNIQUE_POINTER
 from se_api.index_pipeline import index_pipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
@@ -80,8 +72,7 @@ class Handler:
             count: number of results.
         Returns: the matching pointers and their scores.
         """
-        matches = self.search_engine.find_matching(pointer)
-
+        matches = await self.search_engine.find_matching(pointer)
         files = await self.connector.fetch_files(list(matches.keys()))
         for file in files:
             unique_pointer = file.get(UNIQUE_POINTER, "")
@@ -121,7 +112,7 @@ class Handler:
             return file
         return {}
 
-    def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
+    async def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
         """Remove missing files from cache and index.
 
         Args:
@@ -133,7 +124,7 @@ class Handler:
         for match in matches:
             if match in grabs:
                 continue
-            self.search_engine.remove_file(match)
+            await self.search_engine.remove_file(match)
 
     async def preform_search(self, content: dict, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
@@ -159,7 +150,7 @@ class Handler:
         matches, classifications = self.search_engine.query_files(content, offset + count)
         matches = matches[offset : count + offset]
         files: list[dict] = await self.connector.fetch_files(matches)
-        self.clean_misses(matches, files)
+        await self.clean_misses(matches, files)
         for file in files:
             classification = classifications.get(file.get(UNIQUE_POINTER, ""))
             file.update({CLASSIFICATION: classification})
@@ -170,200 +161,3 @@ class Handler:
         await self.indexing.acquire()
         await index_pipeline(self.search_engine, self.connector, self.classifier)
         self.indexing.release()
-
-    async def _fetch_files(self, fetch_queue: Queue, transfer_queue: Queue) -> None:
-        """Fetch files from stream.
-
-        Args:
-            fetch_queue: queue with urls to connectors.
-            transfer_queue: queue for transferring files to the searchengine.
-        """
-        while True:
-            stream_url: str | None = await fetch_queue.get()
-            if stream_url is None:
-                break
-            try:
-                async for file in self.connector.stream(stream_url):
-                    await transfer_queue.put(file)
-            except httpx.HTTPError:
-                dms_warning(f"Failed to connect to {stream_url}.")
-            fetch_queue.task_done()
-
-    async def _decode_content(self, decode_queue: Queue, index_queue: queue.Queue) -> None:
-        """Format and transfer file to search engine indexing queue.
-
-        index_queue: queue containing all the ready files to index.
-        transfer_queue: queue of raw dicts with file data.
-        """
-        loop = get_event_loop()
-        while True:
-            file: dict | None = await decode_queue.get()
-            if file is None:
-                break
-            file, raw_content = await loop.run_in_executor(None, self._decode_base64, file)
-            if file is None or raw_content is None:
-                continue
-            file[CONTENT] = await loop.run_in_executor(None, self._convert_content, raw_content)
-            file[CLASSIFICATION] = "Pending"
-            await loop.run_in_executor(None, index_queue.put, file)
-            decode_queue.task_done()
-
-    def _index_file(self, index_queue: queue.Queue, classify_queue: Queue) -> None:
-        """Wait for formatted file and index it.
-
-        Args:
-            task_queue: queue containing all the files to add.
-        """
-        batch: list[dict] = []
-
-        pending: list[str] = []
-        finnished: list[str] = []
-
-        start_wait = datetime.now()
-
-        while True:
-            data: dict | None = index_queue.get()
-
-            if data is not None:
-                unique_pointer: str = data.get(UNIQUE_POINTER, "")
-                if unique_pointer in pending:
-                    pending.remove(unique_pointer)
-                    finnished.append(unique_pointer)
-                    batch.append(data)
-                if unique_pointer not in finnished:
-                    batch.append(data)
-
-            if len(batch) >= self.BATCH_SIZE or data is None:
-                end_wait = datetime.now()
-                start = datetime.now()
-                unique_files = self._clear_duplicates(batch)
-                with self.search_engine.open_writer() as writer:
-                    for file in unique_files:
-                        self.search_engine.add_file(file, writer)
-                for file in unique_files:
-                    unique_pointer = file.get(UNIQUE_POINTER, "")
-                    if unique_pointer in finnished:
-                        continue
-                    pending.append(unique_pointer)
-                    asyncio.run(classify_queue.put(unique_pointer))
-                index_time = (datetime.now() - start).total_seconds()
-                wait_time = (end_wait - start_wait).total_seconds()
-                dms_info(
-                    f"Batch of {len(unique_files)} commited: "
-                    + f"pending: {len(pending)}, finnished: {len(finnished)}"
-                    + f" (wait time: {round(wait_time, 3)}s"
-                    + f", index time: {round(index_time, 3)}s)"
-                )
-                del unique_files
-                batch = []
-                start_wait = datetime.now()
-            index_queue.task_done()
-            if data is None:
-                break
-
-    async def _classify_content(self, classify_queue: Queue, index_queue: queue.Queue) -> None:
-        """Classify the file content.
-
-        Args:
-            classify_queue: Files to classify.
-            index_queue: Files ready to be indexed.
-        """
-        batch: list[dict] = []
-        loop = get_event_loop()
-        while True:
-            pointer: str | None = await classify_queue.get()
-            if pointer is None:
-                break
-            batch.append(self.search_engine.grab_file(pointer))
-            if len(batch) >= Classifier.BATCH_SIZE:
-                await self.classifier.classify(batch)
-                for file in batch:
-                    await loop.run_in_executor(None, index_queue.put, file)
-                batch = []
-            classify_queue.task_done()
-        if batch:
-            await self.classifier.classify(batch)
-            await loop.run_in_executor(None, index_queue.put, batch)
-            batch = []
-
-    def _decode_base64(self, file: dict) -> tuple[dict | None, bytes | None]:
-        """Decode file content.
-
-        Args:
-            file: dict containing the content in base64.
-        Returns: dict with decoded file content, or none on failure.
-        """
-        flat_file = self._flatten_dict(file)
-        content: str | None = flat_file.get("content")
-
-        if content is None:
-            dms_warning("File is missing content.")
-            return (None, None)
-        content_bytes: bytes = base64.b64decode(content)
-        return flat_file, content_bytes
-
-    @staticmethod
-    def _convert_content(content: bytes) -> str:
-        """Try to convert content into markdown.
-
-        Args:
-            content: file content as bytes.
-            file_type: the files type.
-        Returns: File content as markdown, str
-        """
-
-        if Handler._is_convertable(content):
-            try:
-                md = MarkItDown()
-                stream = io.BytesIO(content)
-                decoded_content = md.convert_stream(stream).text_content
-                return decoded_content
-            except (FileConversionException, UnsupportedFormatException):
-                decoded_content = None
-        try:
-            decoded_content = content.decode("utf-8")
-        except UnicodeDecodeError:
-            decoded_content = ""
-        return decoded_content
-
-    def _flatten_dict(self, d: dict) -> dict:
-        """Flatten the dict.
-
-        Args:
-            d: dict to flatten.
-        Return: a flat dict.
-        """
-
-        flat: dict = {}
-
-        for key, val in d.items():
-            if isinstance(val, dict):
-                flat.update(self._flatten_dict(val))
-            else:
-                flat.update({key: str(val)})
-        return flat
-
-    @staticmethod
-    def _clear_duplicates(files: list[dict]) -> list[dict]:
-        """Remove any duplicates from the list.
-
-        Args:
-            files: original file list.
-        Returns: list with the latest files.
-        """
-        latest_files: list[dict] = []
-        latest_pointers: list[str] = []
-        for file in files[::-1]:
-            pointer: str | None = file.get(UNIQUE_POINTER)
-            if pointer is None or pointer in latest_pointers:
-                continue
-            latest_pointers.append(pointer)
-            latest_files.append(file)
-        return latest_files
-
-    @staticmethod
-    def _is_convertable(content: bytes) -> bool:
-        for convertable in CONVERTABLE_TYPES:
-            if content[: int(len(convertable) / 2)].hex() == convertable:
-                return True
-        return False

@@ -1,32 +1,36 @@
-from asyncio import Queue, create_task, get_event_loop, get_running_loop
-import logging
+from asyncio import Queue, create_task, get_event_loop
 
 import asyncio
 import io
 import base64
-import math
-from threading import Thread
 import httpx
 from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException
 from shared_functions.dmis_logger import datetime, dms_info, dms_warning
 
-from se_api.constants import CLASSIFICATION, CONTENT, CONVERTABLE_TYPES, MAX_PENDING_CONTENT_SIZE, MAX_QUEUE_LENGTH, UNIQUE_POINTER
+from se_api.constants import CLASSIFICATION, CLASSIFICATION_QUEUE_SIZE, CONTENT, CONVERTABLE_TYPES, GENERIC_QUEUE_SIZE, MAX_PENDING_CONTENT_SIZE, POINTER_QUEUE_SIZE, UNIQUE_POINTER
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
-async def index_pipeline(search_engine: SearchEngine, connector: Connector, classifier: Classifier):
+async def index_pipeline(search_engine: SearchEngine, connector: Connector, classifier: Classifier) -> None:
+    """Run indexing pipeline.
+
+    Args:
+        search_engine: the search engine object.
+        connector: connector object.
+        classifier: classifier object.
+    """
     dms_info("Indexing started.")
     start = datetime.now()
 
     fetch_queue: Queue = await connector.connector_fetch()
-    decode_queue: Queue = Queue()
-    index_queue: Queue = Queue()
-    lookup_queue: Queue = Queue()
-    classify_queue: Queue = Queue(10)
-    reindex_queue: Queue = Queue()
+    decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+    index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+    lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
+    classify_queue: Queue = Queue(CLASSIFICATION_QUEUE_SIZE)
+    reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
 
-    fetch_tasks: list = [create_task(_ingest_fetch(fetch_queue, decode_queue, connector)) for _ in range(8)]
+    for _ in range(8): create_task(_ingest_fetch(fetch_queue, decode_queue, connector)) 
     decode_tasks: list = [create_task(_ingest_decode(decode_queue, index_queue)) for _ in range(8)]
     create_task(_ingest_index(index_queue, lookup_queue, search_engine))
 
@@ -36,8 +40,6 @@ async def index_pipeline(search_engine: SearchEngine, connector: Connector, clas
 
     # Wait for fetching job to finish.
     await fetch_queue.join()
-    for _ in fetch_tasks:
-        await fetch_queue.put(None)
     dms_info(f"Finished fetching from connector, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
 
     # Wait for decode job to finish.
@@ -78,7 +80,8 @@ async def _ingest_fetch(fetch_queue: Queue, decode_queue: Queue, connector: Conn
 
     Args:
         fetch_queue: queue with urls to connectors.
-        transfer_queue: queue for transferring files to the searchengine.
+        decode_queue: queue for decoding files.
+        connector: connector object.
     """
     while True:
         stream_url: str | None = await fetch_queue.get()
@@ -92,10 +95,11 @@ async def _ingest_fetch(fetch_queue: Queue, decode_queue: Queue, connector: Conn
         fetch_queue.task_done()
 
 async def _ingest_decode(decode_queue: Queue, index_queue: Queue) -> None:
-    """Format and transfer file to search engine indexing queue.
+    """Format and doecode files.
 
-    index_queue: queue containing all the ready files to index.
-    transfer_queue: queue of raw dicts with file data.
+    Args:
+        decode_queue: queue of raw dicts with file data.
+        index_queue: queue containing all the ready files to index.
     """
     while True:
         file: dict | None = await decode_queue.get()
@@ -109,7 +113,14 @@ async def _ingest_decode(decode_queue: Queue, index_queue: Queue) -> None:
         await index_queue.put(file)
         decode_queue.task_done()
 
-async def _ingest_index(index_queue: Queue, classify_queue: Queue, search_engine: SearchEngine):
+async def _ingest_index(index_queue: Queue, classify_queue: Queue, search_engine: SearchEngine) -> None:
+    """Index file batches of files.
+
+    Args:
+        index_queue: index queue.
+        classify_queue: classification queue.
+        search_engine: SearchEngine object.
+    """
     content_total_size: int = 0
     batch: list[dict] = []
     while True:
@@ -130,49 +141,31 @@ async def _ingest_index(index_queue: Queue, classify_queue: Queue, search_engine
         if file is None:
             break
 
-# Classification stage
+async def _classifier_load_index(fetch_queue: Queue, classify_queue: Queue, search_engine: SearchEngine) -> None:
+    """Fetch files from search engine.
 
-async def _classification_stage(search_engine: SearchEngine, classifer: Classifier, fetch_queue: Queue):
-    dms_info("Classification stage started.")
-    start = datetime.now()
-
-    classify_queue: Queue = Queue(maxsize=MAX_QUEUE_LENGTH)
-    index_queue: Queue = Queue()
-
-    create_task(_classifier_load_index(fetch_queue, classify_queue, search_engine))
-    classify_tasks: list = [create_task(_classifier_execute(classify_queue, index_queue, classifer)) for _ in range(8)]
-    create_task(_classifier_refresh_index(index_queue, search_engine))
-
-    # Wait for fetching job to finish.
-    await fetch_queue.join()
-    await fetch_queue.put(None)
-    await fetch_queue.join()
-    dms_info(f"Finished fetching, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-    # Wait for classification job to finish.
-    await classify_queue.join()
-    for _ in classify_tasks:
-        await classify_queue.put(None)
-    await classify_queue.join()
-    dms_info(f"Finished classifying, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-    # Wait for reindex job to finish.
-    await index_queue.join()
-    await index_queue.put(None)
-    await index_queue.join()
-    dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-    dms_info(f"Ingestion stage completed.")
-
-async def _classifier_load_index(fetch_queue: Queue, classify_queue: Queue, search_engine: SearchEngine):
+    Args: 
+        fetch_queue: files to be fetched.
+        classify_queue: files to be classified.
+        search_engine: SearchEngine object.
+    """
     while True:
         pointer: str | None = await fetch_queue.get()
         if pointer is None:
             break
-        file: dict = await _grab_file_from_index(search_engine, pointer)
+        async with search_engine.open_searcher():
+            file: dict = await _grab_file_from_index(search_engine, pointer)
         await classify_queue.put(file)
         fetch_queue.task_done()
 
-async def _classifier_execute(classify_queue: Queue, index_queue: Queue, classifier: Classifier):
+async def _classifier_execute(classify_queue: Queue, index_queue: Queue, classifier: Classifier) -> None:
+    """Classify batch of files.
+
+    Args:
+        classify_queue: files to classify.
+        index_queue: files to be indexed.
+        classifier: Classifier object.
+    """
     batch: list = []
     while True:
         file: dict | None = await classify_queue.get()
@@ -187,7 +180,13 @@ async def _classifier_execute(classify_queue: Queue, index_queue: Queue, classif
         if file is None:
             break
 
-async def _classifier_refresh_index(index_queue: Queue, search_engine: SearchEngine):
+async def _classifier_refresh_index(index_queue: Queue, search_engine: SearchEngine) -> None:
+    """Reindex batch of files with classification.
+
+    Args:
+        index_queue: files to be indexed.
+        search_engine: SearchEngine object.
+    """
     content_total_size: int = 0
     batch: list[dict] = []
     while True:
@@ -205,22 +204,32 @@ async def _classifier_refresh_index(index_queue: Queue, search_engine: SearchEng
         if file is None:
             break
 
-# Util
-
 async def _grab_file_from_index(search_engine: SearchEngine, pointer: str) -> dict:
+    """Grab a file from the index.
+
+    Args:
+        search_engine: SearchEngine object
+        pointer: file pointer.
+    Returns: file dict.
+    """
     def task() -> dict:
         return search_engine.grab_file(pointer)
     loop = get_event_loop()
     return await loop.run_in_executor(None, task)
 
-async def _index_batch(search_engine: SearchEngine, files: list[dict]):
-    def task(): 
-        with search_engine.open_writer() as writer:
+async def _index_batch(search_engine: SearchEngine, files: list[dict]) -> None:
+    """Index a batch of files.
+
+    Args:
+        search_engine: SearchEngine object.
+        files: files to index.
+    """
+    async def task(): 
+        async with search_engine.open_writer() as writer:
             for file in files:
                 search_engine.add_file(file, writer)
 
-    loop = get_event_loop()
-    await loop.run_in_executor(None, task)
+    await asyncio.create_task(task())
 
 async def _decode_base64(file: dict) -> tuple[dict | None, bytes | None]:
     """Decode file content.
@@ -287,6 +296,12 @@ def _flatten_dict(d: dict) -> dict:
     return flat
 
 def _is_convertable(content: bytes) -> bool:
+    """Check if file is convertable.
+
+    Args:
+        content: file content in bytes.
+    Returns: True if convertable, else False.
+    """
     for convertable in CONVERTABLE_TYPES:
         if content[: int(len(convertable) / 2)].hex() == convertable:
             return True

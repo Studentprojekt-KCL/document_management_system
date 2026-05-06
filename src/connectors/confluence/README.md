@@ -1,13 +1,18 @@
-The following should be exported in local environment:
+The following should be exported in local environment (aligned with `dmis_environment_variable_naming`):
 
-    CONFLUENCE_CONNECTOR_PORT=<CONNECTOR_PORT>
-    CONFLUENCE_ADDRESS=<CONFLUENCE_BASE_URL>          # e.g. https://tenant.atlassian.net
-    CONFLUENCE_MAX_CONCURRENCY=<MAX_PARALLEL_CALLS>   # optional, default 20
+    CONFLUENCE_BIND_ADDR=<BIND_ADDRESS>               # e.g. 0.0.0.0 (default if unset)
+    CONFLUENCE_BIND_PORT=<CONNECTOR_PORT>
+    CONFLUENCE_SITE_URL=<CONFLUENCE_BASE_URL>       # e.g. https://tenant.atlassian.net
+
+    CONFLUENCE_MAX_CONCURRENCY=<MAX_PARALLEL_CALLS> # optional, default 20
 
 Optional fallback credentials (mainly for local scripts):
 
-    CONFLUENCE_EMAIL=<ATLASSIAN_EMAIL>
-    CONFLUENCE_API_TOKEN=<ATLASSIAN_API_TOKEN>
+    CONFLUENCE_DEFAULT_EMAIL=<ATLASSIAN_EMAIL>
+    CONFLUENCE_DEFAULT_API_TOKEN=<ATLASSIAN_API_TOKEN>
+
+**Legacy names** (still honoured if the new names above are not set): ``CONFLUENCE_CONNECTOR_PORT``,
+``CONFLUENCE_ADDRESS``, ``CONFLUENCE_EMAIL``, ``CONFLUENCE_API_TOKEN``.
 
 ## Authentication
 

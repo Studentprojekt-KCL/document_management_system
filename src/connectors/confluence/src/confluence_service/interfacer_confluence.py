@@ -1,11 +1,13 @@
 """Confluence Cloud REST client: spaces, page listing, full page fetch, incremental index.
 
 HTTP is done with ``httpx.AsyncClient`` (async). Calls use Basic auth (email + API token).
-Pass credentials as method arguments, or set ``CONFLUENCE_EMAIL`` and
-``CONFLUENCE_API_TOKEN`` for scripts. The HTTP service in ``collector_api`` reads
+Pass credentials as method arguments, or set ``CONFLUENCE_DEFAULT_EMAIL`` /
+``CONFLUENCE_DEFAULT_API_TOKEN`` for scripts (legacy: ``CONFLUENCE_EMAIL`` /
+``CONFLUENCE_API_TOKEN``). The HTTP service in ``collector_api`` reads
 ``X-Confluence-Email`` and ``X-Confluence-Token``.
 
-Set ``CONFLUENCE_ADDRESS`` to the site root (e.g. ``https://tenant.atlassian.net``).
+Set ``CONFLUENCE_SITE_URL`` to the site root (e.g. ``https://tenant.atlassian.net``).
+Legacy name ``CONFLUENCE_ADDRESS`` is still read if ``CONFLUENCE_SITE_URL`` is unset.
 """
 
 import base64
@@ -22,6 +24,24 @@ from typing import Any
 from urllib.parse import urljoin
 
 import httpx
+
+
+def _confluence_site_url_from_env() -> str:
+    site = (os.environ.get("CONFLUENCE_SITE_URL") or os.environ.get("CONFLUENCE_ADDRESS") or "").strip()
+    return site.rstrip("/")
+
+
+def _default_contact_email_from_env() -> str:
+    return (os.environ.get("CONFLUENCE_DEFAULT_EMAIL") or os.environ.get("CONFLUENCE_EMAIL") or "").strip()
+
+
+def _default_api_token_raw_from_env() -> str | None:
+    for key in ("CONFLUENCE_DEFAULT_API_TOKEN", "CONFLUENCE_API_TOKEN"):
+        raw = os.environ.get(key)
+        if raw is not None and str(raw).strip():
+            return str(raw).strip()
+    return None
+
 
 PROJECT = "project"
 SOURCE_FILE = "source_file"
@@ -43,7 +63,7 @@ class ConfluenceInterfacer:
 
     def __init__(self) -> None:
         self.session = httpx.AsyncClient(timeout=120.0)
-        self.address = os.environ.get("CONFLUENCE_ADDRESS", "").rstrip("/")
+        self.address = _confluence_site_url_from_env()
         self.base = self._api_base(self.address)
         self.max_concurrency = int(os.environ.get("CONFLUENCE_MAX_CONCURRENCY", "20"))
 
@@ -57,8 +77,8 @@ class ConfluenceInterfacer:
 
     def _resolve_auth(self, email: str | None, api_token: str | None) -> tuple[str, str] | None:
         """Resolve (email, token) from arguments or environment."""
-        e = (email or os.environ.get("CONFLUENCE_EMAIL") or "").strip()
-        raw = api_token or os.environ.get("CONFLUENCE_API_TOKEN")
+        e = (email or _default_contact_email_from_env()).strip()
+        raw = api_token or _default_api_token_raw_from_env()
         t = (raw or "").removeprefix("Bearer ").strip() if raw else ""
         if e and t:
             return e, t

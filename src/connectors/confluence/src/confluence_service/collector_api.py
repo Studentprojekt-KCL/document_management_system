@@ -7,8 +7,9 @@ Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
 
 Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
 ``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata (same path name as
-OAuth connectors; GitLab redirects, Confluence does not). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
-optional MinIO env vars for uploads.
+OAuth connectors; GitLab redirects, Confluence does not). Requires ``CONFLUENCE_BIND_PORT`` (or legacy
+``CONFLUENCE_CONNECTOR_PORT``) and ``CONFLUENCE_SITE_URL`` (or legacy ``CONFLUENCE_ADDRESS``); bind address
+via ``CONFLUENCE_BIND_ADDR`` (default ``0.0.0.0``); optional MinIO env vars for uploads.
 """
 
 import argparse
@@ -26,11 +27,11 @@ from pydantic import BaseModel, Field
 
 from shared_functions.boto_tools import upload_file
 from shared_functions.dmis_logger import dms_warning
-from shared_functions.initialisation_tools import read_port
+from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
-# When compose interpolates unset ${CONFLUENCE_CONNECTOR_PORT} to "", it overrides Dockerfile ENV;
+# When compose interpolates unset bind port to "", it overrides Dockerfile ENV;
 # treat blank like unset so preview stacks still boot (override per env in real deployments).
 _CONF_PORT_FALLBACK = 8010
 
@@ -221,7 +222,13 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    if not (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip():
-        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
-    port = read_port("CONFLUENCE_CONNECTOR_PORT")
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)
+    new_port = (os.environ.get("CONFLUENCE_BIND_PORT") or "").strip()
+    legacy_port = (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip()
+    if not new_port and legacy_port:
+        os.environ["CONFLUENCE_BIND_PORT"] = legacy_port
+    if not (os.environ.get("CONFLUENCE_BIND_PORT") or "").strip():
+        os.environ["CONFLUENCE_BIND_PORT"] = str(_CONF_PORT_FALLBACK)
+    port = read_port("CONFLUENCE_BIND_PORT")
+    bind_raw = read_env_variable("CONFLUENCE_BIND_ADDR", required=False)
+    host_bind = bind_raw.strip() if bind_raw else "0.0.0.0"
+    uvicorn.run(api.app, host=host_bind, log_level=api.log_level, port=port)

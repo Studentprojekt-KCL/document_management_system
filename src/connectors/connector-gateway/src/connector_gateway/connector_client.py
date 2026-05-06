@@ -2,10 +2,14 @@
 
 import asyncio
 import json
+from http import HTTPStatus
+
 import httpx
 
 from fastapi.responses import JSONResponse, RedirectResponse
 from shared_functions.dmis_logger import dms_error, dms_warning
+
+_REDIRECT_STATUS_CODES = frozenset((301, 302, 303, 307, 308))
 
 
 class ConnectorClient:
@@ -145,6 +149,33 @@ class ConnectorClient:
         """takes referer header in original request and sets the auth_callback endpoint"""
         return f"{self._slice_url_to_host_and_proto(referer)}/auth_callback"
 
+    @staticmethod
+    def _auth_user_redirect_if_present(auth_url: str, response: httpx.Response) -> RedirectResponse | None:
+        if response.status_code not in _REDIRECT_STATUS_CODES:
+            return None
+        location = response.headers.get("location")
+        if not location:
+            dms_warning(f"Downstream /auth_user returned {response.status_code} without Location for {auth_url}")
+            return None
+        return RedirectResponse(url=location, status_code=response.status_code)
+
+    def _auth_user_json_if_present(self, auth_url: str, response: httpx.Response) -> JSONResponse | None:
+        if response.status_code != HTTPStatus.OK:
+            return None
+        content_type = response.headers.get("content-type", "")
+        base_ct = content_type.split(";", 1)[0].strip().lower()
+        if base_ct != "application/json":
+            return None
+        try:
+            payload = response.json()
+        except json.JSONDecodeError:
+            dms_warning(f"Downstream /auth_user returned non-JSON body despite content-type " f"declared JSON for {auth_url}")
+            return None
+        if isinstance(payload, dict):
+            return JSONResponse(content=payload, status_code=HTTPStatus.OK)
+        dms_warning(f"Downstream /auth_user JSON was not an object for {auth_url}")
+        return None
+
     async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | JSONResponse | None:
         """Proxies downstream ``GET /auth_user``.
 
@@ -154,7 +185,7 @@ class ConnectorClient:
         auth_url = ""
         for system in self.source_systems:
             if system["name"].lower() == source_system.lower():
-                auth_url = f"{system["connector_url"]}/auth_user"
+                auth_url = f'{system["connector_url"]}/auth_user'
                 break
         if not auth_url:
             return None
@@ -168,26 +199,15 @@ class ConnectorClient:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
             return None
 
-        if response.status_code in (301, 302, 303, 307, 308):
-            location = response.headers.get("location")
-            if not location:
-                dms_warning(f"Downstream /auth_user returned {response.status_code} without Location for {auth_url}")
-                return None
-            return RedirectResponse(url=location, status_code=response.status_code)
+        redirect = self._auth_user_redirect_if_present(auth_url, response)
+        if redirect is not None:
+            return redirect
+        parsed = self._auth_user_json_if_present(auth_url, response)
+        if parsed is not None:
+            return parsed
 
-        content_type = response.headers.get("content-type", "")
-        base_ct = content_type.split(";", 1)[0].strip().lower()
-
-        if response.status_code == 200 and base_ct == "application/json":
-            try:
-                payload = response.json()
-            except json.JSONDecodeError:
-                dms_warning(f"Downstream /auth_user returned non-JSON body despite content-type / body shape for {auth_url}")
-                return None
-            if isinstance(payload, dict):
-                return JSONResponse(content=payload, status_code=200)
-            dms_warning(f"Downstream /auth_user JSON was not an object for {auth_url}")
-            return None
-
-        dms_warning(f"Unexpected /auth_user response from {auth_url} (status {response.status_code}, content-type {content_type!r})")
+        content_type_hdr = response.headers.get("content-type", "")
+        dms_warning(
+            f"Unexpected /auth_user response from {auth_url} " f"(status {response.status_code}, content-type {content_type_hdr!r})"
+        )
         return None

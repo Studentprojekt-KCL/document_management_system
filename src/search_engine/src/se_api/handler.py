@@ -26,11 +26,6 @@ class Handler:
     search_engine: SearchEngine
     index_pipeline: IndexPipeline | None
 
-    FETCH_WORKERS: int = 8
-    DECODE_WORKERS: int = 8
-    CLASSIFY_WORKERS: int = 8
-    BATCH_SIZE: int = 500
-
     indexing: Lock
 
     def __init__(self) -> None:

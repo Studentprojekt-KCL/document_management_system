@@ -36,6 +36,9 @@ class Summarizer:
 
     async def summarize(self, items: list[InputItem]) -> SummaryResult | None:
         """Summarize one or more documents."""
+        if not items:
+            dms_warning("summarize received no items.")
+            return SummaryResult(summary="")
         if len(items) == 1:
             prompt = SUMMARIZE_PROMPT.format(content=items[0].content)
             result = await self._call_llm(prompt)
@@ -85,4 +88,4 @@ class Summarizer:
         if not isinstance(data, dict):
             dms_warning(f"Unexpected LLM response shape: {type(data).__name__}")
             return None
-        return data.get("response", "").strip() or None
+        return (data.get("response") or "").strip() or None

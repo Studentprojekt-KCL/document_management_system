@@ -38,31 +38,32 @@ def create_router(
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
-            raise HTTPException(status_code=400)
+            return SummaryResult(summary="")
 
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            raise HTTPException(status_code=502)
+            return SummaryResult(summary="")
         result = await summarizer.summarize(items)
         if result is None:
             dms_warning("summarization failed")
-            raise HTTPException(status_code=500)
+            return SummaryResult(summary="")
         return result
 
     @router.post("/merge", response_model=SummaryResult)
     async def merge(payload: PointerRequest) -> SummaryResult:
+        """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
-            raise HTTPException(status_code=400)
+            return SummaryResult(summary="")
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            raise HTTPException(status_code=502)
+            return SummaryResult(summary="")
         result = await summarizer.merge(items)
         if result is None:
             dms_warning("merge failed")
-            raise HTTPException(status_code=500)
+            return SummaryResult(summary="")
         return result
 
     return router

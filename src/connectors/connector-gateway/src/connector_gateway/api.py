@@ -35,6 +35,7 @@ class API:
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"], response_model=None)
+        self.app.add_api_route("/callback_token", self.callback_token, methods=["POST"])
 
     async def get_files(
         self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
@@ -75,6 +76,8 @@ class API:
             return
         return await self.down_stream_client.get_auth_redirect(source_system, referer)
 
+    async def callback_token(self, body: dict, headers = Header(None), service_namebbbb: str):
+        awiat return self.refrsh_client.send_request("add_session/", service_name: str, headers: str Header()   )
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

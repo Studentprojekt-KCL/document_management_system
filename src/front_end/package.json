@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run --reporter=dot",
+    "test:watch": "vitest --watch"
   },
   "dependencies": {
     "lucide-vue-next": "^0.574.0",
@@ -23,6 +25,9 @@
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-vue": "^9.33.0",
     "prettier": "^3.6.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "@vue/test-utils": "^2.4.10",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.5"
   }
 }

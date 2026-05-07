@@ -5,7 +5,7 @@ from copy import deepcopy
 from asyncio import Lock, get_event_loop
 
 from se_api.constants import CLASSIFICATION, UNIQUE_POINTER
-from se_api.index_pipeline import IndexPipeline
+from se_api.services.index_pipeline import IndexPipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine

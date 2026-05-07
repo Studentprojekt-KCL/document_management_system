@@ -208,9 +208,11 @@ class IndexPipeline:
             classify_queue: files to be classified.
             search_engine: SearchEngine object.
         """
+        done: list = []
         async for old_file in self.search_engine.fetch_pending():
             try:
                 await classify_queue.put(old_file)
+                done.append(old_file.get(UNIQUE_POINTER))
             except QueueShutDown:
                 break
 
@@ -219,6 +221,8 @@ class IndexPipeline:
                 pointer: str | None = await fetch_queue.get()
                 if pointer is None:
                     break
+                if pointer in done:
+                    continue
                 file: dict = await self._grab_files_from_index(self.search_engine, pointer)
                 await classify_queue.put(file)
                 fetch_queue.task_done()

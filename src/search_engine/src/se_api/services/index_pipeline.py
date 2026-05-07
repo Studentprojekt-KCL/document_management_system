@@ -84,7 +84,9 @@ class IndexPipeline:
         create_task(self._ingest_index(index_queue, lookup_queue))
 
         create_task(self._classifier_load_index(lookup_queue, classify_queue))
-        classify_tasks: list = [create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        classify_tasks: list = [
+            create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)
+        ]
         create_task(self._classifier_refresh_index(reindex_queue))
 
         # Wait for fetching job to finish.

@@ -54,6 +54,9 @@ const {
 /* AI */
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary(props)
 
+/* Rerank */
+const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
+
 /* State */
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
@@ -116,7 +119,7 @@ const handleClassificationSave = async (level) => {
 
     emit('update-security', {
       uniquePointer: uniquePointer.value,
-      level
+      security_class: level
     })
 
     localSecurityLevel.value = level
@@ -137,9 +140,6 @@ watch(
     notification.value.visible = false
   }
 )
-
-/* AI rerank composable */
-const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 </script>
 
 <template>

@@ -5,7 +5,7 @@ from copy import deepcopy
 from asyncio import Lock, get_event_loop
 
 from se_api.constants import CLASSIFICATION, UNIQUE_POINTER
-from se_api.index_pipeline import index_pipeline
+from se_api.index_pipeline import IndexPipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
@@ -24,11 +24,13 @@ class Handler:
     connector: Connector
     classifier: Classifier
     search_engine: SearchEngine
+    index_pipeline: IndexPipeline | None
 
     FETCH_WORKERS: int = 8
     DECODE_WORKERS: int = 8
     CLASSIFY_WORKERS: int = 8
     BATCH_SIZE: int = 500
+
     indexing: Lock
 
     def __init__(self) -> None:
@@ -36,6 +38,7 @@ class Handler:
         self.connector = Connector()
         self.search_engine = SearchEngine()
         self.classifier = Classifier()
+        self.index_pipeline = None
         self.indexing = Lock()
 
     async def init(self) -> None:
@@ -46,13 +49,26 @@ class Handler:
 
     async def close(self) -> None:
         """Clean up"""
+        if self.index_pipeline is not None:
+            self.index_pipeline.stop()
         await self.connector.close()
+        await self.classifier.close()
+        await self.search_engine.close()
 
     async def reset(self) -> None:
         """Reset the connector."""
+        await self.close()
+        del self.search_engine
+        del self.connector
+        del self.classifier
+        self.search_engine = SearchEngine()
+        self.connector = Connector()
+        self.classifier = Classifier()
         fields: list[str] | None = await self.connector.get_fields()
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
+        if self.indexing.locked():
+            self.indexing.release()
         dms_info("Search engine was reset.")
 
     def get_classifications(self) -> list[str]:
@@ -159,5 +175,6 @@ class Handler:
     async def _handle_new(self) -> None:
         """Grab connector stream output and pipe it into search engine."""
         await self.indexing.acquire()
-        await index_pipeline(self.search_engine, self.connector, self.classifier)
+        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
+        await self.index_pipeline.run()
         self.indexing.release()

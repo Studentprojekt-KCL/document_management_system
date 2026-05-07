@@ -13,7 +13,7 @@ import httpx
 
 from se_api.constants import TIMEOUT
 
-from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
+from shared_functions.dmis_logger import dms_error, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 
@@ -58,6 +58,7 @@ class Connector:
     async def close(self) -> None:
         """Close clients"""
         await self.client.aclose()
+        self.write_subdata()
 
     def write_subdata(self, subdata: dict | None = None) -> None:
         """Set the subdata.
@@ -143,7 +144,6 @@ class Connector:
                         continue
                     yield data
             self.subdata[stream_url] = subdata
-        dms_info(f"Finished streaming: {stream_url}")
 
     async def fetch_files(self, pointers: list[str]) -> list[dict]:
         """Grab all files from the connectors pointed at by the pointers.

@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run --reporter=dot",
+    "test:watch": "vitest --watch"
   },
   "dependencies": {
     "lucide-vue-next": "^0.574.0",

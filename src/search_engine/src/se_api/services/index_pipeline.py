@@ -14,6 +14,7 @@ from se_api.constants import (
     CONTENT,
     CONVERTABLE_TYPES,
     GENERIC_QUEUE_SIZE,
+    GENERIC_WORKER_COUNT,
     MAX_PENDING_CONTENT_SIZE,
     POINTER_QUEUE_SIZE,
     UNIQUE_POINTER,
@@ -78,12 +79,12 @@ class IndexPipeline:
 
         self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
 
-        fetch_tasks: list = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(8)]
-        decode_tasks: list = [create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(8)]
+        fetch_tasks: list = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        decode_tasks: list = [create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)]
         create_task(self._ingest_index(index_queue, lookup_queue))
 
         create_task(self._classifier_load_index(lookup_queue, classify_queue))
-        classify_tasks: list = [create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(8)]
+        classify_tasks: list = [create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)]
         create_task(self._classifier_refresh_index(reindex_queue))
 
         # Wait for fetching job to finish.

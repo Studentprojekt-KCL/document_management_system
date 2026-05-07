@@ -7,15 +7,13 @@ import json
 import io
 from pathlib import Path
 import zipfile
-from typing import Any
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 import binascii
 import asyncio
 import copy
 
-import requests
-import httpx
+import aiohttp
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
@@ -31,7 +29,7 @@ class GitLab:
     GIT_BLAME: str = "blame?ref=HEAD"
     GIT_HEAD: str = "?ref=HEAD"
     NUM_WORKERS: int = 10
-    session: requests.Session
+    _session: aiohttp.ClientSession | None
     source_system: str
     project_information: dict | None = None
     blame_cache: dict = {}
@@ -41,7 +39,7 @@ class GitLab:
 
     def __init__(self, address: str) -> None:
         """Constructor."""
-        self.session = requests.session()
+        self._session = None
         self.source_system = read_env_variable("CONGITLAB_SYSTEM_NAME")
         self.base = urljoin(f"{address.rstrip("/")}/", self.API_URL)
         file_type_resource = get_file_resource()
@@ -52,16 +50,27 @@ class GitLab:
             key: None for key in determine_file_type("", self.file_extensions, self.extension_descriptions)
         }
 
+    async def get_session(self) -> aiohttp.ClientSession:
+        """Set up AIO http clinet if not initialized."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close_session(self) -> None:
+        """Tear down session."""
+        if self._session is not None:
+            self._session.close()
+
     @staticmethod
     def _construct_request_headers(bearer_token: str | None = None) -> dict:
         if isinstance(bearer_token, str):
             return {"Authorization": f"Bearer {bearer_token}"}
         return {}
 
-    def _get_projects(self, bearer_token: str | None = None) -> dict | list:
+    async def _get_projects(self, bearer_token: str | None = None) -> dict:
         """Retrieve all available projects."""
         url = urljoin(self.base, "projects")
-        projects = self._execute_get_request(url, self._construct_request_headers(bearer_token))
+        projects = await self.execute_get_request(url, self._construct_request_headers(bearer_token))
         self.project_information = {
             str(project.get("id")): {
                 "web_url": project.get("web_url"),
@@ -69,24 +78,12 @@ class GitLab:
             }
             for project in projects
         }
+        # NOTE could probably be done better, just need to get it running.
+        projects_dict = {str(project.get("id")): project for project in projects}
 
-        return projects
-
-    def get_project_ids(self, bearer_token: str | None = None) -> dict[int, str]:
-        """Retrieve a dictionary of IDs for all available projects.
-
-        Returns:
-        -------
-            Dictionary structured {'id': <HASH_OF_LAST_ACTIVITY_TIMESTAMP>}
-        """
-        ids: dict[int, str] = {}
-        for project in self._get_projects(bearer_token):
-            last_activity = project.get("last_activity_at")
-            if not last_activity:
-                continue  # Entails there was no activity for this project
-            ids[project.get("id")] = last_activity
-
-        return ids
+        if isinstance(projects_dict, dict):
+            return projects_dict
+        return {}
 
     @staticmethod
     def _get_project_id(url: str) -> None | str:
@@ -97,7 +94,7 @@ class GitLab:
             return None
         return match.group(2)
 
-    def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
+    async def _get_clickable_url(self, url: str, file_path: str, bearer_token: str | None = None) -> str:
         """Retrieve a clickable URL directing to the Gitlab frontend view.
 
         Note:
@@ -111,9 +108,13 @@ class GitLab:
         """
         project_id = self._get_project_id(url)
         if self.project_information is None or project_id not in self.project_information:
-            self._get_projects(bearer_token)
+            await self._get_projects(bearer_token)
 
-        project_information = self.project_information.get(project_id)  # type: ignore
+        if not isinstance(self.project_information, dict):
+            dms_info(f"Was not able to generate clickable link for {url}")
+            return ""
+        project_information = self.project_information.get(project_id)
+
         if not isinstance(project_information, dict):
             dms_info(f"Was not able to generate clickable link for {url}")
             return ""
@@ -121,7 +122,7 @@ class GitLab:
         default_branch = project_information.get("default_branch")
         return f"{web_url}/-/blob/{default_branch}/{file_path}"
 
-    def get_file(
+    async def get_file(
         self, url: str, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = True
     ) -> dict:
         """Retrieve information about file.
@@ -136,9 +137,11 @@ class GitLab:
         """
         file: dict | list = {}
         if include_content:
-            file = self._execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
+            file = await self.execute_get_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
         else:
-            content: dict = self._execute_head_request(urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token))
+            content: dict = await self.execute_head_request(
+                urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token)
+            )
             lower_content = {key.lower(): value for key, value in content.items()}
             file_name_str = lower_content.get("x-gitlab-file-name")
             file_path_str = lower_content.get("x-gitlab-file-path")
@@ -168,20 +171,20 @@ class GitLab:
         if include_last_edit_date:
             url = urljoin(url.rstrip("/") + "/", self.GIT_BLAME)
             if url not in self.blame_cache:
-                self.blame_cache[url] = self._execute_get_request(url, self._construct_request_headers(bearer_token))
+                self.blame_cache[url] = await self.execute_get_request(url, self._construct_request_headers(bearer_token))
             blame = self.blame_cache.get(url)
             if isinstance(blame, list):
                 base_structure |= {"last_edit_date": unpack_values(blame, (0, "commit", "committed_date"))}
 
         file_path = file.get("file_path")
         if isinstance(file_path, str):
-            base_structure |= {"clickable_url": self._get_clickable_url(url, file_path)}
+            base_structure |= {"clickable_url": await self._get_clickable_url(url, file_path)}
 
         if include_content:
             base_structure |= {"content": file.get("content")}
         return base_structure
 
-    def get_files(
+    async def get_files(
         self, urls: list, bearer_token: str | None = None, include_content: bool = False, include_last_edit_date: bool = False
     ) -> list:
         """Retrieve wanted information about each file in a list of files.
@@ -197,7 +200,7 @@ class GitLab:
         """
         files: list = []
         for url in urls:
-            files.append(self.get_file(url, bearer_token, include_content, include_last_edit_date))
+            files.append(await self.get_file(url, bearer_token, include_content, include_last_edit_date))
 
         return files
 
@@ -212,15 +215,12 @@ class GitLab:
                 info = zip_file.getinfo(file)
                 if info.is_dir():
                     continue
-                try:
-                    file_content = zip_file.read(file).decode("utf-8")
-                except UnicodeDecodeError:
-                    file_content = ""
+                file_content = zip_file.read(file)
                 file_name = file_path.name
                 extension: dict = determine_file_type(file_name, self.file_extensions, self.extension_descriptions)
                 base_structure = copy.deepcopy(self.defined_fields)
                 base_structure |= {
-                    "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                    "content": base64.b64encode(file_content).decode("utf-8"),
                     "unique_pointer": urljoin(base_path, intermediate_path.replace("/", "%2F")),
                     "name": file_name,
                     "size": info.file_size,
@@ -231,73 +231,84 @@ class GitLab:
 
         return files_data
 
-    def _subdata_setup(self, subdata: str | None = None) -> datetime:
-        """Set up subdata, either by parsind data, or if None, return datatime.min data."""
+    @staticmethod
+    def _create_date_object(date_string: str) -> datetime:
+        """Generate datetime object from string and set UTC timezone."""
+        date = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date
+
+    @staticmethod
+    def _parse_subdata(subdata: str | None) -> dict:
+        """Parse string dateobject from iso format to datetime object."""
         if subdata is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return {}
 
-        return self._provided_date(subdata)
+        try:
+            subdata_bytes = base64.b64decode(subdata)
+        except binascii.Error:
+            dms_warning("Request where subdata was invalid base64 encoding made to Gitlab connector: %s", subdata)
+            return {}
+        subdata_str = subdata_bytes.decode("utf-8")
 
-    def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
-        """Retrieve a structure of files to index."""
+        try:
+            return json.loads(subdata_str)
+        except json.decoder.JSONDecodeError:
+            dms_warning("Request where decoded subdata was invalid json structure made to Gitlab connector: %s", subdata_str)
+            return {}
 
-        subdata_date = self._subdata_setup(subdata)
-        current_subdata = self.get_project_ids()
-        projects = self._get_projects(bearer_token)
-        new_date = subdata_date
+    @staticmethod
+    def _generate_subdata(new_subdata: dict) -> str:
+        """Generate base64 encoded subdata from dict."""
+        return base64.urlsafe_b64encode(json.dumps(new_subdata).encode("utf-8")).decode()
 
-        project_data: list[tuple] = []
-        for project in projects:
-            project_id = project.get("id")
-            new_timestamp = current_subdata.get(project_id)
-            if not isinstance(new_timestamp, str):
+    def _projects_to_re_index(self, projects: dict[str, dict], subdata: str | None = None) -> tuple[list, str]:
+        """Determine project needing to be reindexed, together with new subdata."""
+        projects_to_index: list = []
+        subdata_dict = self._parse_subdata(subdata)
+        new_subdata: dict = subdata_dict
+        for project_id, project in projects.items():
+            if not isinstance(project, dict):
                 continue
-            new_timestamp_object = datetime.fromisoformat(new_timestamp.replace("Z", "+00:00"))
-            if new_timestamp_object <= subdata_date:
-                continue
-            new_date = max(new_date, new_timestamp_object)
+            subdata_project = subdata_dict.get(project_id)
             branch = project.get("default_branch")
-            project_data.append(
-                (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
-            )
+            edit_date = project.get("last_activity_at")
+            if not isinstance(subdata_project, str):
+                projects_to_index.append(
+                    (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+                )
+                new_subdata[project_id] = edit_date
+                continue
+            if edit_date is None:  # quick fix dont know if this is wanted behaviour.
+                continue
+            subdata_date_object = self._create_date_object(subdata_project)
+            edit_date_object = self._create_date_object(edit_date)
+            if edit_date_object > subdata_date_object:
+                projects_to_index.append(
+                    (f"{project.get('web_url')}/-/archive/{branch}/{project.get('path')}-{branch}.zip?ref_type=heads", project_id)
+                )
+                new_subdata[project_id] = edit_date
 
-        generated_subdata = base64.urlsafe_b64encode(new_date.isoformat().encode()).decode()
+        encoded_subdata = self._generate_subdata(new_subdata)
 
-        return project_data, generated_subdata
+        return projects_to_index, encoded_subdata
 
-    def files_to_index(self, subdata: str | None = None, bearer_token: str | None = None) -> dict:
-        """Retrieve a structure of files to index.
-
-        Args:
-        ----
-            subdata: Base64 encoded isostructured timestamp.
-            bearer_token: A valid bearer GitLab token or None.
-
-        Returns:
-        -------
-            Dict structure {"subdata": generated_subdata, "files": file_data, "index_needed":
-              <BOOL INDICATIANG IF REINDEX IS NEEED>}
-        """
-        files_data: list = []
-        pointers_to_projects, generated_subdata = self._project_urls(subdata, bearer_token)
-
-        for project_pointers in pointers_to_projects:
-            url, project_id = project_pointers
-            content = requests.get(url, timeout=120).content
-            files_data.extend(self._unpack_zip(content, project_id))
-
-        return {"files": files_data, "subdata": generated_subdata, "index_needed": bool(files_data)}
+    async def _project_urls(self, subdata: str | None = None, bearer_token: str | None = None) -> tuple[list, str]:
+        """Retrieve a structure of files to index."""
+        projects = await self._get_projects(bearer_token)
+        return self._projects_to_re_index(projects, subdata)
 
     async def _download_files(self, task_queue: asyncio.Queue, zip_queue: asyncio.Queue) -> None:
         """Download all artifacts from tast_queue and put in zip_queue."""
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as session:
             while True:
                 task_data = await task_queue.get()
                 if task_data is None:
                     break
                 url, project_id = task_data
-                async with client.stream("GET", url) as response:
-                    data = await response.aread()
+                async with session.get(url) as response:
+                    data = await response.read()
                     await zip_queue.put({"data": data, "project_id": project_id})
                 task_queue.task_done()
 
@@ -325,7 +336,7 @@ class GitLab:
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
 
-        pointers_to_projects, new_subdata = self._project_urls(subdata, bearer_token)
+        pointers_to_projects, new_subdata = await self._project_urls(subdata, bearer_token)
         for project_pointers in pointers_to_projects:
             await task_queue.put(project_pointers)
 
@@ -355,71 +366,52 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    def check_index_needed(self, subdata: str | None, bearer_token: str | None = None) -> dict[str, Any]:
-        """Simple check if reindex is needed based on subdata.
+    async def execute_get_request(self, url: str, headers: dict | None = None) -> dict:
+        """Execute GET request to supplied URL."""
+        if headers is None:
+            headers = {}
 
-        Args:
-        ----
-            subdata: Base64 encoded isostructured timestamp.
-            bearer_token: A valid bearer GitLab token or None.
-
-        Returns:
-        --------
-            Dict structure {"index_needed": <BOOL>}
-        """
-        provided_date = self._provided_date(subdata)
-        project_ids = self.get_project_ids(bearer_token)
-
-        for change_time in project_ids.values():
-            if not isinstance(change_time, str):
-                continue
-            new_timestamp_object = datetime.fromisoformat(change_time.replace("Z", "+00:00"))
-            if new_timestamp_object <= provided_date:
-                continue
-            return {"index_needed": True}
-
-        return {"index_needed": False}
-
-    @staticmethod
-    def _provided_date(subdata: str | None) -> datetime:
-        """Parse string dateobject from iso format to datetime object."""
-        if subdata is not None:
+        session = await self.get_session()
+        async with session.get(url, headers=headers) as resp:
             try:
-                subdata_bytes = base64.b64decode(subdata)
-            except binascii.Error:
-                dms_info("Request with invalid base64 encoding made to Gitlab connector: %s", subdata)
-            subdata_str = subdata_bytes.decode("utf-8")
-            try:
-                date = datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
-                if date.tzinfo is None:
-                    date = date.replace(tzinfo=timezone.utc)
-                return date
-            except ValueError:
-                dms_error("Gitlab connector could not interpret subdata: %s", subdata)
-        return datetime.min.replace(tzinfo=timezone.utc)
+                resp.raise_for_status()
+                response = await resp.json()
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response
 
-    def _execute_get_request(self, url: str, headers: dict) -> dict | list:
-        """Execute GET request to supplied URL, JSON content in response expected."""
-        try:
-            response = self.session.get(url, timeout=120, headers=headers)
-            content = response.json()
-        except requests.exceptions.JSONDecodeError:
-            dms_warning(f"Gitlab request to {url} could not be decoded.\nExpected JSON structure\nGot {response.text}")
-            return {}
-        except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-        if response.status_code != 200:  # noqa: PLR2004
-            dms_info(f"Request to {url} was made. However, Gitlab provided a {response.status_code} response.")
-        return content
-
-    def _execute_head_request(self, url: str, headers: dict) -> dict:
+    async def execute_head_request(self, url: str, headers: dict | None = None) -> dict:
         """Execute HEAD request to supplied URL."""
-        try:
-            content = self.session.head(url, headers=headers)
-            content.raise_for_status()
-        except requests.exceptions.MissingSchema as err:
-            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-        except requests.HTTPError:
-            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {content.status_code})")
-            return {}
-        return dict(content.headers)
+        if headers is None:
+            headers = {}
+
+        session = await self.get_session()
+        async with session.head(url, headers=headers) as resp:
+            try:
+                resp.raise_for_status()
+                response = dict(resp.headers)
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response
+
+    async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None) -> dict:
+        """Execute POST request to supplied URL."""
+        if headers is None:
+            headers = {}
+        if data is None:
+            data = {}
+
+        session = await self.get_session()
+        async with session.post(url, headers=headers, json=data) as resp:
+            try:
+                response = await resp.json()
+                resp.raise_for_status()
+            except (ValueError, aiohttp.InvalidURL) as err:
+                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+            except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        return response

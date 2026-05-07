@@ -104,6 +104,37 @@ services:
       CONGITLAB_BIND_ADDR: ${CONGITLAB_BIND_ADDR}
       CONGITLAB_SYSTEM_NAME: ${CONGITLAB_SYSTEM_NAME}
 
+  connector-github:
+    image: registry.dms-lookup.com/connector-github:latest
+    container_name: connector-github
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONGITHUB}
+    environment:
+      CONGITHUB_BIND_ADDR: ${CONGITHUB_BIND_ADDR}
+      CONGITHUB_BIND_PORT: ${CONGITHUB_BIND_PORT}
+      CONGITHUB_GITHUB_API_URL: ${CONGITHUB_GITHUB_API_URL}
+      CONGITHUB_GITHUB_SYSTEM_NAME: ${CONGITHUB_GITHUB_SYSTEM_NAME}
+      CONGITHUB_GITHUB_API_VERSION: ${CONGITHUB_GITHUB_API_VERSION}
+
+  connector-sharepoint:
+    image: registry.dms-lookup.com/connector-sharepoint:latest
+    container_name: connector-sharepoint
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONSHAREPOINT}
+    environment:
+      CONSHAREPOINT_BIND_ADDR: ${CONSHAREPOINT_BIND_ADDR}
+      CONSHAREPOINT_BIND_PORT: ${CONSHAREPOINT_BIND_PORT}
+      CONSHAREPOINT_SYSTEM_NAME: ${CONSHAREPOINT_SYSTEM_NAME}
+      CONSHAREPOINT_GRAPH_BASE: ${CONSHAREPOINT_GRAPH_BASE}
+      CONSHAREPOINT_TENANT_ID: ${CONSHAREPOINT_TENANT_ID}
+      CONSHAREPOINT_CLIENT_ID: ${CONSHAREPOINT_CLIENT_ID}
+      CONSHAREPOINT_CLIENT_SECRET: ${CONSHAREPOINT_CLIENT_SECRET}
+      CONSHAREPOINT_STATE_SIGNING_SECRET: ${CONSHAREPOINT_STATE_SIGNING_SECRET}
+
   connector-minio:
     image: registry.dms-lookup.com/connector-minio:latest
     container_name: connector-minio
@@ -134,23 +165,23 @@ services:
       STOCHAN_CONNECTOR_ADDRESS: ${STOCHAN_CONNECTOR_ADDRESS}
       STOCHAN_ESCALATION_THRESHOLD: ${STOCHAN_ESCALATION_THRESHOLD}
 
-refresh_service-service:
-    image: registry.dms-lookup.com/refresh-service:latest
-    container_name: refresh-service
-    command: /usr/local/bin/refresh-service
-    networks:
-      dev_net:
-        ipv4_address: ${IP_REFSERVICE}
-    environment:
-      REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
-      REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
-      REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
-      REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
-      REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
-      REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
-      REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
+  refresh_service-service:
+      image: registry.dms-lookup.com/refresh-service:latest
+      container_name: refresh-service
+      command: /usr/local/bin/refresh-service
+      networks:
+        dev_net:
+          ipv4_address: ${IP_REFSERVICE}
+      environment:
+        REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
+        REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
+        REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
+        REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
+        REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+        REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
+        REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
 
-refresh_service-service:
+  refresh_service-worker:
     image: registry.dms-lookup.com/refresh-service:latest
     container_name: refresh-worker
     command: /usr/local/bin/refresh-worker
@@ -166,16 +197,15 @@ refresh_service-service:
       REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
       REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
 
-
-refresh_service-redis:
-    image: registry.dms-lookup.com/refresh_service-redis:latest
-    container_name: refresh_service-redis
-    networks:
-      dev_net:
-        ipv4_address: ${IP_REFSERVICE_REDIS}
-    environment:
-      REDIS_PORT: ${REFSERVICE_REDIS_PORT}
-      REDIS_PASSWORD: ${REFSERVICE_REDIS_PASSW}
+  refresh_service-redis:
+      image: registry.dms-lookup.com/refresh_service-redis:latest
+      container_name: refresh_service-redis
+      networks:
+        dev_net:
+          ipv4_address: ${IP_REFSERVICE_REDIS}
+      environment:
+        REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+        REDIS_PASSWORD: ${REFSERVICE_REDIS_PASSW}
 
 networks:
   dev_net:

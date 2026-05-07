@@ -5,6 +5,8 @@ import argparse
 import secrets
 import time
 from urllib.parse import urlencode
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request, Header
@@ -13,9 +15,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLab
-import requests
 
-from shared_functions.boto_tools import upload_file
 from shared_functions.dmis_logger import dms_info
 from shared_functions.initialisation_tools import read_port, read_env_variable
 from shared_functions.signing_tools import sign_encode_state, validate_decode_state
@@ -39,15 +39,21 @@ class API:
         self.state_secret = read_env_variable("CONGITLAB_STATE_SIGNING_SECRET")
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
 
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+
+    @asynccontextmanager
+    async def lifespan(self) -> AsyncIterator[None]:
+        """Manage teardown."""
+        try:
+            yield
+        finally:
+            await self.gitlab_instance.close_session()
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handeler."""
@@ -60,10 +66,6 @@ class API:
         content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
 
         return JSONResponse(status_code=422, content=content)
-
-    async def index_needed_bool(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> Any:
-        """Endpoint returning status if new index is needed."""
-        return self.gitlab_instance.check_index_needed(subdata, x_gitlab_token)
 
     async def get_files(
         self,
@@ -82,21 +84,19 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        return self.gitlab_instance.get_files(
+        return await self.gitlab_instance.get_files(
             file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date
         )
 
-    async def files_to_index(self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None) -> dict:
-        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
-        OBS; this method will be depricated."""
-        content = self.gitlab_instance.files_to_index(subdata, x_gitlab_token)
-        url = upload_file(content, "gitlab_content.json")
-        return {"subdata": content.get("subdata"), "index_needed": content.get("index_needed"), "file_url": url}
-
     async def stream_files_to_index(
-        self, subdata: str | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
+        self, body: dict[str, str] | None = None, x_gitlab_token: Annotated[str | None, Header()] = None
     ) -> StreamingResponse:
-        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
+        Body should be structured {'subdata': <SUBDATA>}.
+        """
+        subdata: str | None
+        subdata = body.get("subdata") if isinstance(body, dict) else None
+
         return StreamingResponse(
             self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
         )
@@ -106,7 +106,11 @@ class API:
         return list(self.gitlab_instance.defined_fields.keys())
 
     def auth_user(self, request: Request) -> RedirectResponse:
-        """Callback endpoint to set in GitLab application."""
+        """Callback endpoint to set in GitLab application.
+
+        Required headers:
+            callback-url: <REDIRECT_URL>
+        """
         payload = {
             "nonce": secrets.token_urlsafe(16),
             "iat": int(time.time()),
@@ -125,7 +129,7 @@ class API:
 
         return RedirectResponse(f"{auth_url}?{urlencode(params)}")
 
-    def callback(self, request: Request, code: str | None = None) -> JSONResponse:
+    async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Callback endpoint to set in GitLab application."""
         signed_state = request.query_params.get("state")
         if signed_state is None:
@@ -137,25 +141,21 @@ class API:
             return JSONResponse(content="ERROR", status_code=403)
 
         token_url = f"{self.gitlab_url}/oauth/token"
-        token_resp = requests.post(
-            token_url,
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": str(request.url_for("callback")),
-                "client_id": self.gitlab_client_id,
-                "client_secret": self.gitlab_client_secret,
-            },
-            timeout=120,
-        )
+        data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": str(request.url_for("callback")),
+            "client_id": self.gitlab_client_id,
+            "client_secret": self.gitlab_client_secret,
+        }
+        token_json = await self.gitlab_instance.execute_post_request(token_url, data=data)
 
-        token_json = token_resp.json()
         if not token_json.get("access_token"):
             return JSONResponse(content="ERROR", status_code=400)
 
         return JSONResponse(content=token_json, status_code=200)
 
-    def refresh_token(self, request: Request, refresh_token: Annotated[str | None, Header()]) -> JSONResponse:
+    async def refresh_token(self, request: Request, refresh_token: Annotated[str | None, Header()]) -> JSONResponse:
         """Refresh Gitlab session token."""
         token_url = f"{self.gitlab_url}/oauth/token"
         payload = {
@@ -165,8 +165,7 @@ class API:
             "grant_type": "refresh_token",
             "redirect_uri": str(request.url_for("callback")),
         }
-        response = requests.post(token_url, data=payload, timeout=120)
-        new_tokens = response.json()
+        new_tokens = await self.gitlab_instance.execute_post_request(token_url, data=payload)
 
         return JSONResponse(content=new_tokens, status_code=200)
 

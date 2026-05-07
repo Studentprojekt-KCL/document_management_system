@@ -8,9 +8,9 @@ from collections.abc import Sequence
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 
 from se_api.handlers import Handler
 from shared_functions.initialisation_tools import read_env_variable, read_port
@@ -51,17 +51,20 @@ class API:
             self.log_level = "info"
 
         self.port: int = read_port("SEARCHENG_BIND_PORT")
-        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR")
+        self.host: str = read_env_variable("SEARCHENG_BIND_ADDR", required=True)  # type: ignore[attr-defined]
 
         self.app = FastAPI(lifespan=self.lifespan)
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/search", self.query, methods=["GET"])
+        self.app.add_api_route("/search", self.query, methods=["POST"])
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
+        self.app.add_api_route("/classifications", self.get_classifications, methods=["GET"])
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
+        self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])
+        self.app.add_api_route("/searchable_fields", self.searchable_fields, methods=["GET"])
 
     def start(self) -> None:
         """Start the API."""
@@ -103,7 +106,18 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def query(self, query: str | None = None, count: int = 10, offset: int = 0) -> list:
+    async def find_matching(self, pointer: str) -> list[dict]:
+        """Look for matching files.
+
+        Args:
+            pointer: file to compare with.
+            count: number of wanted results.
+        Returns: unique pointers and their score.
+        """
+
+        return await self.handler.find_matching(pointer)
+
+    async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -112,20 +126,24 @@ class API:
         Returns:
             List of found files or None.
         """
-
-        return await self.handler.preform_search(query, count, offset)
+        return await self.handler.preform_search(conent, count, offset)
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""
-        return self.handler.set_classification(change)
+        return await self.handler.set_classification(change)
 
-    async def check_health(self) -> JSONResponse:
+    @staticmethod
+    async def check_health() -> JSONResponse:
         """Respond to health check"""
         return JSONResponse(status_code=200, content={"msg": "healthy"})
 
     async def reset(self) -> None:
         """Reset connector."""
-        self.handler.reset()
+        await self.handler.reset()
+
+    async def searchable_fields(self) -> set:
+        """Retrive all searchable fields."""
+        return self.handler.grab_searchable_fields()
 
     async def file_types(self) -> list:
         """Retrieve all supported file types."""
@@ -134,6 +152,13 @@ class API:
     async def file_types_documents_only(self) -> list:
         """Retrieve file types labeled as documents only."""
         return self.documents_only_rescource
+
+    async def get_classifications(self) -> list[str]:
+        """Get classifications.
+
+        Returns: list of classifications labels.
+        """
+        return self.handler.get_classifications()
 
 
 def run() -> None:

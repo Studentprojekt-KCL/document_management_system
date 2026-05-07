@@ -2,8 +2,11 @@
 
 import binascii
 from base64 import b64decode
+from io import BytesIO
 
 import httpx
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from gateway.schemas import InputItem, MetadataTemplate
 from shared_functions.dmis_logger import dms_warning
@@ -66,15 +69,23 @@ class Connector:
         items = []
         for individual_data in data:
             encoded_content = individual_data.get("content")
+            unique_pointer = individual_data.get("unique_pointer")
             if encoded_content is None:
                 dms_warning(f"No content returned for pointer '{pointers}'")
                 return []
             try:
-                content = b64decode(encoded_content).decode("utf-8")
-            except (binascii.Error, UnicodeDecodeError):
-                dms_warning(f"Base64 decode failed for pointer '{pointers}'")
+                raw = b64decode(encoded_content)
+                if raw.startswith(b"%PDF-"):
+                    content = "\n".join(p.extract_text() or "" for p in PdfReader(BytesIO(raw)).pages).strip()
+                else:
+                    content = raw.decode("utf-8")
+            except (binascii.Error, UnicodeDecodeError, PdfReadError, ValueError) as err:
+                dms_warning(f"Decode failed for pointer '{unique_pointer}': {err}")
                 return []
-            unique_pointer = individual_data.get("unique_pointer")
+
+            if not content:
+                continue
+
             items.append(
                 InputItem(
                     content=content,

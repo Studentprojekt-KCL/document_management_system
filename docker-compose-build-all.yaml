@@ -29,7 +29,7 @@ services:
       dockerfile: src/connectors/gitlab/Dockerfile
 
   connector-samba:
-    image: connector-samba
+    image: connector-samba:pr
     build:
       dockerfile: src/connectors/samba/Dockerfile
 
@@ -37,6 +37,16 @@ services:
     image: connector-github:pr
     build:
       dockerfile: src/connectors/github/Dockerfile
+      
+  connector-confluence:
+    image: connector-confluence:pr
+    build:
+      dockerfile: src/connectors/confluence/Dockerfile
+
+  connector-sharepoint:
+      image: connector-sharepoint:pr
+      build:
+        dockerfile: src/connectors/sharepoint/Dockerfile
 
   connector-minio:
     image: connector-minio:pr

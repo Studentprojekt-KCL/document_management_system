@@ -15,12 +15,12 @@ import { useRoute, useRouter } from 'vue-router'
 /* Logo redirects to search page, page reloads if already on search page */
 const router = useRouter()
 const route = useRoute()
-const navigateToSearch = () => {
+
+const navigateToSearch = async () => {
   if (route.name === 'Search') {
     window.location.reload()
     return
   }
-
   router.push('/search')
 }
 

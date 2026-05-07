@@ -20,6 +20,7 @@ class Summarizer:
     """yeah buddy summarize engine"""
 
     TIMEOUT: int = 120
+    MAX_COMBINED_CHARS: int = 200_000
 
     def __init__(self) -> None:
         self.url = read_env_variable("STOCHAN_LLM_URL").rstrip("/")
@@ -62,6 +63,9 @@ class Summarizer:
             return SummaryResult(summary=extracts[0])
 
         combined = "\n\n".join(extracts)
+        if len(combined) > self.MAX_COMBINED_CHARS:
+            dms_warning("Combined exceeds limit")
+            return SummaryResult(summary="")
         prompt = stage_two.format(doc_count=len(extracts), combined_summaries=combined)
         result = await self._call_llm(prompt)
         return SummaryResult(summary=result) if result else None

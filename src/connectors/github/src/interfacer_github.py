@@ -48,10 +48,10 @@ class GitHub:
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
         file_type_resource = get_file_resource()
-        self.file_extensions = [extension.get("extension") for extension in file_type_resource]
-        self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
+        extensions = [extension.get("extension") for extension in file_type_resource]
+        descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
         self.defined_fields = {"content": None, "name": None, "unique_pointer": None, "size": None, "source_system": None} | {
-            key: None for key in determine_file_type("", self.file_extensions, self.extension_descriptions)
+            key: None for key in determine_file_type("", extensions, descriptions)
         }
 
     def _get_repos(self, token: str | None = None) -> list:

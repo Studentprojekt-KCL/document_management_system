@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest",
+    "test": "vitest run --reporter=dot",
     "test:watch": "vitest --watch"
   },
   "dependencies": {

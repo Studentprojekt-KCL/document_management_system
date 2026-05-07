@@ -59,8 +59,6 @@ class Summarizer:
         if not extracts:
             dms_warning("Stage 1 produced no extracts.")
             return None
-        if len(extracts) == 1:
-            return SummaryResult(summary=extracts[0])
 
         combined = "\n\n".join(extracts)
         if len(combined) > self.MAX_COMBINED_CHARS:

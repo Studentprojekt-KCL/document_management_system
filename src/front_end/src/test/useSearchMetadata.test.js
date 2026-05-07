@@ -10,25 +10,25 @@ import {
   resolveSecurityClass
 } from '@/composables/useSearchMetadata'
 
-/* Test for valid metadata extraction */
+/* Test valid metadata extraction */
 describe('useSearchMetadata', () => {
   /* Unique pointer resolution */
   test('returns unique pointer from metadata', () => {
     const entry = {
       metadata: {
-        unique_pointer: 'pointer-123'
+        unique_pointer: 'pointer-1'
       }
     }
 
-    expect(getMetadata(entry)).toEqual({ unique_pointer: 'pointer-123' })
+    expect(getMetadata(entry)).toEqual({ unique_pointer: 'pointer-1' })
   })
 
   test('falls back to entry unique pointer', () => {
     const entry = {
-      unique_pointer: 'entry-pointer-456'
+      unique_pointer: 'pointer-2'
     }
 
-    expect(getMetadata(entry)).toEqual({ unique_pointer: 'entry-pointer-456' })
+    expect(getMetadata(entry)).toEqual({ unique_pointer: 'pointer-2' })
   })
 
   test('returns empty object for no entry', () => {
@@ -41,11 +41,11 @@ describe('useSearchMetadata', () => {
   test('uses metadata name when available', () => {
     const entry = {
       metadata: {
-        name: 'report.pdf'
+        name: 'test.pdf'
       }
     }
 
-    expect(resolveFilename(entry)).toBe('report.pdf')
+    expect(resolveFilename(entry)).toBe('test.pdf')
   })
 
   test('falls back to entry name', () => {

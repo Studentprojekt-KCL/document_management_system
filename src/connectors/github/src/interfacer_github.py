@@ -22,6 +22,7 @@ import httpx
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
+from shared_functions.file_type_logic import determine_file_type, get_file_resource
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -46,6 +47,12 @@ class GitHub:
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
+        file_type_resource = get_file_resource()
+        self.file_extensions = [extension.get("extension") for extension in file_type_resource]
+        self.extension_descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
+        self.defined_fields = {"content": None, "name": None, "unique_pointer": None, "size": None, "source_system": None} | {
+            key: None for key in determine_file_type("", self.file_extensions, self.extension_descriptions)
+        }
 
     def _get_repos(self, token: str | None = None) -> list:
         """Retrieve all repositories the token can access (user or org)."""

@@ -50,11 +50,13 @@ class TestGitLab(unittest.IsolatedAsyncioTestCase):
 
     BLAME_DATA = [{"commit": {"committed_date": "1970-01-01T00:00:00.000Z"}}]
 
-    TOKEN_REFRESH = {"client_id": "id",
-                "client_secret": "secret",
-                    "refresh_token": "token",
-"grant_type": "type",
-"redirect_uri": "uri"}
+    TOKEN_REFRESH = {
+        "client_id": "id",
+        "client_secret": "secret",
+        "refresh_token": "token",
+        "grant_type": "type",
+        "redirect_uri": "uri",
+    }
 
     def get_side_effect(self, url: str, *_, **__):
         """Side effect for get method"""
@@ -95,8 +97,8 @@ class TestGitLab(unittest.IsolatedAsyncioTestCase):
         response_mock.status = 200
         if "refresh" in url:
             response_mock.json = AsyncMock(return_value=self.TOKEN_REFRESH)
-        else: 
-            response_mock.json = AsyncMock(return_value={"":""})
+        else:
+            response_mock.json = AsyncMock(return_value={"": ""})
         response = AsyncMock()
         response.__aenter__.return_value = response_mock
 
@@ -160,7 +162,17 @@ class TestGitLab(unittest.IsolatedAsyncioTestCase):
         """Test get_file method."""
         self.instance.source_system = "system"
         result = await self.instance.get_file("test_url", include_content=False)
-        assert result == {'unique_pointer': 'test_url', 'name': 'test_name.txt', 'size': 0, 'last_edit_date': '1970-01-01T00:00:00.000Z', 'type': 'source_file', 'source_system': 'system', 'content': None, 'file_type': '.txt', 'file_type_description': 'text file'}
+        assert result == {
+            "unique_pointer": "test_url",
+            "name": "test_name.txt",
+            "size": 0,
+            "last_edit_date": "1970-01-01T00:00:00.000Z",
+            "type": "source_file",
+            "source_system": "system",
+            "content": None,
+            "file_type": ".txt",
+            "file_type_description": "text file",
+        }
 
     def test_projects_to_re_index_not_needed(self):
         projects = {"1": self.CORRECT_DATA}
@@ -172,7 +184,10 @@ class TestGitLab(unittest.IsolatedAsyncioTestCase):
         projects = {"1": self.CORRECT_DATA[0]}
         subdata = "eyIxIjogIjE5NjktMDctMjBUMDA6MDA6MDEuMDAwWiJ9"
         to_index = self.instance._projects_to_re_index(projects=projects, subdata=subdata)
-        assert to_index == ([('/-/archive/main/namespace-main.zip?ref_type=heads', '1')], 'eyIxIjogIjE5NzAtMDEtMDFUMDA6MDA6MDAuMDAwWiJ9')
+        assert to_index == (
+            [("/-/archive/main/namespace-main.zip?ref_type=heads", "1")],
+            "eyIxIjogIjE5NzAtMDEtMDFUMDA6MDA6MDAuMDAwWiJ9",
+        )
 
     def test_generate_subdata(self):
         dates = {"1": "1970-01-01T00:00:00.000Z"}

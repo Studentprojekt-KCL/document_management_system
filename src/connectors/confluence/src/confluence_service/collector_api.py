@@ -1,15 +1,12 @@
 """FastAPI service for the Confluence connector.
 
-Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
-``/get_files`` (POST), ``/files_to_index`` (prefers MinIO ``file_url``, else inline
-``files``), ``/stream_files_to_index``, ``/connected_source_systems``. Legacy GET
-``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
+Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (optional defaults via
+env; see ``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata
+(same route name as OAuth connectors; GitLab redirects, Confluence does not).
 
-Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata (same path name as
-OAuth connectors; GitLab redirects, Confluence does not). Requires ``CONFLUENCE_BIND_PORT`` (or legacy
-``CONFLUENCE_CONNECTOR_PORT``) and ``CONFLUENCE_SITE_URL`` (or legacy ``CONFLUENCE_ADDRESS``); bind address
-via ``CONFLUENCE_BIND_ADDR`` (default ``0.0.0.0``); optional MinIO env vars for uploads.
+Server bind: ``CONCONFLUENCE_BIND_PORT`` / ``CONCONFLUENCE_BIND_ADDR`` (default ``0.0.0.0``).
+Legacy port names ``CONFLUENCE_BIND_PORT`` / ``CONFLUENCE_CONNECTOR_PORT`` fill in when the DMIS-style
+port env is unset.
 """
 
 import argparse
@@ -25,14 +22,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.boto_tools import upload_file
-from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
-# When compose interpolates unset bind port to "", it overrides Dockerfile ENV;
-# treat blank like unset so preview stacks still boot (override per env in real deployments).
 _CONF_PORT_FALLBACK = 8010
 
 
@@ -53,15 +46,9 @@ class API:
         self.confluence_instance = ConfluenceInterfacer()
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        # Legacy (same as older GitLab connector in this repo)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
-        self.app.add_api_route("/file", self.file, methods=["GET"])
-        # DMS-aligned routes
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
-        # Same route name as GitLab connector; GitLab redirects to OAuth — Confluence declares header-based auth (#478).
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
 
     @asynccontextmanager
@@ -106,43 +93,6 @@ class API:
             return None
         return x_confluence_token.removeprefix("Bearer ").strip()
 
-    async def files(
-        self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> Any:
-        """Return file pointers for incremental indexing (honours ``subdata`` checkpoint)."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {"subdata": subdata, "file_pointers": []}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.pointers_to_all_files_to_index(subdata, x_confluence_email.strip(), token)
-
-    async def file(
-        self,
-        file_pointer: str,
-        include_content: bool = True,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> Any:
-        """Return one page as metadata plus optional base64-encoded plain text."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.get_page(file_pointer, include_content, x_confluence_email.strip(), token)
-
-    async def index_needed_bool(
-        self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> dict[str, Any]:
-        """Whether a new index run has work (DMS ``/index_needed_bool``)."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {"index_needed": False}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.check_index_needed(subdata, x_confluence_email.strip(), token)
-
     async def get_files(
         self,
         body: GetFilesBody,
@@ -165,11 +115,15 @@ class API:
 
     async def stream_files_to_index(
         self,
-        subdata: str | None = None,
+        body: dict[str, str] | None = None,
         x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
         x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
     ) -> StreamingResponse:
-        """Stream JSON chunks of pages to index (DMS ``/stream_files_to_index``)."""
+        """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index.
+        Body should be structured {'subdata': <SUBDATA>}."""
+
+        subdata: str | None = body.get("subdata") if isinstance(body, dict) else None
+
         token = self._token(x_confluence_token) if x_confluence_email and x_confluence_token else None
         email = x_confluence_email.strip() if x_confluence_email else None
 
@@ -178,38 +132,6 @@ class API:
                 yield chunk
 
         return StreamingResponse(stream(), media_type="application/octet-stream")
-
-    async def files_to_index(
-        self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> dict[str, Any]:
-        """Full payload; prefers upload URL like DMS GitLab ``/files_to_index``."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {
-                "subdata": subdata,
-                "files": [],
-                "deleted": [],
-                "index_needed": False,
-            }
-        tok = self._token(x_confluence_token)
-        content = await self.confluence_instance.files_to_index(subdata, x_confluence_email.strip(), tok)
-        try:
-            url = upload_file(content, "confluence_content.json")
-            return {
-                "subdata": content.get("subdata"),
-                "index_needed": content.get("index_needed"),
-                "file_url": url,
-            }
-        except (OSError, ValueError) as err:
-            dms_warning(f"Could not upload confluence payload to object storage: {err}")
-            return {
-                "subdata": content.get("subdata"),
-                "index_needed": content.get("index_needed"),
-                "files": content.get("files", []),
-                "deleted": content.get("deleted", []),
-            }
 
 
 def run() -> None:
@@ -222,13 +144,26 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    new_port = (os.environ.get("CONFLUENCE_BIND_PORT") or "").strip()
-    legacy_port = (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip()
-    if not new_port and legacy_port:
-        os.environ["CONFLUENCE_BIND_PORT"] = legacy_port
-    if not (os.environ.get("CONFLUENCE_BIND_PORT") or "").strip():
-        os.environ["CONFLUENCE_BIND_PORT"] = str(_CONF_PORT_FALLBACK)
-    port = read_port("CONFLUENCE_BIND_PORT")
-    bind_raw = read_env_variable("CONFLUENCE_BIND_ADDR", required=False)
-    host_bind = bind_raw.strip() if bind_raw else "0.0.0.0"
-    uvicorn.run(api.app, host=host_bind, log_level=api.log_level, port=port)
+    def _port_digits(name: str) -> bool:
+        val = os.environ.get(name)
+        return isinstance(val, str) and bool(val.strip()) and val.strip().isdigit()
+
+    if not _port_digits("CONCONFLUENCE_BIND_PORT"):
+        for alt in ("CONFLUENCE_BIND_PORT", "CONFLUENCE_CONNECTOR_PORT"):
+            val = os.environ.get(alt)
+            if isinstance(val, str) and val.strip().isdigit():
+                os.environ["CONCONFLUENCE_BIND_PORT"] = val.strip()
+                break
+        else:
+            os.environ["CONCONFLUENCE_BIND_PORT"] = str(_CONF_PORT_FALLBACK)
+
+    bind_primary = read_env_variable("CONCONFLUENCE_BIND_ADDR", required=False)
+    legacy_bind = (os.environ.get("CONFLUENCE_BIND_ADDR") or "").strip()
+    host_bind = (bind_primary.strip() if bind_primary else "") or legacy_bind or "0.0.0.0"
+
+    uvicorn.run(
+        api.app,
+        host=host_bind,
+        log_level=api.log_level,
+        port=read_port("CONCONFLUENCE_BIND_PORT"),
+    )

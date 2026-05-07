@@ -6,8 +6,8 @@ Pass credentials as method arguments, or set ``CONFLUENCE_DEFAULT_EMAIL`` /
 ``CONFLUENCE_API_TOKEN``). The HTTP service in ``collector_api`` reads
 ``X-Confluence-Email`` and ``X-Confluence-Token``.
 
-Set ``CONFLUENCE_SITE_URL`` to the site root (e.g. ``https://tenant.atlassian.net``).
-Legacy name ``CONFLUENCE_ADDRESS`` is still read if ``CONFLUENCE_SITE_URL`` is unset.
+Site root from ``CONCONFLUENCE_CONFLUENCE_URL``, or legacy ``CONFLUENCE_SITE_URL`` /
+``CONFLUENCE_ADDRESS`` when the DMIS name is unset.
 """
 
 import base64
@@ -25,10 +25,17 @@ from urllib.parse import urljoin
 
 import httpx
 
+from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_warning
+
 
 def _confluence_site_url_from_env() -> str:
-    site = (os.environ.get("CONFLUENCE_SITE_URL") or os.environ.get("CONFLUENCE_ADDRESS") or "").strip()
-    return site.rstrip("/")
+    """Resolve base URL using DMIS env first, then legacy names."""
+    for key in ("CONCONFLUENCE_CONFLUENCE_URL", "CONFLUENCE_SITE_URL", "CONFLUENCE_ADDRESS"):
+        raw = os.environ.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip().rstrip("/")
+    return read_env_variable("CONCONFLUENCE_CONFLUENCE_URL").rstrip("/")
 
 
 def _default_contact_email_from_env() -> str:
@@ -41,7 +48,6 @@ def _default_api_token_raw_from_env() -> str | None:
         if raw is not None and str(raw).strip():
             return str(raw).strip()
     return None
-
 
 PROJECT = "project"
 SOURCE_FILE = "source_file"
@@ -65,7 +71,54 @@ class ConfluenceInterfacer:
         self.session = httpx.AsyncClient(timeout=120.0)
         self.address = _confluence_site_url_from_env()
         self.base = self._api_base(self.address)
-        self.max_concurrency = int(os.environ.get("CONFLUENCE_MAX_CONCURRENCY", "20"))
+        self.max_concurrency = 20
+        self.defined_fields = {
+            "content": None,
+            "name": None,
+            "unique_pointer": None,
+            "size": None,
+            "source_system": None,
+            "last_edit_date": None,
+            "type": None,
+            "clickable_url": None,
+            "file_type": "confluence",
+            "file_type_description": "Confluence document",
+        }
+
+    @staticmethod
+    def _parse_subdata(subdata: str | None) -> dict:
+        """Parse string dateobject from iso format to datetime object."""
+        if subdata is None:
+            return {}
+
+        try:
+            subdata_bytes = base64.b64decode(subdata)
+        except binascii.Error:
+            dms_warning("Request where subdata was invalid base64 encoding made to Gitlab connector: %s", subdata)
+            return {}
+        subdata_str = subdata_bytes.decode("utf-8")
+
+        try:
+            return json.loads(subdata_str)
+        except json.decoder.JSONDecodeError:
+            dms_warning("Request where decoded subdata was invalid json structure made to Gitlab connector: %s", subdata_str)
+            return {}
+
+    @staticmethod
+    def _create_date_object(date_string: str | None) -> datetime:
+        """Generate datetime object from string and set UTC timezone."""
+        if date_string is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        date = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date
+
+    @staticmethod
+    def _generate_subdata(new_subdata: dict) -> str:
+        """Generate base64 encoded subdata from dict."""
+        return base64.urlsafe_b64encode(json.dumps(new_subdata).encode("utf-8")).decode()
 
     @staticmethod
     def _api_base(address: str) -> str:
@@ -78,74 +131,22 @@ class ConfluenceInterfacer:
     def _resolve_auth(self, email: str | None, api_token: str | None) -> tuple[str, str] | None:
         """Resolve (email, token) from arguments or environment."""
         e = (email or _default_contact_email_from_env()).strip()
-        raw = api_token or _default_api_token_raw_from_env()
+        raw = api_token if api_token is not None else _default_api_token_raw_from_env()
         t = (raw or "").removeprefix("Bearer ").strip() if raw else ""
         if e and t:
             return e, t
         return None
 
-    @staticmethod
-    def _provided_date(subdata: str | None) -> datetime:
-        if subdata is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
-        try:
-            decoded = base64.b64decode(subdata).decode("utf-8")
-            return datetime.fromisoformat(decoded.replace("Z", "+00:00"))
-        except (binascii.Error, ValueError, UnicodeDecodeError):
-            return datetime.min.replace(tzinfo=timezone.utc)
-
-    async def _execute_request(
-        self,
-        endpoint: str,
-        params: dict[str, Any] | None,
-        email: str | None,
-        api_token: str | None,
-    ) -> dict[str, Any]:
-        if not self.base:
-            return {}
-        creds = self._resolve_auth(email, api_token)
-        if not creds:
-            return {}
-        user, token = creds
-        url = urljoin(self.base, endpoint)
-        try:
-            response = await self.session.get(url, params=params, auth=(user, token))
-            response.raise_for_status()
-            payload = response.json()
-            if isinstance(payload, dict):
-                return payload
-            return {}
-        except (httpx.HTTPError, ValueError):
-            return {}
-
-    async def _execute_url_request(self, url: str, email: str | None, api_token: str | None) -> dict[str, Any]:
-        """Execute request to absolute or relative URL (used for pagination links)."""
-        if not self.base:
-            return {}
-        creds = self._resolve_auth(email, api_token)
-        if not creds:
-            return {}
-        user, token = creds
-        target_url = urljoin(self.base, url)
-        try:
-            response = await self.session.get(target_url, auth=(user, token))
-            response.raise_for_status()
-            payload = response.json()
-            if isinstance(payload, dict):
-                return payload
-            return {}
-        except (httpx.HTTPError, ValueError):
-            return {}
-
     async def _paginate(
         self,
-        endpoint: str,
-        params: dict[str, Any] | None,
+        params: dict[str, Any],
         email: str | None,
         api_token: str | None,
     ) -> list[dict[str, Any]]:
         """Collect all paginated results by following ``_links.next``."""
-        payload = await self._execute_request(endpoint, params, email, api_token)
+
+        url = urljoin(self.base, "content")
+        payload = await self._execute_get_request(url, params, email, api_token)
         out: list[dict[str, Any]] = []
 
         while payload:
@@ -156,7 +157,8 @@ class ConfluenceInterfacer:
             next_link = links.get("next") if isinstance(links, dict) else None
             if not isinstance(next_link, str) or not next_link:
                 break
-            payload = await self._execute_url_request(next_link, email, api_token)
+            url = urljoin(self.base, next_link)
+            payload = await self._execute_get_request(url, {}, email, api_token)
 
         return out
 
@@ -169,9 +171,8 @@ class ConfluenceInterfacer:
         except ValueError:
             return datetime.min.replace(tzinfo=timezone.utc)
 
-    @staticmethod
-    def _pointer(page_id: str) -> str:
-        return f"confluence://{page_id}"
+    def _pointer(self, page_id: str) -> str:
+        return urljoin(self.base, f"content/{page_id}")
 
     @staticmethod
     def _extract_text(storage_value: str) -> str:
@@ -182,7 +183,8 @@ class ConfluenceInterfacer:
 
     async def get_spaces(self, email: str | None = None, api_token: str | None = None) -> list[dict[str, Any]]:
         """Return Confluence spaces as connector-shaped entries (key, name, URL)."""
-        payload = await self._execute_request("space", {"limit": 250}, email, api_token)
+        url = urljoin(self.base, "space")
+        payload = await self._execute_get_request(url, {"limit": 250}, email, api_token)
         results = payload.get("results", [])
         if not isinstance(results, list):
             return []
@@ -212,8 +214,12 @@ class ConfluenceInterfacer:
         api_token: str | None = None,
     ) -> list[dict[str, Any]]:
         return await self._paginate(
-            "content",
-            {"spaceKey": space_key, "type": "page", "limit": 200, "expand": "version"},
+            {
+                "spaceKey": space_key,
+                "type": "page",
+                "limit": 200,
+                "expand": "version",
+            },  # NOTE; page limit is set to 200, should it?
             email,
             api_token,
         )
@@ -255,39 +261,19 @@ class ConfluenceInterfacer:
 
         async def _fetch(ptr: str) -> dict[str, Any]:
             async with semaphore:
-                try:
-                    page = await self.get_page(
-                        ptr,
-                        include_content=data.include_content,
-                        email=data.email,
-                        api_token=data.api_token,
-                    )
-                except (httpx.HTTPError, ValueError, TypeError):
-                    return {"metadata": {"unique_pointer": ptr, "type": SOURCE_FILE}}
-                if not data.include_last_edit_date and isinstance(page.get("metadata"), dict):
+                page = await self.get_page(
+                    ptr,
+                    include_content=data.include_content,
+                    email=data.email,
+                    api_token=data.api_token,
+                )
+                if not data.include_last_edit_date:
                     page = dict(page)
-                    meta = dict(page["metadata"])
-                    meta.pop("last_edit_date", None)
-                    page["metadata"] = meta
                 return page
 
         if not pointers:
             return []
         return await asyncio.gather(*[_fetch(ptr) for ptr in pointers])
-
-    async def check_index_needed(
-        self,
-        subdata: str | None = None,
-        email: str | None = None,
-        api_token: str | None = None,
-    ) -> dict[str, Any]:
-        """Return whether new content should be indexed (DMS ``index_needed_bool``)."""
-        if self._resolve_auth(email, api_token) is None:
-            return {"index_needed": False}
-        payload = await self.pointers_to_all_files_to_index(subdata, email, api_token)
-        pointers = payload.get("file_pointers", [])
-        n = len(pointers) if isinstance(pointers, list) else 0
-        return {"index_needed": n > 0}
 
     async def stream_files_to_index(
         self,
@@ -306,17 +292,13 @@ class ConfluenceInterfacer:
         new_subdata = pointer_payload.get("subdata")
         yield json.dumps({"subdata": new_subdata}).encode("utf-8")
         pointers = pointer_payload.get("file_pointers", [])
-        if not isinstance(pointers, list):
-            return
+
         valid_pointers = [ptr for ptr in pointers if isinstance(ptr, str)]
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
         async def _fetch(pointer: str) -> dict[str, Any]:
             async with semaphore:
-                try:
-                    return await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
-                except (httpx.HTTPError, ValueError, TypeError):
-                    return {"metadata": {"unique_pointer": pointer, "type": SOURCE_FILE}}
+                return await self.get_page(pointer, include_content=True, email=email, api_token=api_token)
 
         tasks = [asyncio.create_task(_fetch(pointer)) for pointer in valid_pointers]
         for task in asyncio.as_completed(tasks):
@@ -331,26 +313,20 @@ class ConfluenceInterfacer:
         api_token: str | None = None,
     ) -> dict[str, Any]:
         """Fetch one page by pointer; metadata plus optional base64-encoded plain text."""
-        page_id = file_pointer.split("://", 1)[1] if "://" in file_pointer else file_pointer
-        payload = await self._execute_request(
-            f"content/{page_id}",
+        payload = await self._execute_get_request(
+            file_pointer,
             {"expand": "body.storage,version,space"},
             email,
             api_token,
         )
         if not payload:
-            return {
-                "metadata": {
-                    "unique_pointer": self._pointer(page_id),
-                    "type": SOURCE_FILE,
-                }
-            }
-        return self._format_page_payload(payload, page_id, include_content)
+            return {}
+        return self._format_page_payload(payload, file_pointer, include_content)
 
     def _format_page_payload(
         self,
         payload: dict[str, Any],
-        page_id: str,
+        unique_pointer: str,
         include_content: bool,
     ) -> dict[str, Any]:
         title = payload.get("title")
@@ -362,18 +338,18 @@ class ConfluenceInterfacer:
         raw_html = storage.get("value") if isinstance(storage, dict) else ""
         text = self._extract_text(raw_html) if isinstance(raw_html, str) else ""
 
-        out: dict[str, Any] = {
-            "metadata": {
-                "unique_pointer": self._pointer(str(payload.get("id", page_id))),
-                "name": title,
-                "last_edit_date": when,
-                "type": SOURCE_FILE,
-                "clickable_url": (urljoin(self.address + "/", webui.lstrip("/")) if isinstance(webui, str) else None),
-            }
+        out_structure: dict[str, Any] = self.defined_fields
+
+        out_structure |= {
+            "unique_pointer": unique_pointer,
+            "name": title,
+            "last_edit_date": when,
+            "type": SOURCE_FILE,
+            "clickable_url": (urljoin(self.address + "/wiki/", webui.lstrip("/")) if isinstance(webui, str) else None),
         }
         if include_content:
-            out["content"] = base64.b64encode(text.encode("utf-8")).decode("utf-8")
-        return out
+            out_structure["content"] = base64.b64encode(text.encode("utf-8")).decode("utf-8")
+        return out_structure
 
     async def _space_latest_and_page_ids(
         self,
@@ -401,54 +377,39 @@ class ConfluenceInterfacer:
         """Return pointers for spaces with activity newer than the ``subdata`` checkpoint."""
         if self._resolve_auth(email, api_token) is None:
             return {"subdata": subdata, "file_pointers": []}
-
-        provided = self._provided_date(subdata)
         latest = datetime.min.replace(tzinfo=timezone.utc)
         pointers: list[str] = []
+
+        decoded_subdata = self._parse_subdata(subdata)
 
         for space in await self.get_spaces(email, api_token):
             key = space.get("key")
             if not isinstance(key, str):
                 continue
+
+            provided = decoded_subdata.get(key)
+            date_object = self._create_date_object(provided)
+
             space_latest, page_ids = await self._space_latest_and_page_ids(key, email, api_token)
             latest = max(latest, space_latest)
-            if space_latest > provided:
+            if space_latest > date_object:
                 pointers.extend([self._pointer(pid) for pid in page_ids])
+                decoded_subdata[key] = space_latest.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
-        token = base64.b64encode(latest.isoformat().encode("utf-8")).decode("utf-8")
-        return {"subdata": token, "file_pointers": pointers}
+        new_subdata = self._generate_subdata(decoded_subdata)
+        return {"subdata": new_subdata, "file_pointers": pointers}
 
-    async def files_to_index(
-        self,
-        subdata: str | None = None,
-        email: str | None = None,
-        api_token: str | None = None,
-    ) -> dict[str, Any]:
-        """Expand changed pointers into full ``get_page`` payloads for indexing."""
-        if self._resolve_auth(email, api_token) is None:
-            return {
-                "subdata": subdata,
-                "files": [],
-                "deleted": [],
-                "index_needed": False,
-            }
-
-        pointer_payload = await self.pointers_to_all_files_to_index(subdata, email, api_token)
-        pointers = pointer_payload.get("file_pointers", [])
-        files: list[dict[str, Any]] = []
-        if isinstance(pointers, list):
-            files = await self.get_files(
-                GetFilesInput(
-                    file_pointers=pointers,
-                    include_content=True,
-                    include_last_edit_date=True,
-                    email=email,
-                    api_token=api_token,
-                )
-            )
-        return {
-            "subdata": pointer_payload.get("subdata"),
-            "files": files,
-            "deleted": [],
-            "index_needed": bool(files),
-        }
+    async def _execute_get_request(self, url: str, params: dict, email: str | None, api_token: str | None) -> dict[str, Any]:
+        creds = self._resolve_auth(email, api_token)
+        if not creds:
+            return {}
+        user, token = creds
+        try:
+            response = await self.session.get(url, params=params, auth=(user, token))
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict):
+                return payload
+        except (httpx.HTTPError, ValueError) as err:
+            dms_warning(f"Request to {url} was not successfullt due to: {err}")
+        return {}

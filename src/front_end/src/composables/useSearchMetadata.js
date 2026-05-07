@@ -13,16 +13,12 @@ const pick = (...values) => {
 }
 
 /* Function to extract metadata from an entry. */
-const getMetadata = (entry) => {
-  if (!entry || typeof entry !== 'object') {
+export const getMetadata = (entry) => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
     return {}
   }
 
-  if (entry.metadata && typeof entry.metadata === 'object') {
-    return entry.metadata
-  }
-
-  return entry
+  return entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata) ? entry.metadata : entry
 }
 
 /* Function to resolve the filename from metadata or entry. Can differ between sources. */
@@ -35,20 +31,20 @@ export const resolveFilename = (entry, index = 0) => {
 export const resolveDocumentType = (entry) => {
   const metadata = getMetadata(entry)
 
-  return pick(metadata?.file_type_description, entry?.file_type_description)
+  return pick(metadata?.file_type_description, entry?.file_type_description, 'Unknown')
 }
 
 export const resolveDocumentExtension = (entry) => {
   const metadata = getMetadata(entry)
 
-  return pick(metadata?.file_type, entry?.file_type)
+  return pick(metadata?.file_type, entry?.file_type, 'Unknown')
 }
 
 /* Function to resolve the source of the document from metadata. */
 export const resolveSource = (entry) => {
   const metadata = getMetadata(entry)
 
-  return pick(metadata?.source_system, entry?.source_system)
+  return pick(metadata?.source_system, entry?.source_system, 'Unknown')
 }
 
 /* Function to resolve the date from a value. */
@@ -56,7 +52,11 @@ export const resolveDateOnly = (entry) => {
   const metadata = getMetadata(entry)
   const value = pick(metadata?.last_edit_date, entry?.last_edit_date)
 
-  return pick((value || '').split('T')[0])
+  if (!value || typeof value !== 'string') {
+    return 'Unknown date'
+  }
+
+  return value.includes('T') ? value.split('T')[0] : value
 }
 
 /* Function to resolve the clickable link from metadata or entry. */
@@ -69,7 +69,7 @@ export const resolveLink = (entry) => {
 export const resolveSecurityClass = (entry) => {
   const metadata = getMetadata(entry)
 
-  return pick(metadata?.security_class, entry?.security_class)
+  return pick(metadata?.security_class, entry?.security_class, 'Pending')
 }
 
 /**

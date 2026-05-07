@@ -3,7 +3,13 @@
 import asyncio
 import aiohttp
 
-from gateway.model_instructions import SUMMARIZER_SYSTEM_PROMPT, SUMMARIZE_PROMPT, MERGE_STAGE_ONE_PROMPT, MERGE_STAGE_TWO_PROMPT
+from gateway.model_instructions import (
+    SUMMARIZER_SYSTEM_PROMPT,
+    SUMMARIZE_PROMPT,
+    STAGE_ONE_PROMPT,
+    MERGE_STAGE_TWO_PROMPT,
+    SUMMARIZE_STAGE_TWO_PROMPT,
+)
 from gateway.schemas import InputItem, SummaryResult
 
 from shared_functions.dmis_logger import dms_warning
@@ -28,28 +34,32 @@ class Summarizer:
         """Close the connection."""
         await self.session.close()
 
-    async def summarize(self, item: InputItem) -> SummaryResult | None:
-        """Summarize a single document"""
-        prompt = SUMMARIZE_PROMPT.format(content=item.content)
-        result = await self._call_llm(prompt)
-        if result is None:
-            dms_warning("No response recieved")
-            return None
-        return SummaryResult(summary=result)
+    async def summarize(self, items: list[InputItem]) -> SummaryResult | None:
+        """Summarize one or more documents."""
+        if len(items) == 1:
+            prompt = SUMMARIZE_PROMPT.format(content=items[0].content)
+            result = await self._call_llm(prompt)
+            return SummaryResult(summary=result) if result else None
+
+        return await self._pipeline(items, STAGE_ONE_PROMPT, SUMMARIZE_STAGE_TWO_PROMPT)
 
     async def merge(self, items: list[InputItem]) -> SummaryResult | None:
         """Handle merging multiple documents into one amazing new document."""
-        tasks = [self._call_llm(MERGE_STAGE_ONE_PROMPT.format(content=item.content)) for item in items]
+        return await self._pipeline(items, STAGE_ONE_PROMPT, MERGE_STAGE_TWO_PROMPT)
+
+    async def _pipeline(self, items: list[InputItem], stage_one: str, stage_two: str) -> SummaryResult | None:
+        """Two-stage pipeline for multiple document logic."""
+        tasks = [self._call_llm(stage_one.format(content=item.content)) for item in items]
         extracts = [e for e in await asyncio.gather(*tasks) if e is not None]
 
         if not extracts:
-            dms_warning("Extracts in stage 1 failed.")
+            dms_warning("Stage 1 produced no extracts.")
             return None
         if len(extracts) == 1:
             return SummaryResult(summary=extracts[0])
 
         combined = "\n\n".join(extracts)
-        prompt = MERGE_STAGE_TWO_PROMPT.format(doc_count=len(extracts), combined_summaries=combined)
+        prompt = stage_two.format(doc_count=len(extracts), combined_summaries=combined)
         result = await self._call_llm(prompt)
         return SummaryResult(summary=result) if result else None
 

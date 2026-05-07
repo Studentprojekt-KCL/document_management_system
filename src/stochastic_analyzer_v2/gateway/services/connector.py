@@ -3,6 +3,7 @@
 from base64 import b64decode
 from io import BytesIO
 
+import asyncio
 import aiohttp
 from markitdown import MarkItDown, FileConversionException, UnsupportedFormatException
 
@@ -48,7 +49,7 @@ class Connector:
 
         items = []
         for entry in data:
-            content = self._extract_text(entry.get("content"))
+            content = await asyncio.to_thread(self._extract_text, entry.get("content"))
             if content is None:
                 continue
             items.append(

@@ -20,7 +20,7 @@ def create_router(
     router = APIRouter()
 
     @router.post("/md-to-pdf")
-    async def md_to_pdf(payload: MarkdownRequest) -> Response:
+    def md_to_pdf(payload: MarkdownRequest) -> Response:
         """Route that takes string as input and gives PDF."""
         pdf = pdf_converter.convert(payload.markdown)
         if pdf is None:
@@ -35,16 +35,16 @@ def create_router(
 
     @router.post("/summarize", response_model=SummaryResult)
     async def summarize(payload: PointerRequest) -> SummaryResult:
-        """Summarize a single document."""
-        if len(payload.pointers) != 1:
-            dms_warning("Only 1 pointer plz")
+        """Summarize one or more documents."""
+        if not payload.pointers:
+            dms_warning("summarize requires at least 1 pointer.")
             raise HTTPException(status_code=400)
 
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
             raise HTTPException(status_code=502)
-        result = await summarizer.summarize(items[0])
+        result = await summarizer.summarize(items)
         if result is None:
             dms_warning("summarization failed")
             raise HTTPException(status_code=500)
@@ -52,7 +52,7 @@ def create_router(
 
     @router.post("/merge", response_model=SummaryResult)
     async def merge(payload: PointerRequest) -> SummaryResult:
-        if len(payload.pointers) < 2:
+        if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
             raise HTTPException(status_code=400)
         items = await connector.get_file_contents(payload.pointers)

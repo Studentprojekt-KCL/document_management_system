@@ -23,9 +23,6 @@ def create_router(
     def md_to_pdf(payload: MarkdownRequest) -> Response:
         """Route that takes string as input and gives PDF."""
         pdf = pdf_converter.convert(payload.markdown)
-        if pdf is None:
-            dms_warning("PDF conversion failed")
-            raise HTTPException(status_code=500)
         return Response(
             content=pdf,
             status_code=200,

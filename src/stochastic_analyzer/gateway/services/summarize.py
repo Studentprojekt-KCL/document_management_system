@@ -17,7 +17,7 @@ from shared_functions.initialisation_tools import read_env_variable
 
 
 class Summarizer:
-    """yeah buddy summarize engine"""
+    """Class instance for summarizer."""
 
     TIMEOUT: int = 120
     MAX_COMBINED_CHARS: int = 200_000

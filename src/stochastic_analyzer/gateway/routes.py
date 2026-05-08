@@ -1,6 +1,6 @@
 """Handeling routes in the API."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import Response
 
 from gateway.services.md_pdf import PdfConverter

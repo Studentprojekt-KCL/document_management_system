@@ -49,13 +49,17 @@ class Connector:
 
         items = []
         for entry in data:
+            pointer = entry.get("unique_pointer")
+            if not pointer:
+                dms_warning("connector entry missing pointer.")
+                continue
             content = await asyncio.to_thread(self._extract_text, entry.get("content"))
             if content is None:
                 continue
             items.append(
                 InputItem(
                     content=content,
-                    metadata=MetadataTemplate(unique_pointer=entry.get("unique_pointer", "")),
+                    metadata=MetadataTemplate(unique_pointer=pointer)),
                 )
             )
         return items

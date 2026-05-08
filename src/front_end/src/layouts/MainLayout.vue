@@ -29,9 +29,9 @@ import TheFooter from '@/components/TheFooter.vue'
       <TheSidebar />
 
       <!-- Dynamic page content -->
-      <div class="content">
+      <main class="content">
         <router-view />
-      </div>
+      </main>
     </div>
 
     <!-- Global footer -->
@@ -43,20 +43,17 @@ import TheFooter from '@/components/TheFooter.vue'
 .layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .main {
   display: flex;
   flex: 1;
-  min-height: 0;
 }
 
 .content {
   flex: 1;
   padding: 2rem;
   background: #f5f6fa;
-  overflow-y: auto;
-  min-height: 0;
 }
 </style>

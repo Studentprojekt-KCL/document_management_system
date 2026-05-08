@@ -57,7 +57,7 @@ class ConnectorClient:
                 sorted_pointers.append([pointer])
         return sorted_pointers
 
-    def _slice_url_to_host_and_proto(self, url: str) -> str:
+    def _slice_url_to_host_and_port(self, url: str) -> str:
         """Returns a URL proto:://<host>/path -> proto://<host>"""
         scheme, rest = url.split("//", 1)
         host = rest.split("/", 1)[0]
@@ -72,8 +72,8 @@ class ConnectorClient:
         source_system_host_list = []
         for grouped_pointers in sorted_pointers:
             for system in self.source_systems:
-                if self._slice_url_to_host_and_proto(grouped_pointers[0]) in system["source_system_url"]:
-                    source_system_host_list.append({"url": system["connector_url"], "header": system["authorization_header"]})
+                if self._slice_url_to_host_and_port(grouped_pointers[0]) in system["source_system_url"]:
+                    source_system_host_list.append({"url": system["connector_url"]})
 
                     break
 
@@ -86,7 +86,6 @@ class ConnectorClient:
                         ("include_content", include_content),
                         ("include_last_edit_date", include_last_edit_date),
                     ],
-                    headers={"Authorization": f"{source_system_host_list[sorted_pointers.index(grouped_pointers)]["header"]}"},
                     json={"file_pointers": grouped_pointers},
                     timeout=self.timeout,
                 )
@@ -148,7 +147,7 @@ class ConnectorClient:
 
     def _set_callback_url(self, referer: str) -> str:
         """takes referer header in original request and sets the auth_callback endpoint"""
-        return f"{self._slice_url_to_host_and_proto(referer)}/auth_callback"
+        return f"{self._slice_url_to_host_and_port(referer)}/auth_callback"
 
     async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
         """redirects user to source system for authentication"""

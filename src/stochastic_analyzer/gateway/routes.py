@@ -31,7 +31,7 @@ def create_router(
         )
 
     @router.post("/summarize")
-    async def summarize(payload: PointerRequest) -> dict [str, str]:
+    async def summarize(payload: PointerRequest) -> dict[str, str]:
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
@@ -48,7 +48,7 @@ def create_router(
         return result
 
     @router.post("/merge")
-    async def merge(payload: PointerRequest) -> dict [str, str]:
+    async def merge(payload: PointerRequest) -> dict[str, str]:
         """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")

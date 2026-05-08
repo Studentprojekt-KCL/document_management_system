@@ -76,7 +76,7 @@ Run the gateway locally inside a virtual python environment:
 
 ```bash
 $ pip install -e .
-$ gateway
+$ stochastic-analyzer
 ```
 
 ## Further API documentation

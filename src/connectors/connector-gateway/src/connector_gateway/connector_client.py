@@ -57,8 +57,9 @@ class ConnectorClient:
                 sorted_pointers.append([pointer])
         return sorted_pointers
 
-    def _slice_url_to_host_and_proto(self, url: str) -> str:
+    def _slice_url_to_host_and_proto(self, url: str | None) -> str:
         """Returns a URL proto:://<host>/path -> proto://<host>"""
+        #TODO, URL can be None here, meaning this will crash.
         scheme, rest = url.split("//", 1)
         host = rest.split("/", 1)[0]
         return f"{scheme}//{host}"
@@ -136,8 +137,9 @@ class ConnectorClient:
         """Returns list of dicts with name and auth_user url"""
         auth_user_endpoints: list[dict] = []
         for source_system in self.source_systems:
+            system_name: str = source_system["name"]
             auth_user_endpoints.append(
-                {"name": source_system["name"], "endpoint": f"/auth_user&source_system={source_system['name'].lower()}"}
+                {"name": system_name, "endpoint": f"/auth_user?source_system={system_name.lower()}", "authentication_method": source_system.get("authentication_method")}
             )
         return auth_user_endpoints
 

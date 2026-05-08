@@ -20,7 +20,7 @@ class RefreshServiceClient:
         self.http_client = httpx.AsyncClient()
 
 
-    async def send_request(self, end_point, params, headers, body: dict):
+    async def send_request(self, end_point: str, params: dict = {}, headers: dict = {}, body: dict = {}):
         try:
             await self.http_client.post(
                 f"{self.service_url}{end_point}",

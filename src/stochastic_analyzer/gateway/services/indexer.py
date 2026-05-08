@@ -1,24 +1,29 @@
 """Document indexing and vector search service for Qdrant."""
 
+import asyncio
 import hashlib
 from base64 import b64decode
 from dataclasses import dataclass
 from http import HTTPStatus
 from io import BytesIO
 
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
-
 import httpx
+from markitdown import MarkItDown, StreamInfo
+from markitdown._exceptions import (
+    UnsupportedFormatException,
+    FileConversionException,
+    MissingDependencyException,
+)
 
 from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable
+
+_md = MarkItDown(enable_plugins=False)
 
 
 def _to_uuid(pointer: str) -> str:
     """Hash a pointer string into a UUID for Qdrant."""
     h = hashlib.md5(pointer.encode()).hexdigest()
-    # Slice the 32-char hex digest into some super cool groups for vector db support
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
 
 
@@ -57,16 +62,7 @@ class Indexer:
 
     @classmethod
     def from_env(cls, client: httpx.AsyncClient) -> "Indexer":
-        """Construct an Indexer from environment variables.
-
-        Reads (required):
-            STOCHAN_EMBEDDING_URL: URL for the TEI embedding container.
-            STOCHAN_QDRANT_URL: URL for the Qdrant vector database.
-
-        Reads (optional):
-            INDEX_BATCH_SIZE: Documents embedded per batch (default 8).
-            STOCHAN_INDEX_MAX_CHARS: Max characters per document (default 2000).
-        """
+        """Construct an Indexer from environment variables."""
         config = IndexerConfig(
             embedding_url=read_env_variable("STOCHAN_EMBEDDING_URL"),
             qdrant_url=read_env_variable("STOCHAN_QDRANT_URL"),
@@ -76,11 +72,7 @@ class Indexer:
         return cls(config=config, client=client)
 
     async def index(self, connector_url: str) -> dict:
-        """Run the full indexing pipeline.
-
-        Returns:
-            Status dict with total file count and indexed count.
-        """
+        """Run the full indexing pipeline."""
         files = await self._fetch_files(connector_url)
         if not files:
             return {"status": "skipped", "reason": "no files or index not needed"}
@@ -89,15 +81,7 @@ class Indexer:
         return {"status": "complete", "total": len(files), "indexed": indexed}
 
     async def search_similar(self, text: str, limit: int = 5) -> list[tuple[str, float]]:
-        """Find the most similar documents in Qdrant for a given text.
-
-        Args:
-            text: reference document content.
-            limit: number of candidates to return.
-
-        Returns:
-            List of (unique_pointer, score) tuples for the top matches.
-        """
+        """Find the most similar documents in Qdrant for a given text."""
         resp = await self.client.post(
             f"{self.embedding_url}/embed",
             json={"inputs": [text[: self.max_chars]]},
@@ -108,11 +92,7 @@ class Indexer:
 
         resp = await self.client.post(
             f"{self.qdrant_url}/collections/documents/points/query",
-            json={
-                "query": vector,
-                "limit": limit,
-                "with_payload": True,
-            },
+            json={"query": vector, "limit": limit, "with_payload": True},
             timeout=self.search_timeout,
         )
         resp.raise_for_status()
@@ -178,6 +158,24 @@ class Indexer:
             timeout=self.index_timeout,
         )
 
+    async def _extract_for_indexing(self, raw: bytes, name: str) -> str | None:
+        """Extract markdown text via markitdown, truncated for embedding. None on failure."""
+        try:
+            result = await asyncio.to_thread(
+                _md.convert_stream,
+                BytesIO(raw),
+                stream_info=StreamInfo(filename=name),
+            )
+        except (
+            UnsupportedFormatException,
+            FileConversionException,
+            MissingDependencyException,
+        ) as err:
+            dms_warning(f"Failed to extract '{name}': {err}")
+            return None
+        content = result.text_content[: self.max_chars]
+        return content if content.strip() else None
+
     async def _embed_and_upsert(self, files: list[dict]) -> int:
         """Embed documents and upsert them into Qdrant in batches."""
         await self._ensure_collection()
@@ -191,15 +189,11 @@ class Indexer:
                 name = f.get("metadata", {}).get("name", "?")
                 try:
                     raw = b64decode(f["content"])
-                    if raw.startswith(b"%PDF-"):
-                        content = "\n".join(p.extract_text() or "" for p in PdfReader(BytesIO(raw)).pages)
-                    else:
-                        content = raw.decode("utf-8")
-                    content = content[: self.max_chars]
-                except (UnicodeDecodeError, ValueError, KeyError, PdfReadError):
-                    dms_warning(f"Failed to decode: {name}")
+                except (ValueError, KeyError):
+                    dms_warning(f"Base64 decode failed: {name}")
                     continue
-                if not content.strip():
+                content = await self._extract_for_indexing(raw, name)
+                if content is None:
                     continue
                 texts.append(content)
                 valid.append(f)

@@ -156,21 +156,22 @@ class SearchEngine:
             except TypeError:
                 dms_warning(f"Value is of wrong type, expected string got '{type(value)}': '{value}'")
 
-        query: Query = Query.boolean_query(sub_queries)
         self.index.reload()
         searcher: Searcher = self.index.searcher()
-        result: SearchResult = searcher.search(query, limit=count, offset=offset)
+        result: SearchResult = searcher.search(Query.boolean_query(sub_queries), limit=count, offset=offset)
         pointers: list[str] = []
         metadata: dict[str, dict] = {}
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
-            classification = doc[CLASSIFICATION][0]
-            modified = doc[MODIFIED][0]
-            metadata.update({unique_pointer: {
-                CLASSIFICATION: classification,
-                MODIFIED: modified,
-            }})
+            metadata.update(
+                {
+                    doc[unique_pointer][0]: {
+                        CLASSIFICATION: doc[CLASSIFICATION][0],
+                        MODIFIED: doc[MODIFIED][0],
+                    }
+                }
+            )
             pointers.append(unique_pointer)
 
         return (pointers, metadata)

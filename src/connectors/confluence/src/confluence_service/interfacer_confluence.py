@@ -45,7 +45,7 @@ class ConfluenceInterfacer:
 
     def __init__(self) -> None:
         self.session = httpx.AsyncClient(timeout=120.0)
-        self.address = read_env_variable("CONCONFLUENCE_CONFLUENCE_URL").rstrip("/")
+        self.address = read_env_variable("CONFLUENCE_ADDRESS").rstrip("/")
         self.base = self._api_base(self.address)
         self.max_concurrency = 20
         self.defined_fields = {

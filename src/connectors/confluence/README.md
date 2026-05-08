@@ -1,8 +1,7 @@
 The following should be exported in local environment:
 
-    CONCONFLUENCE_BIND_PORT=<BIND_PORT>
-    CONCONFLUENCE_BIND_ADDR=<BIND_ADDR>
-    CONCONFLUENCE_CONFLUENCE_URL=<CONFLUENCE_BASE_URL>          # e.g. https://tenant.atlassian.net
+    CONFLUENCE_CONNECTOR_PORT=<PORT>                             # connector HTTP listen port
+    CONFLUENCE_ADDRESS=<CONFLUENCE_BASE_URL>                    # e.g. https://tenant.atlassian.net
 
 
 ## Authentication

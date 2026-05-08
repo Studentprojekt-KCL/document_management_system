@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.initialisation_tools import read_port, read_env_variable
+from shared_functions.initialisation_tools import read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
@@ -125,7 +125,7 @@ def run() -> None:
 
     uvicorn.run(
         api.app,
-        host=read_env_variable("CONCONFLUENCE_BIND_ADDR"),
+        host="0.0.0.0",
         log_level=api.log_level,
-        port=read_port("CONCONFLUENCE_BIND_PORT"),
+        port=read_port("CONFLUENCE_CONNECTOR_PORT"),
     )

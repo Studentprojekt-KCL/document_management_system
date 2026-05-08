@@ -1,9 +1,8 @@
-import asyncio
-import json
+"""Methods for interacting with refresh service."""
+
 import httpx
 
-from fastapi.responses import RedirectResponse
-from shared_functions.dmis_logger import dms_error, dms_warning
+from shared_functions.dmis_logger import dms_warning
 
 
 class RefreshServiceClient:
@@ -19,15 +18,13 @@ class RefreshServiceClient:
         self.timeout = timeout
         self.http_client = httpx.AsyncClient()
 
-
-    async def send_request(self, end_point: str, params: dict = {}, headers: dict = {}, body: dict = {}):
+    async def send_request(
+        self, end_point: str, params: dict | None = None, headers: dict | None = None, body: dict | None = None
+    ) -> list | dict:
+        """Send request to refresh service."""
         try:
             await self.http_client.post(
-                f"{self.service_url}{end_point}",
-                params=params,
-                headers=headers,
-                json=body,
-                timeout=self.timeout
+                f"{self.service_url}{end_point}", params=params, headers=headers, json=body, timeout=self.timeout
             )
         except httpx.TimeoutException:
             dms_warning("Request timed out")

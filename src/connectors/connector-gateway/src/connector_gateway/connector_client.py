@@ -138,7 +138,11 @@ class ConnectorClient:
         for source_system in self.source_systems:
             system_name: str = source_system["name"]
             auth_user_endpoints.append(
-                {"name": system_name, "endpoint": f"/auth_user?source_system={system_name.lower()}", "authentication_method": source_system.get("authentication_method")}
+                {
+                    "name": system_name,
+                    "endpoint": f"/auth_user?source_system={system_name.lower()}",
+                    "authentication_method": source_system.get("authentication_method"),
+                }
             )
         return auth_user_endpoints
 

@@ -3,11 +3,11 @@
 import uvicorn
 import fastapi
 
-from fastapi import Header, Request
+from fastapi import Header
+from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
 from connector_gateway.refreshservice_client import RefreshServiceClient
-from fastapi.exceptions import HTTPException
 
 from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable, read_port
 from shared_functions.dmis_logger import dms_warning
@@ -22,13 +22,9 @@ class API:
         self.timeout: int = int(read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"))
 
         self.down_stream_client = ConnectorClient(
-            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True),  # type: ignore
-            self.timeout
+            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True), self.timeout  # type: ignore
         )
-        self.refresh_client = RefreshServiceClient(
-            read_env_variable("CONGATEWAY_REFRESH_SERVICE_URL"),
-            self.timeout
-        )
+        self.refresh_client = RefreshServiceClient(read_env_variable("CONGATEWAY_REFRESH_SERVICE_URL"), self.timeout)
 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
@@ -74,13 +70,20 @@ class API:
     async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
         """Returns redirect to source system to authenticate."""
         if not isinstance(source_system, str) or referer is None:
-            dms_warning("No %s provided to gateway auth_user" % "referer" if referer is None else "source_system")
+            dms_warning(
+                "No {issue} provided to gateway auth_user".format(  # pylint: disable=C0209
+                    issue="referer" if referer is None else "source_system"
+                )
+            )
             raise HTTPException(status_code=400)
         return await self.down_stream_client.get_auth_redirect(source_system, referer)
 
-    async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict:
+    async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
         """Callback endpoint to insert service session token."""
-        return await self.refresh_client.send_request("add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body)
+        return await self.refresh_client.send_request(
+            "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
+        )
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

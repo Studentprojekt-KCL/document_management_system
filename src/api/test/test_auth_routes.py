@@ -1,0 +1,1 @@
+"""Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""

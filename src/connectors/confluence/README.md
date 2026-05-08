@@ -16,11 +16,18 @@ Authentication is per request. Callers should supply:
     X-Confluence-Email: <user email>
     X-Confluence-Token: <user API token>
 
-``GET /auth_user`` (same path as OAuth connectors) returns JSON only — no redirect. Example shape:
+``GET /auth_user`` (same path as OAuth connectors) answers with **HTTP 200** and ``Content-Type:
+application/json`` — no redirect. The gateway relays that JSON unchanged so the frontend receives a predictable contract.
 
-``type`` = ``api_token``, ``method`` = ``manual``, ``header_names``, ``labels``, ``help_url`` (for DMIS frontend).
+Stable fields for UI (increment ``schema_version`` only on incompatible changes):
 
-The gateway still sends ``callback-url`` when proxying from other flows; this connector does not use it.
+   ``schema_version``, ``connector``, ``flow``, ``required_headers``, ``steps``, ``summary``, ``oauth`` (with ``implemented_in_connector``).
+
+Backward-compatible aliases remain: ``type``, ``method``, ``header_names``, ``labels``, ``help_url``.
+
+OAuth 3LO references (not implemented): see ``oauth.documentation_url`` in the payload and note in PR #520 discussion.
+
+The gateway still sends ``callback-url`` when proxying; this connector does not use it.
 
 If headers are missing, endpoints return empty/no-op payloads and no Confluence API requests are made.
 

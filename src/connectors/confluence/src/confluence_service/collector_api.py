@@ -6,8 +6,9 @@ Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
 ``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
 
 Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata (same path name as
-OAuth connectors; GitLab redirects, Confluence does not). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
+``ConfluenceInterfacer``). ``GET /auth_user`` returns a predictable JSON ``schema_version``
+contract for the frontend (same path name as OAuth connectors; GitLab redirects, Confluence does not).
+Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
 optional MinIO env vars for uploads.
 """
 
@@ -82,22 +83,66 @@ class API:
         return JSONResponse(status_code=422, content=content)
 
     async def auth_user(self) -> JSONResponse:
-        """Declare manual api-token auth (no OAuth redirect). Same ``/auth_user`` route as OAuth connectors (#478).
+        """Gateway calls ``GET /auth_user`` for every connector — OAuth connectors redirect; here we describe header auth.
 
-        Gateway may send extra headers for other connectors; this handler ignores them."""
-        return JSONResponse(
-            status_code=200,
-            content={
-                "type": "api_token",
-                "method": "manual",
-                "header_names": ["X-Confluence-Email", "X-Confluence-Token"],
-                "labels": {
-                    "X-Confluence-Email": "Confluence Email",
-                    "X-Confluence-Token": "Confluence API Token",
+        ``schema_version`` and ``flow`` are stable anchors for DMIS/frontends.
+        OAuth 2 (3LO) exists for Cloud apps; see ``oauth.documentation_url`` in the JSON payload. It is
+        not implemented in this connector; callers use Basic-style email + API token per request."""
+
+        legacy_labels = {
+            "X-Confluence-Email": "Confluence Email",
+            "X-Confluence-Token": "Confluence API Token",
+        }
+        payload: dict[str, Any] = {
+            "schema_version": 1,
+            "connector": "confluence",
+            "flow": "request_headers_credentials",
+            "title": "Confluence Cloud credentials",
+            "summary": (
+                "This connector authenticates each request using your Atlassian Cloud account email and an API token "
+                "sent as HTTP headers. There is no browser OAuth handshake in this service."
+            ),
+            "steps": [
+                "Create or copy an API token from your Atlassian account security page.",
+                "Send it with requests using the headers below alongside the site login email.",
+                "Prefer gateway or connector calls that forward these headers to every downstream endpoint.",
+            ],
+            "required_headers": [
+                {
+                    "name": "X-Confluence-Email",
+                    "label": legacy_labels["X-Confluence-Email"],
+                    "sensitive": False,
+                    "hints": {"format": "email"},
                 },
-                "help_url": "https://id.atlassian.com/manage-profile/security/api-tokens",
+                {
+                    "name": "X-Confluence-Token",
+                    "label": legacy_labels["X-Confluence-Token"],
+                    "sensitive": True,
+                    "hints": {"format": "api_token"},
+                },
+            ],
+            "oauth": {
+                "implemented_in_connector": False,
+                "note": (
+                    "Atlassian OAuth 2.0 authorization code grants (often called 3LO) apply to interactive apps "
+                    "registered in developer console; exchanging an auth code for access tokens differs from PAT-based "
+                    "Basic auth above. Implementing session-based OAuth here would require app registration and callback "
+                    "flows similar to GitHub/GitLab connectors."
+                ),
+                "documentation_url": ("https://developer.atlassian.com/cloud/jira/software/oauth-2-3lo-apps/"),
             },
-        )
+            # --- legacy keys retained for earlier consumers ---
+            "type": "api_token",
+            "method": "manual",
+            "header_names": ["X-Confluence-Email", "X-Confluence-Token"],
+            "labels": legacy_labels,
+            "help_url": "https://id.atlassian.com/manage-profile/security/api-tokens",
+            "documentation": {
+                "api_tokens": "https://id.atlassian.com/manage-profile/security/api-tokens",
+            },
+        }
+
+        return JSONResponse(status_code=200, content=payload)
 
     @staticmethod
     def _token(x_confluence_token: str | None) -> str | None:

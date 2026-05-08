@@ -10,7 +10,6 @@ import base64
 import binascii
 import io
 import json
-import os
 import zipfile
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
@@ -44,7 +43,7 @@ class GitHub:
             raise ValueError("Missing CONGITHUB_GITHUB_API_URL")
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
-        self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
+        self.org = read_env_variable("CONGITHUB_GITHUB_ORG", required=False)
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
         file_type_resource = get_file_resource()
@@ -93,8 +92,8 @@ class GitHub:
 
     @staticmethod
     def _is_excluded_path(path: str) -> bool:
-        """Optional path filter via env GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
-        raw = os.environ.get("GITHUB_EXCLUDE_PATHS", "")
+        """Optional path filter via env CONGITHUB_GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
+        raw = read_env_variable("CONGITHUB_GITHUB_EXCLUDE_PATHS", required=False) or ""
         if not raw:
             return False
         path_l = path.lower()

@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import json
 from os import listdir, mkdir, path, remove
-from asyncio import Lock
+from asyncio import Lock, to_thread
 from tantivy import (
     Document,
     Index,
@@ -73,7 +73,7 @@ class SearchEngine:
         schema_builder = SchemaBuilder()
         for category in categories:
             if category in RAW_CATEGORIES:
-                schema_builder.add_text_field(category, stored=True, tokenizer_name="raw")
+                schema_builder.add_text_field(category, stored=True, tokenizer_name="raw", fast=True)
             elif category in BOOLEAN_CATEGORIES:
                 schema_builder.add_boolean_field(category, stored=True, indexed=True)
             else:
@@ -95,7 +95,9 @@ class SearchEngine:
 
     async def close(self) -> None:
         """Graceful shutdown."""
+        await self.writer_lock.acquire()
         await asyncio.to_thread(self.writer.wait_merging_threads)
+        self.writer_lock.release()
 
     def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
@@ -110,6 +112,7 @@ class SearchEngine:
             unique_pointer: pointer for the file.
             classification: new classification.
         """
+        self.index.reload()
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
         if not result.hits:
@@ -118,14 +121,17 @@ class SearchEngine:
         doc = searcher.doc(doc_address)
         file: dict = {}
         for category in self.categories:
-            file.update({category: doc[category][0]})
-        file.update({CLASSIFICATION: classification})
-        file.update({MODIFIED: True})
+            try:
+                file.update({category: doc[category][0]})
+            except IndexError:
+                dms_warning(f"File '{unique_pointer}' is missing category: '{category}'.")
+        file[CLASSIFICATION] = classification
+        file[MODIFIED] = True
         async with self.open_writer():
-            self.add_file(file)
+            await self.add_file(file, force=True)
         return (unique_pointer, classification)
 
-    def query_files(self, content: dict[str, str], count: int) -> tuple[list[str], dict[str, str]]:
+    def query_files(self, content: dict[str, str], count: int, offset: int) -> tuple[list[str], dict[str, dict]]:
         """Query through the files in the index.
 
         Args:
@@ -146,26 +152,31 @@ class SearchEngine:
                     (Occur.Must, self.index.parse_query(value, [field if field != "documents_only" else IS_DOCUMENT]))
                 )
             except ValueError:
-                dms_warning(f"Failed to create query: {value} for field: {field}")
+                dms_warning(f"Failed to create query: '{value}' for field: '{field}'")
             except TypeError:
-                dms_warning(f"Value is of wrong type, expected string got {type(value)}: {value}")
+                dms_warning(f"Value is of wrong type, expected string got '{type(value)}': '{value}'")
 
-        query: Query = Query.boolean_query(sub_queries)
-
+        self.index.reload()
         searcher: Searcher = self.index.searcher()
-        result: SearchResult = searcher.search(query, count)
+        result: SearchResult = searcher.search(Query.boolean_query(sub_queries), limit=count, offset=offset)
         pointers: list[str] = []
-        classifications: dict[str, str] = {}
+        metadata: dict[str, dict] = {}
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
-            classification = doc[CLASSIFICATION][0]
-            classifications.update({unique_pointer: classification})
+            metadata.update(
+                {
+                    doc[unique_pointer][0]: {
+                        CLASSIFICATION: doc[CLASSIFICATION][0],
+                        MODIFIED: doc[MODIFIED][0],
+                    }
+                }
+            )
             pointers.append(unique_pointer)
 
-        return (pointers, classifications)
+        return (pointers, metadata)
 
-    async def find_matching(self, unique_pointer: str) -> dict:
+    async def find_matching(self, unique_pointer: str, count: int) -> dict:
         """Search for matching files.
 
         Args:
@@ -173,12 +184,13 @@ class SearchEngine:
         Returns: unique pointers and their score.
         """
         matching: dict = {}
+        self.index.reload()
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
         if not result.hits:
             return {}
         doc_address = result.hits[0][1]
-        result = searcher.search(Query.more_like_this_query(doc_address))
+        result = searcher.search(Query.more_like_this_query(doc_address), limit=count + 1)
         original_score: int | None = None
         for score, doc_id in result.hits:
             if original_score is None:
@@ -209,6 +221,7 @@ class SearchEngine:
         Returns: file dict.
         """
 
+        self.index.reload()
         searcher: Searcher = self.index.searcher()
         matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
         if matches.hits:
@@ -223,61 +236,38 @@ class SearchEngine:
             return file
         return {}
 
-    async def fetch_pending(self) -> AsyncGenerator[dict]:
-        """Grab a file from the index.
-
-        Args:
-            unique_pointer: the file pointer.
-        Returns: file dict.
-        """
-
-        while True:
-            searcher: Searcher = self.index.searcher()
-            matches = searcher.search(Query.term_query(self.index.schema, CLASSIFICATION, "Pending"))
-            if matches.hits:
-                for _, doc_id in matches.hits:
-                    doc = searcher.doc(doc_id)
-                    file = {}
-                    for category in self.categories:
-                        try:
-                            file[category] = doc[category][0]
-                        except IndexError:
-                            file[category] = "N/A"
-                    yield file
-            else:
-                break
-
-    def add_file(self, file: dict) -> None:
+    async def add_file(self, file: dict, force: bool = False) -> None:
         """Add file to index.
 
         Requiers init call before and after.
 
         Args:
             file: file dict
+            force: Force change classification field.
         """
 
         unique_pointer: str | None = file.get(UNIQUE_POINTER)
         if unique_pointer is None:
             dms_warning(f"File is missing unique pointer: {file.update({CONTENT: ""})}.")
             return
+        self.index.reload()
         searcher: Searcher = self.index.searcher()
-        matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        matches = await to_thread(searcher.search, Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
         if matches.hits:
             doc_id = matches.hits[0][1]
-            doc = searcher.doc(doc_id)
+            doc = await to_thread(searcher.doc, doc_id)
             modified: bool = bool(doc[MODIFIED][0])
-            if modified:
+            if modified and not force:
                 classification: str = doc[CLASSIFICATION][0]
                 file.update({CLASSIFICATION: classification})
                 file.update({MODIFIED: True})
-            else:
-                file.update({MODIFIED: False})
-        else:
-            file.update({MODIFIED: False})
-        self.writer.delete_documents_by_query(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+            if modified and force:
+                file.update({MODIFIED: True})
+
+        await to_thread(self.writer.delete_documents_by_query, Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
         extension: str = file.get("file_type", "")
         file.update({IS_DOCUMENT: extension in self.documents_only_extension})
-        self.writer.add_json(json.dumps(file))
+        await to_thread(self.writer.add_json, json.dumps(file))
 
     async def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
@@ -287,5 +277,5 @@ class SearchEngine:
         """
 
         async with self.open_writer():
-            self.writer.delete_documents(UNIQUE_POINTER, pointer)
+            await to_thread(self.writer.delete_documents, UNIQUE_POINTER, pointer)
             dms_info(f"Removed {pointer} from index.")

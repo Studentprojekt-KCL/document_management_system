@@ -75,7 +75,7 @@ class Handler:
         classifications.append("Pending")
         return classifications
 
-    async def find_matching(self, pointer: str) -> list[dict]:
+    async def find_matching(self, pointer: str, count: int = 10) -> list[dict]:
         """Grab pointers for matching files.
 
         Args:
@@ -83,8 +83,10 @@ class Handler:
             count: number of results.
         Returns: the matching pointers and their scores.
         """
-        matches = await self.search_engine.find_matching(pointer)
-        files = await self.connector.fetch_files(list(matches.keys()))
+        matches = await self.search_engine.find_matching(pointer, count)
+        files: list | None = await self.connector.fetch_files(list(matches.keys()))
+        if files is None:
+            return []
         for file in files:
             unique_pointer = file.get(UNIQUE_POINTER, "")
             file.update({"score": matches.get(unique_pointer, 0)})
@@ -114,7 +116,7 @@ class Handler:
             return {}
         if classification not in self.classifier.LABELS:
             return {}
-        if self.search_engine.set_classification(pointer, classification) is None:
+        if await self.search_engine.set_classification(pointer, classification) is None:
             return {}
         files = await self.connector.fetch_files([pointer])
         if files:
@@ -158,13 +160,13 @@ class Handler:
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
-        matches, classifications = self.search_engine.query_files(content, offset + count)
-        matches = matches[offset : count + offset]
-        files: list[dict] = await self.connector.fetch_files(matches)
+        matches, metadata = self.search_engine.query_files(content, count, offset)
+        files: list[dict] | None = await self.connector.fetch_files(matches)
+        if files is None:
+            return []
         await self.clean_misses(matches, files)
         for file in files:
-            classification = classifications.get(file.get(UNIQUE_POINTER, ""))
-            file.update({CLASSIFICATION: classification})
+            file.update(metadata.get(file.get(UNIQUE_POINTER, ""), {}))
         return files
 
     async def _handle_new(self) -> None:

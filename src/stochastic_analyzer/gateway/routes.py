@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import Response
 
 from gateway.services.md_pdf import PdfConverter
-from gateway.schemas import MarkdownRequest, SummaryResult, PointerRequest
+from gateway.schemas import MarkdownRequest, PointerRequest
 from gateway.services.summarize import Summarizer
 from gateway.services.connector import Connector
 
@@ -30,37 +30,37 @@ def create_router(
             headers={"Content-Disposition": "attachment; filename='summary.pdf'"},
         )
 
-    @router.post("/summarize", response_model=SummaryResult)
-    async def summarize(payload: PointerRequest) -> SummaryResult:
+    @router.post("/summarize")
+    async def summarize(payload: PointerRequest) -> dict [str, str]:
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
-            return SummaryResult(summary="")
+            return {"summary": ""}
 
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         result = await summarizer.summarize(items)
         if result is None:
             dms_warning("summarization failed")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         return result
 
-    @router.post("/merge", response_model=SummaryResult)
-    async def merge(payload: PointerRequest) -> SummaryResult:
+    @router.post("/merge")
+    async def merge(payload: PointerRequest) -> dict [str, str]:
         """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         result = await summarizer.merge(items)
         if result is None:
             dms_warning("merge failed")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         return result
 
     return router

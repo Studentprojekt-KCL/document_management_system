@@ -10,7 +10,7 @@ from gateway.model_instructions import (
     MERGE_STAGE_TWO_PROMPT,
     SUMMARIZE_STAGE_TWO_PROMPT,
 )
-from gateway.schemas import InputItem, SummaryResult
+from gateway.schemas import InputItem
 
 from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
@@ -35,23 +35,23 @@ class Summarizer:
         """Close the connection."""
         await self.session.close()
 
-    async def summarize(self, items: list[InputItem]) -> SummaryResult | None:
+    async def summarize(self, items: list[InputItem]) -> dict[str, str] | None:
         """Summarize one or more documents."""
         if not items:
             dms_warning("summarize received no items.")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         if len(items) == 1:
             prompt = SUMMARIZE_PROMPT.format(content=items[0].content)
             result = await self._call_llm(prompt)
-            return SummaryResult(summary=result) if result else None
+            return {"summary": result} if result else None
 
         return await self._pipeline(items, STAGE_ONE_PROMPT, SUMMARIZE_STAGE_TWO_PROMPT)
 
-    async def merge(self, items: list[InputItem]) -> SummaryResult | None:
+    async def merge(self, items: list[InputItem]) -> dict[str, str] | None:
         """Handle merging multiple documents into one amazing new document."""
         return await self._pipeline(items, STAGE_ONE_PROMPT, MERGE_STAGE_TWO_PROMPT)
 
-    async def _pipeline(self, items: list[InputItem], stage_one: str, stage_two: str) -> SummaryResult | None:
+    async def _pipeline(self, items: list[InputItem], stage_one: str, stage_two: str) -> dict[str, str] | None:
         """Two-stage pipeline for multiple document logic."""
         tasks = [self._call_llm(stage_one.format(content=item.content)) for item in items]
         extracts = [e for e in await asyncio.gather(*tasks) if e is not None]
@@ -63,10 +63,10 @@ class Summarizer:
         combined = "\n\n".join(extracts)
         if len(combined) > self.MAX_COMBINED_CHARS:
             dms_warning("Combined exceeds limit")
-            return SummaryResult(summary="")
+            return {"summary": ""}
         prompt = stage_two.format(doc_count=len(extracts), combined_summaries=combined)
         result = await self._call_llm(prompt)
-        return SummaryResult(summary=result) if result else None
+        return {"summary": result} if result else None
 
     async def _call_llm(self, prompt: str) -> str | None:
         """Send the prompt to an LLM and return response text."""

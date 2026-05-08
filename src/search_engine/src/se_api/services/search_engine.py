@@ -163,16 +163,19 @@ class SearchEngine:
         metadata: dict[str, dict] = {}
         for _, doc_id in result.hits:
             doc: Document = searcher.doc(doc_id)
-            unique_pointer = doc[UNIQUE_POINTER][0]
-            metadata.update(
-                {
-                    doc[unique_pointer][0]: {
-                        CLASSIFICATION: doc[CLASSIFICATION][0],
-                        MODIFIED: doc[MODIFIED][0],
+            try:
+                unique_pointer = doc[UNIQUE_POINTER][0]
+                metadata.update(
+                    {
+                        unique_pointer: {
+                            CLASSIFICATION: doc[CLASSIFICATION][0],
+                            MODIFIED: doc[MODIFIED][0],
+                        }
                     }
-                }
-            )
-            pointers.append(unique_pointer)
+                )
+                pointers.append(unique_pointer)
+            except IndexError:
+                dms_warning(f"Missing unique_pointer: {doc}")
 
         return (pointers, metadata)
 

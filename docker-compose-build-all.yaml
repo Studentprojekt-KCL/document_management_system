@@ -44,9 +44,9 @@ services:
       dockerfile: src/connectors/confluence/Dockerfile
 
   connector-sharepoint:
-      image: connector-sharepoint:pr
-      build:
-        dockerfile: src/connectors/sharepoint/Dockerfile
+    image: connector-sharepoint:pr
+    build:
+      dockerfile: src/connectors/sharepoint/Dockerfile
 
   connector-minio:
     image: connector-minio:pr

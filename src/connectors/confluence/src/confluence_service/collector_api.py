@@ -42,6 +42,7 @@ class API:
 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
+        self.app.add_api_route("/defined_fields", self.defined_fields_route, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
@@ -60,6 +61,10 @@ class API:
         if self.log_level == "debug":
             content = jsonable_encoder(errors)
         return JSONResponse(status_code=422, content=content)
+
+    async def defined_fields_route(self) -> list[str]:
+        """Field keys for gateway ``retrieve_defined_fields`` union (same pattern as GitLab)."""
+        return list(self.confluence_instance.defined_fields.keys())
 
     @staticmethod
     def _token(x_confluence_token: str | None) -> str | None:

@@ -1,12 +1,15 @@
 """FastAPI service for the Confluence connector.
 
-Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (optional defaults via
-env; see ``ConfluenceInterfacer``). ``GET /auth_user`` returns manual ``api_token`` metadata
-(same route name as OAuth connectors; GitLab redirects, Confluence does not).
+Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (optional defaults via env;
+see ``ConfluenceInterfacer``).
 
-Server bind: ``CONCONFLUENCE_BIND_PORT`` / ``CONCONFLUENCE_BIND_ADDR`` (default ``0.0.0.0``).
-Legacy port names ``CONFLUENCE_BIND_PORT`` / ``CONFLUENCE_CONNECTOR_PORT`` fill in when the DMIS-style
-port env is unset.
+``GET /auth_user`` returns a JSON ``schema_version`` contract for gateway/frontend (same path name
+as OAuth connectors; GitLab redirects, Confluence does not).
+
+``GET /defined_fields`` lists indexer field keys so connector-gateway can build a union (same pattern
+as GitLab).
+
+Listen on ``CONFLUENCE_CONNECTOR_PORT`` at ``0.0.0.0``. Requires ``CONFLUENCE_ADDRESS`` for upstream API base.
 """
 
 import argparse
@@ -22,7 +25,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.initialisation_tools import read_port
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
 
@@ -49,6 +52,7 @@ class API:
 
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
+        self.app.add_api_route("/defined_fields", self.defined_fields_route, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
 
     @asynccontextmanager
@@ -69,23 +73,70 @@ class API:
             content = jsonable_encoder(errors)
         return JSONResponse(status_code=422, content=content)
 
-    async def auth_user(self) -> JSONResponse:
-        """Declare manual api-token auth (no OAuth redirect). Same ``/auth_user`` route as OAuth connectors (#478).
+    async def defined_fields_route(self) -> list[str]:
+        """Field keys for gateway ``retrieve_defined_fields`` union (same pattern as GitLab)."""
+        return list(self.confluence_instance.defined_fields.keys())
 
-        Gateway may send extra headers for other connectors; this handler ignores them."""
-        return JSONResponse(
-            status_code=200,
-            content={
-                "type": "api_token",
-                "method": "manual",
-                "header_names": ["X-Confluence-Email", "X-Confluence-Token"],
-                "labels": {
-                    "X-Confluence-Email": "Confluence Email",
-                    "X-Confluence-Token": "Confluence API Token",
+    async def auth_user(self) -> JSONResponse:
+        """Gateway calls ``GET /auth_user`` for every connector — OAuth connectors redirect; here we describe header auth.
+
+        ``schema_version`` and ``flow`` are stable anchors for DMIS/frontends.
+        OAuth 2 (3LO) exists for Cloud apps; see ``oauth.documentation_url`` in the JSON payload. It is
+        not implemented in this connector; callers use Basic-style email + API token per request."""
+
+        legacy_labels = {
+            "X-Confluence-Email": "Confluence Email",
+            "X-Confluence-Token": "Confluence API Token",
+        }
+        payload: dict[str, Any] = {
+            "schema_version": 1,
+            "connector": "confluence",
+            "flow": "request_headers_credentials",
+            "title": "Confluence Cloud credentials",
+            "summary": (
+                "This connector authenticates each request using your Atlassian Cloud account email and an API token "
+                "sent as HTTP headers. There is no browser OAuth handshake in this service."
+            ),
+            "steps": [
+                "Create or copy an API token from your Atlassian account security page.",
+                "Send it with requests using the headers below alongside the site login email.",
+                "Prefer gateway or connector calls that forward these headers to every downstream endpoint.",
+            ],
+            "required_headers": [
+                {
+                    "name": "X-Confluence-Email",
+                    "label": legacy_labels["X-Confluence-Email"],
+                    "sensitive": False,
+                    "hints": {"format": "email"},
                 },
-                "help_url": "https://id.atlassian.com/manage-profile/security/api-tokens",
+                {
+                    "name": "X-Confluence-Token",
+                    "label": legacy_labels["X-Confluence-Token"],
+                    "sensitive": True,
+                    "hints": {"format": "api_token"},
+                },
+            ],
+            "oauth": {
+                "implemented_in_connector": False,
+                "note": (
+                    "Atlassian OAuth 2.0 authorization code grants (often called 3LO) apply to interactive apps "
+                    "registered in developer console; exchanging an auth code for access tokens differs from PAT-based "
+                    "Basic auth above. Implementing session-based OAuth here would require app registration and callback "
+                    "flows similar to GitHub/GitLab connectors."
+                ),
+                "documentation_url": "https://developer.atlassian.com/cloud/jira/software/oauth-2-3lo-apps/",
             },
-        )
+            "type": "api_token",
+            "method": "manual",
+            "header_names": ["X-Confluence-Email", "X-Confluence-Token"],
+            "labels": legacy_labels,
+            "help_url": "https://id.atlassian.com/manage-profile/security/api-tokens",
+            "documentation": {
+                "api_tokens": "https://id.atlassian.com/manage-profile/security/api-tokens",
+            },
+        }
+
+        return JSONResponse(status_code=200, content=payload)
 
     @staticmethod
     def _token(x_confluence_token: str | None) -> str | None:
@@ -144,26 +195,13 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    def _port_digits(name: str) -> bool:
-        val = os.environ.get(name)
-        return isinstance(val, str) and bool(val.strip()) and val.strip().isdigit()
-
-    if not _port_digits("CONCONFLUENCE_BIND_PORT"):
-        for alt in ("CONFLUENCE_BIND_PORT", "CONFLUENCE_CONNECTOR_PORT"):
-            val = os.environ.get(alt)
-            if isinstance(val, str) and val.strip().isdigit():
-                os.environ["CONCONFLUENCE_BIND_PORT"] = val.strip()
-                break
-        else:
-            os.environ["CONCONFLUENCE_BIND_PORT"] = str(_CONF_PORT_FALLBACK)
-
-    bind_primary = read_env_variable("CONCONFLUENCE_BIND_ADDR", required=False)
-    legacy_bind = (os.environ.get("CONFLUENCE_BIND_ADDR") or "").strip()
-    host_bind = (bind_primary.strip() if bind_primary else "") or legacy_bind or "0.0.0.0"
+    port_raw = os.environ.get("CONFLUENCE_CONNECTOR_PORT")
+    if not (isinstance(port_raw, str) and port_raw.strip() and port_raw.strip().isdigit()):
+        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
 
     uvicorn.run(
         api.app,
-        host=host_bind,
+        host="0.0.0.0",
         log_level=api.log_level,
-        port=read_port("CONCONFLUENCE_BIND_PORT"),
+        port=read_port("CONFLUENCE_CONNECTOR_PORT"),
     )

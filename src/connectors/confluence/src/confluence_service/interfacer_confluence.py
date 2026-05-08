@@ -6,8 +6,7 @@ Pass credentials as method arguments, or set ``CONFLUENCE_DEFAULT_EMAIL`` /
 ``CONFLUENCE_API_TOKEN``). The HTTP service in ``collector_api`` reads
 ``X-Confluence-Email`` and ``X-Confluence-Token``.
 
-Site root from ``CONCONFLUENCE_CONFLUENCE_URL``, or legacy ``CONFLUENCE_SITE_URL`` /
-``CONFLUENCE_ADDRESS`` when the DMIS name is unset.
+Set ``CONFLUENCE_ADDRESS`` to the site root (e.g. ``https://tenant.atlassian.net``).
 """
 
 import base64
@@ -27,15 +26,6 @@ import httpx
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
-
-
-def _confluence_site_url_from_env() -> str:
-    """Resolve base URL using DMIS env first, then legacy names."""
-    for key in ("CONCONFLUENCE_CONFLUENCE_URL", "CONFLUENCE_SITE_URL", "CONFLUENCE_ADDRESS"):
-        raw = os.environ.get(key)
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip().rstrip("/")
-    return read_env_variable("CONCONFLUENCE_CONFLUENCE_URL").rstrip("/")
 
 
 def _default_contact_email_from_env() -> str:
@@ -70,7 +60,7 @@ class ConfluenceInterfacer:
 
     def __init__(self) -> None:
         self.session = httpx.AsyncClient(timeout=120.0)
-        self.address = _confluence_site_url_from_env()
+        self.address = read_env_variable("CONFLUENCE_ADDRESS").rstrip("/")
         self.base = self._api_base(self.address)
         self.max_concurrency = 20
         self.defined_fields = {

@@ -40,13 +40,6 @@ services:
       
   connector-confluence:
     image: connector-confluence:pr
-    build:
-      dockerfile: src/connectors/confluence/Dockerfile
-    environment:
-      CONCONFLUENCE_BIND_ADDR: ${CONCONFLUENCE_BIND_ADDR:-0.0.0.0}
-      CONCONFLUENCE_BIND_PORT: ${CONCONFLUENCE_BIND_PORT:-8010}
-
-  connector-sharepoint:
     image: connector-sharepoint:pr
     build:
       dockerfile: src/connectors/sharepoint/Dockerfile

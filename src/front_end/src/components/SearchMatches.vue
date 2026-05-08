@@ -98,12 +98,19 @@ const resolveBadgeClass = (match) => {
               <div class="meta-row">
                 <span><FileText :size="13" /> {{ resolveDocumentType(item.rawMatch) }}</span>
                 <span><Calendar :size="13" /> {{ resolveDateOnly(item.rawMatch) }}</span>
-                <span
-                  ><ExternalLink :size="13" />
-                  <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer" @click.stop>{{
-                    resolveSource(item.rawMatch)
-                  }}</a></span
-                >
+                <span>
+                  <template v-if="resolveLink(item.rawMatch)">
+                    <ExternalLink :size="13" />
+                    <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer" @click.stop>{{
+                      resolveSource(item.rawMatch)
+                    }}</a>
+                  </template>
+                  <template v-else>
+                    <span class="only-source">
+                      {{ resolveSource(item.rawMatch) }}
+                    </span>
+                  </template>
+                </span>
               </div>
             </div>
             <span class="security-badge" :class="resolveBadgeClass(item.rawMatch)">{{ resolveBadgeText(item.rawMatch) }}</span>
@@ -189,6 +196,10 @@ const resolveBadgeClass = (match) => {
   gap: 0.75rem;
   color: #9aa7bb;
   font-size: 0.84rem;
+}
+
+.only-source {
+  color: #9aa7bb;
 }
 
 .meta-row span {

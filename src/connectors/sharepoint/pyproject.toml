@@ -1,15 +1,15 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dmis_api"
-version = "0.0.1"
-description = "Library for main DMIS main API."
+name = "sharepoint_service"
+description = ""
+version = "0.1.0"
 dynamic = ["dependencies"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [project.scripts]
-dmis_api = "dmis_api.api:run"
+sharepoint_connector = "sharepoint_collector_api:run"

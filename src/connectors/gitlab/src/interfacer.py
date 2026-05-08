@@ -379,6 +379,7 @@ class GitLab:
             except (ValueError, aiohttp.InvalidURL) as err:
                 dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
             except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                response = {}
                 dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
         return response
 
@@ -413,5 +414,6 @@ class GitLab:
             except (ValueError, aiohttp.InvalidURL) as err:
                 dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
             except (aiohttp.ClientResponseError, aiohttp.ClientError):
+                response = {}
                 dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
         return response

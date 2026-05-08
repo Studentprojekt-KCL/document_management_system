@@ -1,11 +1,11 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from collections.abc import Generator
-from contextlib import contextmanager
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 import json
 from os import listdir, mkdir, path, remove
-from threading import Lock
-
+from asyncio import Lock
 from tantivy import (
     Document,
     Index,
@@ -17,7 +17,16 @@ from tantivy import (
     Searcher,
 )
 
-from se_api.constants import BOOLEAN_CATEGORIES, CLASSIFICATION, CONTENT, IS_DOCUMENT, MODIFIED, RAW_CATEGORIES, UNIQUE_POINTER
+from se_api.constants import (
+    BOOLEAN_CATEGORIES,
+    CLASSIFICATION,
+    CONTENT,
+    COOKED_CATEGORIES,
+    IS_DOCUMENT,
+    MODIFIED,
+    RAW_CATEGORIES,
+    UNIQUE_POINTER,
+)
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.file_type_logic import get_documents_only_rescource
@@ -33,10 +42,10 @@ class SearchEngine:
 
     index: Index
     categories: set[str]
-    writer: IndexWriter | None
     index_path: str
     documents_only_extension: list
     writer_lock: Lock
+    writer: IndexWriter
 
     def __init__(self) -> None:
         """Constructor"""
@@ -45,7 +54,6 @@ class SearchEngine:
         self.documents_only_extension = []
         for extention in extentions:
             self.documents_only_extension.extend(extention.get("extension", []))
-        self.writer = None
         self.writer_lock = Lock()
 
     def init(self, fields: list[str] | None) -> None:
@@ -57,6 +65,7 @@ class SearchEngine:
             return
         self.categories = BOOLEAN_CATEGORIES
         self.categories = self.categories.union(RAW_CATEGORIES)
+        self.categories = self.categories.union(COOKED_CATEGORIES)
         if fields is not None:
             for field in fields:
                 self.categories.add(field)
@@ -82,6 +91,11 @@ class SearchEngine:
                 self.index = Index(schema, path=self.index_path)
             except ValueError:
                 dms_error(f"Failed loading index directory, path: {self.index_path}.")
+        self.writer = self.index.writer()
+
+    async def close(self) -> None:
+        """Graceful shutdown."""
+        await asyncio.to_thread(self.writer.wait_merging_threads)
 
     def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
@@ -89,7 +103,7 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.init(fields)
 
-    def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
+    async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
 
         Args:
@@ -107,7 +121,7 @@ class SearchEngine:
             file.update({category: doc[category][0]})
         file.update({CLASSIFICATION: classification})
         file.update({MODIFIED: True})
-        with self.open_writer():
+        async with self.open_writer():
             self.add_file(file)
         return (unique_pointer, classification)
 
@@ -151,18 +165,13 @@ class SearchEngine:
 
         return (pointers, classifications)
 
-    def find_matching(self, unique_pointer: str, count: int | None) -> dict:
+    async def find_matching(self, unique_pointer: str) -> dict:
         """Search for matching files.
 
         Args:
             unique_pointer: file to match with.
-            count: number of wanted results.
         Returns: unique pointers and their score.
         """
-        if count is not None and count < 0:
-            dms_warning(f"Recived count below 0 as an argument in 'find_matching', {count}")
-            return {}
-
         matching: dict = {}
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
@@ -173,23 +182,70 @@ class SearchEngine:
         original_score: int | None = None
         for score, doc_id in result.hits:
             if original_score is None:
+                if score == 0:
+                    break
                 original_score = score
+                continue
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
             matching.update({unique_pointer: score / original_score})
-            if count is not None and len(matching) == count:
-                break
         return matching
 
-    @contextmanager
-    def open_writer(self) -> Generator:
+    @asynccontextmanager
+    async def open_writer(self) -> AsyncGenerator[None]:
         """Init index writer."""
-        self.writer_lock.acquire()
-        self.writer = self.index.writer()
-        yield
-        self.writer.commit()
-        self.writer.wait_merging_threads()
-        self.writer_lock.release()
+        await self.writer_lock.acquire()
+        try:
+            yield
+        finally:
+            await asyncio.to_thread(self.writer.commit)
+            self.writer_lock.release()
+
+    def grab_file(self, unique_pointer: str) -> dict:
+        """Grab a file from the index.
+
+        Args:
+            unique_pointer: the file pointer.
+        Returns: file dict.
+        """
+
+        searcher: Searcher = self.index.searcher()
+        matches = searcher.search(Query.term_query(self.index.schema, UNIQUE_POINTER, unique_pointer))
+        if matches.hits:
+            doc_id = matches.hits[0][1]
+            doc = searcher.doc(doc_id)
+            file = {}
+            for category in self.categories:
+                try:
+                    file[category] = doc[category][0]
+                except IndexError:
+                    file[category] = "N/A"
+            return file
+        return {}
+
+    async def fetch_pending(self) -> AsyncGenerator[dict]:
+        """Grab a file from the index.
+
+        Args:
+            unique_pointer: the file pointer.
+        Returns: file dict.
+        """
+
+        while True:
+            searcher: Searcher = self.index.searcher()
+            matches = searcher.search(Query.term_query(self.index.schema, CLASSIFICATION, "Pending"))
+            if matches.hits:
+                for _, doc_id in matches.hits:
+                    doc = searcher.doc(doc_id)
+                    file = {}
+                    for category in self.categories:
+                        try:
+                            file[category] = doc[category][0]
+                        except IndexError:
+                            file[category] = "N/A"
+                    yield file
+            else:
+                break
 
     def add_file(self, file: dict) -> None:
         """Add file to index.
@@ -200,8 +256,6 @@ class SearchEngine:
             file: file dict
         """
 
-        if self.writer is None:
-            return
         unique_pointer: str | None = file.get(UNIQUE_POINTER)
         if unique_pointer is None:
             dms_warning(f"File is missing unique pointer: {file.update({CONTENT: ""})}.")
@@ -225,16 +279,13 @@ class SearchEngine:
         file.update({IS_DOCUMENT: extension in self.documents_only_extension})
         self.writer.add_json(json.dumps(file))
 
-    def remove_file(self, pointer: str) -> None:
+    async def remove_file(self, pointer: str) -> None:
         """Remove a file from the index.
 
         Args:
             pointer: unique pointer.
         """
 
-        writer: IndexWriter = self.index.writer()
-        writer.delete_documents(UNIQUE_POINTER, pointer)
-        writer.commit()
-        writer.wait_merging_threads()
-        dms_info(f"Removed {pointer} from index.")
-        self.index.reload()
+        async with self.open_writer():
+            self.writer.delete_documents(UNIQUE_POINTER, pointer)
+            dms_info(f"Removed {pointer} from index.")

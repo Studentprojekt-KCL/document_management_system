@@ -1,18 +1,17 @@
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
-import { useReload } from '@/composables/useReload'
 
 export function useAIRerank(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
 
   /* Rerank state */
-  const { state: aiRerankResults } = useReload('aiRerankResults', [])
-  const { state: rerankPointer } = useReload('rerankPointer', '')
-  const { state: rerankFilename } = useReload('rerankFilename', '')
-  const { state: isReranking } = useReload('isReranking', false)
-  const { state: rerankError } = useReload('rerankError', '')
+  const aiRerankResults = ref([])
+  const rerankPointer = ref('')
+  const rerankFilename = ref('')
+  const rerankError = ref('')
+  const isReranking = ref(false)
 
   const mapRankedResults = (results = []) =>
     results.map((item, index) => ({
@@ -39,10 +38,11 @@ export function useAIRerank(props = {}) {
     aiRerankResults.value = []
 
     try {
-      const response = await authFetch(API_PATHS.rerank, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pointers: [uniquePointer.value] })
+      const rerankUrl = new URL(API_PATHS.rerank, window.location.origin)
+      rerankUrl.searchParams.set('pointer', uniquePointer.value)
+
+      const response = await authFetch(rerankUrl, {
+        method: 'GET'
       })
 
       if (!response.ok) {
@@ -50,7 +50,7 @@ export function useAIRerank(props = {}) {
       }
 
       const data = await response.json()
-      const rankedResults = Array.isArray(data.ranked_results) ? data.ranked_results : []
+      const rankedResults = Array.isArray(data) ? data : []
       aiRerankResults.value = mapRankedResults(rankedResults)
       rerankPointer.value = uniquePointer.value
       rerankFilename.value = filename

@@ -28,7 +28,6 @@ from shared_functions.initialisation_tools import read_env_variable
 HTTP_OK = 200
 REQUEST_TIMEOUT = 120
 NUM_WORKERS = 10
-BINARY_SKIP_LOG_LIMIT = 10
 
 
 class GitHub:
@@ -36,7 +35,6 @@ class GitHub:
 
     _client: httpx.Client
     api_base: str
-    _binary_skip_logs: int
 
     def __init__(self) -> None:
         """Constructor."""
@@ -47,7 +45,6 @@ class GitHub:
         self.api_base = raw.rstrip("/") + "/"
         self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
-        self._binary_skip_logs = 0
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
 
     def _get_repos(self, token: str | None = None) -> list:
@@ -219,20 +216,11 @@ class GitHub:
                 info = zip_file.getinfo(name)
                 if info.is_dir():
                     continue
-                try:
-                    file_content = zip_file.read(name).decode("utf-8")
-                except UnicodeDecodeError as err:
-                    file_content = ""
-                    if self._binary_skip_logs < BINARY_SKIP_LOG_LIMIT:
-                        dms_info(f"Skipping binary/non-UTF8 file content: {name}. {err}")
-                        self._binary_skip_logs += 1
-                        if self._binary_skip_logs == BINARY_SKIP_LOG_LIMIT:
-                            dms_info("Further binary/non-UTF8 file skip logs are suppressed for this run.")
                 enc = self._encode_content_path(intermediate_path)
                 unique_pointer = f"{base_pointer_prefix}{enc}?ref={quote(branch, safe='')}"
                 files_data.append(
                     {
-                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
+                        "content": base64.b64encode(zip_file.read(name)).decode("utf-8"),
                         "metadata": {
                             "name": Path(intermediate_path).name,
                             "unique_pointer": unique_pointer,

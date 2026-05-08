@@ -44,7 +44,8 @@ class API:
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"], deprecated=True)
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/defined_fields", self.defined_fields_route, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
@@ -97,13 +98,22 @@ class API:
         url = upload_file(content, "github_content.json")
         return {"subdata": content.get("subdata"), "file_url": url}
 
+    async def defined_fields_route(self) -> list[str]:
+        """Field keys compatible with gateway ``retrieve_defined_fields`` union (matches GitLab contract)."""
+        return list(self.github_instance.defined_fields.keys())
+
+    @staticmethod
+    def _strip_github_token(header: str | None) -> str | None:
+        return header.removeprefix("Bearer ").strip() if header else None
+
     async def stream_files_to_index(
         self,
-        subdata: str | None = None,
+        body: dict[str, str | None] | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
     ) -> StreamingResponse:
-        """Streaming endpoint for all files to index."""
-        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        """Stream NDJSON: subdata line then one JSON object per file — POST + body shape as GitLab (``{"subdata": ...}``)."""
+        subdata: str | None = body.get("subdata") if isinstance(body, dict) else None
+        token = self._strip_github_token(x_github_token)
         return StreamingResponse(
             self.github_instance.stream_files_to_index(subdata, token),
             media_type="application/octet-stream",

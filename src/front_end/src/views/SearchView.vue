@@ -196,8 +196,7 @@ const handleFilterChangeAndSearch = async (filters) => {
       documentsOnly: documentsOnlyMode.value,
       file_type: filters.type.join(' '),
       source_system: filters.source.join(' '),
-      security_class: filters.security.join(' '),
-      resetPreview: false
+      security_class: filters.security.join(' ')
     })
   }
   // Apply filter AFTER server results are loaded

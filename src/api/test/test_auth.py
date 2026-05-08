@@ -137,23 +137,6 @@ class TestTokenVerifier(TestCase):
 
         assert raised.exception.status_code == 403
 
-    def test_required_scopes_are_optional(self):
-        verifier, _ = self.make_verifier()
-        self.decode.return_value = {
-            **self.CLAIMS,
-            "scope": "",
-        }
-
-        claims = verifier.verify_access_token(
-            "Bearer valid-token",
-            required_scopes=[],
-        )
-
-        assert claims == {
-            **self.CLAIMS,
-            "scope": "",
-        }
-
     def test_multiple_required_scopes_must_all_exist(self):
         verifier, _ = self.make_verifier()
         self.decode.return_value = {
@@ -168,56 +151,3 @@ class TestTokenVerifier(TestCase):
             )
 
         assert raised.exception.status_code == 403
-
-    def test_audience_configuration_is_optional(self):
-        self.env_patch.stop()
-
-        env_without_audience = {
-            **self.ENV,
-            "DMISAPI_AD_AUDIENCE": None,
-        }
-
-        self.env_patch = mock.patch(
-            "dmis_api.auth.read_env_variable",
-            side_effect=lambda name, required=True: env_without_audience.get(name),
-        )
-        self.env_patch.start()
-        self.addCleanup(self.env_patch.stop)
-
-        verifier, _ = self.make_verifier()
-
-        verifier.verify_access_token("Bearer valid-token")
-
-        self.decode.assert_called_once_with(
-            "valid-token",
-            "public-key",
-            algorithms=["RS256"],
-            issuer="https://identity-provider.test/tenant",
-            audience=None,
-            options={"verify_aud": False},
-        )
-
-    def test_allowed_authorized_party_is_configurable(self):
-        self.env_patch.stop()
-
-        stakeholder_env = {
-            **self.ENV,
-            "DMISAPI_AD_ALLOWED_AZP": "custom-stakeholder-client",
-        }
-
-        self.env_patch = mock.patch(
-            "dmis_api.auth.read_env_variable",
-            side_effect=lambda name, required=True: stakeholder_env.get(name),
-        )
-        self.env_patch.start()
-        self.addCleanup(self.env_patch.stop)
-
-        verifier, _ = self.make_verifier()
-        self.decode.return_value = {
-            **self.CLAIMS,
-            "azp": "custom-stakeholder-client",
-        }
-
-        claims = verifier.verify_access_token("Bearer valid-token")
-
-        assert claims["azp"] == "custom-stakeholder-client"

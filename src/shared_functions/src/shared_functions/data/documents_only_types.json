@@ -3,5 +3,6 @@
     {"description": "Word", "extension": [".docx", ".doc", ".odt"], "type": "text"},
     {"description": "Text", "extension": [".txt", ".md"], "type": "text"},
     {"description": "Excel", "extension": [".xlsx", ".ods"], "type": "sheet"},
-    {"description": "PowerPoint", "extension": [".pptx", ".ppt", ".odp"], "type": "slide"}
+    {"description": "PowerPoint", "extension": [".pptx", ".ppt", ".odp"], "type": "slide"},
+    {"description": "Confluence", "extension": ["confluence"], "type": "text"}
 ]

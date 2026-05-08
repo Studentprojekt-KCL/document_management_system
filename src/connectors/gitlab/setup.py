@@ -9,6 +9,7 @@ setup(
     install_requires=[
         "fastapi[standard]>=0.128",
         "requests>=2.32",
+        "aiohttp>=3.13",
         f"shared-functions @ {shared_lib_path}",
     ]
 )

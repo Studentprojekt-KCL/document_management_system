@@ -1,29 +1,32 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law.
 
-GitHub connector following same structure as GitLab connector.
-Must return:
-- files
-- subdata
-- file_pointers
-Same format as GitLab.
+GitHub connector API following the same route contract as the GitLab connector.
 """
 
 import argparse
-from typing import Any
+import secrets
+import time
+import warnings
+from typing import Annotated, Any
+from urllib.parse import urlencode
 
+import httpx
 import uvicorn
 from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+
 from interfacer_github import GitHub
 
 from shared_functions.boto_tools import upload_file
+from shared_functions.dmis_logger import dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
+from shared_functions.signing_tools import sign_encode_state, validate_decode_state
 
 
 class API:
-    """Management class for GitHub connector API (same routes/shape as GitLab connector)."""
+    """Management class for GitHub connector API."""
 
     app = FastAPI()
 
@@ -32,10 +35,19 @@ class API:
     def __init__(self) -> None:
         """Constructor."""
         self.github_instance = GitHub()
+        self.client_id = read_env_variable("CONGITHUB_CLIENT_ID")
+        self.client_secret = read_env_variable("CONGITHUB_CLIENT_SECRET")
+        self.state_secret = read_env_variable("CONGITHUB_STATE_SIGNING_SECRET")
+        self.github_base_url = read_env_variable("CONGITHUB_GITHUB_BASE_URL").rstrip("/")
+
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
-        self.app.add_api_route("/file", self.file, methods=["GET"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
+        self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
+        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"], deprecated=True)
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
+        self.app.add_api_route("/callback", self.callback, methods=["GET"])
+        self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -45,45 +57,118 @@ class API:
         else:
             errors = {"detail": str(exc)}
 
-        content: str | dict
-        content = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
+        content: str | dict = jsonable_encoder(errors) if self.log_level == "debug" else "ERROR"
         return JSONResponse(status_code=422, content=content)
 
-    async def files(
+    async def index_needed_bool(
         self,
         subdata: str | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
-    ) -> Any:
-        """List file pointers plus subdata (same as GitLab /files)."""
-        if x_github_token is None:
-            return {"subdata": subdata, "file_pointers": []}
-        token = x_github_token.removeprefix("Bearer ").strip()
-        return self.github_instance.pointers_to_all_files_to_index(subdata, token)
+    ) -> dict[str, Any]:
+        """Check whether any repo has new content to index."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return self.github_instance.check_index_needed(subdata, token)
 
-    async def file(
+    async def get_files(
         self,
-        file_pointer: str,
-        include_content: bool = True,
+        file_pointers: dict[str, list],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
     ) -> Any:
-        """Single file by pointer (same metadata/content shape as GitLab /file)."""
-        if x_github_token is None:
-            return {}
-        token = x_github_token.removeprefix("Bearer ").strip()
-        return self.github_instance.get_file(file_pointer, include_content, token)
+        """Fetch specific files by pointer."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return self.github_instance.get_files(
+            file_pointers.get("file_pointers", []), include_content, include_last_edit_date, token
+        )
 
     async def files_to_index(
         self,
         subdata: str | None = None,
         x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
-    ) -> dict:
-        """Bulk payload uploaded like GitLab; response includes subdata and file_url."""
-        if x_github_token is None:
-            return {"subdata": subdata, "file_url": None}
-        token = x_github_token.removeprefix("Bearer ").strip()
+    ) -> dict[str, Any]:
+        """Bulk payload of all files to index; uploads to storage and returns file_url.
+
+        Deprecated: use /stream_files_to_index instead. Kept until the connector gateway is in place.
+        """
+        warnings.warn("/files_to_index is deprecated; use /stream_files_to_index instead.", DeprecationWarning, stacklevel=2)
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
         content = self.github_instance.files_to_index(subdata, token)
         url = upload_file(content, "github_content.json")
         return {"subdata": content.get("subdata"), "file_url": url}
+
+    async def stream_files_to_index(
+        self,
+        subdata: str | None = None,
+        x_github_token: str | None = Header(default=None, alias="X-GitHub-Token"),
+    ) -> StreamingResponse:
+        """Streaming endpoint for all files to index."""
+        token = x_github_token.removeprefix("Bearer ").strip() if x_github_token else None
+        return StreamingResponse(
+            self.github_instance.stream_files_to_index(subdata, token),
+            media_type="application/octet-stream",
+        )
+
+    def auth_user(self, callback_url: str = Header()) -> RedirectResponse:
+        """Redirect the user to GitHub OAuth authorization.
+
+        Required headers:
+            callback-url: <REDIRECT_URL>
+        """
+        payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
+        signed_state = sign_encode_state(payload, self.state_secret)
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": callback_url,
+            "state": signed_state,
+        }
+        return RedirectResponse(f"{self.github_base_url}/login/oauth/authorize?{urlencode(params)}")
+
+    async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
+        """Exchange GitHub authorization code for access and refresh tokens."""
+        signed_state = request.query_params.get("state")
+        if signed_state is None:
+            dms_info("No state returned from GitHub when trying to authenticate a user.")
+            return JSONResponse(content="ERROR", status_code=403)
+
+        validation_status, _ = validate_decode_state(signed_state, self.state_secret)
+        if not validation_status:
+            return JSONResponse(content="ERROR", status_code=403)
+
+        token_url = f"{self.github_base_url}/login/oauth/access_token"
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                token_url,
+                data={
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "code": code,
+                    "redirect_uri": str(request.url_for("callback")),
+                },
+                headers={"Accept": "application/json"},
+                timeout=120,
+            )
+        token_json = token_resp.json()
+        if not token_json.get("access_token"):
+            return JSONResponse(content="ERROR", status_code=400)
+        return JSONResponse(content=token_json, status_code=200)
+
+    async def refresh_token(self, refresh_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Refresh a GitHub access token using a refresh token."""
+        token_url = f"{self.github_base_url}/login/oauth/access_token"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                token_url,
+                data={
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                },
+                headers={"Accept": "application/json"},
+                timeout=120,
+            )
+        return JSONResponse(content=response.json(), status_code=200)
 
 
 def run() -> None:

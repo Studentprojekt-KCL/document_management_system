@@ -22,8 +22,8 @@ import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
-import { hasRole } from '@/utils/auth'
-import { SESSION_KEY_ACCESS_TOKEN, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
+import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
+import MergeFilesView from '@/views/MergeFilesView.vue'
 
 const routes = [
   /* Public */
@@ -51,6 +51,13 @@ const routes = [
     component: SearchView,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/merge-files',
+    name: 'MergeFiles',
+    component: MergeFilesView,
+    meta: { requiresAuth: true }
+  },
+
   /* Admin only routes */
   {
     path: '/sources',
@@ -104,7 +111,7 @@ const routes = [
     props: {
       code: 403,
       title: 'Forbidden',
-      description: 'You do not have permission to this page.'
+      description: 'You do not have permission to view this page.'
     }
   },
   {
@@ -121,32 +128,28 @@ const router = createRouter({
 })
 
 /* router guard so that you can't go to protected pages without logging in */
-router.beforeEach((to) => {
-  const token = localStorage.getItem(SESSION_KEY_ACCESS_TOKEN)
-  const isAuthed = !!token
+function userHasRole(authInfo, role) {
+  const clientRoles = authInfo?.user?.client_roles ?? []
+  const realmRoles = authInfo?.user?.realm_roles ?? []
+  return clientRoles.includes(role) || realmRoles.includes(role)
+}
 
-  if (to.name === 'AuthCallback') {
-    const hasCode = typeof to.query?.code === 'string' && to.query.code.length > 0
-    const hasError = typeof to.query?.error === 'string' && to.query.error.length > 0
-    const hasPkceVerifier = !!localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
-
-    if (!hasError && (!hasCode || !hasPkceVerifier)) {
-      return { path: '/401' }
-    }
+router.beforeEach(async (to) => {
+  if (!to.meta?.requiresAuth) {
     return true
   }
 
-  if (to.name === 'Login' && isAuthed) {
-    return { path: '/search' }
-  }
-
-  if (to.meta?.requiresAuth && !isAuthed) {
+  const authenticated = await isAuthenticated()
+  if (!authenticated) {
     return { path: '/401' }
   }
 
   /* Admin only route */
-  if (to.meta?.requiresAdmin && !hasRole('admin')) {
-    return { path: '/403' }
+  if (to.meta?.requiresAdmin) {
+    const authInfo = await getCurrentUser()
+    if (!userHasRole(authInfo, 'admin')) {
+      return { path: '/403' }
+    }
   }
 
   return true

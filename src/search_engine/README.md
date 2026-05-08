@@ -77,11 +77,13 @@ An automated API documentation is constructed when the API service is initiaded,
 
 Configuration is done through environment variables.
 
-- `SEARCHENG_BIND_PORT` Search engine port.
-- `SEARCHENG_BIND_ADDR` Search engine bind address.
-- `SEARCHENG_CONGATEWAY_URL` Connector address.
-- `SEARCHENG_STOCHAN_URL` Query address.
-- `SEARCHENG_CACHE_DIRECTORY` Cache file location.
+```env
+SEARCHENG_BIND_PORT=<Search engine port>
+SEARCHENG_BIND_ADDR=<Search engine bind address>
+SEARCHENG_CONGATEWAY_URL=<Connector address>
+SEARCHENG_WORKING_DIRECTORY=<Data location>
+SEARCHENG_CLASSIFIER_URL=<Url to classifier instance>
+```
 
 Optional flags:
 

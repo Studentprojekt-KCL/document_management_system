@@ -8,6 +8,7 @@ import httpx
 from gateway.schemas import InputItem, ClassificationResult
 
 from shared_functions.dmis_logger import dms_warning
+from shared_functions.initialisation_tools import read_env_variable, read_float_env_variable
 
 LABELS = ["Public", "Internal", "Sensitive", "Confidential"]
 
@@ -25,6 +26,7 @@ class Classifier:
 
     Attributes:
         url: URL for the TEI classifier endpoint.
+        client: Shared async HTTP client.
         escalation_threshold: Score gap threshold for security-first escalation.
         max_chars: Maximum characters per document for classification.
         batch_size: Number of NLI pairs per batch request.
@@ -35,9 +37,24 @@ class Classifier:
     batch_size: int = 32
     timeout: float = 15.0
 
-    def __init__(self, url: str, escalation_threshold: float) -> None:
+    def __init__(self, url: str, escalation_threshold: float, client: httpx.AsyncClient) -> None:
         self.url = url
         self.escalation_threshold = escalation_threshold
+        self.client = client
+
+    @classmethod
+    def from_env(cls, client: httpx.AsyncClient) -> "Classifier":
+        """Construct a Classifier from environment variables.
+
+        Reads:
+            STOCHAN_CLASSIFIER_URL: URL for the TEI classifier endpoint.
+            STOCHAN_ESCALATION_THRESHOLD: Score gap threshold for escalation.
+        """
+        return cls(
+            url=read_env_variable("STOCHAN_CLASSIFIER_URL"),
+            escalation_threshold=read_float_env_variable("STOCHAN_ESCALATION_THRESHOLD"),
+            client=client,
+        )
 
     def _build_inputs(self, items: list[InputItem]) -> list[list[str]]:
         """Build NLI premise-hypothesis pairs for all documents."""
@@ -85,8 +102,8 @@ class Classifier:
         inputs = self._build_inputs(items)
         all_scores = [0.0] * len(inputs)
 
-        async def fetch_batch(client: httpx.AsyncClient, start_idx: int, batch: list[list[str]]) -> None:
-            response = await client.post(
+        async def fetch_batch(start_idx: int, batch: list[list[str]]) -> None:
+            response = await self.client.post(
                 f"{self.url}/predict",
                 json={"inputs": batch},
                 timeout=self.timeout,
@@ -101,9 +118,8 @@ class Classifier:
                 all_scores[start_idx + i] = score
 
         try:
-            async with httpx.AsyncClient() as client:
-                tasks = [fetch_batch(client, i, inputs[i : i + self.batch_size]) for i in range(0, len(inputs), self.batch_size)]
-                await asyncio.gather(*tasks)
+            tasks = [fetch_batch(i, inputs[i : i + self.batch_size]) for i in range(0, len(inputs), self.batch_size)]
+            await asyncio.gather(*tasks)
         except httpx.HTTPStatusError as err:
             dms_warning(f"Unexpected response from {self.url}, {err}")
             return []

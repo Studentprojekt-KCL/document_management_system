@@ -9,19 +9,26 @@
  * <TheSidebar />
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Network, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
-import { hasRole } from '@/utils/auth'
+import { getCurrentUser } from '@/utils/authClient'
 
-/* Router instances for navigation and route info */
 const router = useRouter()
 const route = useRoute()
 
-/* State for sidebar collapse/expand */
 const isOpen = ref(false)
+const authInfo = ref(null)
 
-/* Define all possible menu items with their respective icons and paths */
+/* get info about user from /auth/me endpoint using authClient helper */
+const loadAuthInfo = async () => {
+  authInfo.value = await getCurrentUser()
+}
+
+/* Reload user info on route change */
+watch(() => route.fullPath, loadAuthInfo, { immediate: true })
+
+/* all available items on the sidebar */
 const menuItems = [
   { id: 'connections', label: 'Connections', icon: Network, path: '/connections' },
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
@@ -31,27 +38,22 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-/* Check if the user has admin role */
+/* Checks if user is admin */
 const isAdmin = computed(() => {
-  route.fullPath
-  return hasRole('admin')
+  const clientRoles = authInfo.value?.user?.client_roles ?? []
+  const realmRoles = authInfo.value?.user?.realm_roles ?? []
+  return clientRoles.includes('admin') || realmRoles.includes('admin')
 })
 
-/* Compute visible menu items based on user role */
+/* Show all itmes fro admin otherwise only search and connections */
 const visibleMenuItems = computed(() => {
-  if (isAdmin.value) {
-    return menuItems
-  }
-  // else if when we get another role higher than user
-  else {
-    return menuItems.filter((item) => item.id === 'connections' || item.id === 'search')
-  }
+  const searchAndConnections = menuItems.filter((item) => item.id === 'search' || item.id === 'connections')
+  return isAdmin.value ? menuItems : searchAndConnections
 })
 
-/* Compute the active menu item based on current route */
+/* Compute the active menu item */
 const activeItem = computed(() => {
-  const currentPath = route.path
-  const found = menuItems.find((item) => item.path === currentPath)
+  const found = menuItems.find((item) => item.path === route.path)
   return found ? found.id : 'search'
 })
 
@@ -86,7 +88,6 @@ const navigateTo = (path) => {
       >
         <component :is="item.icon" class="nav-icon" />
         <span v-show="isOpen" class="nav-label">{{ item.label }}</span>
-        <div v-if="activeItem === item.id && isOpen" class="nav-indicator" />
       </button>
     </nav>
   </aside>
@@ -112,24 +113,29 @@ const navigateTo = (path) => {
 .sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .hamburger-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-  color: #6b7280;
-  transition: color 0.2s;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #6b7280;
 }
 
 .hamburger-btn:hover {
+  background: #f3f4f6;
   color: #1f2937;
+}
+
+.sidebar.collapsed .hamburger-btn {
+  justify-content: center;
+  padding: 0.875rem;
 }
 
 .nav-menu {
@@ -147,7 +153,6 @@ const navigateTo = (path) => {
   background: transparent;
   cursor: pointer;
   border-radius: 8px;
-  transition: all 0.2s;
   text-align: left;
   position: relative;
 }
@@ -169,7 +174,6 @@ const navigateTo = (path) => {
 .nav-icon {
   width: 20px;
   height: 20px;
-  flex-shrink: 0;
   stroke-width: 2;
 }
 
@@ -193,12 +197,5 @@ const navigateTo = (path) => {
 
 .nav-item.active .nav-label {
   color: white;
-}
-
-.nav-indicator {
-  width: 6px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
 }
 </style>

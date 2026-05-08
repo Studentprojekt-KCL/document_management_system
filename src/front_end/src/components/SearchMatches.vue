@@ -11,18 +11,39 @@
 
 import { computed } from 'vue'
 import { Calendar, FileText, ExternalLink } from 'lucide-vue-next'
-import { useSearchMetadata } from '@/composables/useSearchMetadata'
+import { useSearchMetadata, resolveLink } from '@/composables/useSearchMetadata'
 
 /* Props received from parent component (SearchView) */
 const props = defineProps({
   matches: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   selected: { type: String, default: '' },
-  query: { type: String, default: '' }
+  query: { type: String, default: '' },
+  badgeMode: { type: String, default: 'security' },
+  selectable: { type: Boolean, default: false },
+  selectedPointers: { type: Array, default: () => [] }
 })
 
-/* Emit to parent (SearchView) component when a match is selected */
-const emit = defineEmits(['select'])
+/* Emit to parent component when a match is selected or selection is toggled */
+const emit = defineEmits(['select', 'update:selectedPointers'])
+
+const getPointer = (match) => match?.unique_pointer || ''
+
+const isSelectedPointer = (pointer) => props.selectedPointers.includes(pointer)
+
+const isSelected = (match) => isSelectedPointer(getPointer(match))
+
+const onCardClick = (match) => {
+  if (!props.selectable) return emit('select', match)
+
+  const pointer = getPointer(match)
+  if (!pointer) return
+
+  emit(
+    'update:selectedPointers',
+    isSelectedPointer(pointer) ? props.selectedPointers.filter((p) => p !== pointer) : [...props.selectedPointers, pointer]
+  )
+}
 
 /* Custom composable to normalize matches, resolve match dates, and resolve sources for display */
 const { normalizeMatches, resolveDateOnly, resolveSource, resolveDocumentType, resolveSecurityClass } = useSearchMetadata(props)
@@ -38,6 +59,22 @@ const resultsLabel = computed(() => {
   }
   return `Found ${count} result${count === 1 ? '' : 's'} for "${props.query}"`
 })
+
+const resolveBadgeText = (match) => {
+  if (props.badgeMode === 'score') {
+    return match?.scorePercent || 'N/A'
+  }
+
+  return resolveSecurityClass(match) || 'Unknown'
+}
+
+const resolveBadgeClass = (match) => {
+  if (props.badgeMode === 'score') {
+    return 'score-badge'
+  }
+
+  return `security-${(resolveSecurityClass(match) || 'unknown').toLowerCase()}`
+}
 </script>
 
 <template>
@@ -49,7 +86,11 @@ const resultsLabel = computed(() => {
     <!-- List of search result matches with titles, types, dates and source -->
     <ul class="results-list">
       <li v-for="item in normalizedMatches" :key="item.filename" class="result-item">
-        <button class="result-card" :class="{ active: selected === item.filename }" @click="emit('select', item.rawMatch)">
+        <button
+          class="result-card"
+          :class="{ active: selected === item.filename, selected: selectable && isSelected(item.rawMatch) }"
+          @click="onCardClick(item.rawMatch)"
+        >
           <div class="result-main">
             <div class="result-content">
               <h3 class="result-title">{{ item.title }}</h3>
@@ -57,12 +98,22 @@ const resultsLabel = computed(() => {
               <div class="meta-row">
                 <span><FileText :size="13" /> {{ resolveDocumentType(item.rawMatch) }}</span>
                 <span><Calendar :size="13" /> {{ resolveDateOnly(item.rawMatch) }}</span>
-                <span><ExternalLink :size="13" /> {{ resolveSource(item.rawMatch) }}</span>
+                <span>
+                  <template v-if="resolveLink(item.rawMatch)">
+                    <ExternalLink :size="13" />
+                    <a :href="resolveLink(item.rawMatch)" target="_blank" rel="noopener noreferrer" @click.stop>{{
+                      resolveSource(item.rawMatch)
+                    }}</a>
+                  </template>
+                  <template v-else>
+                    <span class="only-source">
+                      {{ resolveSource(item.rawMatch) }}
+                    </span>
+                  </template>
+                </span>
               </div>
             </div>
-            <span class="security-badge" :class="`security-${(resolveSecurityClass(item.rawMatch) || 'unknown').toLowerCase()}`">{{
-              resolveSecurityClass(item.rawMatch) || 'Unknown'
-            }}</span>
+            <span class="security-badge" :class="resolveBadgeClass(item.rawMatch)">{{ resolveBadgeText(item.rawMatch) }}</span>
           </div>
         </button>
       </li>
@@ -114,6 +165,12 @@ const resultsLabel = computed(() => {
   border-color: #d7e0ec;
 }
 
+.result-card.selected {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 1px #bfdbfe;
+}
+
 .result-main {
   display: flex;
   align-items: flex-start;
@@ -140,6 +197,10 @@ const resultsLabel = computed(() => {
   font-size: 0.84rem;
 }
 
+.only-source {
+  color: #9aa7bb;
+}
+
 .meta-row span {
   display: inline-flex;
   align-items: center;
@@ -147,13 +208,13 @@ const resultsLabel = computed(() => {
 }
 
 .security-badge {
+  align-self: center;
   flex-shrink: 0;
-  align-self: flex-start;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.2rem 0.55rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 6px;
   border: 1px solid;
 }
@@ -180,5 +241,11 @@ const resultsLabel = computed(() => {
   color: #dc2626;
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+.score-badge {
+  color: #7c2d12;
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 </style>

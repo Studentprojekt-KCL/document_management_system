@@ -35,6 +35,8 @@ IP_SEARCH_ENGINE=<IP address for search-engine container>
 IP_DMISAPI=<IP address for dmis-api container>
 IP_FRONTEND=<IP address for front-end container>
 IP_CONGITLAB=<IP address for connector-gitlab container>
+IP_CONGITHUB=<IP address for connector-github container>
+IP_CONSHAREPOINT=<IP address for connector-sharepoint container>
 IP_CONNECTOR_MINIO=<IP address for connector-minio container>
 IP_STOCHASTIC_ANALYZER=<IP address for stochastic-analyzer container>
 
@@ -76,6 +78,23 @@ CONGITLAB_MINIO_PASSWORD=<password>
 CONGITLAB_BIND_ADDR=<bind address>
 CONGITLAB_SYSTEM_NAME:<system name>
 
+# connector-github
+CONGITHUB_BIND_ADDR=<bind address>
+CONGITHUB_BIND_PORT=<port number>
+CONGITHUB_GITHUB_API_URL=<GitHub API base URL>
+CONGITHUB_GITHUB_SYSTEM_NAME=<source system name>
+CONGITHUB_GITHUB_API_VERSION=<API version>
+
+# connector-sharepoint
+CONSHAREPOINT_BIND_ADDR=<bind address>
+CONSHAREPOINT_BIND_PORT=<port number>
+CONSHAREPOINT_SYSTEM_NAME=<name to display in frontend for this SharePoint instance>
+CONSHAREPOINT_TENANT_ID=<Azure AD tenant ID>
+CONSHAREPOINT_CLIENT_ID=<client ID of DMIS application registered in Azure AD>
+CONSHAREPOINT_CLIENT_SECRET=<client secret of DMIS application in Azure AD>
+CONSHAREPOINT_STATE_SIGNING_SECRET=<secret string for OAuth state signing>
+CONSHAREPOINT_GRAPH_BASE=<optional; Microsoft Graph root URL, default https://graph.microsoft.com/v1.0>
+
 # connector-minio
 MINIO_ACCESS_ADDRESS_LOCAL=<local access URL>
 MINIO_ROOT_USER=<root username>
@@ -86,7 +105,6 @@ MINIO_PASSWORD=<password>
 # stochastic-analyzer
 STOCHAN_BIND_ADDR=<bind address>
 STOCHAN_BIND_PORT=<port number>
-STOCHAN_TEI_URL=<rerank endpoint URL>
 STOCHAN_CLASSIFIER_URL=<classifier endpoint URL>
 STOCHAN_LLM_URL=<LLM endpoint URL>
 STOCHAN_LLM_MODEL=<model name>

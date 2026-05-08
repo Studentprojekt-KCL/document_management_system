@@ -1,22 +1,67 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Grid2X2, FileText, Shield } from 'lucide-vue-next'
-import { useSourceFilters, useDocumentsOnlyFilters, useSecurityFilters } from '@/composables/useFilters'
+import { useSourceFilters, useDocumentsOnlyFilters, useAllFileTypeFilters, useSecurityFilters } from '@/composables/useFilters'
 
 const sourceFilters = useSourceFilters()
 const documentsOnlyFilters = useDocumentsOnlyFilters()
+const allFilesTypeFilters = useAllFileTypeFilters()
 const securityFilters = useSecurityFilters()
 
-const typeFilters = computed(() =>
-  documentsOnlyFilters.value.map((item) => ({
-    label: `${item.description} (${item.extension.join(', ')})`,
-    value: item.extension.join('|')
-  }))
-)
-
 const props = defineProps({
-  selectedFilters: Object
+  selectedFilters: Object,
+  documentsOnly: { type: Boolean, default: true }
 })
+
+/* If documentsOnly is true, only show document type filters, otherwise show all file type filters with a dropdown */
+const typeFilters = computed(() => {
+  const source = props.documentsOnly ? documentsOnlyFilters.value : allFilesTypeFilters.value
+
+  if (props.documentsOnly) {
+    return source.map((item) => ({
+      label: `${item.description} (${item.extension.join(', ')})`,
+      value: item.extension.join('|')
+    }))
+  } else {
+    return source.map((item) => ({
+      label: `${item.description}`,
+      value: item.extension.join('|')
+    }))
+  }
+})
+
+/* Tracks types picked from the dropdown so they appear as buttons? on filtercard. */
+const selectedTypes = ref([])
+
+/* Show all document filters, but only first 11 ones + any selected from dropdown in all files mode. */
+const visibleTypeFilters = computed(() => {
+  if (props.documentsOnly) return typeFilters.value
+
+  const base = typeFilters.value.slice(0, 11)
+  const selected = typeFilters.value.filter(
+    (item) => selectedTypes.value.includes(item.value) && !base.some((b) => b.value === item.value)
+  )
+  return [...base, ...selected]
+})
+
+/* Remaining filters stay in dropdown, excludes already visible filters. */
+const overflowTypeFilters = computed(() => {
+  if (props.documentsOnly) return []
+
+  const visibleValues = new Set(visibleTypeFilters.value.map((item) => item.value))
+  return typeFilters.value.filter((item) => !visibleValues.has(item.value))
+})
+
+function selectTypeFromMenu(event) {
+  const value = event.target.value
+  if (!value) return
+  if (!selectedTypes.value.includes(value)) {
+    selectedTypes.value = [...selectedTypes.value, value]
+  }
+  toggleFilter('type', value)
+  event.target.value = ''
+}
+
 const emit = defineEmits(['update:filters'])
 
 /* Local refs for filter selection */
@@ -62,6 +107,7 @@ const clearAllFilters = () => {
   localSource.value = []
   localType.value = []
   localSecurity.value = []
+  selectedTypes.value = []
   emit('update:filters', {
     source: [],
     type: [],
@@ -98,13 +144,27 @@ const clearAllFilters = () => {
           TYPE:
         </span>
         <button
-          v-for="item in typeFilters"
+          v-for="item in visibleTypeFilters"
           :key="item.value"
           :class="['chip', { active: isSelected('type', item.value) }]"
           @click="toggleFilter('type', item.value)"
         >
           {{ item.label }}
         </button>
+
+        <div v-if="!props.documentsOnly && overflowTypeFilters.length" class="type-dropdown">
+          <select class="chip more-types" @change="selectTypeFromMenu">
+            <option value="">More Types</option>
+            <option
+              v-for="item in overflowTypeFilters"
+              :key="item.value"
+              :value="item.value"
+              :class="{ active: isSelected('type', item.value) }"
+            >
+              {{ item.label }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <span class="group-divider" aria-hidden="true"></span>
@@ -138,6 +198,7 @@ const clearAllFilters = () => {
   border-radius: 18px;
   padding: 0.95rem 1rem 1rem;
   margin-top: 0.8rem;
+  margin-bottom: 0.8rem;
 }
 
 .filters-header {
@@ -211,6 +272,10 @@ const clearAllFilters = () => {
   width: 1px;
   height: 22px;
   background: #d9dfe8;
+}
+
+.more-types {
+  width: 8.5rem;
 }
 
 @media (max-width: 768px) {

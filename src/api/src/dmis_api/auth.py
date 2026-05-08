@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from collections.abc import Iterable
 
 import jwt
 from fastapi import HTTPException
@@ -10,25 +11,39 @@ from jwt import PyJWKClient
 
 from shared_functions.dmis_logger import dms_info
 
+from shared_functions.initialisation_tools import read_env_variable
+
 
 class TokenVerifier:
-    """Verify Keycloak bearer access tokens for this API."""
+    """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(
+    def __init__(self) -> None:
+        """Initialize token verifier with AD settings."""
+        self.issuer = read_env_variable("DMISAPI_AD_URL").rstrip("/")
+        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_AD_JWKS_URL"))
+
+        audience = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
+        expected_audience = [value.strip() for value in audience.split(",") if value.strip()] if audience else None
+
+        if expected_audience is None:
+            self.expected_audience = None
+        elif isinstance(expected_audience, str):
+            self.expected_audience = [expected_audience]
+        else:
+            self.expected_audience = list(expected_audience)
+
+        allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
+        self.allowed_azp = set(allowed_azp) if allowed_azp else None
+
+    def verify_access_token(
         self,
-        issuer: str,
-        jwks_url: str,
-        expected_azp: str,
-    ) -> None:
-        """Initialize token verifier with Keycloak settings."""
-        self.issuer = issuer.rstrip("/")
-        self.jwks_client = PyJWKClient(jwks_url)
-        self.expected_azp = expected_azp
-
-    def verify_access_token(self, authorization: str | None) -> dict[str, Any]:
+        authorization: str | None,
+        required_scopes: Iterable[str] | None = None,
+    ) -> dict[str, Any]:
         """Validate bearer token and return token claims."""
+
         if authorization is None:
-            dms_info("Missing Authorization header.")
+            dms_info("Recieved token with missing authorization header.")
             raise HTTPException(status_code=401)
 
         scheme, _, token = authorization.partition(" ")
@@ -36,7 +51,7 @@ class TokenVerifier:
 
         if scheme.lower() != "bearer" or not token:
             dms_info("Missing or invalid Authorization header.")
-            raise HTTPException(status_code=401)
+            raise HTTPException(status_code=400)
 
         try:
             signing_key = self.jwks_client.get_signing_key_from_jwt(token)
@@ -45,27 +60,25 @@ class TokenVerifier:
                 signing_key.key,
                 algorithms=["RS256"],
                 issuer=self.issuer,
-                options={"verify_aud": False},
+                audience=self.expected_audience,
+                options={"verify_aud": self.expected_audience is not None},
             )
         except jwt.InvalidTokenError as exc:
             dms_info(f"Invalid access token: {exc}")
             raise HTTPException(status_code=401) from exc
 
         azp = claims.get("azp")
-        if azp != self.expected_azp:
-            dms_info(f"Unexpected azp: {azp!r}, expected {self.expected_azp!r}")
+        if self.allowed_azp is not None and azp not in self.allowed_azp:
+            dms_info(f"Unexpected azp: {azp!r}, allowed={sorted(self.allowed_azp)!r}")
             raise HTTPException(status_code=403)
 
-        realm_roles = set(claims.get("realm_access", {}).get("roles", []))
-        client_roles = set(claims.get("resource_access", {}).get(self.expected_azp, {}).get("roles", []))
-        all_roles = realm_roles | client_roles
+        required_scope_set = set(required_scopes or [])
+        token_scope = claims.get("scope", "")
+        token_scopes = set(token_scope.split()) if isinstance(token_scope, str) else set()
 
-        if "user" not in all_roles and "admin" not in all_roles:
+        if required_scope_set and not required_scope_set.issubset(token_scopes):
             dms_info(
-                "Missing required role. "
-                f"expected one of ['user', 'admin], "
-                f"realm_roles={sorted(realm_roles)}, "
-                f"client_roles={sorted(client_roles)}"
+                "Missing required scope. " f"required_scopes={sorted(required_scope_set)}, " f"token_scopes={sorted(token_scopes)}"
             )
             raise HTTPException(status_code=403)
 

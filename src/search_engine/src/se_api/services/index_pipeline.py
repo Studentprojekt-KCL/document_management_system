@@ -16,6 +16,7 @@ from se_api.constants import (
     GENERIC_QUEUE_SIZE,
     GENERIC_WORKER_COUNT,
     MAX_PENDING_CONTENT_SIZE,
+    MODIFIED,
     POINTER_QUEUE_SIZE,
     UNIQUE_POINTER,
 )
@@ -167,6 +168,7 @@ class IndexPipeline:
                     continue
                 file[CONTENT] = await self._convert_content(raw_content)
                 file[CLASSIFICATION] = "Pending"
+                file[MODIFIED] = False
                 await index_queue.put(file)
                 decode_queue.task_done()
             except QueueShutDown:
@@ -211,21 +213,12 @@ class IndexPipeline:
             classify_queue: files to be classified.
             search_engine: SearchEngine object.
         """
-        done: list = []
-        async for old_file in self.search_engine.fetch_pending():
-            try:
-                await classify_queue.put(old_file)
-                done.append(old_file.get(UNIQUE_POINTER))
-            except QueueShutDown:
-                break
 
         while True:
             try:
                 pointer: str | None = await fetch_queue.get()
                 if pointer is None:
                     break
-                if pointer in done:
-                    continue
                 file: dict = await self._grab_files_from_index(self.search_engine, pointer)
                 await classify_queue.put(file)
                 fetch_queue.task_done()
@@ -315,7 +308,7 @@ class IndexPipeline:
         try:
             async with search_engine.open_writer():
                 for file in files:
-                    await to_thread(search_engine.add_file, file)
+                    await search_engine.add_file(file)
         except RuntimeError:
             dms_warning("Failed to write file to index.")
 

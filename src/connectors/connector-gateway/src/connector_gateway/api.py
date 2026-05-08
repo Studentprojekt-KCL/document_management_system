@@ -73,7 +73,6 @@ class API:
 
     async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
         """Returns redirect to source system to authenticate."""
-        referer = "http://127.0.0.1:8000/" #TODO, remove this.
         if not isinstance(source_system, str) or referer is None:
             dms_warning("No %s provided to gateway auth_user" % "referer" if referer is None else "source_system")
             raise HTTPException(status_code=400)

@@ -57,9 +57,8 @@ class ConnectorClient:
                 sorted_pointers.append([pointer])
         return sorted_pointers
 
-    def _slice_url_to_host_and_proto(self, url: str | None) -> str:
+    def _slice_url_to_host_and_proto(self, url: str) -> str:
         """Returns a URL proto:://<host>/path -> proto://<host>"""
-        #TODO, URL can be None here, meaning this will crash.
         scheme, rest = url.split("//", 1)
         host = rest.split("/", 1)[0]
         return f"{scheme}//{host}"

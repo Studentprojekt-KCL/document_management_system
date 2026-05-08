@@ -58,6 +58,7 @@ class Connector:
     async def close(self) -> None:
         """Close clients"""
         await self.client.aclose()
+        self.write_subdata()
 
     def write_subdata(self, subdata: dict | None = None) -> None:
         """Set the subdata.

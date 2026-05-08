@@ -35,16 +35,16 @@ def create_router(
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
-            return {"summary": ""}
+            return {"summary": "At least one pointer is required."}
 
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            return {"summary": ""}
+            return {"summary": "Could not retrieve documents."}
         result = await summarizer.summarize(items)
         if result is None:
             dms_warning("summarization failed")
-            return {"summary": ""}
+            return {"summary": "Failed to generate a summary."}
         return result
 
     @router.post("/merge")
@@ -52,15 +52,15 @@ def create_router(
         """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
-            return {"summary": ""}
+            return {"summary": "At least two documents are required to merge."}
         items = await connector.get_file_contents(payload.pointers)
         if not items:
             dms_warning("document retreival failure")
-            return {"summary": ""}
+            return {"summary": "Could not retrieve documents"}
         result = await summarizer.merge(items)
         if result is None:
             dms_warning("merge failed")
-            return {"summary": ""}
+            return {"summary": "Failed to merge the documents"}
         return result
 
     return router

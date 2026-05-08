@@ -57,7 +57,8 @@ that org, not by any additional permission.
 | `/auth_user` | GET | Redirects user to GitHub OAuth consent page (`callback-url` header required) |
 | `/callback` | GET | Exchanges GitHub authorization code for access/refresh tokens |
 | `/refresh_token` | GET | Refreshes an expiring access token (`refresh-token` header required) |
+| `/defined_fields` | GET | Lists field keys returned for indexed documents (gateway union contract) |
 | `/index_needed_bool` | GET | Returns whether any repo has new content since the last index |
-| `/stream_files_to_index` | GET | Streams NDJSON — subdata header followed by one file per line |
+| `/stream_files_to_index` | POST | Streams NDJSON — JSON body ``{"subdata": ...}``, then one file per line (same as GitLab) |
 | `/get_files` | POST | Fetches specific files by pointer |
 | `/files_to_index` | GET | **Deprecated** — use `/stream_files_to_index` instead |

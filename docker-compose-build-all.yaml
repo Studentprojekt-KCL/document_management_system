@@ -40,6 +40,10 @@ services:
       
   connector-confluence:
     image: connector-confluence:pr
+    build:
+      dockerfile: src/connectors/confluence/Dockerfile
+
+  connector-sharepoint:
     image: connector-sharepoint:pr
     build:
       dockerfile: src/connectors/sharepoint/Dockerfile

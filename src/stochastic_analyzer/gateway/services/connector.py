@@ -43,7 +43,7 @@ class Connector:
             ) as response:
                 response.raise_for_status()
                 data = await response.json()
-        except (aiohttp.ClientError, TimeoutError) as err:
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             dms_warning(f"Connector request failed: {err}")
             return []
 

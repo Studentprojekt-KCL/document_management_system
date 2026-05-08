@@ -11,7 +11,7 @@ import { useAuthSession } from '@/composables/useAuthSession'
 
 /* Determine if the current route is a public or error page. */
 const route = useRoute()
-const isPublicOrErrorPage = computed(() => ['/', '/401', '/403', '/404'].includes(route.path))
+const isPublicOrErrorPage = computed(() => ['/', '/auth/callback', '/401', '/403', '/404'].includes(route.path))
 useAuthSession()
 </script>
 

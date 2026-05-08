@@ -11,26 +11,28 @@ from jwt import PyJWKClient
 
 from shared_functions.dmis_logger import dms_info
 
+from shared_functions.initialisation_tools import read_env_variable
+
 
 class TokenVerifier:
     """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(
-        self,
-        issuer: str,
-        jwks_url: str,
-        expected_audience: str | Iterable[str] | None = None,
-        allowed_azp: Iterable[str] | None = None,
-    ) -> None:
-        """Initialize token verifier with Keycloak settings."""
-        self.issuer = issuer.rstrip("/")
-        self.jwks_client = PyJWKClient(jwks_url)
+    def __init__(self) -> None:
+        """Initialize token verifier with AD settings."""
+        self.issuer = read_env_variable("DMISAPI_AD_URL").rstrip("/")
+        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_AD_JWKS_URL"))
+
+        audience = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
+        expected_audience = [value.strip() for value in audience.split(",") if value.strip()] if audience else None
+
         if expected_audience is None:
             self.expected_audience = None
         elif isinstance(expected_audience, str):
             self.expected_audience = [expected_audience]
         else:
             self.expected_audience = list(expected_audience)
+
+        allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
         self.allowed_azp = set(allowed_azp) if allowed_azp else None
 
     def verify_access_token(
@@ -41,25 +43,15 @@ class TokenVerifier:
         """Validate bearer token and return token claims."""
 
         if authorization is None:
-            dms_info("Missing Authorization header.")
-            raise HTTPException(
-                status_code=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            dms_info("Recieved token with missing authorization header.")
+            raise HTTPException(status_code=401)
 
         scheme, _, token = authorization.partition(" ")
         token = token.strip()
 
         if scheme.lower() != "bearer" or not token:
             dms_info("Missing or invalid Authorization header.")
-            raise HTTPException(
-                status_code=400,
-                headers={
-                    "WWW-Authenticate": (
-                        'Bearer error="invalid_request", ' 'error_description="Missing or invalid Authorization header."'
-                    )
-                },
-            )
+            raise HTTPException(status_code=400)
 
         try:
             signing_key = self.jwks_client.get_signing_key_from_jwt(token)
@@ -73,27 +65,12 @@ class TokenVerifier:
             )
         except jwt.InvalidTokenError as exc:
             dms_info(f"Invalid access token: {exc}")
-            raise HTTPException(
-                status_code=401,
-                headers={
-                    "WWW-Authenticate": (
-                        'Bearer error="invalid_token", ' 'error_description="The access token is invalid or expired."'
-                    )
-                },
-            ) from exc
+            raise HTTPException(status_code=401) from exc
 
         azp = claims.get("azp")
         if self.allowed_azp is not None and azp not in self.allowed_azp:
             dms_info(f"Unexpected azp: {azp!r}, allowed={sorted(self.allowed_azp)!r}")
-            raise HTTPException(
-                status_code=403,
-                headers={
-                    "WWW-Authenticate": (
-                        'Bearer error="insufficient_scope", '
-                        'error_description="The access token is not authorized for this client." '
-                    )
-                },
-            )
+            raise HTTPException(status_code=403)
 
         required_scope_set = set(required_scopes or [])
         token_scope = claims.get("scope", "")
@@ -103,15 +80,6 @@ class TokenVerifier:
             dms_info(
                 "Missing required scope. " f"required_scopes={sorted(required_scope_set)}, " f"token_scopes={sorted(token_scopes)}"
             )
-            raise HTTPException(
-                status_code=403,
-                headers={
-                    "WWW-Authenticate": (
-                        'Bearer error="insufficient_scope", '
-                        f'scope="{" ".join(sorted(required_scope_set))}", '
-                        'error_description="The access token lacks required scope."'
-                    )
-                },
-            )
+            raise HTTPException(status_code=403)
 
         return claims

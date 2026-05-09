@@ -42,7 +42,7 @@ SUMMARIZE_STAGE_TWO_PROMPT = """Summarize the following {doc_count} document ext
 </extracts>
 
 Output format:
-- 3 to 5 short bullet points covering the key facts across all documents.
+- 3 short bullet points covering the key facts across all documents.
 - A short summary paragraph, max 100 words.
 
 **Key Highlights:**

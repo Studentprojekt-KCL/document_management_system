@@ -1,6 +1,6 @@
 """Handeling routes in the API."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from gateway.services.md_pdf import PdfConverter
@@ -35,7 +35,7 @@ def create_router(
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
-            return {"summary": "At least one pointer is required."}
+            raise HTTPException(status_code = 418)
 
         items = await connector.get_file_contents(payload.pointers)
         if not items:

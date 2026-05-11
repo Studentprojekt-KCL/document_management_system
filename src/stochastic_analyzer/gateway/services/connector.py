@@ -18,7 +18,6 @@ class Connector:
     """Fetches file content from connector gateway."""
 
     TIMEOUT: int = 120
-    CONVERTABLE_TYPES: list[str] = ["255044462d", "504b0304"]
     _converter = MarkItDown()
 
     def __init__(self) -> None:
@@ -66,14 +65,6 @@ class Connector:
         return items
 
     @staticmethod
-    def _is_convertable(content: bytes) -> bool:
-        """Check if file is convertable."""
-        for convertable in Connector.CONVERTABLE_TYPES:
-            if content[: int(len(convertable) / 2)].hex() == convertable:
-                return True
-        return False
-
-    @staticmethod
     def _extract_text(encoded: str | None) -> str | None:
         """Decode payload and extract text. Tries markitdown first, falls back to utf-8."""
         if encoded is None:
@@ -83,11 +74,11 @@ class Connector:
         except ValueError as err:
             dms_warning(f"Base64 decode failed: {err}")
             return None
-        if Connector._is_convertable(raw):
-            try:
-                return Connector._converter.convert_stream(BytesIO(raw)).text_content
-            except (FileConversionException, UnsupportedFormatException):
-                pass
+
+        try:
+            return Connector._converter.convert_stream(BytesIO(raw)).text_content
+        except (FileConversionException, UnsupportedFormatException):
+            pass
 
         try:
             return raw.decode("utf-8")

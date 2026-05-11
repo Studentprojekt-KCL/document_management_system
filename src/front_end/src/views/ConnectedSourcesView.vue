@@ -138,7 +138,6 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
     modalLoading.value = true
     modalError.value = ''
 
-    /* TODO: BASE64 */
     try {
       const credentials = btoa(`${username}:${password}`)
 

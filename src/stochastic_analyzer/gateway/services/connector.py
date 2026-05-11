@@ -32,11 +32,12 @@ class Connector:
         """Close HTTP session."""
         await self.session.close()
 
-    async def get_file_contents(self, pointers: list[str]) -> list[InputItem]:
+    async def get_file_contents(self, pointers: list[str], authorization: str | None) -> list[InputItem]:
         """Get file content from connector"""
         try:
             async with self.session.post(
                 f"{self.url}/get_files",
+                headers=[("Authorization", authorization)] if authorization is not None else None,
                 params={"include_content": "true", "include_last_edit_date": "false"},
                 json={"file_pointers": pointers},
                 timeout=aiohttp.ClientTimeout(total=self.TIMEOUT),

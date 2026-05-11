@@ -1,6 +1,6 @@
 """Handeling routes in the API."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from fastapi.responses import Response
 from aiohttp import ClientError
 
@@ -32,13 +32,13 @@ def create_router(
         )
 
     @router.post("/summarize")
-    async def summarize(payload: PointerRequest) -> dict[str, str]:
+    async def summarize(payload: PointerRequest, authorization: str | None = Header(default=None)) -> dict[str, str]:
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
             return {"summary": ""}
         try:
-            items = await connector.get_file_contents(payload.pointers)
+            items = await connector.get_file_contents(payload.pointers, authorization)
         except (ClientError, TimeoutError, ValueError):
             dms_warning("connector unreachable")
             return {"summary": ""}
@@ -46,7 +46,7 @@ def create_router(
         if not items:
             return {
                 "summary": (
-                    "I wasn't able to extract any readable content from the documents"
+                    "I wasn't able to extract any readable content from the documents "
                     "you provided—this usually happens with file types I don't support, "
                     "image-only documents, or empty files."
                 )
@@ -60,13 +60,13 @@ def create_router(
         return result
 
     @router.post("/merge")
-    async def merge(payload: PointerRequest) -> dict[str, str]:
+    async def merge(payload: PointerRequest, authorization: str | None = Header(default=None)) -> dict[str, str]:
         """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
             return {"summary": ""}
         try:
-            items = await connector.get_file_contents(payload.pointers)
+            items = await connector.get_file_contents(payload.pointers, authorization)
         except (ClientError, TimeoutError, ValueError):
             dms_warning("connector unreachable")
             return {"summary": ""}

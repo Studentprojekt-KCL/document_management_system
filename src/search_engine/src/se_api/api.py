@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 from collections.abc import Sequence
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -117,7 +117,13 @@ class API:
 
         return await self.handler.find_matching(pointer, count)
 
-    async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
+    async def query(
+            self, 
+            conent: dict[str, str], 
+            count: int = 10, 
+            offset: int = 0, 
+            authorization: str | None = Header(default=None)
+        ) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -126,7 +132,7 @@ class API:
         Returns:
             List of found files or None.
         """
-        return await self.handler.preform_search(conent, count, offset)
+        return await self.handler.preform_search(conent, count, offset, authorization)
 
     async def set_classification(self, change: dict[str, str]) -> dict:
         """Manualy set the classification of a pointer."""

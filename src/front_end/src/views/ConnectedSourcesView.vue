@@ -30,7 +30,15 @@ const getAuthEndpoint = (source) => {
 const resolveAuthEndpointUrl = (endpoint) => {
   if (!endpoint) return ''
   if (endpoint.startsWith('http')) return endpoint
-  return `${window.location.origin}${endpoint}`
+  if (endpoint.startsWith('/api/')) return endpoint
+
+  const fixedEndpoint = endpoint.replace('/auth_user&', '/auth_user?')
+
+  if (fixedEndpoint.startsWith('/auth_user?')) {
+    return `${API_PATHS.authUser}?${fixedEndpoint.split('?')[1]}`
+  }
+
+  return fixedEndpoint
 }
 
 const fetchSources = async () => {
@@ -133,10 +141,11 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
     /* TODO: BASE64 */
     try {
       const credentials = btoa(`${username}:${password}`)
+
       const response = await authFetch(targetUrl, {
         method: 'GET',
         headers: {
-          Authorization: `Basic ${credentials}`
+          'X-Connector-Authorization': `Basic ${credentials}`
         }
       })
 

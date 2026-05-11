@@ -372,15 +372,18 @@ class GitLab:
             headers = {}
 
         session = await self.get_session()
-        async with session.get(url, headers=headers) as resp:
-            try:
+        try:
+            async with session.get(url, headers=headers) as resp:
                 resp.raise_for_status()
                 response = await resp.json()
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                response = {}
-                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            response = {}
+            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
         return response
 
     async def execute_head_request(self, url: str, headers: dict | None = None) -> dict:
@@ -389,14 +392,17 @@ class GitLab:
             headers = {}
 
         session = await self.get_session()
-        async with session.head(url, headers=headers) as resp:
-            try:
+        try:
+            async with session.head(url, headers=headers) as resp:
                 resp.raise_for_status()
                 response = dict(resp.headers)
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
         return response
 
     async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None) -> dict:
@@ -407,13 +413,16 @@ class GitLab:
             data = {}
 
         session = await self.get_session()
-        async with session.post(url, headers=headers, json=data) as resp:
-            try:
+        try:
+            async with session.post(url, headers=headers, json=data) as resp:
                 response = await resp.json()
                 resp.raise_for_status()
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                response = {}
-                dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            response = {}
+            dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
         return response

@@ -1,7 +1,8 @@
 """Handeling routes in the API."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import Response
+from aiohttp import ClientError
 
 from gateway.services.md_pdf import PdfConverter
 from gateway.schemas import MarkdownRequest, PointerRequest
@@ -35,16 +36,27 @@ def create_router(
         """Summarize one or more documents."""
         if not payload.pointers:
             dms_warning("summarize requires at least 1 pointer.")
-            raise HTTPException(status_code = 418)
+            return {"summary": ""}
+        try:
+            items = await connector.get_file_contents(payload.pointers)
+        except (ClientError, TimeoutError, ValueError):
+            dms_warning("connector unreachable")
+            return {"summary": ""}
 
-        items = await connector.get_file_contents(payload.pointers)
         if not items:
-            dms_warning("document retreival failure")
-            return {"summary": "Could not retrieve documents."}
+            return {
+                "summary": (
+                    "I wasn't able to extract any readable content from the documents"
+                    "you provided—this usually happens with file types I don't support, "
+                    "image-only documents, or empty files."
+                )
+            }
+
         result = await summarizer.summarize(items)
         if result is None:
             dms_warning("summarization failed")
-            return {"summary": "Failed to generate a summary."}
+            return {"summary": ""}
+
         return result
 
     @router.post("/merge")
@@ -52,15 +64,26 @@ def create_router(
         """Endpoint for returning merged documents."""
         if len(payload.pointers) <= 1:
             dms_warning("merge requires minimum 2 pointers.")
-            return {"summary": "At least two documents are required to merge."}
-        items = await connector.get_file_contents(payload.pointers)
+            return {"summary": ""}
+        try:
+            items = await connector.get_file_contents(payload.pointers)
+        except (ClientError, TimeoutError, ValueError):
+            dms_warning("connector unreachable")
+            return {"summary": ""}
+
         if not items:
-            dms_warning("document retreival failure")
-            return {"summary": "Could not retrieve documents"}
+            return {
+                "summary": (
+                    "I wasn't able to extract any readable content from the documents "
+                    "you provided—this usually happens with file types I don't support, "
+                    "image-only documents, or empty files."
+                )
+            }
+
         result = await summarizer.merge(items)
         if result is None:
             dms_warning("merge failed")
-            return {"summary": "Failed to merge the documents"}
+            return {"summary": ""}
         return result
 
     return router

@@ -45,7 +45,7 @@ class Connector:
                 data = await response.json()
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             dms_warning(f"Connector request failed: {err}")
-            return []
+            raise
 
         items = []
         for entry in data:

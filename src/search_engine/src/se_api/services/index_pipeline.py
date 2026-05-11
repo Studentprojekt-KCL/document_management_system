@@ -60,7 +60,7 @@ class IndexPipeline:
         self.queues.classify_queue.shutdown(immediate=True)
         self.queues.reindex_queue.shutdown(immediate=True)
 
-    async def run(self) -> None:
+    async def run(self, authorization: str | None) -> None:
         """Run indexing pipeline.
 
         Args:
@@ -71,7 +71,7 @@ class IndexPipeline:
         dms_info("Indexing started.")
         start = datetime.now()
 
-        fetch_queue: Queue = await self.connector.connector_fetch()
+        fetch_queue: Queue = await self.connector.connector_fetch(authorization)
         decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
@@ -139,14 +139,14 @@ class IndexPipeline:
         """
         while True:
             try:
-                stream_url: str | None = await fetch_queue.get()
-                if stream_url is None:
+                stream_object: dict | None = await fetch_queue.get()
+                if stream_object is None:
                     break
                 try:
-                    async for file in self.connector.stream(stream_url):
+                    async for file in self.connector.stream(stream_object):
                         await decode_queue.put(file)
                 except httpx.HTTPError:
-                    dms_warning(f"Failed to connect to {stream_url}.")
+                    dms_warning(f"Failed to connect to {stream_object.get("stream_url")}.")
                 fetch_queue.task_done()
             except QueueShutDown:
                 break

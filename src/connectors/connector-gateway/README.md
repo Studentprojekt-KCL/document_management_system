@@ -17,10 +17,22 @@ tee src/connectors/connector-gateway/source_systems.json > /dev/null <<'EOF'
 [
   {
     "name": "Gitlab",
-    "connector_url": "http://connector-gitlab.dev.dms-lookup.com",
-    "source_system_url": "https://gitlab.dms-lookup.com"
+    "connector_url": <CONNECTOR_HOST>,
+    "source_system_url": <SOURCE_HOST>,
+    "authentication_method": "session",
+    "authentication_header": "x_gitlab_token",
+    "token_type": "bearer"
+  },
+  {
+    "name": "SMB",
+    "connector_url": <CONNECTOR_HOST>,
+    "source_system_url": <SOURCE_HOST>,
+    "authentication_method": "BA",
+    "authentication_header": "authorization",
+    "token_type": "Basic"
   }
 ]
+
 EOF
 ```
 

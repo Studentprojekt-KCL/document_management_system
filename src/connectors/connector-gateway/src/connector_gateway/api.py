@@ -35,7 +35,11 @@ class API:
         self.app.add_api_route("/callback_token", self.callback_token, methods=["POST"])
 
     async def get_files(
-        self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
+        self,
+        file_pointers: dict[str, list],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
+        authorization: str | None = Header(default=None),
     ) -> list:
         """Endpoint for retrieving specific file.
         Example request:
@@ -47,8 +51,17 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
+        split_pointers = self.down_stream_client.split_pointers(file_pointers.get("file_pointers"))  # noqa
+        services = [service.get("name") for service in split_pointers]
+        headers = {"authorization": authorization.strip()} if authorization else None
+        authentication_tokens = await self.refresh_client.send_post_request(
+            "/get_session_tokens", params=None, headers=headers, body=services
+        )
+        if not isinstance(authentication_tokens, dict):
+            raise HTTPException(status_code=400)
+
         return await self.down_stream_client.fetch_files_metadata(
-            file_pointers["file_pointers"], include_content, include_last_edit_date
+            split_pointers, include_content, include_last_edit_date, authentication_tokens
         )
 
     async def stream_files_to_index(self) -> list[str]:
@@ -80,7 +93,7 @@ class API:
 
     async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
         """Callback endpoint to insert service session token."""
-        return await self.refresh_client.send_request(
+        return await self.refresh_client.send_post_request(
             "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
         )
 

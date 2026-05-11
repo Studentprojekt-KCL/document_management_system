@@ -20,8 +20,8 @@ vi.mock('@/composables/useSearchMetadata', () => ({
   useSearchMetadata: () => mockMetadata
 }))
 
-// the following two mocks are needed to prevent errors from the AI Summary and Rerank features, 
-// but the tests in this file don't interact with those features at all, 
+// the following two mocks are needed to prevent errors from the AI Summary and Rerank features,
+// but the tests in this file don't interact with those features at all,
 // so when I couldn´t fix it in other way I disableing eslint rules.
 
 vi.mock('@/composables/aiSummary', () => {

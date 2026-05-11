@@ -13,6 +13,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
 import { getCurrentUser } from '@/utils/authClient'
+import { getAdminRoles, userHasAnyRole } from '@/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -39,9 +40,7 @@ const menuItems = [
 
 /* Checks if user is admin */
 const isAdmin = computed(() => {
-  const clientRoles = authInfo.value?.user?.client_roles ?? []
-  const realmRoles = authInfo.value?.user?.realm_roles ?? []
-  return clientRoles.includes('admin') || realmRoles.includes('admin')
+  return userHasAnyRole(authInfo.value, getAdminRoles())
 })
 
 /* Show all itmes fro admin otherwise only search */

@@ -24,10 +24,10 @@ import {
 
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
-import { hasRole } from '@/utils/auth'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
+import { hasAdminRole } from '../utils/auth'
 
 /* Props */
 const props = defineProps({
@@ -60,7 +60,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 /* EDIT */
 const canEdit = ref(false)
 onMounted(async () => {
-  canEdit.value = await hasRole('admin')
+  canEdit.value = await hasAdminRole()
 })
 
 /* State */

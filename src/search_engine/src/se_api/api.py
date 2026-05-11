@@ -118,12 +118,8 @@ class API:
         return await self.handler.find_matching(pointer, authorization, count)
 
     async def query(
-            self, 
-            conent: dict[str, str], 
-            count: int = 10, 
-            offset: int = 0, 
-            authorization: str | None = Header(default=None)
-        ) -> list:
+        self, conent: dict[str, str], count: int = 10, offset: int = 0, authorization: str | None = Header(default=None)
+    ) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:

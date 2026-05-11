@@ -108,7 +108,7 @@ class AuthRoutes:
         if not client_roles:
             raise HTTPException(
                 status_code=403,
-                detail="User does not belong to dms-frontend-dev",
+                detail="User does not belong to the client",
             )
 
         return JSONResponse(

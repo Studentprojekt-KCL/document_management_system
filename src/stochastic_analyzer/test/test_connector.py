@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 
 from gateway.schemas import InputItem
-from gateway.services.connector import Connector
+from gateway.services.connector import Connector, ConnectorUnreachable, UnsupportedContent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -152,57 +152,57 @@ class TestGetFileContents(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result), 3)
 
     async def test_missing_content_returns_empty_list(self) -> None:
-        """Returns [] and logs warning when content field is missing."""
+        """Raises ConnectorUnreachable and logs warning when content field is missing."""
         c = _make_connector()
         _mock_response(c.client, [{"unique_pointer": GITLAB_POINTER}])  # no "content"
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(ConnectorUnreachable):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
     async def test_invalid_base64_returns_empty_list(self) -> None:
-        """Returns [] and logs warning when base64 decoding fails."""
+        """Raises UnsupportedContent and logs warning when base64 decoding fails."""
         c = _make_connector()
         _mock_response(c.client, [{"content": "!!!not-valid-base64!!!", "unique_pointer": GITLAB_POINTER}])
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(UnsupportedContent):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
-    async def test_http_status_error_returns_empty_list(self) -> None:
-        """Returns [] and logs warning on HTTPStatusError."""
+    async def test_http_status_error_raises(self) -> None:
+        """Raises ConnectorUnreachable and logs warning on HTTPStatusError."""
         c = _make_connector()
         _mock_error(c.client, httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock()))
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(ConnectorUnreachable):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
-    async def test_timeout_returns_empty_list(self) -> None:
-        """Returns [] and logs warning on TimeoutException."""
+    async def test_timeout_raises(self) -> None:
+        """Raises ConnectorUnreachable and logs warning on TimeoutException."""
         c = _make_connector()
         _mock_error(c.client, httpx.TimeoutException("timed out"))
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(ConnectorUnreachable):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
-    async def test_connect_error_returns_empty_list(self) -> None:
-        """Returns [] and logs warning on ConnectError."""
+    async def test_connect_error_raises(self) -> None:
+        """Raises ConnectorUnreachable and logs warning on ConnectError."""
         c = _make_connector()
         _mock_error(c.client, httpx.ConnectError("connection refused"))
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(ConnectorUnreachable):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
-    async def test_value_error_returns_empty_list(self) -> None:
-        """Returns [] and logs warning on ValueError (e.g. bad JSON)."""
+    async def test_value_error_raises(self) -> None:
+        """Raises ConnectorUnreachable and logs warning on ValueError (e.g. bad JSON)."""
         c = _make_connector()
         _mock_error(c.client, ValueError("bad value"))
         with unittest.mock.patch("gateway.services.connector.dms_warning") as mock_warn:
-            result = await c.get_file_contents([GITLAB_POINTER])
-        self.assertEqual(result, [])
+            with self.assertRaises(ConnectorUnreachable):
+                await c.get_file_contents([GITLAB_POINTER])
         mock_warn.assert_called_once()
 
 

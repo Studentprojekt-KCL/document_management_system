@@ -49,6 +49,8 @@ class ConnectorClient:
         system_pointers: dict = {}
         for pointer in pointers:
             for system in self.source_system_structure:
+                if system not in pointer:
+                    continue
                 if system in system_pointers:
                     system_pointers[system].append(pointer)
                     break

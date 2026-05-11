@@ -196,8 +196,7 @@ const handleFilterChangeAndSearch = async (filters) => {
       documentsOnly: documentsOnlyMode.value,
       file_type: filters.type.join(' '),
       source_system: filters.source.join(' '),
-      security_class: filters.security.join(' '),
-      resetPreview: false
+      security_class: filters.security.join(' ')
     })
   }
   // Apply filter AFTER server results are loaded
@@ -260,19 +259,21 @@ const refreshCurrentSearch = async () => {
 .search-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
   padding: 1rem;
   box-sizing: border-box;
 }
 
 .search-static {
-  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f5f6fa;
+  padding-bottom: 1rem;
 }
 
 .search-results-scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 </style>

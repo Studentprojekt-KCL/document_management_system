@@ -49,14 +49,13 @@ class ConnectorClient:
         system_pointers: dict = {}
         for pointer in pointers:
             for system in self.source_system_structure:
-                if system in pointer or not isinstance(system_pointers.get(system), list):
-                    system_pointers[system] = [pointer]
-                    break
-                if system in pointer:
+                if system in system_pointers:
                     system_pointers[system].append(pointer)
+                    break
+                if not isinstance(system_pointers.get(system), list):
+                    system_pointers[system] = [pointer]
             else:
                 dms_info(f"No source system found for {pointer}")
-
         system_list: list = []
         for system, file_pointers in system_pointers.items():
             source = self.source_system_structure.get(system)

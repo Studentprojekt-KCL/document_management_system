@@ -106,7 +106,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str, count: int = 10) -> list[dict]:
+    async def find_matching(self, pointer: str, count: int = 10, authorization: str | None = Header(default=None)) -> list[dict]:
         """Look for matching files.
 
         Args:
@@ -115,7 +115,7 @@ class API:
         Returns: unique pointers and their score.
         """
 
-        return await self.handler.find_matching(pointer, count)
+        return await self.handler.find_matching(pointer, authorization, count)
 
     async def query(
             self, 
@@ -134,9 +134,9 @@ class API:
         """
         return await self.handler.preform_search(conent, count, offset, authorization)
 
-    async def set_classification(self, change: dict[str, str]) -> dict:
+    async def set_classification(self, change: dict[str, str], authorization: str | None = Header(default=None)) -> dict:
         """Manualy set the classification of a pointer."""
-        return await self.handler.set_classification(change)
+        return await self.handler.set_classification(change, authorization)
 
     @staticmethod
     async def check_health() -> JSONResponse:

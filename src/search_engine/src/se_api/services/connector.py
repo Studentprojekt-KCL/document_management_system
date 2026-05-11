@@ -73,7 +73,7 @@ class Connector:
             else:
                 f["subdata"] = self.subdata
 
-    async def connector_fetch(self) -> Queue:
+    async def connector_fetch(self, authorization: str | None) -> Queue:
         """Grab connectors from gateway.
 
         Returns: queue with stream urls.
@@ -82,6 +82,7 @@ class Connector:
         try:
             response = await self.client.get(
                 self.STREAM_ENDPOINT,
+                headers=[("Authorization", authorization)] if authorization is not None else None,
                 timeout=TIMEOUT,
             )
             response.raise_for_status()
@@ -145,7 +146,7 @@ class Connector:
                     yield data
             self.subdata[stream_url] = subdata
 
-    async def fetch_files(self, pointers: list[str]) -> list[dict] | None:
+    async def fetch_files(self, pointers: list[str], authorization: str | None) -> list[dict] | None:
         """Grab all files from the connectors pointed at by the pointers.
 
         Args:
@@ -157,16 +158,17 @@ class Connector:
         Raises:
             SeAPIException: Potential formatting errors.
         """
-        response: Any | None = await self._get_file_from_pointers(pointers)
+        response: Any | None = await self._get_file_from_pointers(pointers, authorization)
         if not isinstance(response, list):
             return None
         return response
 
-    async def _get_file_from_pointers(self, pointers: list[str]) -> Any | None:
+    async def _get_file_from_pointers(self, pointers: list[str], authorization: str | None) -> Any | None:
         """Get file from pointer"""
         try:
             response = await self.client.post(
                 self.GET_FILE_ENDPOINT,
+                headers=[("Authorization", authorization)] if authorization is not None else None,
                 params=[("include_content", False), ("include_last_edit_date", True)],
                 json={"file_pointers": pointers},
                 timeout=TIMEOUT,

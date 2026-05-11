@@ -60,7 +60,7 @@ class IndexPipeline:
         self.queues.classify_queue.shutdown(immediate=True)
         self.queues.reindex_queue.shutdown(immediate=True)
 
-    async def run(self) -> None:
+    async def run(self, authorization: str | None) -> None:
         """Run indexing pipeline.
 
         Args:
@@ -71,7 +71,7 @@ class IndexPipeline:
         dms_info("Indexing started.")
         start = datetime.now()
 
-        fetch_queue: Queue = await self.connector.connector_fetch()
+        fetch_queue: Queue = await self.connector.connector_fetch(authorization)
         decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)

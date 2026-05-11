@@ -70,6 +70,7 @@ class API:
 
         self.app.add_api_route("/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
         self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
+        self.app.add_api_route("/auth/checkAdmin", self.auth_routes.check_admin, methods=["GET"])
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
         self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])

@@ -26,6 +26,8 @@ class AuthRoutes:
         self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
         self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+        admin_roles_list = read_env_variable("DMISAPI_ADMIN_ROLES", required=False)
+        self.admin_roles = [role.strip() for role in admin_roles_list.split(",") if role.strip()] if admin_roles_list else []
 
         self._session = None
 
@@ -145,6 +147,23 @@ class AuthRoutes:
                     "client_roles": client_roles,
                     "realm_roles": realm_roles,
                 },
+            },
+        )
+
+    async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Check if authenticated user has an admin role"""
+        claims = self._verify_cookie_token(access_token)
+        if not claims:
+            raise HTTPException(status_code=401)
+
+        client_roles = self._get_client_roles(claims)
+
+        is_admin = any(role in client_roles for role in self.admin_roles)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "admin": is_admin,
             },
         )
 

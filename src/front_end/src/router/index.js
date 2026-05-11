@@ -21,9 +21,9 @@ import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
-import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
+import { isAuthenticated } from '@/utils/authClient'
 import MergeFilesView from '@/views/MergeFilesView.vue'
-import { getAdminRoles, userHasAnyRole } from '@/utils/auth.js'
+import { isAdmin } from '@/utils/auth.js'
 
 const routes = [
   /* Public */
@@ -133,8 +133,7 @@ router.beforeEach(async (to) => {
 
   /* Admin only route */
   if (to.meta?.requiresAdmin) {
-    const authInfo = await getCurrentUser()
-    if (!userHasAnyRole(authInfo, getAdminRoles())) {
+    if (!(await isAdmin())) {
       return { path: '/403' }
     }
   }

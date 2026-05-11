@@ -12,22 +12,19 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
-import { getCurrentUser } from '@/utils/authClient'
-import { getAdminRoles, userHasAnyRole } from '@/utils/auth'
+import { isAdmin } from '@/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
 
 const isOpen = ref(false)
-const authInfo = ref(null)
+const admin = ref(false)
 
-/* get info about user from /auth/me endpoint using authClient helper */
-const loadAuthInfo = async () => {
-  authInfo.value = await getCurrentUser()
+const loadAdminStatus = async () => {
+  admin.value = await isAdmin()
 }
 
-/* Reload user info on route change */
-watch(() => route.fullPath, loadAuthInfo, { immediate: true })
+watch(() => route.fullPath, loadAdminStatus, { immediate: true })
 
 /* all available items on the sidebar */
 const menuItems = [
@@ -38,15 +35,10 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-/* Checks if user is admin */
-const isAdmin = computed(() => {
-  return userHasAnyRole(authInfo.value, getAdminRoles())
-})
-
 /* Show all itmes fro admin otherwise only search */
 const visibleMenuItems = computed(() => {
   const searchOnly = menuItems.filter((item) => item.id === 'search')
-  return isAdmin.value ? menuItems : searchOnly
+  return admin.value ? menuItems : searchOnly
 })
 
 /* Compute the active menu item */

@@ -27,7 +27,7 @@ import { useAISummary } from '@/composables/aiSummary'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
-import { hasAdminRole } from '../utils/auth'
+import { isAdmin } from '@/utils/auth'
 
 /* Props */
 const props = defineProps({
@@ -60,7 +60,7 @@ const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = 
 /* EDIT */
 const canEdit = ref(false)
 onMounted(async () => {
-  canEdit.value = await hasAdminRole()
+  canEdit.value = await isAdmin()
 })
 
 /* State */

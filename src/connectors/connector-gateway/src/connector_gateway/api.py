@@ -4,10 +4,13 @@ import uvicorn
 import fastapi
 
 from fastapi import Header
+from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from connector_gateway.connector_client import ConnectorClient
+from connector_gateway.refreshservice_client import RefreshServiceClient
 
 from shared_functions.initialisation_tools import read_env_variable, read_int_env_variable, read_port
+from shared_functions.dmis_logger import dms_warning
 
 
 class API:
@@ -16,21 +19,27 @@ class API:
     app = fastapi.FastAPI()
 
     def __init__(self) -> None:
-        self.down_stream_client = ConnectorClient(
-            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True),  # type: ignore
-            read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"),
-        )
+        self.timeout: int = int(read_int_env_variable("CONGATEWAY_REQUEST_TIMEOUT"))
 
-        # Endpints
+        self.down_stream_client = ConnectorClient(
+            read_env_variable("CONGATEWAY_CONFIG_FILE_PATH", required=True), self.timeout  # type: ignore
+        )
+        self.refresh_client = RefreshServiceClient(read_env_variable("CONGATEWAY_REFRESH_SERVICE_URL"), self.timeout)
+
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
         self.app.add_api_route("/connected_source_systems", self.connected_source_systems, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"], response_model=None)
+        self.app.add_api_route("/callback_token", self.callback_token, methods=["POST"])
 
     async def get_files(
-        self, file_pointers: dict[str, list], include_content: bool = False, include_last_edit_date: bool = True
+        self,
+        file_pointers: dict[str, list],
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
+        authorization: str | None = Header(default=None),
     ) -> list:
         """Endpoint for retrieving specific file.
         Example request:
@@ -42,13 +51,43 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
+        split_pointers = self.down_stream_client.split_pointers(file_pointers.get("file_pointers"))  # noqa
+        services = [service.get("name") for service in split_pointers]
+        headers = {"authorization": authorization.strip()} if authorization else None
+        authentication_tokens = await self.refresh_client.send_post_request(
+            "/get_session_tokens", params=None, headers=headers, body=services
+        )
+        if not isinstance(authentication_tokens, dict):
+            raise HTTPException(status_code=400)
+
         return await self.down_stream_client.fetch_files_metadata(
-            file_pointers["file_pointers"], include_content, include_last_edit_date
+            split_pointers, include_content, include_last_edit_date, authentication_tokens
         )
 
-    async def stream_files_to_index(self) -> list[str]:
+    async def stream_files_to_index(self, authorization: str | None = Header(default=None)) -> list[dict]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
-        return await self.down_stream_client.fetch_start_of_streams()
+        connectors = await self.down_stream_client.fetch_start_of_streams()
+        services = [service.get("name") for service in connectors]
+        headers: dict = {"authorization": authorization.strip()} if authorization else {}
+        authentication_tokens: dict = {}
+
+        if authorization:
+            tokens = await self.refresh_client.send_post_request("/get_session_tokens", params=None, headers=headers, body=services)
+            if isinstance(tokens, dict):
+                authentication_tokens = tokens
+            else:
+                dms_warning(f"Recieved unexpeced structure from refresh-service (expected dict): git({type(tokens)})")
+
+        stream_references: list = []
+
+        for service in connectors:
+            service_token = authentication_tokens.get(service.get("name"))
+            headers_to_set: dict = {}
+            if service_token:
+                headers_to_set |= {service.get("authentication_header"): f"{service.get('token_type')} {service_token}"}
+            stream_references.append({"stream_url": service.get("stream_url"), "required_headers": headers_to_set})
+
+        return stream_references
 
     async def connected_source_systems(self) -> list[str]:
         """Returns list with names of all connected source systems"""
@@ -63,10 +102,21 @@ class API:
         return await self.down_stream_client.get_auth_urls()
 
     async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
-        """returns redirect to source system to authenitacte"""
-        if not isinstance(source_system, str):
-            return
+        """Returns redirect to source system to authenticate."""
+        if not isinstance(source_system, str) or referer is None:
+            dms_warning(
+                "No {issue} provided to gateway auth_user".format(  # pylint: disable=C0209
+                    issue="referer" if referer is None else "source_system"
+                )
+            )
+            raise HTTPException(status_code=400)
         return await self.down_stream_client.get_auth_redirect(source_system, referer)
+
+    async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
+        """Callback endpoint to insert service session token."""
+        return await self.refresh_client.send_post_request(
+            "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
+        )
 
 
 def run() -> None:

@@ -86,7 +86,14 @@ class Connector:
                 timeout=TIMEOUT,
             )
             response.raise_for_status()
-            connectors: list[str] = response.json()
+            content = response.json()
+            if not isinstance(content, list):
+                dms_warning(f"Expected a list of dicts when calling: {self.STREAM_ENDPOINT}")
+                return fetch_queue
+            if content and not isinstance(content[0], dict):
+                dms_warning(f"Expected a list of dicts when calling: {self.STREAM_ENDPOINT}")
+                return fetch_queue
+            connectors: list[dict] = content
             for connector in connectors:
                 await fetch_queue.put(connector)
         except httpx.TimeoutException:
@@ -117,19 +124,30 @@ class Connector:
             dms_warning(f"Invalid HTTP response, url: {self.GET_FIELDS}.")
         return None
 
-    async def stream(self, stream_url: str) -> AsyncGenerator:
+    async def stream(self, stream_object: dict) -> AsyncGenerator:
         """Open stream connection to connector.
 
         Args:
             stream_url: url to stream from.
         """
+        stream_url: str | None = stream_object.get("stream_url")
+        headers: dict | None = stream_object.get("required_headers")
+
+        if stream_url is None or headers is None:
+            dms_warning("Recieved an empty field from gateway.")
+            return
+
         async with AsyncClient() as client:
             raw = ""
             prev_subdata: str | None = self.subdata.get(stream_url)
             subdata: str | None = None
             data: dict
             async with client.stream(
-                "POST", stream_url, timeout=TIMEOUT, json={"subdata": prev_subdata} if prev_subdata is not None else None
+                "POST",
+                stream_url,
+                timeout=TIMEOUT,
+                headers=list(headers.items()),
+                json={"subdata": prev_subdata} if prev_subdata is not None else None,
             ) as stream:
                 async for chunk in stream.aiter_text():
                     raw += chunk

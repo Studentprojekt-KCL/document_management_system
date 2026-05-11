@@ -139,14 +139,14 @@ class IndexPipeline:
         """
         while True:
             try:
-                stream_url: str | None = await fetch_queue.get()
-                if stream_url is None:
+                stream_object: dict | None = await fetch_queue.get()
+                if stream_object is None:
                     break
                 try:
-                    async for file in self.connector.stream(stream_url):
+                    async for file in self.connector.stream(stream_object):
                         await decode_queue.put(file)
                 except httpx.HTTPError:
-                    dms_warning(f"Failed to connect to {stream_url}.")
+                    dms_warning(f"Failed to connect to {stream_object.get("stream_url")}.")
                 fetch_queue.task_done()
             except QueueShutDown:
                 break

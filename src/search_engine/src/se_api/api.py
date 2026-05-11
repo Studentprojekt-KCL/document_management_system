@@ -165,5 +165,6 @@ class API:
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
+
     api: API = API()
     api.start()

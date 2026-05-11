@@ -58,6 +58,7 @@ class Connector:
     async def close(self) -> None:
         """Close clients"""
         await self.client.aclose()
+        self.write_subdata()
 
     def write_subdata(self, subdata: dict | None = None) -> None:
         """Set the subdata.
@@ -144,7 +145,7 @@ class Connector:
                     yield data
             self.subdata[stream_url] = subdata
 
-    async def fetch_files(self, pointers: list[str]) -> list[dict]:
+    async def fetch_files(self, pointers: list[str]) -> list[dict] | None:
         """Grab all files from the connectors pointed at by the pointers.
 
         Args:
@@ -158,7 +159,7 @@ class Connector:
         """
         response: Any | None = await self._get_file_from_pointers(pointers)
         if not isinstance(response, list):
-            return []
+            return None
         return response
 
     async def _get_file_from_pointers(self, pointers: list[str]) -> Any | None:

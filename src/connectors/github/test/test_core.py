@@ -47,6 +47,13 @@ class TestGitHubHelpers(unittest.TestCase):
     def setUp(self) -> None:
         self.github = GitHub()
 
+    def test_defined_fields_matches_gitlab_contract_shape(self) -> None:
+        """Schema keys overlap GitLab connector (base fields + extensions from file_types)."""
+        keys = list(self.github.defined_fields.keys())
+        self.assertIn("content", keys)
+        self.assertIn("unique_pointer", keys)
+        self.assertIn("source_system", keys)
+
     def test_make_and_parse_pointer_roundtrip(self) -> None:
         """File pointer URL encodes and decodes to the same components."""
         pointer = self.github._make_file_pointer("owner/repo", "src/file.py", "main")

@@ -33,7 +33,8 @@ const handleSearch = () => {
   }
 
   emit('search', { query, documentsOnly: documentsOnly.value })
-  searchQuery.value = ''
+  /* Last searched term visible in the input. */
+  searchQuery.value = query
 }
 
 /* Disable search button if query is empty or currently searching */

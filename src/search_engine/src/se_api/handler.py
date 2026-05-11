@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from asyncio import Lock, get_event_loop
 
-from se_api.constants import CLASSIFICATION, UNIQUE_POINTER
+from se_api.constants import CLASSIFICATION, MAX_FAIL_COUNT, UNIQUE_POINTER
 from se_api.services.index_pipeline import IndexPipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
@@ -125,20 +125,6 @@ class Handler:
             return file
         return {}
 
-    async def clean_misses(self, matches: list[str], grabbed: list[dict]) -> None:
-        """Remove missing files from cache and index.
-
-        Args:
-            matches: list of pointers
-            grabbed: list of file dicts.
-        """
-
-        grabs = [grab.get("unique_pointer") for grab in grabbed]
-        for match in matches:
-            if match in grabs:
-                continue
-            await self.search_engine.remove_file(match)
-
     async def preform_search(self, content: dict, count: int, offset: int) -> list:
         """Get get files from collectors preform the search, returns a list.
 
@@ -160,13 +146,25 @@ class Handler:
             loop = get_event_loop()
             loop.create_task(self._handle_new())
 
-        matches, metadata = self.search_engine.query_files(content, count, offset)
-        files: list[dict] | None = await self.connector.fetch_files(matches)
-        if files is None:
-            return []
-        await self.clean_misses(matches, files)
-        for file in files:
-            file.update(metadata.get(file.get(UNIQUE_POINTER, ""), {}))
+        files: list[dict] = []
+        missing: int = count
+        actual_offset: int = offset
+        fails: int = 0
+
+        while missing > 0 and fails < MAX_FAIL_COUNT:
+            matches, metadata = self.search_engine.query_files(content, missing, actual_offset)
+            if not matches:
+                break
+            available: list[dict] | None = await self.connector.fetch_files(matches)
+            if available is None:
+                return []
+            for file in available:
+                file.update(metadata.get(file.get(UNIQUE_POINTER, ""), {}))
+                files.append(file)
+            missing = count - len(files)
+            if not files:
+                fails += 1
+            actual_offset += count
         return files
 
     async def _handle_new(self) -> None:

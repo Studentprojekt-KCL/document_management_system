@@ -38,10 +38,8 @@ export function useAIRerank(props = {}) {
     aiRerankResults.value = []
 
     try {
-      const rerankUrl = new URL(API_PATHS.rerank, window.location.origin)
-      rerankUrl.searchParams.set('pointer', uniquePointer.value)
-
-      const response = await authFetch(rerankUrl, {
+      const url = `${API_PATHS.rerank}?pointer=${encodeURIComponent(uniquePointer.value)}`
+      const response = await authFetch(url, {
         method: 'GET'
       })
 

@@ -7,9 +7,31 @@
 import { computed, ref } from 'vue'
 import { ShieldCheck, Wifi } from 'lucide-vue-next'
 import { authFetch, API_PATHS } from '@/utils/api'
+import ConnectModal from '@/components/ConnectModal.vue'
 
 const sources = ref([])
+const sourceAuthEntries = ref([])
 const connectedSources = ref([])
+const showModal = ref(false)
+const selectedSource = ref(null)
+const modalLoading = ref(false)
+const modalError = ref('')
+
+const normalizeAuthMethod = (method) => {
+  if (!method) return 'unknown'
+  return String(method).toLowerCase()
+}
+
+const getAuthEndpoint = (source) => {
+  const sourceName = String(source || '').toLowerCase()
+  return sourceAuthEntries.value.find((entry) => String(entry?.name || '').toLowerCase() === sourceName) || null
+}
+
+const resolveAuthEndpointUrl = (endpoint) => {
+  if (!endpoint) return ''
+  if (endpoint.startsWith('http')) return endpoint
+  return `${window.location.origin}${endpoint}`
+}
 
 const fetchSources = async () => {
   try {
@@ -25,15 +47,111 @@ const fetchSources = async () => {
     console.error(`Error fetching source systems: ${error}`)
   }
 }
+
+const fetchAuthUserUrls = async () => {
+  try {
+    const res = await authFetch(API_PATHS.authUserUrl)
+
+    if (!res.ok) {
+      console.error(`Failed to fetch auth user URLs: ${res.statusText}`)
+      sourceAuthEntries.value = []
+      return
+    }
+    const data = await res.json()
+    sourceAuthEntries.value = Array.isArray(data) ? data : []
+    console.log('Auth user URLs:', data)
+  } catch (error) {
+    console.error(`Error fetching auth user URLs: ${error}`)
+    sourceAuthEntries.value = []
+  }
+}
+
 fetchSources()
+fetchAuthUserUrls()
 
 const connectedCount = computed(() => sources.value.filter((source) => isConnected(source)).length)
+const selectedSourceAuthEntry = computed(() => getAuthEndpoint(selectedSource.value))
+const selectedSourceAuthMethod = computed(() => normalizeAuthMethod(selectedSourceAuthEntry.value?.authentication_method))
 
 const isConnected = (source) => connectedSources.value.includes(source)
 
 const connectSource = (source) => {
+  const authEntry = getAuthEndpoint(source)
+  const method = normalizeAuthMethod(authEntry?.authentication_method)
+  const targetUrl = resolveAuthEndpointUrl(authEntry?.endpoint)
+
+  if (method === 'ba' || method === 'session') {
+    selectedSource.value = source
+    modalError.value = ''
+    showModal.value = true
+    return
+  }
+
+  if (!targetUrl) {
+    selectedSource.value = source
+    modalError.value = 'No authentication endpoint found.'
+    showModal.value = true
+    return
+  }
+
+  window.location.assign(targetUrl)
+}
+
+const closeConnectModal = () => {
+  showModal.value = false
+  selectedSource.value = null
+  modalError.value = ''
+  modalLoading.value = false
+}
+
+const markConnected = (source) => {
   if (!connectedSources.value.includes(source)) {
     connectedSources.value = [...connectedSources.value, source]
+  }
+}
+
+const handleConnect = async ({ source, endpoint, method, username, password }) => {
+  if (!source) return
+
+  const resolvedMethod = normalizeAuthMethod(method)
+  const targetUrl = resolveAuthEndpointUrl(endpoint)
+
+  if (!targetUrl) {
+    modalError.value = 'Missing authentication endpoint for this source.'
+    return
+  }
+
+  if (resolvedMethod === 'session') {
+    window.location.assign(targetUrl)
+    return
+  }
+
+  if (resolvedMethod === 'ba') {
+    modalLoading.value = true
+    modalError.value = ''
+
+    /* TODO: BASE64 */
+    try {
+      const credentials = btoa(`${username}:${password}`)
+      const response = await authFetch(targetUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Basic ${credentials}`
+        }
+      })
+
+      if (!response.ok) {
+        modalError.value = 'Authentication failed. Check credentials and try again.'
+        return
+      }
+
+      markConnected(source)
+      closeConnectModal()
+    } catch (error) {
+      modalError.value = `Connection failed: ${String(error)}`
+    } finally {
+      modalLoading.value = false
+    }
   }
 }
 </script>
@@ -66,6 +184,16 @@ const connectSource = (source) => {
         </div>
       </li>
     </ul>
+    <ConnectModal
+      :open="showModal"
+      :source-name="selectedSource || ''"
+      :loading="modalLoading"
+      :error-message="modalError"
+      :auth-method="selectedSourceAuthMethod"
+      :auth-endpoint="selectedSourceAuthEntry?.endpoint || ''"
+      @close="closeConnectModal"
+      @connect="handleConnect"
+    />
   </section>
 </template>
 

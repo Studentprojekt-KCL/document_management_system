@@ -134,7 +134,7 @@ class API:
             return f"Bearer {access_token}"
         return None
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> Any:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -150,17 +150,12 @@ class API:
         try:
             async with self.http_client.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
-        except JSONDecodeError as exc:
-            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
-            raise HTTPException(status_code=502) from exc
+                return await response.read()
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        return JSONResponse(status_code=200, content=response_data)
-
-    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> Any:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -179,22 +174,17 @@ class API:
         try:
             async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
-        except JSONDecodeError as exc:
-            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
-            raise HTTPException(status_code=502) from exc
+                return await response.read()
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
-
-        return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(
         self,
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(authorization, request.headers.get("Referer"), required_scopes=self.required_scopes["searcheng"])
@@ -205,7 +195,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """POST request to search engine."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -220,7 +210,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """GET request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -235,7 +225,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -250,7 +240,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -265,7 +255,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> JSONResponse:
+    ) -> Any:
         """POST request to connector API."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(

@@ -13,6 +13,7 @@
  * - Blocks non-admin users from admin routes (403).
  */
 import { createRouter, createWebHistory } from 'vue-router'
+import ConnectedSourcesView from '@/views/ConnectedSourcesView.vue'
 import SearchView from '@/views/SearchView.vue'
 import SourcesView from '@/views/SourcesView.vue'
 import IntelligenceView from '@/views/IntelligenceView.vue'
@@ -38,6 +39,12 @@ const routes = [
     component: AuthCallbackView
   },
   /* Protected */
+  {
+    path: '/connections',
+    name: 'Connections',
+    component: ConnectedSourcesView,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/search',
     name: 'Search',

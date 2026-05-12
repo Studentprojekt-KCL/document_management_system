@@ -19,6 +19,12 @@ export const API_PATHS = {
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
   merge: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/merge`,
   mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`,
+
+  /* Connected source system auth endpoints */
+  authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
+  authUser: `${FRONTEND_DMISAPI_BASE_URL}/connector/auth_user`,
+
+  /* General auth endpoints */
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,

@@ -148,17 +148,10 @@ class API:
             raise HTTPException(status_code=500)
 
         try:
-            async with self.http_client.get(url, params=params, headers=headers) as response:
-                response.raise_for_status()
-                response_data = await response.json()
-        except JSONDecodeError as exc:
-            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
-            raise HTTPException(status_code=502) from exc
+            return await self.http_client.get(url, params=params, headers=headers)
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
-
-        return JSONResponse(status_code=200, content=response_data)
 
     async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
         """Execute POST request."""
@@ -177,17 +170,10 @@ class API:
             raise HTTPException(status_code=500)
 
         try:
-            async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
-                response.raise_for_status()
-                response_data = await response.json()
-        except JSONDecodeError as exc:
-            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
-            raise HTTPException(status_code=502) from exc
+            return await self.http_client.post(url, params=params, json=body, headers=headers)
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
-
-        return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(
         self,

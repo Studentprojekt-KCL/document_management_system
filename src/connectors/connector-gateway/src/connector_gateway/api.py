@@ -2,6 +2,7 @@
 
 import uvicorn
 import fastapi
+from typing import Annotated
 
 from fastapi import Header
 from fastapi.exceptions import HTTPException
@@ -52,7 +53,7 @@ class API:
             }'
         """
         split_pointers = self.down_stream_client.split_pointers(file_pointers.get("file_pointers"))  # noqa
-        services = [service.get("name") for service in split_pointers]
+        services = [service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in split_pointers]
         headers = {"authorization": authorization.strip()} if authorization else None
         authentication_tokens = await self.refresh_client.send_post_request(
             "/get_session_tokens", params=None, headers=headers, body=services
@@ -67,7 +68,8 @@ class API:
     async def stream_files_to_index(self, authorization: str | None = Header(default=None)) -> list[dict]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
         connectors = await self.down_stream_client.fetch_start_of_streams()
-        services = [service.get("name") for service in connectors]
+        #services = [service.get("name") for service in connectors]
+        services = [service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in connectors]
         headers: dict = {"authorization": authorization.strip()} if authorization else {}
         authentication_tokens: dict = {}
 
@@ -81,7 +83,8 @@ class API:
         stream_references: list = []
 
         for service in connectors:
-            service_token = authentication_tokens.get(service.get("name"))
+            service_name = service.get("name").lower() if isinstance(service.get("name"), str) else ""
+            service_token = authentication_tokens.get(service_name)
             headers_to_set: dict = {}
             if service_token:
                 headers_to_set |= {service.get("authentication_header"): f"{service.get('token_type')} {service_token}"}
@@ -101,8 +104,19 @@ class API:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
 
-    async def auth_user(self, source_system: str, referer: str = Header(None)) -> RedirectResponse | None:
+    async def auth_user(self, source_system: str, authorization: str | None = Header(None), x_connector_authorization: Annotated[str | None, Header()] = None, referer: Annotated[str | None, Header()] = None):
         """Returns redirect to source system to authenticate."""
+        source_system_info = self.down_stream_client.find_service(source_system)
+
+        if source_system_info.get("authentication_method") == "BA":
+            body = {"refresh_url": "", "session_variables": {"access_token": x_connector_authorization.lstrip(f"{source_system_info.get('token_type')} ")}}
+            response = await self.refresh_client.send_post_request(
+                "add_session_token", params={"service_name": source_system}, headers={"authorization": authorization}, body=body
+            )
+            return response
+        if source_system_info.get("source_system") == "session":
+            pass #TODO, redirect system.
+
         if not isinstance(source_system, str) or referer is None:
             dms_warning(
                 "No {issue} provided to gateway auth_user".format(  # pylint: disable=C0209
@@ -110,7 +124,9 @@ class API:
                 )
             )
             raise HTTPException(status_code=400)
+
         return await self.down_stream_client.get_auth_redirect(source_system, referer)
+
 
     async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
         """Callback endpoint to insert service session token."""

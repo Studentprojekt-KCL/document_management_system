@@ -28,8 +28,15 @@ class ConnectorClient:
             system["source_system_url"] = system["source_system_url"].rstrip("/")
             source_system_structure[system.get("source_system_url")] = system
 
-        self.source_systems: list = source_systems  # NOTE; Try to depricate this.
+        self.source_systems: list[dict] = source_systems  # NOTE; Try to depricate this.
         self.source_system_structure = source_system_structure
+
+    def find_service(self, service_value: str) -> dict:
+        """Retrieve specific service for any value specified in source_systems."""
+        for service in self.source_systems:
+            if service_value.lower() in [v.lower() if isinstance(v, str) else v for v in service.values()]:
+                return service
+        return {}
 
     def _load_source_systems_from_file(self, path: str) -> list:
         """Reads config file and loads it into the program"""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from json.decoder import JSONDecodeError
 import argparse
-from typing import Any
+from typing import Any, Annotated
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
@@ -61,12 +61,12 @@ class API:
             "congateway": congateway_scope_raw.split() if congateway_scope_raw else [],
         }
 
-        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
-        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
-        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
-        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
-        self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
-        self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
+        self.app.add_api_route("/api/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
+        self.app.add_api_route("/api/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
+        self.app.add_api_route("/api/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
+        self.app.add_api_route("/api/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
+        self.app.add_api_route("/api/connector/{endpoint}", self.connector_get, methods=["GET"])
+        self.app.add_api_route("/api/connector/{endpoint}", self.connector_post, methods=["POST"])
 
         self.app.add_api_route("/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
         self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
@@ -143,6 +143,8 @@ class API:
             return JSONResponse(status_code=400, content={})
 
         headers = {"Authorization": authorization} if authorization else {}
+        if isinstance(additional_headers, dict):
+            headers |= additional_headers
 
         if self.http_client is None:
             raise HTTPException(status_code=500)
@@ -176,6 +178,8 @@ class API:
             return JSONResponse(status_code=400, content={})
 
         headers = {"Authorization": authorization} if authorization else {}
+        if isinstance(additional_headers, dict):
+            headers |= additional_headers
 
         if self.http_client is None:
             raise HTTPException(status_code=500)
@@ -258,6 +262,8 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
+        x_connector_authorization: Annotated[str | None, Header()] = None,
+        referer: Annotated[str | None, Header()] = None
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
@@ -266,7 +272,9 @@ class API:
             request.headers.get("Referer"),
             required_scopes=self.required_scopes["congateway"],
         )
-        return await self.execute_get_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
+        headers = {"x-connector-authorization": x_connector_authorization} if x_connector_authorization else {}
+        headers |= {"referer": referer} if referer else {}
+        return await self.execute_get_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization, headers)
 
     async def connector_post(
         self,

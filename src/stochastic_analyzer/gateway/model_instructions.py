@@ -60,4 +60,4 @@ MERGE_STAGE_TWO_PROMPT = """Merge the following {doc_count} document extracts in
 
 Write a single coherent document in flowing prose that integrates all {doc_count} extracts.
 Cover every extract; do not let any one dominate. Use paragraph breaks where natural.
-No bullet points, no preamble, no section headers. Keep it minimal and use fewer than 200 words"""
+No bullet points, no preamble, no section headers."""

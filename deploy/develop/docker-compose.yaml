@@ -104,6 +104,37 @@ services:
       CONGITLAB_BIND_ADDR: ${CONGITLAB_BIND_ADDR}
       CONGITLAB_SYSTEM_NAME: ${CONGITLAB_SYSTEM_NAME}
 
+  connector-github:
+    image: registry.dms-lookup.com/connector-github:latest
+    container_name: connector-github
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONGITHUB}
+    environment:
+      CONGITHUB_BIND_ADDR: ${CONGITHUB_BIND_ADDR}
+      CONGITHUB_BIND_PORT: ${CONGITHUB_BIND_PORT}
+      CONGITHUB_GITHUB_API_URL: ${CONGITHUB_GITHUB_API_URL}
+      CONGITHUB_GITHUB_SYSTEM_NAME: ${CONGITHUB_GITHUB_SYSTEM_NAME}
+      CONGITHUB_GITHUB_API_VERSION: ${CONGITHUB_GITHUB_API_VERSION}
+
+  connector-sharepoint:
+    image: registry.dms-lookup.com/connector-sharepoint:latest
+    container_name: connector-sharepoint
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONSHAREPOINT}
+    environment:
+      CONSHAREPOINT_BIND_ADDR: ${CONSHAREPOINT_BIND_ADDR}
+      CONSHAREPOINT_BIND_PORT: ${CONSHAREPOINT_BIND_PORT}
+      CONSHAREPOINT_SYSTEM_NAME: ${CONSHAREPOINT_SYSTEM_NAME}
+      CONSHAREPOINT_GRAPH_BASE: ${CONSHAREPOINT_GRAPH_BASE}
+      CONSHAREPOINT_TENANT_ID: ${CONSHAREPOINT_TENANT_ID}
+      CONSHAREPOINT_CLIENT_ID: ${CONSHAREPOINT_CLIENT_ID}
+      CONSHAREPOINT_CLIENT_SECRET: ${CONSHAREPOINT_CLIENT_SECRET}
+      CONSHAREPOINT_STATE_SIGNING_SECRET: ${CONSHAREPOINT_STATE_SIGNING_SECRET}
+
   connector-minio:
     image: registry.dms-lookup.com/connector-minio:latest
     container_name: connector-minio

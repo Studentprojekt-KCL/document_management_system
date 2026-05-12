@@ -11,13 +11,18 @@ export const FRONTEND_DMISAPI_BASE_URL = window.__ENV__.FRONTEND_DMISAPI_BASE_UR
 export const API_PATHS = {
   search: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/search`,
   summarize: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/summarize`,
-  rerank: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/rerank`,
+  rerank: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/find_matching`,
   classifications: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/classifications`,
   classification: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/classification`,
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
 
+  /* Connected source system auth endpoints */
+  authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
+  authUser: `${FRONTEND_DMISAPI_BASE_URL}/connector/auth_user`,
+
+  /* General auth endpoints */
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,

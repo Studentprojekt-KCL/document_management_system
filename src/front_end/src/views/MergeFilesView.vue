@@ -9,7 +9,7 @@ import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
 import { useMdToPdf } from '@/composables/mdToPdf'
 import SearchMatches from '@/components/SearchMatches.vue'
-import { download } from 'lucide-vue-next'
+import { Download } from 'lucide-vue-next'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary, resetSummary } = useAISummary()
@@ -55,13 +55,13 @@ watch(selectedPointer, () => {
           <div v-else class="download-section">
             <a :href="pdfUrl" target="_blank" class="preview-button"> Preview merged PDF </a>
 
-            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> <download /> Download merged PDF </a>
+            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> <Download /> Download merged PDF </a>
           </div>
 
           <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
         </div>
 
-        <div class="actions">
+        <div class="summary-actions">
           <button
             v-if="selectedCount > 0 && !aiSummaryHtml"
             type="button"
@@ -79,7 +79,7 @@ watch(selectedPointer, () => {
         <div class="summary-markdown" v-html="aiSummaryHtml"></div>
       </div>
       <div v-if="mergedHtmlRaw" class="merged-html-result">
-        <h2>Merged HTML</h2>
+        <h2>Merged Result</h2>
         <div class="summary-markdown" v-html="mergedHtmlRaw"></div>
       </div>
     </div>
@@ -106,7 +106,11 @@ watch(selectedPointer, () => {
 }
 
 .actions button,
-.preview-button {
+.preview-button,
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   border: 1px solid #d7e0ec;
   background: #f6f8fc;
   color: #0f172a;
@@ -114,6 +118,7 @@ watch(selectedPointer, () => {
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .actions button:disabled {
@@ -133,7 +138,8 @@ watch(selectedPointer, () => {
   align-items: center;
 }
 
-.preview-button:hover {
+.preview-button:hover,
+.download-button:hover {
   background: #f8fafc;
 }
 </style>

@@ -103,7 +103,7 @@ class TestAPI(TestCase):
 
         return api, http_client
 
-    #def test_valid_cookie_token_allows_get_proxying(self):
+    # def test_valid_cookie_token_allows_get_proxying(self):
     #    api, http_client = self.make_api()
 
     #    with TestClient(api.app) as client:
@@ -126,7 +126,7 @@ class TestAPI(TestCase):
     #        required_scopes=["search:access"],
     #    )
 
-    #def test_valid_cookie_token_allows_post_proxying(self):
+    # def test_valid_cookie_token_allows_post_proxying(self):
     #    api, http_client = self.make_api()
 
     #    with TestClient(api.app) as client:

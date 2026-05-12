@@ -1,3 +1,10 @@
+/*
+*
+  useReload(key, initialValue) — creates a ref initialized from localStorage (or the provided default). A watch with { deep: true, flush: 'sync' } 
+  persists every change back to localStorage immediately. Returns { state, clear } where clear() resets to the default and removes the key from storage.
+  clearAllSearchState() — removes all predefined search-related keys from localStorage in one call (used on logout to wipe stale state).
+*
+*/
 import { ref, watch } from 'vue'
 
 const SEARCH_STORAGE_KEYS = [

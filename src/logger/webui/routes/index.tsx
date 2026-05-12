@@ -9,7 +9,7 @@ interface LogEntry {
 }
 
 export default async function LogDashboard() {
-  const apiUrl = Deno.env.get("LOG_API_URL");
+  const apiUrl = Deno.env.get("LOGAPI_ADDR");
   
   let allLogs: LogEntry[] = [];
   let fetchError = false;

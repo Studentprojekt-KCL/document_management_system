@@ -78,13 +78,7 @@ export function useMdToPdf(props = {}) {
       body: JSON.stringify({ markdown: markdown })
     })
 
-    console.log('PDF status:', pdfResponse.status)
-
     if (!pdfResponse.ok) {
-      const errorBody = await pdfResponse.text()
-
-      console.error('PDF ERROR:', errorBody)
-
       throw new Error(`PDF generation failed (${pdfResponse.status})`)
     }
 
@@ -107,14 +101,10 @@ export function useMdToPdf(props = {}) {
 
       const markdown = await mergeFiles(pointers, sourcePointer)
 
-      console.log('Merged markdown:', markdown)
-
       const pdfBlob = await generatePdfFromMarkdown(markdown)
 
       downloadPdf(pdfBlob)
     } catch (error) {
-      console.error(error)
-
       pdfError.value = error.message || 'An error occurred while generating PDF.'
     } finally {
       isGeneratingPDF.value = false

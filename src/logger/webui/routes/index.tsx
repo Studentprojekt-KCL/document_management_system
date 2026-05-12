@@ -1,6 +1,5 @@
 // webui/routes/index.tsx
 
-// 1. Define the TypeScript interface based on your Python Log model
 interface LogEntry {
   id: number;
   occured: string;
@@ -16,7 +15,6 @@ export default async function LogDashboard() {
   let fetchError = false;
 
   try {
-    // 3. Fetch the logs from the Python API securely on the server
     const res = await fetch(`${apiUrl}/logs`);
     if (res.ok) {
       allLogs = await res.json();

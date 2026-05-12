@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Cookie
+from fastapi import FastAPI, Request, HTTPException, Cookie, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -150,7 +150,16 @@ class API:
         try:
             async with self.http_client.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
-                return await response.read()
+                content_type = response.headers.get("Content-Type", "")
+                content: Any
+                if content_type == "json":
+                    content = await response.json()
+                else:
+                    content = await response.read()
+                return Response(content=content, media_type=content_type)
+        except JSONDecodeError as exc:
+            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
+            raise HTTPException(status_code=502) from exc
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -174,7 +183,16 @@ class API:
         try:
             async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
                 response.raise_for_status()
-                return await response.read()
+                content_type = response.headers.get("Content-Type", "")
+                content: Any
+                if content_type == "json":
+                    content = await response.json()
+                else:
+                    content = await response.read()
+                return Response(content=content, media_type=content_type)
+        except JSONDecodeError as exc:
+            dms_warning(f"Request to {url} returned invalid JSON: {exc}")
+            raise HTTPException(status_code=502) from exc
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -184,7 +202,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(authorization, request.headers.get("Referer"), required_scopes=self.required_scopes["searcheng"])
@@ -195,7 +213,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -210,7 +228,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -225,7 +243,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -240,7 +258,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(
@@ -255,7 +273,7 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
-    ) -> Any:
+    ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.resolve_authorization(access_token)
         self.authorize(

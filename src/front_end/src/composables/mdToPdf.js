@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
@@ -13,13 +13,19 @@ export function useMdToPdf(props = {}) {
   const pdfUrl = ref('')
   const isGeneratingPDF = ref(false)
 
-  const mergedHtml = computed(() => {
-    if (!uniquePointer.value) {
-      return mergedHtmlRaw.value
+  const clearPdf = () => {
+    if (pdfUrl.value) {
+      window.URL.revokeObjectURL(pdfUrl.value)
     }
+    pdfUrl.value = ''
+  }
 
-    return mergedMarkdown.value && mergedHtmlRaw.value ? mergedHtmlRaw.value : ''
-  })
+  const resetMerged = () => {
+    clearPdf()
+    mergedMarkdown.value = ''
+    mergedHtmlRaw.value = ''
+    pdfError.value = ''
+  }
 
   /* Merge files part */
   const mergeFiles = async (pointers = [], sourcePointer = '') => {
@@ -57,6 +63,8 @@ export function useMdToPdf(props = {}) {
       markdownText = await mergeResponse.text()
     }
 
+    mergedMarkdown.value = markdownText
+    mergedHtmlRaw.value = globalThis.marked ? globalThis.marked.parse(markdownText) : markdownText
     return markdownText
   }
 
@@ -99,9 +107,6 @@ export function useMdToPdf(props = {}) {
 
       const markdown = await mergeFiles(pointers, sourcePointer)
 
-      mergedMarkdown.value = markdown
-      mergedHtmlRaw.value = markdown
-
       console.log('Merged markdown:', markdown)
 
       const pdfBlob = await generatePdfFromMarkdown(markdown)
@@ -115,5 +120,5 @@ export function useMdToPdf(props = {}) {
       isGeneratingPDF.value = false
     }
   }
-  return { generatePDF, mergedMarkdown, mergedHtml, pdfError, isGeneratingPDF, pdfUrl }
+  return { generatePDF, mergedMarkdown, mergedHtmlRaw, pdfError, isGeneratingPDF, pdfUrl, resetMerged }
 }

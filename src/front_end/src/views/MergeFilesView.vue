@@ -4,19 +4,24 @@
  * Metadata displaying and so is fetched from SearchMatches.vue
  * Similar files and the scores are fetched from useAIRerank :)
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
 import { useMdToPdf } from '@/composables/mdToPdf'
 import SearchMatches from '@/components/SearchMatches.vue'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
-const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary()
-const { pdfError, mergedHtml, isGeneratingPDF, generatePDF, pdfUrl } = useMdToPdf()
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary, resetSummary } = useAISummary()
+const { pdfError, mergedHtmlRaw, isGeneratingPDF, generatePDF, pdfUrl, resetMerged } = useMdToPdf()
 
 const selectedPointer = ref([rerankPointer.value]) // Start with the reranked file selected
 
 const selectedCount = computed(() => selectedPointer.value.length)
+
+watch(selectedPointer, () => {
+  resetMerged()
+  resetSummary()
+})
 </script>
 
 <template>
@@ -34,28 +39,35 @@ const selectedCount = computed(() => selectedPointer.value.length)
       <div class="merge-actions">
         <p>{{ selectedCount }} file{{ selectedCount === 1 ? '' : 's' }} selected</p>
 
-        <div>
+        <div class="pdf-actions">
           <button
+            v-if="!pdfUrl"
             type="button"
             :disabled="isGeneratingPDF || selectedCount === 0"
             @click="generatePDF(selectedPointer, rerankPointer.value)"
           >
             {{ isGeneratingPDF ? 'Generating PDF...' : 'Merge + Generate PDF' }}
           </button>
-          <div v-if="pdfUrl" class="download-section">
-            <a :href="pdfUrl" download="summary.pdf" class="download-button"> Download PDF </a>
+
+          <div v-else class="download-section">
+            <a :href="pdfUrl" target="_blank" class="preview-button"> Preview merged PDF </a>
+
+            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> Download merged PDF </a>
           </div>
+
           <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
         </div>
 
-        <div>
+        <div class="summary-actions">
           <button
+            v-if="selectedCount > 0 && !aiSummaryHtml"
             type="button"
-            :disabled="isGeneratingSummary || selectedCount === 0"
+            :disabled="isGeneratingSummary"
             @click="generateAISummary(selectedPointer, rerankPointer.value)"
           >
             {{ isGeneratingSummary ? 'Generating summary...' : 'Summarize' }}
           </button>
+
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </div>
       </div>
@@ -63,9 +75,9 @@ const selectedCount = computed(() => selectedPointer.value.length)
         <h2>Summary Result</h2>
         <div class="summary-markdown" v-html="aiSummaryHtml"></div>
       </div>
-      <div v-if="mergedHtml" class="merged-html-result">
+      <div v-if="mergedHtmlRaw" class="merged-html-result">
         <h2>Merged HTML</h2>
-        <div class="merged-html" v-html="mergedHtml"></div>
+        <div class="summary-markdown" v-html="mergedHtmlRaw"></div>
       </div>
     </div>
   </div>
@@ -105,22 +117,30 @@ const selectedCount = computed(() => selectedPointer.value.length)
   opacity: 0.55;
 }
 
-.download-section {
-  margin-top: 1rem;
+.pdf-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.download-button {
+.download-section {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.preview-button {
   display: inline-block;
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: white;
+  border: 1px solid #64748b;
+  background: white;
+  color: #0f172a;
   padding: 0.6rem 1rem;
   border-radius: 10px;
   font-weight: 700;
   text-decoration: none;
 }
 
-.download-button:hover {
-  opacity: 0.9;
+.preview-button:hover {
+  background: #f8fafc;
 }
 </style>

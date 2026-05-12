@@ -65,17 +65,6 @@
   - Proactively refreshes the token before expiration.
 - Logout Sync: Redirects to / when a logout event is detected from another tab via storage events.
 
-## useReload.js — 16 tests
-
-- State Management:
-  - Initializes with a default value if localStorage is empty.
-  - Restores primitives, arrays, booleans, and complex objects from localStorage.
-  - Persists state changes (primitives and objects) back to localStorage.
-  - Maintains reactivity when state is updated.
-- Clear Function: Resets state to default and removes the key from localStorage.
-- Isolation: Ensures independent keys do not interfere with each other.
-- clearAllSearchState: Removes all predefined search-related keys from localStorage without affecting unrelated keys.
-
 ## useSearchMetadata.js — 25 tests
 
 - Pure Functions:

@@ -1,17 +1,13 @@
-# Fresh project
+# Log UI
 
-Your new Fresh project is ready to go. You can follow the Fresh "Getting
-Started" guide here: https://fresh.deno.dev/docs/getting-started
+A minimal, server-side rendered dashboard built with Deno and Fresh.
 
-### Usage
+## Environment Variables
 
-Make sure to install Deno:
-https://docs.deno.com/runtime/getting_started/installation
+This service requires the following environment variable to run:
 
-Then start the project in development mode:
+* `LOG_API_URL` - The full HTTP URL pointing to Log API
 
+```env
+LOGAPI_ADDR=<Logger API address>
 ```
-deno task dev
-```
-
-This will watch the project directory and restart as necessary.

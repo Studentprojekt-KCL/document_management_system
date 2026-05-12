@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Queue, QueueShutDown, create_task, to_thread
+from asyncio import Queue, QueueShutDown, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -50,15 +50,23 @@ class IndexPipeline:
         self.search_engine = search_engine
         self.connector = connector
         self.classifier = classifier
+        self._tasks: list = []
 
-    def stop(self) -> None:
-        """Stop indexing"""
-        self.queues.fetch_queue.shutdown(immediate=True)
-        self.queues.decode_queue.shutdown(immediate=True)
-        self.queues.index_queue.shutdown(immediate=True)
-        self.queues.lookup_queue.shutdown(immediate=True)
-        self.queues.classify_queue.shutdown(immediate=True)
-        self.queues.reindex_queue.shutdown(immediate=True)
+    async def stop(self) -> None:
+        """Stop indexing and wait for workers to exit."""
+        for queue in (
+            self.queues.fetch_queue,
+            self.queues.decode_queue,
+            self.queues.index_queue,
+            self.queues.lookup_queue,
+            self.queues.classify_queue,
+            self.queues.reindex_queue,
+        ):
+            queue.shutdown(immediate=True)
+        for task in self._tasks:
+            task.cancel()
+        if self._tasks:
+            await gather(*self._tasks, return_exceptions=True)
 
     async def run(self, authorization: str | None) -> None:
         """Run indexing pipeline.
@@ -79,16 +87,22 @@ class IndexPipeline:
         reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
 
         self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
+        fetch_tasks = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        decode_tasks = [create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        ingest_index_task = create_task(self._ingest_index(index_queue, lookup_queue))
 
-        fetch_tasks: list = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        decode_tasks: list = [create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        create_task(self._ingest_index(index_queue, lookup_queue))
+        classifier_load_task = create_task(self._classifier_load_index(lookup_queue, classify_queue))
+        classify_tasks = [create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        classifier_refresh_task = create_task(self._classifier_refresh_index(reindex_queue))
 
-        create_task(self._classifier_load_index(lookup_queue, classify_queue))
-        classify_tasks: list = [
-            create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)
+        self._tasks = [
+            *fetch_tasks,
+            *decode_tasks,
+            *classify_tasks,
+            ingest_index_task,
+            classifier_load_task,
+            classifier_refresh_task,
         ]
-        create_task(self._classifier_refresh_index(reindex_queue))
 
         # Wait for fetching job to finish.
         await fetch_queue.join()

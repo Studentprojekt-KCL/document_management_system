@@ -83,25 +83,6 @@ export function useMdToPdf(props = {}) {
     return await pdfResponse.blob()
   }
 
-  /* Download PDF part */
-  /*
-  const downloadPdf = (blob, filename = 'converted.pdf') => {
-    const url = window.URL.createObjectURL(blob)
-
-    const a = document.createElement('a')
-
-    a.href = url
-    a.download = filename
-
-    document.body.appendChild(a)
-
-    a.click()
-
-    a.remove()
-
-    window.URL.revokeObjectURL(url)
-  }
-    */
   const downloadPdf = (blob) => {
     if (pdfUrl.value) {
       window.URL.revokeObjectURL(pdfUrl.value)

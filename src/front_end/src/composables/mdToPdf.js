@@ -10,6 +10,7 @@ export function useMdToPdf(props = {}) {
   const mergedMarkdown = ref('')
   const mergedHtmlRaw = ref('')
   const pdfError = ref('')
+  const pdfUrl = ref('')
   const isGeneratingPDF = ref(false)
 
   const mergedHtml = computed(() => {
@@ -20,77 +21,118 @@ export function useMdToPdf(props = {}) {
     return mergedMarkdown.value && mergedHtmlRaw.value ? mergedHtmlRaw.value : ''
   })
 
-  /* /merge returns markdown, then markdown is sent to /md-to-pdf to receive the PDF blob. */
-  const generatePDF = async (pointers = [], sourcePointer = '') => {
+  /* Merge files part */
+  const mergeFiles = async (pointers = [], sourcePointer = '') => {
     const filesToMerge = pointers && pointers.length > 0 ? pointers : uniquePointer.value ? [uniquePointer.value] : []
+
     const requestPointers = [...new Set([...filesToMerge, sourcePointer].filter((p) => p?.trim()))]
 
     if (!requestPointers.length) {
-      pdfError.value = 'No valid pointer provided for PDF generation.'
-      return
+      throw new Error('No valid pointer provided.')
     }
 
-    isGeneratingPDF.value = true
-    pdfError.value = ''
-    mergedHtmlRaw.value = ''
-    mergedMarkdown.value = ''
+    const mergeResponse = await authFetch(API_PATHS.merge, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pointers: requestPointers
+      })
+    })
 
+    if (!mergeResponse.ok) {
+      throw new Error(`Merge request failed (${mergeResponse.status})`)
+    }
+
+    const contentType = mergeResponse.headers.get('content-type') || ''
+
+    let markdownText = ''
+
+    if (contentType.includes('application/json')) {
+      const data = await mergeResponse.json()
+
+      markdownText = typeof data.summary === 'string' ? data.summary : JSON.stringify(data)
+    } else {
+      markdownText = await mergeResponse.text()
+    }
+
+    return markdownText
+  }
+
+  /* Generate PDF from markdown part */
+  const generatePdfFromMarkdown = async (markdown) => {
+    const pdfResponse = await authFetch(API_PATHS.mdToPDF, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ markdown: markdown })
+    })
+
+    console.log('PDF status:', pdfResponse.status)
+
+    if (!pdfResponse.ok) {
+      const errorBody = await pdfResponse.text()
+
+      console.error('PDF ERROR:', errorBody)
+
+      throw new Error(`PDF generation failed (${pdfResponse.status})`)
+    }
+
+    return await pdfResponse.blob()
+  }
+
+  /* Download PDF part */
+  /*
+  const downloadPdf = (blob, filename = 'converted.pdf') => {
+    const url = window.URL.createObjectURL(blob)
+
+    const a = document.createElement('a')
+
+    a.href = url
+    a.download = filename
+
+    document.body.appendChild(a)
+
+    a.click()
+
+    a.remove()
+
+    window.URL.revokeObjectURL(url)
+  }
+    */
+  const downloadPdf = (blob) => {
+    if (pdfUrl.value) {
+      window.URL.revokeObjectURL(pdfUrl.value)
+    }
+
+    pdfUrl.value = window.URL.createObjectURL(blob)
+  }
+
+  /* Main function to complete the generation of PDF */
+  const generatePDF = async (pointers = [], sourcePointer = '') => {
     try {
-      const mergeResponse = await authFetch(API_PATHS.merge, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pointers: requestPointers })
-      })
-      console.log('Pointers sent for merge:', requestPointers) // Debug log for pointers sent to merge
+      isGeneratingPDF.value = true
+      pdfError.value = ''
 
-      if (!mergeResponse.ok) {
-        throw new Error(`Merge request failed (${mergeResponse.status})`)
-      }
+      const markdown = await mergeFiles(pointers, sourcePointer)
 
-      const mergeContentType = mergeResponse.headers.get('content-type') || ''
-      let markdownText = ''
+      mergedMarkdown.value = markdown
+      mergedHtmlRaw.value = markdown
 
-      if (mergeContentType.includes('application/json')) {
-        const data = await mergeResponse.json()
-        markdownText = typeof data.summary === 'string' ? data.summary : JSON.stringify(data)
-      } else {
-        markdownText = await mergeResponse.text()
-      }
+      console.log('Merged markdown:', markdown)
 
-      mergedMarkdown.value = markdownText
-      mergedHtmlRaw.value = markdownText
-      console.log('Merged Markdown:', markdownText) // Debug log for merged markdown
+      const pdfBlob = await generatePdfFromMarkdown(markdown)
 
-      const pdfResponse = await authFetch(API_PATHS.mdToPDF, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary: mergedMarkdown.value })
-      })
-
-      if (!pdfResponse.ok) {
-        const errorBody = await pdfResponse.text()
-        throw new Error(`PDF generation request failed (${pdfResponse.status}): ${errorBody}`)
-      }
-
-      console.log('PDF generation response received') // Debug log for PDF response
-
-      const blob = await pdfResponse.blob()
-      const url = window.URL.createObjectURL(blob)
-
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'converted.pdf'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-
-      window.URL.revokeObjectURL(url)
+      downloadPdf(pdfBlob)
     } catch (error) {
-      pdfError.value = error.message || 'An error occurred while generating the PDF.'
+      console.error(error)
+
+      pdfError.value = error.message || 'An error occurred while generating PDF.'
     } finally {
       isGeneratingPDF.value = false
     }
   }
-
-  return { generatePDF, mergedMarkdown, mergedHtml, pdfError, isGeneratingPDF }
+  return { generatePDF, mergedMarkdown, mergedHtml, pdfError, isGeneratingPDF, pdfUrl }
 }

@@ -9,6 +9,7 @@ import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
 import { useMdToPdf } from '@/composables/mdToPdf'
 import SearchMatches from '@/components/SearchMatches.vue'
+import { download } from 'lucide-vue-next'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
 const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary, resetSummary } = useAISummary()
@@ -29,14 +30,16 @@ watch(selectedPointer, () => {
     <h1>Merge/Summarize reranked files</h1>
 
     <div v-if="aiRerankResults.length">
-      <h3>Similar to: {{ rerankFilename }}</h3>
-      <p class="text-secondary">
-        Click on one or more files to select them to merge and summarize them together with the reranked file.
+      <h3>Files similar to: {{ rerankFilename }}</h3>
+      <p>
+        Click on one or more files to select them to merge and summarize them together with the reranked file. The merging will also
+        generate a PDF you can download. You can choose to merge/summarize as many files as you want, but keep in mind that the
+        result may take more time.
       </p>
 
       <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointer" badge-mode="score" selectable />
 
-      <div class="merge-actions">
+      <div class="actions">
         <p>{{ selectedCount }} file{{ selectedCount === 1 ? '' : 's' }} selected</p>
 
         <div class="pdf-actions">
@@ -52,13 +55,13 @@ watch(selectedPointer, () => {
           <div v-else class="download-section">
             <a :href="pdfUrl" target="_blank" class="preview-button"> Preview merged PDF </a>
 
-            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> Download merged PDF </a>
+            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> <download /> Download merged PDF </a>
           </div>
 
           <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
         </div>
 
-        <div class="summary-actions">
+        <div class="actions">
           <button
             v-if="selectedCount > 0 && !aiSummaryHtml"
             type="button"
@@ -88,7 +91,7 @@ watch(selectedPointer, () => {
   padding: 2rem;
 }
 
-.merge-actions {
+.actions {
   margin-top: 1rem;
   display: flex;
   align-items: center;
@@ -96,13 +99,14 @@ watch(selectedPointer, () => {
   gap: 1rem;
 }
 
-.merge-actions p {
+.actions p {
   margin: 0;
   color: #64748b;
   font-weight: 600;
 }
 
-.merge-actions button {
+.actions button,
+.preview-button {
   border: 1px solid #d7e0ec;
   background: #f6f8fc;
   color: #0f172a;
@@ -112,7 +116,7 @@ watch(selectedPointer, () => {
   cursor: pointer;
 }
 
-.merge-actions button:disabled {
+.actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -127,17 +131,6 @@ watch(selectedPointer, () => {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-}
-
-.preview-button {
-  display: inline-block;
-  border: 1px solid #64748b;
-  background: white;
-  color: #0f172a;
-  padding: 0.6rem 1rem;
-  border-radius: 10px;
-  font-weight: 700;
-  text-decoration: none;
 }
 
 .preview-button:hover {

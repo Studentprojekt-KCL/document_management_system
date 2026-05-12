@@ -187,7 +187,6 @@ class Handler:
 
     async def _handle_new(self, authorization: str | None) -> None:
         """Grab connector stream output and pipe it into search engine."""
-        await self.indexing.acquire()
-        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
-        await self.index_pipeline.run(authorization)
-        self.indexing.release()
+        async with self.indexing:
+            self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
+            await self.index_pipeline.run(authorization)

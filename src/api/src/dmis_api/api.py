@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Cookie, Response
+from fastapi import FastAPI, Request, HTTPException, Cookie, Header, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -134,7 +134,7 @@ class API:
             return f"Bearer {access_token}"
         return None
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> Any:
+    async def execute_get_request(self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -166,7 +166,7 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> Any:
+    async def execute_post_request(self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()

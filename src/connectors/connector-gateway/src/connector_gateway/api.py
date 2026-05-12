@@ -78,7 +78,7 @@ class API:
             if isinstance(tokens, dict):
                 authentication_tokens = tokens
             else:
-                dms_warning(f"Recieved unexpeced structure from refresh-service (expected dict): git({type(tokens)})")
+                dms_warning(f"Recieved unexpeced structure from refresh-service (expected dict): ({type(tokens)})")
 
         stream_references: list = []
 

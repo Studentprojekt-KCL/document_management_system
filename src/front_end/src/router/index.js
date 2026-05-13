@@ -24,6 +24,7 @@ import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
 import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
 import MergeFilesView from '@/views/MergeFilesView.vue'
+import SessionCallbackView from '@/views/SessionCallbackView.vue'
 
 const routes = [
   /* Public */
@@ -37,6 +38,11 @@ const routes = [
     path: '/auth/callback',
     name: 'AuthCallback',
     component: AuthCallbackView
+  },
+  {
+    path: '/session/callback',
+    name: 'SessionCallback',
+    component: SessionCallbackView
   },
   /* Protected */
   {

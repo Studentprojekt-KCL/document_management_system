@@ -80,7 +80,7 @@ class AuthRoutes:
                 secure=True,
                 samesite="none",
                 max_age=self.REFRESH_COOKIE_MAX_AGE,
-                path="/auth/refresh",
+                path="api/auth/refresh",
             )
         if isinstance(id_token, str):
             response.set_cookie(
@@ -90,7 +90,7 @@ class AuthRoutes:
                 secure=True,
                 samesite="none",
                 max_age=self.ACCESS_COOKIE_MAX_AGE,
-                path="/auth/logout",
+                path="api/auth/logout",
             )
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:

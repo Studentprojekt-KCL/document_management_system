@@ -7,18 +7,10 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { exchangeAuthorizationCode, isAuthenticated } from '@/utils/authClient'
 import { SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
-import { logout } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
 const errorMsg = ref('')
-
-const logoutAfterError = async (message) => {
-  errorMsg.value = message
-  setTimeout(async () => {
-    await logout()
-  }, 3000)
-}
 
 onMounted(async () => {
   const code = route.query.code
@@ -57,9 +49,8 @@ onMounted(async () => {
   }
 
   const authed = await isAuthenticated()
-
   if (!authed) {
-    logoutAfterError('Login succeeded, but authentication failed.')
+    errorMsg.value = 'Login succeeded, but session cookie was not available afterward.'
     return
   }
 

@@ -11,20 +11,22 @@
 
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, Database, BarChart3, ShieldCheck, Settings, Menu, Network } from 'lucide-vue-next'
-import { isAdmin } from '@/utils/auth'
+import { Search, Network, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
+import { getCurrentUser } from '@/utils/authClient'
 
 const router = useRouter()
 const route = useRoute()
 
 const isOpen = ref(false)
-const admin = ref(false)
+const authInfo = ref(null)
 
-const loadAdminStatus = async () => {
-  admin.value = await isAdmin()
+/* get info about user from /auth/me endpoint using authClient helper */
+const loadAuthInfo = async () => {
+  authInfo.value = await getCurrentUser()
 }
 
-watch(() => route.fullPath, loadAdminStatus, { immediate: true })
+/* Reload user info on route change */
+watch(() => route.fullPath, loadAuthInfo, { immediate: true })
 
 /* all available items on the sidebar */
 const menuItems = [
@@ -36,10 +38,17 @@ const menuItems = [
   { id: 'settings', label: 'System Settings', icon: Settings, path: '/settings' }
 ]
 
-/* Show all itmes fro admin otherwise only search */
+/* Checks if user is admin */
+const isAdmin = computed(() => {
+  const clientRoles = authInfo.value?.user?.client_roles ?? []
+  const realmRoles = authInfo.value?.user?.realm_roles ?? []
+  return clientRoles.includes('admin') || realmRoles.includes('admin')
+})
+
+/* Show all itmes fro admin otherwise only search and connections */
 const visibleMenuItems = computed(() => {
-  const searchOnly = menuItems.filter((item) => item.id === 'search')
-  return admin.value ? menuItems : searchOnly
+  const searchAndConnections = menuItems.filter((item) => item.id === 'search' || item.id === 'connections')
+  return isAdmin.value ? menuItems : searchAndConnections
 })
 
 /* Compute the active menu item */

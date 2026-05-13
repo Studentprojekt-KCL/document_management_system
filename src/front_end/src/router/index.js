@@ -22,9 +22,8 @@ import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
-import { isAuthenticated } from '@/utils/authClient'
+import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
 import MergeFilesView from '@/views/MergeFilesView.vue'
-import { isAdmin } from '@/utils/auth.js'
 import SessionCallbackView from '@/views/SessionCallbackView.vue'
 
 const routes = [
@@ -134,6 +133,13 @@ const router = createRouter({
   routes
 })
 
+/* router guard so that you can't go to protected pages without logging in */
+function userHasRole(authInfo, role) {
+  const clientRoles = authInfo?.user?.client_roles ?? []
+  const realmRoles = authInfo?.user?.realm_roles ?? []
+  return clientRoles.includes(role) || realmRoles.includes(role)
+}
+
 router.beforeEach(async (to) => {
   if (!to.meta?.requiresAuth) {
     return true
@@ -146,7 +152,8 @@ router.beforeEach(async (to) => {
 
   /* Admin only route */
   if (to.meta?.requiresAdmin) {
-    if (!(await isAdmin())) {
+    const authInfo = await getCurrentUser()
+    if (!userHasRole(authInfo, 'admin')) {
       return { path: '/403' }
     }
   }

@@ -8,7 +8,7 @@
  * <SearchPreviewDrawer :open="isPreviewOpen" :selected-file="selectedFile" :selected-match="selectedMatch" :matches="matches" @close="closePreview" />
  */
 
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   X,
   StarsIcon,
@@ -24,10 +24,10 @@ import {
 
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { useAISummary } from '@/composables/aiSummary'
+import { hasRole } from '@/utils/auth'
 import ClassificationEditor from '@/components/ClassificationEditor.vue'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { useAIRerank } from '@/composables/aiRerank'
-import { isAdmin } from '@/utils/auth'
 
 /* Props */
 const props = defineProps({
@@ -57,12 +57,6 @@ const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = 
 /* Rerank */
 const { aiRerankResultsComputed, isReranking, rerankError, generateAIRerank } = useAIRerank(props)
 
-/* EDIT */
-const canEdit = ref(false)
-onMounted(async () => {
-  canEdit.value = await isAdmin()
-})
-
 /* State */
 const isEditingClassification = ref(false)
 const classificationEditorRef = ref(null)
@@ -80,6 +74,9 @@ watch(
 /* Computed */
 const currentSecurityLevel = computed(() => localSecurityLevel.value)
 const hasUniquePointer = computed(() => Boolean(uniquePointer.value))
+
+/* Permissions */
+const canEdit = computed(() => hasRole('admin'))
 
 /* notification */
 const notification = ref({ visible: false, success: true, message: '' })

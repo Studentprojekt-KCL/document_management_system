@@ -2,16 +2,16 @@ import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
+/* Rerank state */
+const aiRerankResults = ref([])
+const rerankPointer = ref('')
+const rerankFilename = ref('')
+const rerankError = ref('')
+const isReranking = ref(false)
+
 export function useAIRerank(props = {}) {
   /* Unique pointer from metadata */
   const { uniquePointer } = useSearchMetadata(props)
-
-  /* Rerank state */
-  const aiRerankResults = ref([])
-  const rerankPointer = ref('')
-  const rerankFilename = ref('')
-  const rerankError = ref('')
-  const isReranking = ref(false)
 
   const mapRankedResults = (results = []) =>
     results.map((item, index) => ({
@@ -38,10 +38,8 @@ export function useAIRerank(props = {}) {
     aiRerankResults.value = []
 
     try {
-      const rerankUrl = new URL(API_PATHS.rerank, window.location.origin)
-      rerankUrl.searchParams.set('pointer', uniquePointer.value)
-
-      const response = await authFetch(rerankUrl, {
+      const url = `${API_PATHS.rerank}?pointer=${encodeURIComponent(uniquePointer.value)}`
+      const response = await authFetch(url, {
         method: 'GET'
       })
 

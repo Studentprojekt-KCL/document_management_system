@@ -17,6 +17,8 @@ export const API_PATHS = {
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
+  merge: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/merge`,
+  mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`,
 
   /* Connected source system auth endpoints */
   authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
@@ -27,7 +29,11 @@ export const API_PATHS = {
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,
   authLogout: `${FRONTEND_DMISAPI_BASE_URL}/auth/logout`,
-  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`
+  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`,
+  checkAdmin: `${FRONTEND_DMISAPI_BASE_URL}/auth/checkAdmin`,
+
+  /* code exchange for 3rd parties */
+  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session-callback`
 }
 
 /**
@@ -38,14 +44,35 @@ export const API_PATHS = {
  * @param {RequestInit} [options]
  * @returns {Promise<Response>}
  */
-export function apiFetch(url, options = {}) {
-  return fetch(url, {
+
+export async function apiFetch(url, options = {}) {
+  const requestOptions = {
     credentials: 'include',
     ...options,
     headers: {
       ...(options.headers ?? {})
     }
+  }
+
+  let response = await fetch(url, requestOptions)
+
+  if (response.status !== 401 || url === API_PATHS.authRefresh || url === API_PATHS.authLogout) {
+    return response
+  }
+
+  const refreshResponse = await fetch(API_PATHS.authRefresh, {
+    method: 'POST',
+    credentials: 'include'
   })
+
+  if (!refreshResponse.ok) {
+    window.location.href = '/login'
+    return response
+  }
+
+  response = await fetch(url, requestOptions)
+  return response
 }
-// causes all previos authFetch calls into apiFetch
+
+/* causes all previos authFetch calls into apiFetch */
 export const authFetch = apiFetch

@@ -66,7 +66,7 @@ class AuthRoutes:
 
     def _get_token_max_age(
         self,
-        token_data: dict[str, any],
+        token_data: dict[str, Any],
         key: str,
         fallback: int,
     ) -> int:

@@ -63,6 +63,7 @@ class ConnectorClient:
                     break
                 if not isinstance(system_pointers.get(system), list):
                     system_pointers[system] = [pointer]
+                    break
             else:
                 dms_warning(f"No source system found for {pointer}")
         system_list: list = []
@@ -95,7 +96,8 @@ class ConnectorClient:
         tasks: list = []
         try:
             for system in pointers:
-                auth_header = authentication_tokens.get(system.get("name"))  # type: ignore
+                system_name = system.get("name") if isinstance(system.get("name"), str) else ""
+                auth_header = authentication_tokens.get(system_name.lower())  # type: ignore
                 response = self.http_client.post(
                     f"{system.get("connector_url")}/get_files",
                     params=[

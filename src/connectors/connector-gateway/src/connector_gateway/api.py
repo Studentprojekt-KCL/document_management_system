@@ -145,7 +145,7 @@ class API:
     async def code_callback(self, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
         """Callback endpoint to insert service session token."""
         paramas = request.query_params
-        service_name = paramas.get("source")
+        service_name = paramas.get("source") if paramas.get("source") else ""
         service_details = self.down_stream_client.find_service(service_name)
         connector_url = service_details.get("connector_url")
 
@@ -156,7 +156,7 @@ class API:
         token = await self.down_stream_client.auth_code_callback(connector_url, paramas)
         body = {"refresh_url": f"{connector_url}/refresh_token", "session_variables": token}
         append_response = await self.refresh_client.send_post_request(
-            "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
+            "add_session_token", params={"service_name": service_name.lower()}, headers={"authorization": authorization}, body=body
         )
 
         if append_response == {}:

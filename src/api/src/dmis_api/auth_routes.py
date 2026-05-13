@@ -94,7 +94,7 @@ class AuthRoutes:
                 secure=True,
                 samesite="none",
                 max_age=refresh_max_age,
-                path="/auth/refresh",
+                path="api/auth/refresh",
             )
 
         if isinstance(id_token, str):
@@ -105,7 +105,7 @@ class AuthRoutes:
                 secure=True,
                 samesite="none",
                 max_age=access_max_age,
-                path="/auth/logout",
+                path="api/auth/logout",
             )
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
@@ -232,6 +232,6 @@ class AuthRoutes:
             content={"logout_url": logout_url},
         )
         response.delete_cookie("access_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("refresh_token", path="/auth/refresh", secure=True, samesite="none")
-        response.delete_cookie("id_token", path="/auth/logout", secure=True, samesite="none")
+        response.delete_cookie("refresh_token", path="api/auth/refresh", secure=True, samesite="none")
+        response.delete_cookie("id_token", path="api/auth/logout", secure=True, samesite="none")
         return response

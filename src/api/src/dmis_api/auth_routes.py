@@ -94,7 +94,7 @@ class AuthRoutes:
                 secure=True,
                 samesite="none",
                 max_age=refresh_max_age,
-                path="/auth/refresh",
+                path="api/auth/refresh",
             )
 
         if isinstance(id_token, str):

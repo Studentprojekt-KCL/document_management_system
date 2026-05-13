@@ -32,12 +32,9 @@ onMounted(async () => {
   })
 
   try {
-    const response = await apiFetch(
-  `${API_PATHS.sessionCallback}?${params.toString()}`,
-      {
+    const response = await apiFetch(`${API_PATHS.sessionCallback}?${params.toString()}`, {
       method: 'GET'
-      }
-    )
+    })
     if (!response.ok) {
       errorMSG.value = 'Session Callback Failed'
       return

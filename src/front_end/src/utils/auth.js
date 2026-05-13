@@ -33,7 +33,8 @@ export async function logout() {
 
   try {
     const response = await apiFetch(API_PATHS.authLogout, {
-      method: 'POST'
+      method: 'POST',
+      credentials: 'include'
     })
 
     if (!response.ok) {

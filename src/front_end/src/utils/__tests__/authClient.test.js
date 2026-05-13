@@ -27,7 +27,7 @@ describe('authClient.js', () => {
         json: () => Promise.resolve({ token: 'abc' })
       })
 
-      const result = await exchangeAuthorizationCode({
+      await exchangeAuthorizationCode({
         code: 'auth-code-123',
         codeVerifier: 'verifier-456'
       })
@@ -208,10 +208,7 @@ describe('authClient.js', () => {
 
       await isAuthenticated()
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/auth/check'),
-        expect.objectContaining({ method: 'GET' })
-      )
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/auth/check'), expect.objectContaining({ method: 'GET' }))
     })
   })
 
@@ -260,10 +257,7 @@ describe('authClient.js', () => {
 
       await getCurrentUser()
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/auth/me'),
-        expect.objectContaining({ method: 'GET' })
-      )
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/auth/me'), expect.objectContaining({ method: 'GET' }))
     })
   })
 })

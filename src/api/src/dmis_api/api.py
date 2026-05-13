@@ -111,7 +111,6 @@ class API:
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        return {}
         if (
             authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
         ):  # NOTE; THIS MUST BE REMOVED LATER
@@ -179,6 +178,8 @@ class API:
         except TypeError:
             params = None
         except JSONDecodeError:
+            body = await request.body()
+            print(f"body: {body}")
             dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {await request.body()}")
             return JSONResponse(status_code=400, content={})
 
@@ -284,12 +285,15 @@ class API:
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to connector API."""
+        print("Request here.")
         authorization = self.resolve_authorization(access_token)
+        print(f"Auth: {authorization}")
         self.authorize(
             authorization,
             request.headers.get("Referer"),
             required_scopes=self.required_scopes["congateway"],
         )
+        print(f"Doing downstream")
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
 

@@ -4,9 +4,9 @@ import uvicorn
 import fastapi
 from typing import Annotated
 
-from fastapi import Header
+from fastapi import Header, Request
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from connector_gateway.connector_client import ConnectorClient
 from connector_gateway.refreshservice_client import RefreshServiceClient
 
@@ -33,7 +33,7 @@ class API:
         self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/get_auth_user_urls", self.get_auth_user_urls, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"], response_model=None)
-        self.app.add_api_route("/callback_token", self.callback_token, methods=["POST"])
+        self.app.add_api_route("/session-callback", self.code_callback, methods=["GET"])
 
     async def get_files(
         self,
@@ -129,12 +129,29 @@ class API:
         raise HTTPException(status_code=400)
 
 
-    async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
+    async def code_callback(self, request: Request, authorization: str | None = Header(None)):
         """Callback endpoint to insert service session token."""
+        paramas = request.query_params
+        service_name = paramas.get("source")
+        service_details = self.down_stream_client.find_service(service_name)
 
-        return await self.refresh_client.send_post_request(
+        if paramas is None:
+            dms_warning("Auth callback request with missing exchange code.")
+            raise HTTPException(400)
+
+        token = await self.down_stream_client.auth_code_callback(service_details.get("connector_url"), paramas)
+        print(f"THE TOKEN IS: {token}")
+        body = {"refresh_url": f"{service_details.get('connector_url')}/refresh_token", "session_variables": token}
+        append_response = await self.refresh_client.send_post_request(
             "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
         )
+
+        if append_response == {}:
+            dms_warning(f"Failed to insert {service_name} into refresh_service.")
+            raise HTTPException(400)
+
+        print("New session token added!")
+        return JSONResponse(status_code=200, content='')
 
 
 def run() -> None:

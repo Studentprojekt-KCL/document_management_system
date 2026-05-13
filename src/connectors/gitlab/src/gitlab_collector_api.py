@@ -121,7 +121,7 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": "http://localhost:8004/callback", #str(request.url_for("callback")),
+            "redirect_uri": "http://localhost:8080/session/callback", #str(request.url_for("callback")),
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
@@ -145,7 +145,7 @@ class API:
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": "http://localhost:8080/session/callback", #str(request.url_for("callback")),
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }
@@ -157,8 +157,7 @@ class API:
         if not token_json.get("access_token"):
             return JSONResponse(content="ERROR", status_code=400)
 
-        #return JSONResponse(content=token_json, status_code=200)
-        return RedirectResponse("http://localhost:8080/connections")
+        return JSONResponse(content=token_json, status_code=200)
 
     async def refresh_token(self, request: Request, refresh_token: Annotated[str | None, Header()]) -> JSONResponse:
         """Refresh Gitlab session token."""

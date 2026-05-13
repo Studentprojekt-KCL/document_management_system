@@ -185,14 +185,21 @@ class ConnectorClient:
             return
         get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
         try:
-            print(auth_url)
             response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
-            #print(response.status_code)
-            #print(response.headers["location"])
-            #return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
             return JSONResponse(content=response.json(), status_code=307)
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
         return None
+
+    async def auth_code_callback(self, service_url: str, code: str):
+        url = f"{service_url}/callback?{code}"
+        try:
+            response = await self.http_client.get(url, follow_redirects=False)
+        except httpx.TimeoutException:
+            dms_warning("Request timed out")
+        except httpx.HTTPError:
+            dms_warning(f"Failed to connect to connector, url: {url} ")
+
+        return response.json()

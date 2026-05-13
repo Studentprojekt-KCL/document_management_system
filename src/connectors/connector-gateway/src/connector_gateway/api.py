@@ -115,7 +115,9 @@ class API:
         x_connector_authorization: Annotated[str | None, Header()] = None,
         referer: Annotated[str | None, Header()] = None,
     ) -> Any:
-        """OAuth: proxied redirect. BA: token to refresh-service. Session/headers-only connectors (e.g. Confluence): JSON or redirect."""
+        """OAuth: proxied redirect. BA: token to refresh-service.
+
+        Session/headers-only connectors (e.g. Confluence): JSON or redirect."""
         source_system_info = self.down_stream_client.find_service(source_system)
 
         if source_system_info.get("authentication_method") == "BA":

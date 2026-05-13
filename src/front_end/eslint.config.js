@@ -27,5 +27,22 @@ export default [
       ]
     }
   },
+  {
+    files: ['**/__tests__/**', '**/*.test.js'],
+    languageOptions: {
+      globals: {
+        require: 'readonly',
+        global: 'readonly'
+      }
+    }
+  },
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly'
+      }
+    }
+  },
   eslintConfigPrettier
 ]

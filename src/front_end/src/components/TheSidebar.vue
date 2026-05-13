@@ -38,8 +38,8 @@ const menuItems = [
 
 /* Show all itmes fro admin otherwise only search */
 const visibleMenuItems = computed(() => {
-  const searchOnly = menuItems.filter((item) => item.id === 'search')
-  return admin.value ? menuItems : searchOnly
+  const regularUserItems = menuItems.filter((item) => item.id === 'search' || item.id === 'connections')
+  return admin.value ? menuItems : regularUserItems
 })
 
 /* Compute the active menu item */

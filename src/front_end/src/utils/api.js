@@ -44,7 +44,16 @@ export const API_PATHS = {
  * @param {RequestInit} [options]
  * @returns {Promise<Response>}
  */
-
+export function apiFetch(url, options = {}) {
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...(options.headers ?? {})
+    }
+  })
+}
+/*
 export async function apiFetch(url, options = {}) {
   const requestOptions = {
     credentials: 'include',
@@ -73,6 +82,7 @@ export async function apiFetch(url, options = {}) {
   response = await fetch(url, requestOptions)
   return response
 }
+*/
 
 /* causes all previos authFetch calls into apiFetch */
 export const authFetch = apiFetch

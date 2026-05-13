@@ -27,7 +27,10 @@ export const API_PATHS = {
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,
   authLogout: `${FRONTEND_DMISAPI_BASE_URL}/auth/logout`,
-  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`
+  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`,
+
+  /* code exchange for 3rd parties */
+  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session/callback`
 }
 
 /**

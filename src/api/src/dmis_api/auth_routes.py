@@ -53,6 +53,7 @@ class AuthRoutes:
         key: str,
         value: str,
         max_age: int,
+        path: str = "/",
     ) -> None:
         """Set an HTTP-only authentication cookie on the response."""
         response.set_cookie(
@@ -62,6 +63,7 @@ class AuthRoutes:
             secure=True,
             samesite="none",
             max_age=max_age,
+            path=path,
         )
 
     def _set_auth_cookies(self, response: JSONResponse, token_data: dict[str, Any]) -> None:
@@ -73,9 +75,9 @@ class AuthRoutes:
         if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, self.ACCESS_COOKIE_MAX_AGE)
         if isinstance(refresh_token, str):
-            self._set_cookie(response, "refresh_token", refresh_token, self.REFRESH_COOKIE_MAX_AGE)
+            self._set_cookie(response, "refresh_token", refresh_token, self.REFRESH_COOKIE_MAX_AGE, path="/auth/refresh")
         if isinstance(id_token, str):
-            self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE)
+            self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE, path="/auth/logout")
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
@@ -201,6 +203,6 @@ class AuthRoutes:
             content={"logout_url": logout_url},
         )
         response.delete_cookie("access_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("id_token", path="/", secure=True, samesite="none")
+        response.delete_cookie("refresh_token", path="/auth/refresh", secure=True, samesite="none")
+        response.delete_cookie("id_token", path="/auth/logout", secure=True, samesite="none")
         return response

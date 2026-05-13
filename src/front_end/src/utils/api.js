@@ -43,6 +43,7 @@ export const API_PATHS = {
  * @param {RequestInit} [options]
  * @returns {Promise<Response>}
  */
+
 export async function apiFetch(url, options = {}) {
   const requestOptions = {
     credentials: 'include',

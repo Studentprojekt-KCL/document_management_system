@@ -46,6 +46,7 @@ class API:
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[None]:
@@ -169,6 +170,13 @@ class API:
 
         return JSONResponse(content=new_tokens, status_code=200)
 
+    async def validate_token(self, x_gitlab_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Check token validity."""
+        if x_gitlab_token is None:
+            return JSONResponse(content=False, status_code=200)
+        token_url = f"{self.gitlab_url}/oauth/token/info"
+        data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {x_gitlab_token}"})
+        return JSONResponse(content=bool(data), status_code=200)
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

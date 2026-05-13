@@ -12,7 +12,7 @@ export interface FetchLogParams{
 }
 
 export async function fetchLogs( {page}: FetchLogParams): Promise<FetchLogsResult> {
-    const apiUrl = Deno.env.get("LOGAPI_ADDR");
+    const apiUrl = Deno.env.get("LOGWEB_ADDR");
     const res = await fetch(`${apiUrl}/logs?start=2025-01-01T00:00:00`);
 
     const all: LogEntry[] = await res.json();

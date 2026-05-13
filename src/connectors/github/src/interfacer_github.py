@@ -344,7 +344,6 @@ class GitHub:
         response = self._request(token_url, x_github_token)
         return response.status_code == HTTP_OK
 
-
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:
         if subdata is None:

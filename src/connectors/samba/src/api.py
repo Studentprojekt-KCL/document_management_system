@@ -37,7 +37,7 @@ class API:
 
     def __init__(self) -> None:
         """constructor"""
-        self.host: str = read_env_variable("CONSMB_BIND_ADDR") # type: ignore
+        self.host: str = read_env_variable("CONSMB_BIND_ADDR")  # type: ignore
         self.port: int = read_port("CONSMB_BIND_PORT")
 
         logging.basicConfig()
@@ -129,7 +129,7 @@ class API:
 
     async def validate_token(self, authorization: Annotated[str | None, Header()] = None) -> JSONResponse:
         """Validate user auth.
-        
+
         Args:
             authorization: user credentials.
         Returns: response with true/false

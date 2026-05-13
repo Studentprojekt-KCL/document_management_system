@@ -56,14 +56,14 @@ class Samba:
         port = read_port("CONSMB_SMB_SHARE_PORT")
         user = read_env_variable("CONSMB_SMB_SHARE_SERVICE_USER")
         password = read_env_variable("CONSMB_SMB_SHARE_SERVICE_PASS")
-        service_mount = read_env_variable("CONSMB_SMB_SERVICE_MOUNT_PATH").rstrip("/") # type: ignore
-        user_mount = read_env_variable("CONSMB_SMB_USER_MOUNT_PATH").rstrip("/") # type: ignore
-        self.source_system = read_env_variable("CONSMB_SYSTEM_NAME") # type: ignore
+        service_mount = read_env_variable("CONSMB_SMB_SERVICE_MOUNT_PATH").rstrip("/")  # type: ignore
+        user_mount = read_env_variable("CONSMB_SMB_USER_MOUNT_PATH").rstrip("/")  # type: ignore
+        self.source_system = read_env_variable("CONSMB_SYSTEM_NAME")  # type: ignore
 
         share = rf"//{host}/{read_env_variable("CONSMB_SMB_SHARE_NAME")}"
 
-        self.share_host = ShareHost(host, port, share) # type: ignore
-        self.mount_options = MountOptions(user, password, service_mount, user_mount) # type: ignore
+        self.share_host = ShareHost(host, port, share)  # type: ignore
+        self.mount_options = MountOptions(user, password, service_mount, user_mount)  # type: ignore
 
         file_extentions = []
         extention_descriptions = {}
@@ -80,7 +80,7 @@ class Samba:
         self.file_info = FileInfo(file_extentions, extention_descriptions)
 
         try:
-            self._mount(user, password, service_mount) # type: ignore
+            self._mount(user, password, service_mount)  # type: ignore
         except CalledProcessError:
             dms_error(f"Failed to mount {share} at {service_mount} as {user}.")
 
@@ -98,7 +98,6 @@ class Samba:
         """Stop notification watcher."""
         self.watcher.stop()
         dms_info(f"Closed notification watcher for {self.share_host.share}.")
-
 
     async def check_index_needed(self, subdata: str | None) -> dict:
         """Check if an index is needed.

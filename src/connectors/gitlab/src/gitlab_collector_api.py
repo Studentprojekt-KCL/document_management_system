@@ -184,6 +184,7 @@ class API:
         data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {x_gitlab_token}"})
         return JSONResponse(content=bool(data), status_code=200)
 
+
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()

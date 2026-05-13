@@ -163,6 +163,7 @@ class API:
         """
         return JSONResponse(content=await self.github_instance.verify_token(x_github_token), status_code=200)
 
+
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()

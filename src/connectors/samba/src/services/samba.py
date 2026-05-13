@@ -10,14 +10,19 @@ from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode, b64encode
 from pathlib import Path
 
 from subprocess import CalledProcessError, run
+from uuid import uuid4
 import aiofiles
 import aiofiles.os
+
+from smbprotocol.connection import Connection
+from smbprotocol.session import Session
 
 from models import FileInfo, MountOptions, ShareHost
 from services.share_watcher import ShareWatcher
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable, read_port
 from shared_functions.file_type_logic import determine_file_type, get_file_resource
+from smbprotocol.exceptions import LogonFailure
 
 
 class Samba:
@@ -51,14 +56,14 @@ class Samba:
         port = read_port("CONSMB_SMB_SHARE_PORT")
         user = read_env_variable("CONSMB_SMB_SHARE_SERVICE_USER")
         password = read_env_variable("CONSMB_SMB_SHARE_SERVICE_PASS")
-        service_mount = read_env_variable("CONSMB_SMB_SERVICE_MOUNT_PATH").rstrip("/")
-        user_mount = read_env_variable("CONSMB_SMB_USER_MOUNT_PATH").rstrip("/")
-        self.source_system = read_env_variable("CONSMB_SYSTEM_NAME")
+        service_mount = read_env_variable("CONSMB_SMB_SERVICE_MOUNT_PATH").rstrip("/") # type: ignore
+        user_mount = read_env_variable("CONSMB_SMB_USER_MOUNT_PATH").rstrip("/") # type: ignore
+        self.source_system = read_env_variable("CONSMB_SYSTEM_NAME") # type: ignore
 
         share = rf"//{host}/{read_env_variable("CONSMB_SMB_SHARE_NAME")}"
 
-        self.share_host = ShareHost(host, port, share)
-        self.mount_options = MountOptions(user, password, service_mount, user_mount)
+        self.share_host = ShareHost(host, port, share) # type: ignore
+        self.mount_options = MountOptions(user, password, service_mount, user_mount) # type: ignore
 
         file_extentions = []
         extention_descriptions = {}
@@ -75,7 +80,7 @@ class Samba:
         self.file_info = FileInfo(file_extentions, extention_descriptions)
 
         try:
-            self._mount(user, password, service_mount)
+            self._mount(user, password, service_mount) # type: ignore
         except CalledProcessError:
             dms_error(f"Failed to mount {share} at {service_mount} as {user}.")
 
@@ -94,6 +99,7 @@ class Samba:
         self.watcher.stop()
         dms_info(f"Closed notification watcher for {self.share_host.share}.")
 
+
     async def check_index_needed(self, subdata: str | None) -> dict:
         """Check if an index is needed.
 
@@ -109,6 +115,30 @@ class Samba:
         else:
             index_needed = len(self.changes) != 0
         return {"index_needed": index_needed}
+
+    def check_auth(self, authorization: str | None) -> bool:
+        if authorization is None:
+            return False
+
+        username: str | None = None
+        password: str | None = None
+        try:
+            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+        except (UnicodeDecodeError, UnicodeEncodeError, ValueError) as err:
+            dms_warning(f"Failed to decode authorization: {err}")
+        if username is None or password is None:
+            return False
+
+        connection = Connection(uuid4(), self.share_host.host, self.share_host.port)
+        try:
+            connection.connect()
+            session = Session(connection, username, password)
+            session.connect()
+        except LogonFailure:
+            return False
+        finally:
+            connection.disconnect(True)
+        return True
 
     def grab_files(self, content: dict, authorization: str, include_content: bool, include_last_edit_date: bool) -> list[dict]:
         """Grab the requested files.

@@ -117,6 +117,12 @@ class Samba:
         return {"index_needed": index_needed}
 
     def check_auth(self, authorization: str | None) -> bool:
+        """Check if credentials are valid.
+
+        Args:
+            authorization: credentials in base64
+        Returns: true / false
+        """
         if authorization is None:
             return False
 

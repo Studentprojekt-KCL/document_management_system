@@ -333,7 +333,11 @@ class GitHub:
         return self._unpack_zip(resp.content, full_name, branch)
 
     async def verify_token(self, x_github_token: str | None) -> bool:
-        """Refresh a GitHub access token using a refresh token."""
+        """Verifies token validity
+
+        Args:
+            x_github_token: token
+        Returns: True / False"""
         if x_github_token is None:
             return False
         token_url = f"{self.api_base}user"

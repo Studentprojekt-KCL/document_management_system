@@ -173,7 +173,11 @@ class API:
         return JSONResponse(content=new_tokens, status_code=200)
 
     async def validate_token(self, x_gitlab_token: Annotated[str | None, Header()] = None) -> JSONResponse:
-        """Check token validity."""
+        """Check token validity.
+
+        Args:
+            x_gitlab_token: token
+        Returns: response with true/false"""
         if x_gitlab_token is None:
             return JSONResponse(content=False, status_code=200)
         token_url = f"{self.gitlab_url}/oauth/token/info"

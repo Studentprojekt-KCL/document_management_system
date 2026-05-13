@@ -128,6 +128,12 @@ class API:
         return StreamingResponse(self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream")
 
     async def validate_token(self, authorization: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Validate user auth.
+        
+        Args:
+            authorization: user credentials.
+        Returns: response with true/false
+        """
         return JSONResponse(content=self.samba_service.check_auth(authorization), status_code=200)
 
     @staticmethod

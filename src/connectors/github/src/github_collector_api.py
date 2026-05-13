@@ -155,7 +155,12 @@ class API:
         return JSONResponse(content=response.json(), status_code=200)
 
     async def validate_token(self, x_github_token: str | None = Header(default=None, alias="X-GitHub-Token")) -> JSONResponse:
-        """Refresh a GitHub access token using a refresh token."""
+        """Validate token access.
+
+        Args:
+            x_github_token: token
+        returns: true / false
+        """
         return JSONResponse(content=await self.github_instance.verify_token(x_github_token), status_code=200)
 
 def run() -> None:

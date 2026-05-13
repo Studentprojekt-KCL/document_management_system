@@ -111,14 +111,20 @@ class ConnectorClient:
             dms_warning("Failed to connect to connector.")
         return []
 
-    async def fetch_start_of_streams(self) -> list[str]:
+    async def fetch_start_of_streams(self) -> list[dict]:
         """returns URL to connector for stream proto://<connector-host>/stream_files_to_index"""
-        stream_urls: list[str] = []
+        stream_requirements: list[dict] = []
         for source_system in self.source_systems:
-            proto_host_url = source_system["connector_url"]
-            stream_url = f"{proto_host_url}/stream_files_to_index"
-            stream_urls.append(stream_url)
-        return stream_urls
+            stream_requirements.append(
+                {
+                    "stream_url": f"{source_system.get("connector_url")}/stream_files_to_index",
+                    "name": source_system.get("name"),
+                    "authentication_header": source_system.get("authentication_header"),
+                    "token_type": source_system.get("token_type"),
+                }
+            )
+
+        return stream_requirements
 
     async def get_source_system_names(self) -> list[str]:
         """Returns names of source systems according to config file"""

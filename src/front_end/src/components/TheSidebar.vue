@@ -11,7 +11,7 @@
 
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
+import { Search, Network, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
 import { getCurrentUser } from '@/utils/authClient'
 
 const router = useRouter()
@@ -30,6 +30,7 @@ watch(() => route.fullPath, loadAuthInfo, { immediate: true })
 
 /* all available items on the sidebar */
 const menuItems = [
+  { id: 'connections', label: 'Connections', icon: Network, path: '/connections' },
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
   { id: 'intelligence', label: 'Intelligence', icon: BarChart3, path: '/intelligence' },
@@ -44,10 +45,10 @@ const isAdmin = computed(() => {
   return clientRoles.includes('admin') || realmRoles.includes('admin')
 })
 
-/* Show all itmes fro admin otherwise only search */
+/* Show all itmes fro admin otherwise only search and connections */
 const visibleMenuItems = computed(() => {
-  const searchOnly = menuItems.filter((item) => item.id === 'search')
-  return isAdmin.value ? menuItems : searchOnly
+  const searchAndConnections = menuItems.filter((item) => item.id === 'search' || item.id === 'connections')
+  return isAdmin.value ? menuItems : searchAndConnections
 })
 
 /* Compute the active menu item */

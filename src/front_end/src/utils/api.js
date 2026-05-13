@@ -17,12 +17,22 @@ export const API_PATHS = {
   connectedSourceSystems: `${FRONTEND_DMISAPI_BASE_URL}/connector/connected_source_systems`,
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
+  merge: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/merge`,
+  mdToPDF: `${FRONTEND_DMISAPI_BASE_URL}/stochastic-analyzer/md-to-pdf`,
 
+  /* Connected source system auth endpoints */
+  authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
+  authUser: `${FRONTEND_DMISAPI_BASE_URL}/connector/auth_user`,
+
+  /* General auth endpoints */
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,
   authLogout: `${FRONTEND_DMISAPI_BASE_URL}/auth/logout`,
-  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`
+  codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`,
+
+  /* code exchange for 3rd parties */
+  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session/callback`
 }
 
 /**
@@ -42,5 +52,6 @@ export function apiFetch(url, options = {}) {
     }
   })
 }
-// causes all previos authFetch calls into apiFetch
+
+/* causes all previos authFetch calls into apiFetch */
 export const authFetch = apiFetch

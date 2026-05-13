@@ -179,7 +179,7 @@ class SearchEngine:
 
         return (pointers, metadata)
 
-    async def find_matching(self, unique_pointer: str, count: int) -> dict:
+    async def find_matching(self, unique_pointer: str, count: int) -> tuple[list[str], dict[str, dict]]:
         """Search for matching files.
 
         Args:
@@ -191,7 +191,7 @@ class SearchEngine:
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
         if not result.hits:
-            return {}
+            return ([], {})
         doc_address = result.hits[0][1]
         result = searcher.search(Query.more_like_this_query(doc_address), limit=count + 1)
         original_score: int | None = None
@@ -204,7 +204,7 @@ class SearchEngine:
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
             matching.update({unique_pointer: score / original_score})
-        return matching
+        return (list(matching.keys()), matching)
 
     @asynccontextmanager
     async def open_writer(self) -> AsyncGenerator[None]:

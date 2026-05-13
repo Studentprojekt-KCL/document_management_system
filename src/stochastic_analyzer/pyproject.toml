@@ -12,7 +12,11 @@ dynamic = ["dependencies"]
 packages = ["gateway", "gateway.services"]
 
 [project.scripts]
+<<<<<<< feature/query/unit-tests
 gateway = "gateway.main:start"
 
 [project.optional-dependencies]
 test = ["httpx"]
+=======
+stochastic-analyzer = "gateway.main:start"
+>>>>>>> develop

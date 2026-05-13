@@ -45,7 +45,7 @@ class Handler:
     async def close(self) -> None:
         """Clean up"""
         if self.index_pipeline is not None:
-            self.index_pipeline.stop()
+            await self.index_pipeline.stop()
         await self.connector.close()
         await self.classifier.close()
         await self.search_engine.close()

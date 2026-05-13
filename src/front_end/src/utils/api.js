@@ -74,6 +74,5 @@ export async function apiFetch(url, options = {}) {
   return response
 }
 
-
 /* causes all previos authFetch calls into apiFetch */
 export const authFetch = apiFetch

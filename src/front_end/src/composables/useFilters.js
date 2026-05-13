@@ -104,7 +104,7 @@ const securityFilters = ref([])
 let securityFiltersLoaded = false
 
 export function useSecurityFilters() {
-  if (securityFiltersLoaded){
+  if (securityFiltersLoaded) {
     return securityFilters
   }
   securityFiltersLoaded = true

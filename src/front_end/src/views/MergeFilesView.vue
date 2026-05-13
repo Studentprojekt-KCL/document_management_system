@@ -4,7 +4,7 @@
  * Metadata displaying and so is fetched from SearchMatches.vue
  * Similar files and the scores are fetched from useAIRerank :)
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
 import { useMdToPdf } from '@/composables/mdToPdf'
@@ -19,10 +19,26 @@ const selectedPointer = ref([rerankPointer.value]) // Start with the reranked fi
 
 const selectedCount = computed(() => selectedPointer.value.length)
 
-watch(selectedPointer, () => {
+const changedSelctions = computed(() => [...selectedPointer.value].sort().join('|'))
+const lastPdfSelction = ref('')
+const lastSummarySelection = ref('')
+
+const currentPdfSelection = computed(() => Boolean(pdfUrl.value) && lastPdfSelction.value === changedSelctions.value)
+const currentSummarySelection = computed(
+  () => Boolean(aiSummaryHtml.value) && lastSummarySelection.value === changedSelctions.value
+)
+
+const handleGeneratePDF = async () => {
+  lastPdfSelction.value = changedSelctions.value
   resetMerged()
+  await generatePDF(selectedPointer.value, rerankPointer.value)
+}
+
+const handleGenerateSummary = async () => {
+  lastSummarySelection.value = changedSelctions.value
   resetSummary()
-})
+  await generateAISummary(selectedPointer.value, rerankPointer.value)
+}
 </script>
 
 <template>
@@ -36,18 +52,18 @@ watch(selectedPointer, () => {
         generate a PDF you can download. You can choose to merge/summarize as many files as you want, but keep in mind that the
         result may take more time.
       </p>
+      <p v-if="selectedCount === 1">Currently, only the reranked file is selected</p>
 
       <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointer" badge-mode="score" selectable />
 
       <div class="actions">
         <p>{{ selectedCount }} file{{ selectedCount === 1 ? '' : 's' }} selected</p>
-
         <div class="pdf-actions">
           <button
-            v-if="!pdfUrl"
+            v-if="!currentPdfSelection"
             type="button"
             :disabled="isGeneratingPDF || selectedCount === 0"
-            @click="generatePDF(selectedPointer, rerankPointer.value)"
+            @click="handleGeneratePDF"
           >
             {{ isGeneratingPDF ? 'Generating PDF...' : 'Merge + Generate PDF' }}
           </button>
@@ -62,12 +78,7 @@ watch(selectedPointer, () => {
         </div>
 
         <div class="summary-actions">
-          <button
-            v-if="selectedCount > 0 && !aiSummaryHtml"
-            type="button"
-            :disabled="isGeneratingSummary"
-            @click="generateAISummary(selectedPointer, rerankPointer.value)"
-          >
+          <button v-if="!currentSummarySelection" type="button" :disabled="isGeneratingSummary" @click="handleGenerateSummary">
             {{ isGeneratingSummary ? 'Generating summary...' : 'Summarize' }}
           </button>
 

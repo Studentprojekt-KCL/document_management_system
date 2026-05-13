@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "confluence_service"
-description = "Conflucence connector"
+description = "Confluence connector"
 version = "0.1.0"
 dynamic = ["dependencies"]
 

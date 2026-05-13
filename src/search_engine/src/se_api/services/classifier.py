@@ -101,3 +101,5 @@ class Classifier:
             dms_warning(f"Response from classifier could not be decoded, {err}")
         except httpx.TimeoutException as err:
             dms_warning(f"Connection to classifier timed out, {err}")
+        except httpx.ConnectError as err:
+            dms_warning(f"Classifier connection unavailable, {err}")

@@ -56,13 +56,6 @@ onMounted(async () => {
     return
   }
 
-  const authed = await isAuthenticated()
-
-  if (!authed) {
-    logoutAfterError('Login succeeded, but authentication failed.')
-    return
-  }
-
   router.replace('/search')
 })
 </script>

@@ -33,7 +33,7 @@ export const API_PATHS = {
   checkAdmin: `${FRONTEND_DMISAPI_BASE_URL}/auth/checkAdmin`,
 
   /* code exchange for 3rd parties */
-  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session/callback`
+  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session-callback`
 }
 
 /**

@@ -68,7 +68,6 @@ class API:
     async def stream_files_to_index(self, authorization: str | None = Header(default=None)) -> list[dict]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
         connectors = await self.down_stream_client.fetch_start_of_streams()
-        #services = [service.get("name") for service in connectors]
         services = [service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in connectors]
         headers: dict = {"authorization": authorization.strip()} if authorization else {}
         authentication_tokens: dict = {}
@@ -124,7 +123,6 @@ class API:
                 raise HTTPException(status_code=400)
 
             return await self.down_stream_client.get_auth_redirect(source_system, referer)
-            #return RedirectResponse(auth_url, headers=get_headers, follow_redirects=False)
 
         raise HTTPException(status_code=400)
 
@@ -140,7 +138,6 @@ class API:
             raise HTTPException(400)
 
         token = await self.down_stream_client.auth_code_callback(service_details.get("connector_url"), paramas)
-        print(f"THE TOKEN IS: {token}")
         body = {"refresh_url": f"{service_details.get('connector_url')}/refresh_token", "session_variables": token}
         append_response = await self.refresh_client.send_post_request(
             "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
@@ -150,7 +147,6 @@ class API:
             dms_warning(f"Failed to insert {service_name} into refresh_service.")
             raise HTTPException(400)
 
-        print("New session token added!")
         return JSONResponse(status_code=200, content='')
 
 

@@ -9,7 +9,7 @@
  * <TheSidebar />
  */
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Database, BarChart3, ShieldCheck, Settings, Menu, Network } from 'lucide-vue-next'
 import { isAdmin } from '@/utils/auth'
@@ -24,7 +24,7 @@ const loadAdminStatus = async () => {
   admin.value = await isAdmin()
 }
 
-watch(() => route.fullPath, loadAdminStatus, { immediate: true })
+onMounted(loadAdminStatus)
 
 /* all available items on the sidebar */
 const menuItems = [

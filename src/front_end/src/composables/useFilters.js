@@ -4,7 +4,7 @@
  * Centralized here to keep API logic separate from component code and allow reuse across components if needed.
  */
 import { ref } from 'vue'
-import { authFetch, API_PATHS } from '@/utils/api'
+import { apiFetch, API_PATHS } from '@/utils/api'
 
 const normalizeExtensions = (extension) => {
   if (Array.isArray(extension)) return extension.map((ext) => String(ext))
@@ -20,7 +20,7 @@ const normalizeExtensions = (extension) => {
 export function useSourceFilters() {
   const sourceFilters = ref([])
 
-  authFetch(API_PATHS.connectedSourceSystems)
+  apiFetch(API_PATHS.connectedSourceSystems)
     .then((res) => {
       if (!res.ok) {
         console.error(`Failed to fetch source systems: ${res.statusText}`)
@@ -44,7 +44,7 @@ export function useSourceFilters() {
 export function useDocumentsOnlyFilters() {
   const documentsOnlyFilters = ref([])
 
-  authFetch(API_PATHS.documentsOnly)
+  apiFetch(API_PATHS.documentsOnly)
     .then((res) => {
       if (!res.ok) {
         console.error(`Failed to fetch documents only filters: ${res.statusText}`)
@@ -71,7 +71,7 @@ export function useDocumentsOnlyFilters() {
 export function useAllFileTypeFilters() {
   const allFileTypeFilters = ref([])
 
-  authFetch(API_PATHS.allFileTypes)
+  apiFetch(API_PATHS.allFileTypes)
     .then((res) => {
       if (!res.ok) {
         console.error(`Failed to fetch all file type filters: ${res.statusText}`)
@@ -100,10 +100,16 @@ export function useAllFileTypeFilters() {
  *
  * @returns {Ref<string[]>}
  */
-export function useSecurityFilters() {
-  const securityFilters = ref([])
+const securityFilters = ref([])
+let securityFiltersLoaded = false
 
-  authFetch(API_PATHS.classifications)
+export function useSecurityFilters() {
+  if (securityFiltersLoaded){
+    return securityFilters
+  }
+  securityFiltersLoaded = true
+
+  apiFetch(API_PATHS.classifications)
     .then((res) => {
       if (!res.ok) {
         console.error(`Failed to fetch security classifications: ${res.statusText}`)

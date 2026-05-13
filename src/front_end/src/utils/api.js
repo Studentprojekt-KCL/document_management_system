@@ -18,12 +18,20 @@ export const API_PATHS = {
   documentsOnly: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types_documents_only`,
   allFileTypes: `${FRONTEND_DMISAPI_BASE_URL}/search_engine/file_types`,
 
+  /* Connected source system auth endpoints */
+  authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
+  authUser: `${FRONTEND_DMISAPI_BASE_URL}/connector/auth_user`,
+
+  /* General auth endpoints */
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,
   authMe: `${FRONTEND_DMISAPI_BASE_URL}/auth/me`,
   authRefresh: `${FRONTEND_DMISAPI_BASE_URL}/auth/refresh`,
   authLogout: `${FRONTEND_DMISAPI_BASE_URL}/auth/logout`,
   codeExchange: `${FRONTEND_DMISAPI_BASE_URL}/auth/codeExchange`,
-  checkAdmin: `${FRONTEND_DMISAPI_BASE_URL}/auth/checkAdmin`
+  checkAdmin: `${FRONTEND_DMISAPI_BASE_URL}/auth/checkAdmin`,
+
+  /* code exchange for 3rd parties */
+  sessionCallback: `${FRONTEND_DMISAPI_BASE_URL}/connector/session/callback`
 }
 
 /**

@@ -64,9 +64,30 @@ class API:
             split_pointers, include_content, include_last_edit_date, authentication_tokens
         )
 
-    async def stream_files_to_index(self) -> list[str]:
+    async def stream_files_to_index(self, authorization: str | None = Header(default=None)) -> list[dict]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
-        return await self.down_stream_client.fetch_start_of_streams()
+        connectors = await self.down_stream_client.fetch_start_of_streams()
+        services = [service.get("name") for service in connectors]
+        headers: dict = {"authorization": authorization.strip()} if authorization else {}
+        authentication_tokens: dict = {}
+
+        if authorization:
+            tokens = await self.refresh_client.send_post_request("/get_session_tokens", params=None, headers=headers, body=services)
+            if isinstance(tokens, dict):
+                authentication_tokens = tokens
+            else:
+                dms_warning(f"Recieved unexpeced structure from refresh-service (expected dict): git({type(tokens)})")
+
+        stream_references: list = []
+
+        for service in connectors:
+            service_token = authentication_tokens.get(service.get("name"))
+            headers_to_set: dict = {}
+            if service_token:
+                headers_to_set |= {service.get("authentication_header"): f"{service.get('token_type')} {service_token}"}
+            stream_references.append({"stream_url": service.get("stream_url"), "required_headers": headers_to_set})
+
+        return stream_references
 
     async def connected_source_systems(self) -> list[str]:
         """Returns list with names of all connected source systems"""

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Cookie
+from fastapi import FastAPI, Request, HTTPException, Cookie, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -134,7 +134,7 @@ class API:
             return f"Bearer {access_token}"
         return None
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> Any:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -150,7 +150,13 @@ class API:
         try:
             async with self.http_client.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
+                content_type = response.headers.get("Content-Type", "")
+                content: Any
+                if content_type == "json":
+                    content = await response.json()
+                else:
+                    content = await response.read()
+                return Response(content=content, media_type=content_type)
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -158,9 +164,7 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        return JSONResponse(status_code=200, content=response_data)
-
-    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> Any:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -179,15 +183,19 @@ class API:
         try:
             async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
+                content_type = response.headers.get("Content-Type", "")
+                content: Any
+                if content_type == "json":
+                    content = await response.json()
+                else:
+                    content = await response.read()
+                return Response(content=content, media_type=content_type)
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
-
-        return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(
         self,

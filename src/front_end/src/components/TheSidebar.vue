@@ -28,6 +28,7 @@ watch(() => route.fullPath, loadAdminStatus, { immediate: true })
 
 /* all available items on the sidebar */
 const menuItems = [
+  { id: 'connections', label: 'Connections', icon: Network, path: '/connections' },
   { id: 'search', label: 'Universal Search', icon: Search, path: '/search' },
   { id: 'sources', label: 'Information Sources', icon: Database, path: '/sources' },
   { id: 'intelligence', label: 'Intelligence', icon: BarChart3, path: '/intelligence' },

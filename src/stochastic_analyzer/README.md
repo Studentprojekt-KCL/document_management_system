@@ -1,239 +1,96 @@
-# Unified Document Analysis Gateway
+# Stochastic Analyzer Gateway
 
-## Description
+The code in this subdirectory contains the package for the Stochastic Analyzer Gateway, a service that handles document summarization, merging, and markdown-to-PDF conversion.
 
-This microservice provides semantic document ranking using Cross-Encoder models, alongside document security classification and batch summarization powered by generative LLMs. It evaluates the relevance of document content against a specific query, determines corporate security levels, synthesizes unified summaries from multiple sources, and converts markdown summaries to PDF.
+## Endpoints
+
+### Summarize
+
+Summarize one or more documents.
+
+- `pointers`: list of file pointers, required (1 or more).
+
+```url
+http://<host>:<port>/summarize
+```
+
+```json
+{
+    "pointers": ["<file pointer>", "<file pointer>", ...]
+}
+```
+
+Response:
+
+```json
+{
+    "summary": "<summary text>"
+}
+```
+
+### Merge
+
+Merge multiple documents into one coherent document.
+
+- `pointers`: list of file pointers, required (2 or more).
+
+```url
+http://<host>:<port>/merge
+```
+
+```json
+{
+    "pointers": ["<file pointer>", "<file pointer>", ...]
+}
+```
+
+Response:
+
+```json
+{
+    "summary": "<merged document>"
+}
+```
+
+### Markdown to PDF
+
+Convert a markdown string into a PDF file.
+
+- `markdown`: markdown string, required.
+
+```url
+http://<host>:<port>/md-to-pdf
+```
+
+```json
+{
+    "markdown": "<markdown string>"
+}
+```
+
+Response: PDF file (`application/pdf`).
 
 ## Developer Instructions
 
-Run the gateway locally in developer mode, inside a virtual python environment do the following:
+Run the gateway locally inside a virtual python environment:
 
 ```bash
 $ pip install -e .
-$ gateway --dev
+$ stochastic-analyzer
 ```
+
+## Further API documentation
+
+Automated API documentation is constructed when the service is initiated, and can be found at http://127.0.0.1:8000/docs
 
 ## Configuration
 
 Configuration is done through environment variables.
 
-- `STOCHAN_BIND_ADDR` — Address to bind to.
-- `STOCHAN_BIND_PORT` — Port to host on.
-- `STOCHAN_CLASSIFIER_URL` — URL for the TEI classifier container.
-- `STOCHAN_LLM_URL` — URL for the Ministral LLM container.
-- `STOCHAN_LLM_MODEL` — Model identifier for Ministral.
-
-Optional flags:
-
-- `--dev`, developer mode (enables debug logging and detailed error responses).
-
-## Running the Service
-
-To build and run the service via Docker:
-
-1. **Build the image:**
-   ```bash
-   sudo docker build -t stochastic-analyzer -f src/stochastic_analyzer/Dockerfile .
-   ```
-
-2. **Run the container (using host networking):**
-   ```bash
-   sudo docker run -d \
-     --name analyzer \
-     --network host \
-     --env-file src/stochastic_analyzer/.env \
-     stochastic-analyzer
-   ```
-
-## Test request to API
-
-To test that the API is working correctly, test the following CURL command:
-
-```bash
-curl -v http://127.0.0.1:8000/health
+```env
+STOCHAN_BIND_ADDR=<Gateway bind address>
+STOCHAN_BIND_PORT=<Gateway port>
+STOCHAN_CONGATEWAY_URL=<Connector address>
+STOCHAN_LLM_URL=<LLM endpoint URL>
+STOCHAN_LLM_MODEL=<LLM model name>
 ```
-
-Which should result in a `200` and:
-
-```json
-{
-  "status": "active",
-  "model_loaded": true,
-  "device": "external"
-}
-```
-
-## API Endpoints
-
-### 1. Health Check
-
-Checks if the API is active and identifies the compute device.
-
-* **URL:** `/health`
-* **Method:** `GET`
-* **Success Response:** `200 OK`
-
-**Response Example:**
-```json
-{
-  "status": "active",
-  "model_loaded": true,
-  "device": "external"
-}
-```
-
-### 2. Document Re-Ranker
-
-Scores and sorts a list of documents based on their semantic relevance to a provided query.
-
-* **URL:** `/rerank`
-* **Method:** `POST`
-* **Content-Type:** `application/json`
-
-**Request Body Example:**
-```json
-{
-  "query": "What are the rules for data compliance?",
-  "documents": [
-    {
-      "title": "GDPR Overview",
-      "owner": "Legal Dept",
-      "reference": "doc-001",
-      "content": "General Data Protection Regulation guidelines..."
-    },
-    {
-      "title": "Lunch Menu",
-      "owner": "HR",
-      "reference": "doc-002",
-      "content": "Today we are serving meatballs..."
-    }
-  ]
-}
-```
-
-**Success Response:** `200 OK`
-
-**Response Example:**
-```json
-{
-  "ranked_results": [
-    {
-      "score": 0.892,
-      "document": {
-        "title": "GDPR Overview",
-        "owner": "Legal Dept",
-        "reference": "doc-001",
-        "content": "General Data Protection Regulation guidelines..."
-      }
-    },
-    {
-      "score": -1.245,
-      "document": {
-        "title": "Lunch Menu",
-        "owner": "HR",
-        "reference": "doc-002",
-        "content": "Today we are serving meatballs..."
-      }
-    }
-  ]
-}
-```
-
-### 3. Document Classifier
-
-Classifies documents into security levels (Public, Internal, Sensitive, Confidential) using zero-shot NLI inference via the RoBERTa TEI container.
-
-* **URL:** `/classify`
-* **Method:** `POST`
-* **Content-Type:** `application/json`
-
-**Request Body Example:**
-```json
-[
-  {
-    "content": "Quarterly financial projections and unreleased earnings targets.",
-    "metadata": {
-      "name": "Q3_Projections",
-      "author": "Finance Team"
-    }
-  }
-]
-```
-
-**Success Response:** `200 OK`
-
-**Response Example:**
-```json
-[
-  {
-    "unique_pointer": "Q3_Projections",
-    "Security-class": "Confidential"
-  }
-]
-```
-
-### 4. Batch Summarizer
-
-Synthesizes the content of multiple documents into a single, unified summary using the Ministral model.
-
-* **URL:** `/summarize`
-* **Method:** `POST`
-* **Content-Type:** `application/json`
-
-**Request Body Example:**
-```json
-[
-  {
-    "content": "Quarterly financial projections and unreleased earnings targets.",
-    "metadata": {
-      "name": "Q3_Projections",
-      "author": "Finance Team"
-    }
-  },
-  {
-    "content": "Marketing expenditure was reduced by 15% across European regions.",
-    "metadata": {
-      "name": "EU_Marketing_Q3",
-      "author": "Marketing Team"
-    }
-  }
-]
-```
-
-**Success Response:** `200 OK`
-
-**Response Example:**
-```json
-{
-  "summary": "In Q3, the organization focused on strict financial projections and unreleased earnings targets, alongside a 15% reduction in European marketing expenditure."
-}
-```
-
-### 5. Markdown to PDF
-
-Converts a markdown summary into a downloadable PDF file.
-
-* **URL:** `/md-to-pdf`
-* **Method:** `POST`
-* **Content-Type:** `application/json`
-
-**Request Body Example:**
-```json
-{
-  "summary": "# Incident Summary\n\nThe servers experienced downtime at 2 AM due to a power outage. No data loss was reported."
-}
-```
-
-**Success Response:** `200 OK` with `application/pdf` body.
-
-**CURL Example:**
-```bash
-curl -X POST http://localhost:8000/md-to-pdf \
-  -H "Content-Type: application/json" \
-  -d '{"summary": "# Report\n\nThis is the summary content."}' \
-  --output summary.pdf
-```
-
-## Further API documentation
-
-An automated API documentation is constructed when the API service is started, and can be found at http://127.0.0.1:8000/docs

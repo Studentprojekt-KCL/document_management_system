@@ -11,7 +11,7 @@
 
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, Database, BarChart3, ShieldCheck, Settings, Menu } from 'lucide-vue-next'
+import { Search, Database, BarChart3, ShieldCheck, Settings, Menu, Network } from 'lucide-vue-next'
 import { isAdmin } from '@/utils/auth'
 
 const router = useRouter()

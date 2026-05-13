@@ -1,15 +1,19 @@
 import { LOCAL_KEY_LOGOUT_EVENT } from '@/utils/config'
 import { apiFetch, API_PATHS } from '@/utils/api'
-import { getCurrentUser } from '@/utils/authClient'
 
-export async function hasRole(role) {
-  const authInfo = await getCurrentUser()
-  if (!authInfo?.authenticated) return false
-
-  const clientRoles = authInfo.user?.client_roles ?? []
-  const realmRoles = authInfo.user?.realm_roles ?? []
-
-  return clientRoles.includes(role) || realmRoles.includes(role)
+/* ADMIN roles checking */
+export async function isAdmin() {
+  try {
+    const response = await apiFetch(API_PATHS.checkAdmin)
+    if (!response.ok) {
+      return false
+    }
+    const data = await response.json()
+    return data.admin === true
+  } catch (err) {
+    console.error('failed admin check:', err)
+    return false
+  }
 }
 
 export async function refreshSession() {

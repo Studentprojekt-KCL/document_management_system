@@ -45,7 +45,7 @@ class Handler:
     async def close(self) -> None:
         """Clean up"""
         if self.index_pipeline is not None:
-            self.index_pipeline.stop()
+            await self.index_pipeline.stop()
         await self.connector.close()
         await self.classifier.close()
         await self.search_engine.close()
@@ -83,13 +83,29 @@ class Handler:
             count: number of results.
         Returns: the matching pointers and their scores.
         """
-        matches = await self.search_engine.find_matching(pointer, count)
-        files: list | None = await self.connector.fetch_files(list(matches.keys()), authorization)
-        if files is None:
-            return []
-        for file in files:
-            unique_pointer = file.get(UNIQUE_POINTER, "")
-            file.update({"score": matches.get(unique_pointer, 0)})
+        files: list[dict] = []
+        missing: int = count
+        offset: int = 0
+        available_offset: int = 0
+        fails: int = 0
+
+        while missing > 0 and fails < MAX_FAIL_COUNT:
+            matches, metadata = await self.search_engine.find_matching(pointer, missing + offset)
+            if not matches:
+                break
+            available: list[dict] | None = await self.connector.fetch_files(matches, authorization)
+            if available is None:
+                return []
+            for file in available[available_offset:]:
+                file.update({"score": metadata.get(file.get(UNIQUE_POINTER, ""), 0)})
+                files.append(file)
+            missing = count - len(files)
+            if not files:
+                fails += 1
+            else:
+                fails = 0
+            offset += count
+            available_offset += len(available)
         return files
 
     def grab_searchable_fields(self) -> set:

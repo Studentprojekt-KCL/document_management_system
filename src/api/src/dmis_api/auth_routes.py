@@ -78,7 +78,7 @@ class AuthRoutes:
                 value=refresh_token,
                 httponly=True,
                 secure=True,
-                samesite=None,
+                samesite="none",
                 max_age=self.REFRESH_COOKIE_MAX_AGE,
                 path="/auth/refresh",
             )

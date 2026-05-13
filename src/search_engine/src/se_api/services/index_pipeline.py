@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Queue, QueueShutDown, create_task, gather, to_thread
+from asyncio import Queue, QueueShutDown, Task, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -44,13 +44,14 @@ class IndexPipeline:
     """Index pipeline class"""
 
     queues: Queues
+    _tasks: list[Task]
 
     def __init__(self, search_engine: SearchEngine, connector: Connector, classifier: Classifier) -> None:
         """Constructor"""
         self.search_engine = search_engine
         self.connector = connector
         self.classifier = classifier
-        self._tasks: list = []
+        self._tasks = []
 
     async def stop(self) -> None:
         """Stop indexing and wait for workers to exit."""
@@ -87,13 +88,17 @@ class IndexPipeline:
         reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
 
         self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
-        fetch_tasks = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        decode_tasks = [create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        ingest_index_task = create_task(self._ingest_index(index_queue, lookup_queue))
+        fetch_tasks: list[Task] = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
+        decode_tasks: list[Task] = [
+            create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)
+        ]
+        ingest_index_task: Task = create_task(self._ingest_index(index_queue, lookup_queue))
 
-        classifier_load_task = create_task(self._classifier_load_index(lookup_queue, classify_queue))
-        classify_tasks = [create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        classifier_refresh_task = create_task(self._classifier_refresh_index(reindex_queue))
+        classifier_load_task: Task = create_task(self._classifier_load_index(lookup_queue, classify_queue))
+        classify_tasks: list[Task] = [
+            create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)
+        ]
+        classifier_refresh_task: Task = create_task(self._classifier_refresh_index(reindex_queue))
 
         self._tasks = [
             *fetch_tasks,

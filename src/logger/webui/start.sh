@@ -1,15 +1,20 @@
 #!/bin/sh
 set -e
 
-if [ -z "$LOGWEB_ADDR" ]; then
-  echo "ERROR: LOGWEB_ADDR is not set" >&2
+if [ -z "$LOGWEB_BIND_ADDR" ]; then
+  echo "ERROR: LOGWEB_BIND_ADDR is not set" >&2
   exit 1
 fi
 
-if [ -z "$LOGWEB_BIND" ]; then
-  echo "ERROR: LOGWEB_BIND is not set" >&2
+if [ -z "$LOGWEB_BIND_PORT" ]; then
+  echo "ERROR: LOGWEB_BIND_PORT is not set" >&2
   exit 1
 fi
 
-echo "Starting Fresh server on port $LOGWEB_BIND (LOGWEB_ADDR=$LOGWEB_ADDR)..."
-exec deno serve -A --port="$LOGWEB_BIND" _fresh/server.js
+if [ -z "$LOGWEBB_API_ADDR" ]; then
+  echo "ERROR: LOGWEBB_API_ADDR is not set" >&2
+  exit 1
+fi
+
+echo "Starting Fresh server on $LOGWEB_BIND_ADDR:$LOGWEB_BIND_PORT (API=$LOGWEBB_API_ADDR)..."
+exec deno serve -A --host="$LOGWEB_BIND_ADDR" --port="$LOGWEB_BIND_PORT" _fresh/server.js

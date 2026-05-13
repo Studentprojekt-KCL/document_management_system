@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request, Header
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLab
@@ -31,6 +31,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
+        self.auth_callback_url = read_env_variable("CONGITLAB_CONNECT_SERVICE_CALLBACK")
         self.gitlab_url = read_env_variable("CONGITLAB_GITLAB_URL").rstrip("/")
         self.gitlab_instance = GitLab(self.gitlab_url)
 
@@ -106,7 +107,7 @@ class API:
         """Retrieve fields delivered for file conent."""
         return list(self.gitlab_instance.defined_fields.keys())
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self) -> JSONResponse:
         """Callback endpoint to set in GitLab application.
 
         Required headers:
@@ -122,13 +123,13 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
         }
 
-        return RedirectResponse(f"{auth_url}?{urlencode(params)}")
+        return JSONResponse(content={"redirect": f"{auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Callback endpoint to set in GitLab application."""
@@ -145,10 +146,11 @@ class API:
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }
+
         token_json = await self.gitlab_instance.execute_post_request(token_url, data=data)
 
         if not token_json.get("access_token"):

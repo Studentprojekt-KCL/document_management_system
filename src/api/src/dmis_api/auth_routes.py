@@ -64,14 +64,28 @@ class AuthRoutes:
             max_age=max_age,
         )
 
+    def _get_token_max_age(
+        self,
+        token_data: dict[str, Any],
+        key: str,
+        fallback: int,
+    ) -> int:
+        """Get token max age from tokens form AD"""
+        max_age = token_data.get(key)
+        return max_age if isinstance(max_age, int) else fallback
+
     def _set_auth_cookies(self, response: JSONResponse, token_data: dict[str, Any]) -> None:
         """Set authentication cookies from token response data."""
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
+        access_max_age = self._get_token_max_age(token_data, "expires_in", self.ACCESS_COOKIE_MAX_AGE)
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.REFRESH_COOKIE_MAX_AGE)
+
         if isinstance(access_token, str):
-            self._set_cookie(response, "access_token", access_token, self.ACCESS_COOKIE_MAX_AGE)
+            self._set_cookie(response, "access_token", access_token, access_max_age)
+
         if isinstance(refresh_token, str):
             response.set_cookie(
                 key="refresh_token",
@@ -79,9 +93,10 @@ class AuthRoutes:
                 httponly=True,
                 secure=True,
                 samesite="none",
-                max_age=self.REFRESH_COOKIE_MAX_AGE,
-                path="api/auth/refresh",
+                max_age=refresh_max_age,
+                path="/auth/refresh",
             )
+
         if isinstance(id_token, str):
             response.set_cookie(
                 key="id_token",
@@ -89,7 +104,7 @@ class AuthRoutes:
                 httponly=True,
                 secure=True,
                 samesite="none",
-                max_age=self.ACCESS_COOKIE_MAX_AGE,
+                max_age=access_max_age,
                 path="api/auth/logout",
             )
 

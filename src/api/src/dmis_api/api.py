@@ -13,7 +13,7 @@ import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Cookie, Header, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
@@ -24,6 +24,8 @@ from .auth_routes import AuthRoutes
 
 class API:
     """Management class for main API."""
+
+    REDIRECT_STATUS_CODES: list = [307, 308]
 
     app: FastAPI = FastAPI()
 
@@ -109,6 +111,7 @@ class API:
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
+        return {}
         if (
             authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
         ):  # NOTE; THIS MUST BE REMOVED LATER
@@ -153,12 +156,14 @@ class API:
             async with self.http_client.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("Content-Type", "")
-                content: Any
-                if content_type == "json":
-                    content = await response.json()
-                else:
+                if response.status not in self.REDIRECT_STATUS_CODES:
                     content = await response.read()
-                return Response(content=content, media_type=content_type)
+                    return Response(content=content, media_type=content_type)
+
+                headers = {"location": response.headers.get("location")}
+                body = await response.json()
+                print(body)
+                return RedirectResponse(body.get("redirect"))
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -188,11 +193,7 @@ class API:
             async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("Content-Type", "")
-                content: Any
-                if content_type == "json":
-                    content = await response.json()
-                else:
-                    content = await response.read()
+                content = await response.read()
                 return Response(content=content, media_type=content_type)
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")

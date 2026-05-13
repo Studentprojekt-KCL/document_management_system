@@ -104,7 +104,7 @@ class API:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
 
-    async def auth_user(self, source_system: str, authorization: str | None = Header(None), x_connector_authorization: Annotated[str | None, Header()] = None, referer: Annotated[str | None, Header()] = None):
+    async def auth_user(self, source_system: str, authorization: str | None = Header(None), x_connector_authorization: Annotated[str | None, Header()] = None, referer: Annotated[str | None, Header()] = None) -> RedirectResponse:
         """Returns redirect to source system to authenticate."""
         source_system_info = self.down_stream_client.find_service(source_system)
 
@@ -114,22 +114,24 @@ class API:
                 "add_session_token", params={"service_name": source_system}, headers={"authorization": authorization}, body=body
             )
             return response
-        if source_system_info.get("source_system") == "session":
-            pass #TODO, redirect system.
-
-        if not isinstance(source_system, str) or referer is None:
-            dms_warning(
-                "No {issue} provided to gateway auth_user".format(  # pylint: disable=C0209
-                    issue="referer" if referer is None else "source_system"
+        if source_system_info.get("authentication_method") == "session":
+            if not isinstance(source_system, str) or referer is None:
+                dms_warning(
+                    "No {issue} provided to gateway auth_user".format(  # pylint: disable=C0209
+                        issue="referer" if referer is None else "source_system"
+                    )
                 )
-            )
-            raise HTTPException(status_code=400)
+                raise HTTPException(status_code=400)
 
-        return await self.down_stream_client.get_auth_redirect(source_system, referer)
+            return await self.down_stream_client.get_auth_redirect(source_system, referer)
+            #return RedirectResponse(auth_url, headers=get_headers, follow_redirects=False)
+
+        raise HTTPException(status_code=400)
 
 
     async def callback_token(self, body: dict, service_name: str, authorization: str | None = Header(None)) -> dict | list:
         """Callback endpoint to insert service session token."""
+
         return await self.refresh_client.send_post_request(
             "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
         )

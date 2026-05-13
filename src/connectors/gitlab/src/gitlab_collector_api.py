@@ -105,7 +105,7 @@ class API:
         """Retrieve fields delivered for file conent."""
         return list(self.gitlab_instance.defined_fields.keys())
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self, request: Request) -> JSONResponse:
         """Callback endpoint to set in GitLab application.
 
         Required headers:
@@ -121,13 +121,14 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": "http://localhost:8004/callback", #str(request.url_for("callback")),
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
         }
 
-        return RedirectResponse(f"{auth_url}?{urlencode(params)}")
+        #return RedirectResponse()
+        return JSONResponse(content={"redirect": f"{auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Callback endpoint to set in GitLab application."""
@@ -148,12 +149,16 @@ class API:
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }
+        print(data)
+
         token_json = await self.gitlab_instance.execute_post_request(token_url, data=data)
+        print(token_json)
 
         if not token_json.get("access_token"):
             return JSONResponse(content="ERROR", status_code=400)
 
-        return JSONResponse(content=token_json, status_code=200)
+        #return JSONResponse(content=token_json, status_code=200)
+        return RedirectResponse("http://localhost:8080/connections")
 
     async def refresh_token(self, request: Request, refresh_token: Annotated[str | None, Header()]) -> JSONResponse:
         """Refresh Gitlab session token."""

@@ -4,7 +4,7 @@ import asyncio
 import json
 import httpx
 
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from shared_functions.dmis_logger import dms_error, dms_warning, dms_info
 
 
@@ -174,9 +174,9 @@ class ConnectorClient:
         """takes referer header in original request and sets the auth_callback endpoint"""
         return f"{self._slice_url_to_host_and_port(referer)}/auth_callback"
 
-    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
+    async def get_auth_redirect(self, source_system: str, referer: str) -> JSONResponse | None:
         """redirects user to source system for authentication"""
-        auth_url = ""
+        auth_url: str = ""
         for system in self.source_systems:
             if system["name"].lower() == source_system.lower():
                 auth_url = f"{system["connector_url"]}/auth_user"
@@ -185,8 +185,12 @@ class ConnectorClient:
             return
         get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
         try:
+            print(auth_url)
             response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
-            return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
+            #print(response.status_code)
+            #print(response.headers["location"])
+            #return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
+            return JSONResponse(content=response.json(), status_code=307)
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:

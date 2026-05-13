@@ -44,14 +44,33 @@ export const API_PATHS = {
  * @param {RequestInit} [options]
  * @returns {Promise<Response>}
  */
-export function apiFetch(url, options = {}) {
-  return fetch(url, {
+export async function apiFetch(url, options = {}) {
+  const requestOptions = {
     credentials: 'include',
     ...options,
     headers: {
       ...(options.headers ?? {})
     }
+  }
+
+  let response = await fetch(url, requestOptions)
+
+  if (response.status !== 401 || url === API_PATHS.authRefresh || url === API_PATHS.authLogout) {
+    return response
+  }
+
+  const refreshResponse = await fetch(API_PATHS.authRefresh, {
+    method: 'POST',
+    credentials: 'include'
   })
+
+  if (!refreshResponse.ok) {
+    window.location.href = '/login'
+    return response
+  }
+
+  response = await fetch(url, requestOptions)
+  return response
 }
 
 /* causes all previos authFetch calls into apiFetch */

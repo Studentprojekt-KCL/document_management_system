@@ -49,6 +49,7 @@ class API:
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        self.app.add_api_route("/verify_token", self.verify_token, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -180,6 +181,16 @@ class API:
             )
         return JSONResponse(content=response.json(), status_code=200)
 
+    async def verify_token(self, x_github_token: str | None = Header(default=None, alias="X-GitHub-Token")) -> JSONResponse:
+        """Refresh a GitHub access token using a refresh token."""
+        token_url = f"{self.github_base_url}/users"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                token_url,
+                headers={"Authorization": f"Bearer {x_github_token}"},
+                timeout=120,
+            )
+            return JSONResponse(content=bool(response), status_code=200)
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

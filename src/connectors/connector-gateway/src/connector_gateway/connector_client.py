@@ -193,7 +193,8 @@ class ConnectorClient:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
         return None
 
-    async def auth_code_callback(self, service_url: str, code: str):
+    async def auth_code_callback(self, service_url: str, code: str) -> dict:
+        """Callback to connector layer service."""
         url = f"{service_url}/callback?{code}"
         try:
             response = await self.http_client.get(url, follow_redirects=False)
@@ -202,4 +203,7 @@ class ConnectorClient:
         except httpx.HTTPError:
             dms_warning(f"Failed to connect to connector, url: {url} ")
 
-        return response.json()
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {}

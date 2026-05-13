@@ -1,12 +1,13 @@
 """Main interface for search engine to interact with connectors to source systems"""
 
+from typing import Annotated, Any
+
 import uvicorn
 import fastapi
-from typing import Annotated
 
 from fastapi import Header, Request
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from connector_gateway.connector_client import ConnectorClient
 from connector_gateway.refreshservice_client import RefreshServiceClient
 
@@ -52,8 +53,10 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
-        split_pointers = self.down_stream_client.split_pointers(file_pointers.get("file_pointers"))  # noqa
-        services = [service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in split_pointers]
+        split = self.down_stream_client.split_pointers(file_pointers.get("file_pointers"))  # noqa
+        services = [
+            service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in split  # type: ignore
+        ]
         headers = {"authorization": authorization.strip()} if authorization else None
         authentication_tokens = await self.refresh_client.send_post_request(
             "/get_session_tokens", params=None, headers=headers, body=services
@@ -62,13 +65,15 @@ class API:
             raise HTTPException(status_code=400)
 
         return await self.down_stream_client.fetch_files_metadata(
-            split_pointers, include_content, include_last_edit_date, authentication_tokens
+            split, include_content, include_last_edit_date, authentication_tokens
         )
 
     async def stream_files_to_index(self, authorization: str | None = Header(default=None)) -> list[dict]:
         """Returns list with proto://<connector-host>/stream_files_to_index"""
         connectors = await self.down_stream_client.fetch_start_of_streams()
-        services = [service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in connectors]
+        services = [
+            service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in connectors  # type: ignore
+        ]
         headers: dict = {"authorization": authorization.strip()} if authorization else {}
         authentication_tokens: dict = {}
 
@@ -82,7 +87,7 @@ class API:
         stream_references: list = []
 
         for service in connectors:
-            service_name = service.get("name").lower() if isinstance(service.get("name"), str) else ""
+            service_name = service.get("name").lower() if isinstance(service.get("name"), str) else ""  # type: ignore
             service_token = authentication_tokens.get(service_name)
             headers_to_set: dict = {}
             if service_token:
@@ -103,12 +108,23 @@ class API:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
 
-    async def auth_user(self, source_system: str, authorization: str | None = Header(None), x_connector_authorization: Annotated[str | None, Header()] = None, referer: Annotated[str | None, Header()] = None) -> RedirectResponse:
+    async def auth_user(
+        self,
+        source_system: str,
+        authorization: str | None = Header(None),
+        x_connector_authorization: Annotated[str | None, Header()] = None,
+        referer: Annotated[str | None, Header()] = None,
+    ) -> Any:
         """Returns redirect to source system to authenticate."""
         source_system_info = self.down_stream_client.find_service(source_system)
 
         if source_system_info.get("authentication_method") == "BA":
-            body = {"refresh_url": "", "session_variables": {"access_token": x_connector_authorization.lstrip(f"{source_system_info.get('token_type')} ")}}
+            if not isinstance(x_connector_authorization, str):
+                raise HTTPException(status_code=400)
+            body = {
+                "refresh_url": "",
+                "session_variables": {"access_token": x_connector_authorization.lstrip(f"{source_system_info.get('token_type')} ")},
+            }
             response = await self.refresh_client.send_post_request(
                 "add_session_token", params={"service_name": source_system}, headers={"authorization": authorization}, body=body
             )
@@ -126,19 +142,19 @@ class API:
 
         raise HTTPException(status_code=400)
 
-
-    async def code_callback(self, request: Request, authorization: str | None = Header(None)):
+    async def code_callback(self, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
         """Callback endpoint to insert service session token."""
         paramas = request.query_params
         service_name = paramas.get("source")
         service_details = self.down_stream_client.find_service(service_name)
+        connector_url = service_details.get("connector_url")
 
-        if paramas is None:
+        if paramas is None or not isinstance(connector_url, str):
             dms_warning("Auth callback request with missing exchange code.")
             raise HTTPException(400)
 
-        token = await self.down_stream_client.auth_code_callback(service_details.get("connector_url"), paramas)
-        body = {"refresh_url": f"{service_details.get('connector_url')}/refresh_token", "session_variables": token}
+        token = await self.down_stream_client.auth_code_callback(connector_url, paramas)
+        body = {"refresh_url": f"{connector_url}/refresh_token", "session_variables": token}
         append_response = await self.refresh_client.send_post_request(
             "add_session_token", params={"service_name": service_name}, headers={"authorization": authorization}, body=body
         )
@@ -147,7 +163,7 @@ class API:
             dms_warning(f"Failed to insert {service_name} into refresh_service.")
             raise HTTPException(400)
 
-        return JSONResponse(status_code=200, content='')
+        return JSONResponse(status_code=200, content="")
 
 
 def run() -> None:

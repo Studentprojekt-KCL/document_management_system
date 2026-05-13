@@ -63,19 +63,19 @@ class API:
             "congateway": congateway_scope_raw.split() if congateway_scope_raw else [],
         }
 
-        self.app.add_api_route("/api/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
-        self.app.add_api_route("/api/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
-        self.app.add_api_route("/api/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
-        self.app.add_api_route("/api/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
-        self.app.add_api_route("/api/connector/{endpoint}", self.connector_get, methods=["GET"])
-        self.app.add_api_route("/api/connector/{endpoint}", self.connector_post, methods=["POST"])
+        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
+        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
+        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
+        self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
+        self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
+        self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
 
-        self.app.add_api_route("/api/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
-        self.app.add_api_route("/api/auth/check", self.auth_routes.check_auth, methods=["GET"])
-        self.app.add_api_route("/api/auth/checkAdmin", self.auth_routes.check_admin, methods=["GET"])
-        self.app.add_api_route("/api/auth/me", self.auth_routes.auth_me, methods=["GET"])
-        self.app.add_api_route("/api/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
-        self.app.add_api_route("/api/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
+        self.app.add_api_route("/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
+        self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
+        self.app.add_api_route("/auth/checkAdmin", self.auth_routes.check_admin, methods=["GET"])
+        self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
+        self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
+        self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
 
     def create_http_client(self) -> aiohttp.ClientSession:
         """Create aiohttp client with timeout."""
@@ -111,7 +111,6 @@ class API:
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        return {}
         if (
             authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
         ):  # NOTE; THIS MUST BE REMOVED LATER
@@ -137,7 +136,9 @@ class API:
             return f"Bearer {access_token}"
         return None
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None) -> JSONResponse:
+    async def execute_get_request(
+        self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None
+    ) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -162,7 +163,6 @@ class API:
 
                 headers = {"location": response.headers.get("location")}
                 body = await response.json()
-                print(body)
                 return RedirectResponse(body.get("redirect"))
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
@@ -171,7 +171,9 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-    async def execute_post_request(self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None) -> JSONResponse:
+    async def execute_post_request(
+        self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None
+    ) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -180,7 +182,6 @@ class API:
             params = None
         except JSONDecodeError:
             body = await request.body()
-            print(f"body: {body}")
             dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {await request.body()}")
             return JSONResponse(status_code=400, content={})
 
@@ -266,13 +267,13 @@ class API:
         request: Request,
         access_token: str | None = Cookie(default=None),
         x_connector_authorization: Annotated[str | None, Header()] = None,
-        referer: Annotated[str | None, Header()] = None
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
+        referer = request.headers.get("Referer")
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
+            referer,
             required_scopes=self.required_scopes["congateway"],
         )
         headers = {"x-connector-authorization": x_connector_authorization} if x_connector_authorization else {}
@@ -286,15 +287,12 @@ class API:
         access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to connector API."""
-        print("Request here.")
         authorization = self.resolve_authorization(access_token)
-        print(f"Auth: {authorization}")
         self.authorize(
             authorization,
             request.headers.get("Referer"),
             required_scopes=self.required_scopes["congateway"],
         )
-        print(f"Doing downstream")
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
 

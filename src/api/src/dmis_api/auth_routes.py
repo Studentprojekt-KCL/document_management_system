@@ -133,13 +133,13 @@ class AuthRoutes:
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Check if user is authenticated."""
-        #claims = self._verify_cookie_token(access_token)
-        #if not claims:
-        #    raise HTTPException(status_code=401)
+        claims = self._verify_cookie_token(access_token)
+        if not claims:
+            raise HTTPException(status_code=401)
 
-        #client_roles = self._get_client_roles(claims)
-        #if not client_roles:
-        #    raise HTTPException(status_code=403)
+        client_roles = self._get_client_roles(claims)
+        if not client_roles:
+            raise HTTPException(status_code=403)
 
         return JSONResponse(
             status_code=200,

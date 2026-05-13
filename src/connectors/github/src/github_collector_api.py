@@ -45,7 +45,7 @@ class API:
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
-        self.app.add_api_route("/validate_token", self.verify_token, methods=["GET"])
+        self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -154,7 +154,7 @@ class API:
             )
         return JSONResponse(content=response.json(), status_code=200)
 
-    async def verify_token(self, x_github_token: str | None = Header(default=None, alias="X-GitHub-Token")) -> JSONResponse:
+    async def validate_token(self, x_github_token: str | None = Header(default=None, alias="X-GitHub-Token")) -> JSONResponse:
         """Refresh a GitHub access token using a refresh token."""
         return JSONResponse(content=await self.github_instance.verify_token(x_github_token), status_code=200)
 

@@ -146,7 +146,7 @@ class AuthRoutes:
             content={
                 "authenticated": True,
                 "user": {
-                    "username": "jaen22",
+                    "username": claims.get("preferred_username"),
                 },
             },
         )

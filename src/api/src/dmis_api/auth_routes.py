@@ -232,6 +232,6 @@ class AuthRoutes:
             content={"logout_url": logout_url},
         )
         response.delete_cookie("access_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("refresh_token", path="/auth/refresh", secure=True, samesite="none")
-        response.delete_cookie("id_token", path="/auth/logout", secure=True, samesite="none")
+        response.delete_cookie("refresh_token", path="api/auth/refresh", secure=True, samesite="none")
+        response.delete_cookie("id_token", path="api/auth/logout", secure=True, samesite="none")
         return response

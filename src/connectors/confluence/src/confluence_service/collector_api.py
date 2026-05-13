@@ -57,7 +57,7 @@ class API:
             token_url=read_env_variable("CONCONFLUENCE_TOKEN_URL"),
             scopes=read_env_variable("CONCONFLUENCE_SCOPES"),
         )
-
+        self.auth_callback_url = read_env_variable("CONCONFLUENCE_CONNECT_SERVICE_CALLBACK")
         session = self.confluence_instance.session
 
         @asynccontextmanager
@@ -124,13 +124,13 @@ class API:
 
         return StreamingResponse(stream(), media_type="application/octet-stream")
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self) -> RedirectResponse:
         """Redirect user to Atlassian OAuth login."""
         payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
         signed_state = sign_encode_state(payload, self.oauth.state_secret)
         params = {
             "client_id": self.oauth.client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "response_type": "code",
             "scope": self.oauth.scopes,
             "audience": "api.atlassian.com",
@@ -156,7 +156,7 @@ class API:
                     "client_id": self.oauth.client_id,
                     "client_secret": self.oauth.client_secret,
                     "code": code,
-                    "redirect_uri": str(request.url_for("callback")),
+                    "redirect_uri": self.auth_callback_url,
                 },
                 timeout=120,
             )

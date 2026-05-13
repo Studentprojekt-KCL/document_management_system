@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
+import { marked } from 'marked'
 
 export function useAISummary(props = {}) {
   /* Unique pointer from metadata */
@@ -71,7 +72,7 @@ export function useAISummary(props = {}) {
       }
 
       aiSummary.value = summaryText
-      aiSummaryHtmlRaw.value = globalThis.marked ? globalThis.marked.parse(summaryText) : summaryText
+      aiSummaryHtmlRaw.value = marked.parse(summaryText)
       summaryPointer.value = requestPointers.join('|')
     } catch (error) {
       summaryError.value = error.message

@@ -108,10 +108,7 @@ class AuthRoutes:
 
         client_roles = self._get_client_roles(claims)
         if not client_roles:
-            raise HTTPException(
-                status_code=403,
-                detail="User does not belong to the client",
-            )
+            raise HTTPException(status_code=403)
 
         return JSONResponse(
             status_code=200,

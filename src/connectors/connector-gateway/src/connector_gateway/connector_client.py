@@ -5,7 +5,7 @@ import json
 import httpx
 
 from fastapi.responses import JSONResponse
-from shared_functions.dmis_logger import dms_error, dms_warning, dms_info
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class ConnectorClient:
@@ -64,7 +64,7 @@ class ConnectorClient:
                 if not isinstance(system_pointers.get(system), list):
                     system_pointers[system] = [pointer]
             else:
-                dms_info(f"No source system found for {pointer}")
+                dms_warning(f"No source system found for {pointer}")
         system_list: list = []
         for system, file_pointers in system_pointers.items():
             source = self.source_system_structure.get(system)

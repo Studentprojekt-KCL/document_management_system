@@ -119,12 +119,6 @@ class API:
             authorization,
             required_scopes=required_scopes,
         )
-        dms_info(
-            f"Authorized request: "
-            f"sub={claims.get('sub')} "
-            f"user={claims.get('preferred_username')} "
-            f"azp={claims.get('azp')}"
-        )
         return claims
 
     def resolve_authorization(

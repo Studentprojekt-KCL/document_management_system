@@ -9,6 +9,7 @@ This service requires the following environment variable to run:
 * `LOG_API_URL` - The full HTTP URL pointing to Log API
 
 ```env
-LOGWEB_ADDR=<Logger API address>
-LOGWEB_BIND=<port>
+LOGWEB_BIND_ADDR=<address>
+LOGWEB_BIND_PORT=<port>
+LOGWEBB_API_ADDR=<address to log API>
 ```

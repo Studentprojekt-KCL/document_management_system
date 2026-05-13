@@ -1,6 +1,6 @@
 // webui/routes/index.tsx
 import { define } from "@/utils.ts";
-import { fetchLogs, PAGE_SIZE } from "@/lib/api.ts";
+import { fetchLogs, PAGE_SIZE } from "@/core/api.ts";
 import { LogTable } from "@/components/LogTable.tsx";
 import { Pagination } from "@/components/Pagination.tsx";
 

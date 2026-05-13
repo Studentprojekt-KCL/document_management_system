@@ -1,6 +1,6 @@
 // webui/components/LogRow.tsx
-import type { LogEntry } from "@/lib/types.ts";
-import { formatDate } from "@/lib/format.ts";
+import type { LogEntry } from "@/core/types.ts";
+import { formatDate } from "@/core/format.ts";
 import { LogBadge } from "@/components/LogBadge.tsx";
 
 interface LogRowProps {

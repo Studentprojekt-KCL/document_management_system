@@ -1,5 +1,5 @@
 // webui/components/LogTable.tsx
-import type { LogEntry } from "@/lib/types.ts";
+import type { LogEntry } from "@/core/types.ts";
 import { LogRow } from "@/components/LogRow.tsx";
 
 interface LogTableProps {

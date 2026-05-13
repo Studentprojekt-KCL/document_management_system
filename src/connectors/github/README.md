@@ -13,14 +13,18 @@ They cannot be derived from each other without hardcoding that special case.
 
 OAuth (required for `/auth_user`, `/callback`, `/refresh_token`):
 
-    CONGITHUB_CLIENT_ID=<GITHUB_OAUTH_APP_CLIENT_ID>
-    CONGITHUB_CLIENT_SECRET=<GITHUB_OAUTH_APP_CLIENT_SECRET>
+    CONGITHUB_CLIENT_ID=<GITHUB_APP_CLIENT_ID>
+    CONGITHUB_CLIENT_SECRET=<GITHUB_APP_CLIENT_SECRET>
     CONGITHUB_STATE_SIGNING_SECRET=<HMAC_SECRET>           # random secret for CSRF state signing
 
 Optional:
 
-    CONGITHUB_GITHUB_ORG=<ORG_LOGIN>                      # if set, fetches org repos instead of user repos
+    CONGITHUB_GITHUB_ORG=<ORG_LOGIN>
     CONGITHUB_GITHUB_EXCLUDE_PATHS=<COMMA_SEPARATED>      # path substrings to exclude from indexing
+
+`CONGITHUB_GITHUB_ORG` is the organisation's login - the URL slug that appears in `github.com/<org-login>`.
+When set, the connector indexes that organisation's repositories instead of the authenticated user's repositories.
+The GitHub App must be installed on the organisation; repo-level access can be limited at installation time.
 
 ## Authentication
 
@@ -42,8 +46,7 @@ Required GitHub App permissions:
 Org repo access (`CONGITHUB_GITHUB_ORG`) is gated by whether the GitHub App is installed on
 that org, not by any additional permission.
 
-1. Call `GET /auth_user` with a `callback-url` header pointing to the `/callback` endpoint on this service.
-   The connector redirects the user to GitHub's consent page.
+1. Call `GET /auth_user`. The connector redirects the user to GitHub's consent page.
 2. GitHub redirects back to `/callback?code=…&state=…`.
    The connector validates the state signature and exchanges the code for tokens, returning JSON.
 3. Use the returned `access_token` in subsequent `X-GitHub-Token` headers.
@@ -54,10 +57,9 @@ that org, not by any additional permission.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/auth_user` | GET | Redirects user to GitHub OAuth consent page (`callback-url` header required) |
+| `/auth_user` | GET | Redirects user to GitHub OAuth consent page |
 | `/callback` | GET | Exchanges GitHub authorization code for access/refresh tokens |
 | `/refresh_token` | GET | Refreshes an expiring access token (`refresh-token` header required) |
-| `/index_needed_bool` | GET | Returns whether any repo has new content since the last index |
-| `/stream_files_to_index` | GET | Streams NDJSON — subdata header followed by one file per line |
+| `/defined_fields` | GET | Lists field keys returned for indexed documents (gateway union contract) |
+| `/stream_files_to_index` | POST | Streams NDJSON — JSON body ``{"subdata": ...}``, then one file per line (same as GitLab) |
 | `/get_files` | POST | Fetches specific files by pointer |
-| `/files_to_index` | GET | **Deprecated** — use `/stream_files_to_index` instead |

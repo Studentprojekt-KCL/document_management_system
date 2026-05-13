@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 from collections.abc import Sequence
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -106,7 +106,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str) -> list[dict]:
+    async def find_matching(self, pointer: str, count: int = 10, authorization: str | None = Header(default=None)) -> list[dict]:
         """Look for matching files.
 
         Args:
@@ -115,9 +115,11 @@ class API:
         Returns: unique pointers and their score.
         """
 
-        return await self.handler.find_matching(pointer)
+        return await self.handler.find_matching(pointer, authorization, count)
 
-    async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
+    async def query(
+        self, conent: dict[str, str], count: int = 10, offset: int = 0, authorization: str | None = Header(default=None)
+    ) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -126,11 +128,11 @@ class API:
         Returns:
             List of found files or None.
         """
-        return await self.handler.preform_search(conent, count, offset)
+        return await self.handler.preform_search(conent, count, offset, authorization)
 
-    async def set_classification(self, change: dict[str, str]) -> dict:
+    async def set_classification(self, change: dict[str, str], authorization: str | None = Header(default=None)) -> dict:
         """Manualy set the classification of a pointer."""
-        return await self.handler.set_classification(change)
+        return await self.handler.set_classification(change, authorization)
 
     @staticmethod
     async def check_health() -> JSONResponse:
@@ -163,5 +165,6 @@ class API:
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
+
     api: API = API()
     api.start()

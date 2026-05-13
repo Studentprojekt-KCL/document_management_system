@@ -97,6 +97,8 @@ class RefreshService:
         access_tokens = {}
         for service_name in body:
             content = self.redis_database.get_session_token(user, service_name)[0]
+            if not content:
+                continue
             access_tokens[service_name] = self.session_enc.decrypt_session_variables(content).get("access_token")
 
         return access_tokens

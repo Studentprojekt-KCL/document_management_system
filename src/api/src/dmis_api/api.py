@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from json.decoder import JSONDecodeError
 import argparse
-from typing import Any
+from typing import Any, Annotated
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
 import aiohttp
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Cookie
+from fastapi import FastAPI, Request, HTTPException, Cookie, Header, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
@@ -24,6 +24,8 @@ from .auth_routes import AuthRoutes
 
 class API:
     """Management class for main API."""
+
+    REDIRECT_STATUS_CODES: list = [307, 308]
 
     app: FastAPI = FastAPI()
 
@@ -39,7 +41,6 @@ class API:
     ) -> None:
         """Constructor."""
         self.app = FastAPI(lifespan=self.lifespan)
-
         self.log_level = log_level
         self.upstream_urls = upstream_urls
 
@@ -71,6 +72,7 @@ class API:
 
         self.app.add_api_route("/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
         self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
+        self.app.add_api_route("/auth/checkAdmin", self.auth_routes.check_admin, methods=["GET"])
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
         self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
@@ -134,7 +136,9 @@ class API:
             return f"Bearer {access_token}"
         return None
 
-    async def execute_get_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_get_request(
+        self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None
+    ) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -143,6 +147,8 @@ class API:
             return JSONResponse(status_code=400, content={})
 
         headers = {"Authorization": authorization} if authorization else {}
+        if isinstance(additional_headers, dict):
+            headers |= additional_headers
 
         if self.http_client is None:
             raise HTTPException(status_code=500)
@@ -150,7 +156,14 @@ class API:
         try:
             async with self.http_client.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
+                content_type = response.headers.get("Content-Type", "")
+                if response.status not in self.REDIRECT_STATUS_CODES:
+                    content = await response.read()
+                    return Response(content=content, media_type=content_type)
+
+                headers = {"location": response.headers.get("location")}
+                body = await response.json()
+                return RedirectResponse(body.get("redirect"))
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
@@ -158,9 +171,9 @@ class API:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
 
-        return JSONResponse(status_code=200, content=response_data)
-
-    async def execute_post_request(self, url: str, request: Request, authorization: str | None) -> JSONResponse:
+    async def execute_post_request(
+        self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None
+    ) -> JSONResponse:
         """Execute POST request."""
         try:
             body = await request.json()
@@ -168,10 +181,13 @@ class API:
         except TypeError:
             params = None
         except JSONDecodeError:
+            body = await request.body()
             dms_info(f"API retrieved a POST request ({url}) with incorrect body format: {await request.body()}")
             return JSONResponse(status_code=400, content={})
 
         headers = {"Authorization": authorization} if authorization else {}
+        if isinstance(additional_headers, dict):
+            headers |= additional_headers
 
         if self.http_client is None:
             raise HTTPException(status_code=500)
@@ -179,15 +195,15 @@ class API:
         try:
             async with self.http_client.post(url, params=params, json=body, headers=headers) as response:
                 response.raise_for_status()
-                response_data = await response.json()
+                content_type = response.headers.get("Content-Type", "")
+                content = await response.read()
+                return Response(content=content, media_type=content_type)
         except JSONDecodeError as exc:
             dms_warning(f"Request to {url} returned invalid JSON: {exc}")
             raise HTTPException(status_code=502) from exc
         except aiohttp.ClientError as exc:
             dms_warning(f"Request to {url} failed: {exc}")
             raise HTTPException(status_code=502) from exc
-
-        return JSONResponse(status_code=200, content=response_data)
 
     async def search_engine_get(
         self,
@@ -250,15 +266,19 @@ class API:
         endpoint: str,
         request: Request,
         access_token: str | None = Cookie(default=None),
+        x_connector_authorization: Annotated[str | None, Header()] = None,
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
+        referer = request.headers.get("Referer")
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
+            referer,
             required_scopes=self.required_scopes["congateway"],
         )
-        return await self.execute_get_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
+        headers = {"x-connector-authorization": x_connector_authorization} if x_connector_authorization else {}
+        headers |= {"referer": referer} if referer else {}
+        return await self.execute_get_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization, headers)
 
     async def connector_post(
         self,

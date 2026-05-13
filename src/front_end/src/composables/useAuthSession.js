@@ -1,6 +1,5 @@
 import { onMounted, onUnmounted } from 'vue'
 import { refreshSession, logout } from '@/utils/auth.js'
-import { isAuthenticated } from '@/utils/authClient.js'
 import { tryBecomeLeader, isLeader, setLeader, broadcastActivity, getLastActivity, broadcastLogout } from '@/utils/authSync.js'
 
 export function useAuthSession() {
@@ -8,8 +7,13 @@ export function useAuthSession() {
   let watchdogLoop = null
   let heartbeatLoop = null
 
-  const TIME_LIMIT = 60 * 60 * 1000
-  const REFRESH_TIME = 25 * 60 * 1000
+  /**
+   36 min
+   4 min 30s
+   15s 
+   */
+  const IDLE_TIMEOUT = 36 * 60 * 1000
+  const REFRESH_INTERVAL = 4 * 60 * 1000
   const LEADER_TIMEOUT = 15000
 
   // ACTIVITY (ALL TABS)
@@ -41,7 +45,7 @@ export function useAuthSession() {
 
       const now = Date.now()
       const lastActivity = getLastActivity()
-      const isActive = now - lastActivity < TIME_LIMIT
+      const isActive = now - lastActivity < IDLE_TIMEOUT
 
       // inactivity logout
       if (!isActive) {
@@ -49,17 +53,12 @@ export function useAuthSession() {
         return
       }
 
-      const stillAuthed = await isAuthenticated()
-      if (!stillAuthed) {
-        await triggerLogout('auth-check-failed')
-        return
-      }
-
       const refreshed = await refreshSession()
       if (!refreshed) {
         await triggerLogout('refresh-failed')
+        return
       }
-    }, REFRESH_TIME)
+    }, REFRESH_INTERVAL)
   }
 
   // watchdog on all tabs

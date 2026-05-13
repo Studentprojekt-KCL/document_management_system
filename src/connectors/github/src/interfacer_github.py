@@ -332,6 +332,15 @@ class GitHub:
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
+    async def verify_token(self, x_github_token: str | None) -> bool:
+        """Refresh a GitHub access token using a refresh token."""
+        if x_github_token is None:
+            return False
+        token_url = f"{self.api_base}user"
+        response = self._request(token_url, x_github_token)
+        return response.status_code == HTTP_OK
+
+
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:
         if subdata is None:

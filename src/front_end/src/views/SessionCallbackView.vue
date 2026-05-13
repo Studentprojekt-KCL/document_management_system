@@ -11,9 +11,9 @@ const route = useRoute()
 const errorMSG = ref('')
 
 const getCookie = (name) => {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-};
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? decodeURIComponent(match[2]) : null
+}
 
 onMounted(async () => {
   const code = route.query.code
@@ -23,7 +23,7 @@ onMounted(async () => {
     await router.push('/login')
     return
   }
-  const sourceCookie = getCookie('source');
+  const sourceCookie = getCookie('source')
 
   const params = new URLSearchParams({
     code,

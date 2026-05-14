@@ -21,3 +21,10 @@ class Log(BaseModel):
     def to_values(self) -> tuple[datetime, str, str, str]:
         """Get the log object as an array."""
         return (self.occured, self.message, self.event_type, self.service)
+
+
+class LogsResponse(BaseModel):
+    "Paginated logs response"
+
+    logs: list[Log]
+    total: int

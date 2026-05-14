@@ -179,7 +179,7 @@ class API:
             x_gitlab_token: token
         Returns: response with true/false"""
         if x_gitlab_token is None:
-            return JSONResponse(content=False, status_code=200)
+            return JSONResponse(content={"valid": False}, status_code=200)
         token_url = f"{self.gitlab_url}/oauth/token/info"
         data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {x_gitlab_token}"})
         return JSONResponse(content={"valid": bool(data)}, status_code=200)

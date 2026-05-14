@@ -11,7 +11,7 @@ import ConnectModal from '@/components/ConnectModal.vue'
 
 const sources = ref([])
 const sourceAuthEntries = ref([])
-const activeSessions = ref([])
+const activeSessions = ref({})
 const showModal = ref(false)
 const selectedSource = ref(null)
 const modalLoading = ref(false)
@@ -23,6 +23,14 @@ const normalizeAuthMethod = (method) => {
 }
 
 const normalizeSourceName = (source) => String(source || '').toLowerCase()
+
+const mapNormalizeSources = (sessions) => {
+  if (!sessions || typeof sessions !== 'object') return {}
+
+  return Object.fromEntries(
+    Object.entries(sessions).map(([serviceName, isActive]) => [normalizeSourceName(serviceName), Boolean(isActive)])
+  )
+}
 
 const getAuthEndpoint = (source) => {
   const sourceName = normalizeSourceName(source)
@@ -87,7 +95,7 @@ const fetchActiveSessions = async () => {
     }
 
     const data = await res.json()
-    activeSessions.value = data && typeof data === 'object' ? data : {}
+    activeSessions.value = mapNormalizeSources(data)
     console.log('Active sessions:', data)
   } catch (error) {
     console.error(`Error fetching active sessions: ${error}`)
@@ -170,7 +178,7 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
         return
       }
 
-      fetchActiveSessions()
+      await fetchActiveSessions()
       closeConnectModal()
     } catch (error) {
       modalError.value = `Connection failed: ${String(error)}`

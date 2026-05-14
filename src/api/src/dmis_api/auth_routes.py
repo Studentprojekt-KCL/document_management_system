@@ -17,8 +17,6 @@ from shared_functions.dmis_logger import dms_warning
 class AuthRoutes:
     """Authentication route handlers."""
 
-    ACCESS_COOKIE_MAX_AGE = 3600
-    REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
     _session: aiohttp.ClientSession | None
 
     def __init__(self, token_verifier: Any) -> None:
@@ -30,6 +28,13 @@ class AuthRoutes:
         self.admin_roles = [role.strip() for role in admin_roles_list.split(",") if role.strip()] if admin_roles_list else []
 
         self._session = None
+
+        self.access_cookie_max_age = int(
+        read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600
+        )
+        self.refresh_cookie_max_age = int(
+            read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600
+        )
 
     async def close_session(self) -> None:
         """Tear down session."""
@@ -82,8 +87,8 @@ class AuthRoutes:
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
-        access_max_age = self._get_token_max_age(token_data, "expires_in", self.ACCESS_COOKIE_MAX_AGE)
-        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.REFRESH_COOKIE_MAX_AGE)
+        access_max_age = self._get_token_max_age(token_data, "expires_in", self.access_cookie_max_age)
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.refresh_cookie_max_age)
 
         if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, access_max_age)

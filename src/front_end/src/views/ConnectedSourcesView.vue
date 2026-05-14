@@ -2,6 +2,8 @@
 /**
  * ConnectedSourcesView
  * Displays all supported integrations and whether the user is connected.
+ * Fetches available sources, active sessions, and auth endpoints.
+ * Allows users to connect new sources via session-based or basic auth.
  */
 
 import { computed, ref } from 'vue'

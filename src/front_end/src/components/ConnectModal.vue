@@ -1,4 +1,10 @@
 <script setup>
+/**
+ * ConnectModal Component
+ * A modal used for connecting our different source systems.
+ * It supports both basic auth (username/password) and sessionbased auth.
+ * Used in ConnectedSourcesView.vue when user clicks "Connect" on a source that is not yet connected.
+ */
 import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 

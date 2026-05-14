@@ -11,7 +11,8 @@
  * This view is rendered at the /search route of the application.
  */
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
@@ -33,7 +34,8 @@ const documentsOnlyMode = ref(true)
 
 /* Number of search results to fetch, possible to change. */
 const SEARCH_COUNT = 20
-const SEARCH_OFFSET = 0
+const currentPage = ref(1)
+const offset = computed(() => (currentPage.value - 1) * SEARCH_COUNT)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -79,11 +81,15 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
     return
   }
 
+  if (resetPreview) {
+    currentPage.value = 1
+  }
+
   isSearching.value = true
   try {
     const params = new URLSearchParams({
       count: String(SEARCH_COUNT),
-      offset: String(SEARCH_OFFSET)
+      offset: String(offset.value)
     })
     const payload = searchPayload(query, documentsOnly, file_type, source_system, security_class)
 
@@ -105,7 +111,7 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
     allMatches.value = resultArray
     matches.value = resultArray
 
-    if (matches.value.length === 0) {
+    if (matches.value.length === 0 && currentPage.value === 1) {
       error.value = 'No matching files found.'
       return
     }
@@ -122,10 +128,11 @@ const searchParams = () => ({
   security_class: selectedFilters.value.security.join(' ')
 })
 
-const searchWithFilters = async ({ query, documentsOnly }) => {
+const searchWithFilters = async ({ query, documentsOnly, resetPreview = true }) => {
   await handleSearch({
     query,
     documentsOnly,
+    resetPreview,
     ...searchParams()
   })
 }
@@ -214,6 +221,30 @@ const refreshCurrentSearch = async () => {
     resetPreview: false
   })
 }
+
+const nextPage = async () => {
+  currentPage.value++
+  await searchWithFilters({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false
+  })
+
+  if (matches.value.length === 0) {
+    currentPage.value--
+  }
+}
+
+const previousPage = async () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    await searchWithFilters({
+      query: lastQuery.value,
+      documentsOnly: documentsOnlyMode.value,
+      resetPreview: false
+    })
+  }
+}
 </script>
 
 <template>
@@ -241,6 +272,19 @@ const refreshCurrentSearch = async () => {
         @select="selectMatch"
         @update-security="refreshCurrentSearch"
       />
+    </div>
+
+    <!-- Paging functionality? -->
+    <div v-if="matches.length > 0" class="pagination">
+      <div class="button-slot">
+        <button v-if="currentPage > 1" @click="previousPage"><ChevronLeft /></button>
+      </div>
+
+      <span>Page {{ currentPage }}</span>
+
+      <div class="button-slot">
+        <button v-if="matches.length >= SEARCH_COUNT" @click="nextPage"><ChevronRight /></button>
+      </div>
     </div>
 
     <!-- Search Preview Drawer Component -->
@@ -275,5 +319,28 @@ const refreshCurrentSearch = async () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.button-slot {
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  color: #ffffff;
 }
 </style>

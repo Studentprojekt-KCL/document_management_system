@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from asyncio import Lock, get_event_loop
+from asyncio import Task, create_task
 
 from se_api.constants import CLASSIFICATION, MAX_FAIL_COUNT, UNIQUE_POINTER
 from se_api.services.index_pipeline import IndexPipeline
@@ -24,28 +24,26 @@ class Handler:
     connector: Connector
     classifier: Classifier
     search_engine: SearchEngine
-    index_pipeline: IndexPipeline | None
-
-    indexing: Lock
+    index_pipeline: IndexPipeline
+    indexing: Task
 
     def __init__(self) -> None:
         """Constructor"""
         self.connector = Connector()
         self.search_engine = SearchEngine()
         self.classifier = Classifier()
-        self.index_pipeline = None
-        self.indexing = Lock()
+        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
+        self.indexing = create_task(self.index_pipeline.start())
 
     async def init(self) -> None:
         """Init handler"""
-
         fields: list[str] | None = await self.connector.get_fields()
         self.search_engine.init(fields)
 
     async def close(self) -> None:
         """Clean up"""
-        if self.index_pipeline is not None:
-            await self.index_pipeline.stop()
+        await self.index_pipeline.stop()
+        await self.indexing
         await self.connector.close()
         await self.classifier.close()
         await self.search_engine.close()
@@ -62,8 +60,8 @@ class Handler:
         fields: list[str] | None = await self.connector.get_fields()
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
-        if self.indexing.locked():
-            self.indexing.release()
+        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
+        self.indexing = create_task(self.index_pipeline.start())
         dms_info("Search engine was reset.")
 
     def get_classifications(self) -> list[str]:
@@ -160,10 +158,7 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        if not self.indexing.locked():
-            loop = get_event_loop()
-            loop.create_task(self._handle_new(authorization))
-
+        await self.index_pipeline.add(authorization)
         files: list[dict] = []
         missing: int = count
         actual_offset: int = offset
@@ -184,9 +179,3 @@ class Handler:
                 fails += 1
             actual_offset += count
         return files
-
-    async def _handle_new(self, authorization: str | None) -> None:
-        """Grab connector stream output and pipe it into search engine."""
-        async with self.indexing:
-            self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
-            await self.index_pipeline.run(authorization)

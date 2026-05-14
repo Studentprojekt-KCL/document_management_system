@@ -276,7 +276,7 @@ const previousPage = async () => {
 
     <!-- Paging functionality? -->
     <div class="pagination">
-      <button :disabled="currentPage === 1" @click="previousPage"><ChevronLeft /></button>
+      <button :disabled="currentPage <= 1" @click="previousPage"><ChevronLeft /></button>
 
       <span>Page {{ currentPage }}</span>
 

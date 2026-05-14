@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import json
-from os import listdir, mkdir, path, remove
+from os import listdir, remove
 from asyncio import Lock, to_thread
 from tantivy import (
     Document,
@@ -56,22 +56,33 @@ class SearchEngine:
             self.documents_only_extension.extend(extention.get("extension", []))
         self.writer_lock = Lock()
 
-    def init(self, fields: list[str] | None) -> None:
-        """Initialize the index schema with the saved categories."""
-        if not path.exists(self.index_path):
-            mkdir(self.index_path)
-        if not path.isdir(self.index_path):
-            dms_error(f"{self.index_path} is not a directory.")
-            return
-        self.categories = BOOLEAN_CATEGORIES
-        self.categories = self.categories.union(RAW_CATEGORIES)
-        self.categories = self.categories.union(COOKED_CATEGORIES)
-        if fields is not None:
-            for field in fields:
-                self.categories.add(field)
-        categories = sorted(self.categories)
+    def _load_fields(self, fetched_fields: list | None) -> list:
+        """Prepear fields for usage.
+
+        Args:
+            fetched_fields: fields from connector.
+        Returns: sorted list of fields
+        """
+        fields: set = BOOLEAN_CATEGORIES
+        fields = fields.union(RAW_CATEGORIES)
+        fields = fields.union(COOKED_CATEGORIES)
+        if fetched_fields is not None:
+            for field in fetched_fields:
+                fields.add(field)
+        self.categories = fields
+        return sorted(list(fields))
+
+    def load_index(self, fetched_fields: list | None) -> bool:
+        """Load index and build schema.
+
+        Args:
+            fetched_fields: Fetched fields from connectors.
+        Returns: true if rebuild, else false.
+        """
+        rebuild = False
+        fields = self._load_fields(fetched_fields)
         schema_builder = SchemaBuilder()
-        for category in categories:
+        for category in fields:
             if category in RAW_CATEGORIES:
                 schema_builder.add_text_field(category, stored=True, tokenizer_name="raw", fast=True)
             elif category in BOOLEAN_CATEGORIES:
@@ -89,9 +100,11 @@ class SearchEngine:
                 remove(f"{self.index_path}/{file}")
             try:
                 self.index = Index(schema, path=self.index_path)
+                rebuild = True
             except ValueError:
                 dms_error(f"Failed loading index directory, path: {self.index_path}.")
         self.writer = self.index.writer()
+        return rebuild
 
     async def close(self) -> None:
         """Graceful shutdown."""
@@ -103,7 +116,7 @@ class SearchEngine:
         """Reset the search engine."""
         for file in listdir(self.index_path):
             remove(f"{self.index_path}/{file}")
-        self.init(fields)
+        self.load_index(fields)
 
     async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
@@ -176,7 +189,6 @@ class SearchEngine:
                 pointers.append(unique_pointer)
             except IndexError:
                 dms_warning(f"Missing unique_pointer: {doc}")
-
         return (pointers, metadata)
 
     async def find_matching(self, unique_pointer: str, count: int) -> tuple[list[str], dict[str, dict]]:

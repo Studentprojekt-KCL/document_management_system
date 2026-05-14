@@ -75,7 +75,7 @@ class API:
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
         """FastAPI lifespan"""
         self.handler = Handler()
-        await self.handler.init()
+        await self.handler.build()
         yield
         await self.handler.close()
 

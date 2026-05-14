@@ -7,14 +7,38 @@
 import { computed, ref } from 'vue'
 import { useAIRerank } from '@/composables/aiRerank'
 import { useAISummary } from '@/composables/aiSummary'
+import { useMdToPdf } from '@/composables/mdToPdf'
 import SearchMatches from '@/components/SearchMatches.vue'
+import { Download } from 'lucide-vue-next'
 
 const { aiRerankResults, rerankFilename, rerankPointer } = useAIRerank()
-const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary } = useAISummary()
+const { aiSummaryHtml, summaryError, isGeneratingSummary, generateAISummary, resetSummary } = useAISummary()
+const { pdfError, mergedHtmlRaw, isGeneratingPDF, generatePDF, pdfUrl, resetMerged } = useMdToPdf()
 
-const selectedPointers = ref([rerankPointer.value]) // Start with the reranked file selected
+const selectedPointer = ref([rerankPointer.value]) // Start with the reranked file selected
 
-const selectedCount = computed(() => selectedPointers.value.length)
+const selectedCount = computed(() => selectedPointer.value.length)
+
+const changedSelctions = computed(() => [...selectedPointer.value].sort().join('|'))
+const lastPdfSelction = ref('')
+const lastSummarySelection = ref('')
+
+const currentPdfSelection = computed(() => Boolean(pdfUrl.value) && lastPdfSelction.value === changedSelctions.value)
+const currentSummarySelection = computed(
+  () => Boolean(aiSummaryHtml.value) && lastSummarySelection.value === changedSelctions.value
+)
+
+const handleGeneratePDF = async () => {
+  lastPdfSelction.value = changedSelctions.value
+  resetMerged()
+  await generatePDF(selectedPointer.value, rerankPointer.value)
+}
+
+const handleGenerateSummary = async () => {
+  lastSummarySelection.value = changedSelctions.value
+  resetSummary()
+  await generateAISummary(selectedPointer.value, rerankPointer.value)
+}
 </script>
 
 <template>
@@ -22,30 +46,52 @@ const selectedCount = computed(() => selectedPointers.value.length)
     <h1>Merge/Summarize reranked files</h1>
 
     <div v-if="aiRerankResults.length">
-      <h3>Similar to: {{ rerankFilename }}</h3>
-      <p class="text-secondary">
-        Click on one or more files to select them to merge and summarize them together with the reranked file.
+      <h3>Files similar to: {{ rerankFilename }}</h3>
+      <p>
+        Click on one or more files to select them to merge and summarize them together with the reranked file. The merging will also
+        generate a PDF you can download. You can choose to merge/summarize as many files as you want, but keep in mind that the
+        result may take more time.
       </p>
+      <p v-if="selectedCount === 1">Currently, only the reranked file is selected</p>
 
-      <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointers" badge-mode="score" selectable />
+      <SearchMatches :matches="aiRerankResults" v-model:selected-pointers="selectedPointer" badge-mode="score" selectable />
 
-      <div class="merge-actions">
+      <div class="actions">
         <p>{{ selectedCount }} file{{ selectedCount === 1 ? '' : 's' }} selected</p>
-
-        <div>
+        <div class="pdf-actions">
           <button
+            v-if="!currentPdfSelection"
             type="button"
-            :disabled="isGeneratingSummary || selectedCount === 0"
-            @click="generateAISummary(selectedPointers, rerankPointer.value)"
+            :disabled="isGeneratingPDF || selectedCount === 0"
+            @click="handleGeneratePDF"
           >
-            {{ isGeneratingSummary ? 'Generating summary...' : 'Merge & Summarize' }}
+            {{ isGeneratingPDF ? 'Generating PDF...' : 'Merge + Generate PDF' }}
           </button>
+
+          <div v-else class="download-section">
+            <a :href="pdfUrl" target="_blank" class="preview-button"> Preview merged PDF </a>
+
+            <a :href="pdfUrl" download="mergedFiles.pdf" class="download-button"> <Download /> Download merged PDF </a>
+          </div>
+
+          <p v-if="pdfError" class="error">Error generating PDF: {{ pdfError }}</p>
+        </div>
+
+        <div class="summary-actions">
+          <button v-if="!currentSummarySelection" type="button" :disabled="isGeneratingSummary" @click="handleGenerateSummary">
+            {{ isGeneratingSummary ? 'Generating summary...' : 'Summarize' }}
+          </button>
+
           <p v-if="summaryError" class="error">Error generating summary: {{ summaryError }}</p>
         </div>
       </div>
       <div v-if="aiSummaryHtml" class="summary-result">
         <h2>Summary Result</h2>
         <div class="summary-markdown" v-html="aiSummaryHtml"></div>
+      </div>
+      <div v-if="mergedHtmlRaw" class="merged-html-result">
+        <h2>Merged Result</h2>
+        <div class="summary-markdown" v-html="mergedHtmlRaw"></div>
       </div>
     </div>
   </div>
@@ -56,7 +102,7 @@ const selectedCount = computed(() => selectedPointers.value.length)
   padding: 2rem;
 }
 
-.merge-actions {
+.actions {
   margin-top: 1rem;
   display: flex;
   align-items: center;
@@ -64,13 +110,18 @@ const selectedCount = computed(() => selectedPointers.value.length)
   gap: 1rem;
 }
 
-.merge-actions p {
+.actions p {
   margin: 0;
   color: #64748b;
   font-weight: 600;
 }
 
-.merge-actions button {
+.actions button,
+.preview-button,
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   border: 1px solid #d7e0ec;
   background: #f6f8fc;
   color: #0f172a;
@@ -78,10 +129,28 @@ const selectedCount = computed(() => selectedPointers.value.length)
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
 }
 
-.merge-actions button:disabled {
+.actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.pdf-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.download-section {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.preview-button:hover,
+.download-button:hover {
+  background: #f8fafc;
 }
 </style>

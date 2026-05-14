@@ -1,6 +1,7 @@
 FROM python:3.13-slim
 
-ENV CONFLUENCE_CONNECTOR_PORT=8010
+ENV CONCONFLUENCE_BIND_ADDR=0.0.0.0
+ENV CONCONFLUENCE_BIND_PORT=8010
 
 WORKDIR /app
 
@@ -10,7 +11,7 @@ COPY src/connectors/confluence ./connectors/confluence
 
 WORKDIR /app/connectors/confluence
 
-RUN pip install --upgrade pip
-RUN pip install .
+RUN pip install --upgrade pip \
+    && pip install .
 
 CMD ["confluence_connector"]

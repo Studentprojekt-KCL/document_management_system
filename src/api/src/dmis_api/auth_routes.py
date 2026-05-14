@@ -26,6 +26,8 @@ class AuthRoutes:
         self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
         self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+        admin_roles_list = read_env_variable("DMISAPI_ADMIN_ROLES", required=False)
+        self.admin_roles = [role.strip() for role in admin_roles_list.split(",") if role.strip()] if admin_roles_list else []
 
         self._session = None
 
@@ -60,9 +62,19 @@ class AuthRoutes:
             value=value,
             httponly=True,
             secure=True,
-            samesite="none",
+            samesite="lax",
             max_age=max_age,
         )
+
+    def _get_token_max_age(
+        self,
+        token_data: dict[str, Any],
+        key: str,
+        fallback: int,
+    ) -> int:
+        """Get token max age from tokens form AD"""
+        max_age = token_data.get(key)
+        return max_age if isinstance(max_age, int) else fallback
 
     def _set_auth_cookies(self, response: JSONResponse, token_data: dict[str, Any]) -> None:
         """Set authentication cookies from token response data."""
@@ -70,12 +82,33 @@ class AuthRoutes:
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
+        access_max_age = self._get_token_max_age(token_data, "expires_in", self.ACCESS_COOKIE_MAX_AGE)
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.REFRESH_COOKIE_MAX_AGE)
+
         if isinstance(access_token, str):
-            self._set_cookie(response, "access_token", access_token, self.ACCESS_COOKIE_MAX_AGE)
+            self._set_cookie(response, "access_token", access_token, access_max_age)
+
         if isinstance(refresh_token, str):
-            self._set_cookie(response, "refresh_token", refresh_token, self.REFRESH_COOKIE_MAX_AGE)
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=refresh_max_age,
+                path="api/auth/refresh",
+            )
+
         if isinstance(id_token, str):
-            self._set_cookie(response, "id_token", id_token, self.ACCESS_COOKIE_MAX_AGE)
+            response.set_cookie(
+                key="id_token",
+                value=id_token,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=access_max_age,
+                path="api/auth/logout",
+            )
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
@@ -104,6 +137,10 @@ class AuthRoutes:
         if not claims:
             raise HTTPException(status_code=401)
 
+        client_roles = self._get_client_roles(claims)
+        if not client_roles:
+            raise HTTPException(status_code=403)
+
         return JSONResponse(
             status_code=200,
             content={
@@ -113,6 +150,11 @@ class AuthRoutes:
                 },
             },
         )
+
+    def _get_client_roles(self, claims: dict[str, Any]) -> list[str]:
+        """Extract client roles for configured client."""
+        roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
+        return roles if isinstance(roles, list) else []
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Return authenticated user details and roles."""
@@ -133,6 +175,23 @@ class AuthRoutes:
                     "client_roles": client_roles,
                     "realm_roles": realm_roles,
                 },
+            },
+        )
+
+    async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Check if authenticated user has an admin role"""
+        claims = self._verify_cookie_token(access_token)
+        if not claims:
+            raise HTTPException(status_code=401)
+
+        client_roles = self._get_client_roles(claims)
+
+        is_admin = any(role in client_roles for role in self.admin_roles)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "admin": is_admin,
             },
         )
 
@@ -200,7 +259,7 @@ class AuthRoutes:
             status_code=200,
             content={"logout_url": logout_url},
         )
-        response.delete_cookie("access_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("refresh_token", path="/", secure=True, samesite="none")
-        response.delete_cookie("id_token", path="/", secure=True, samesite="none")
+        response.delete_cookie("access_token", path="/", secure=True, samesite="lax")
+        response.delete_cookie("refresh_token", path="api/auth/refresh", secure=True, samesite="lax")
+        response.delete_cookie("id_token", path="api/auth/logout", secure=True, samesite="lax")
         return response

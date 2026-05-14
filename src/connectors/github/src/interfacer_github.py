@@ -10,7 +10,6 @@ import base64
 import binascii
 import io
 import json
-import os
 import zipfile
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
@@ -22,6 +21,7 @@ import httpx
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
+from shared_functions.file_type_logic import determine_file_type, get_file_resource
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -43,9 +43,15 @@ class GitHub:
             raise ValueError("Missing CONGITHUB_GITHUB_API_URL")
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
-        self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
+        self.org = read_env_variable("CONGITHUB_GITHUB_ORG", required=False)
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
+        file_type_resource = get_file_resource()
+        extensions = [extension.get("extension") for extension in file_type_resource]
+        descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
+        self.defined_fields = {"content": None, "name": None, "unique_pointer": None, "size": None, "source_system": None} | {
+            key: None for key in determine_file_type("", extensions, descriptions)
+        }
 
     def _get_repos(self, token: str | None = None) -> list:
         """Retrieve all repositories the token can access (user or org)."""
@@ -86,8 +92,8 @@ class GitHub:
 
     @staticmethod
     def _is_excluded_path(path: str) -> bool:
-        """Optional path filter via env GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
-        raw = os.environ.get("GITHUB_EXCLUDE_PATHS", "")
+        """Optional path filter via env CONGITHUB_GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
+        raw = read_env_variable("CONGITHUB_GITHUB_EXCLUDE_PATHS", required=False) or ""
         if not raw:
             return False
         path_l = path.lower()
@@ -141,16 +147,6 @@ class GitHub:
         if isinstance(data, list) and data:
             return unpack_values(data[0], ("commit", "committer", "date"))
         return None
-
-    def check_index_needed(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
-        """Check whether any repo has been updated since the provided subdata timestamp."""
-        provided_date = self._provided_date(subdata)
-        for change_time in self.get_repo_ids(token).values():
-            if not isinstance(change_time, str):
-                continue
-            if datetime.fromisoformat(change_time.replace("Z", "+00:00")) > provided_date:
-                return {"index_needed": True}
-        return {"index_needed": False}
 
     def get_file(
         self, pointer: str, include_content: bool = True, include_last_edit_date: bool = True, token: str | None = None
@@ -336,31 +332,17 @@ class GitHub:
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
-    def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
-        """Same contract as GitLab.files_to_index: {"files", "subdata"}."""
-        provided_date = self._provided_date(subdata)
-        files_data: list = []
-        repos = self._get_repos(token)
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+    async def verify_token(self, x_github_token: str | None) -> bool:
+        """Verifies token validity
 
-        for repo in repos:
-            fn = repo.get("full_name")
-            if not isinstance(fn, str):
-                continue
-            ts = repo.get("pushed_at")
-            if not isinstance(ts, str):
-                continue
-            ts_obj = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if ts_obj <= provided_date:
-                continue
-            latest_update = max(latest_update, ts_obj)
-            branch = repo.get("default_branch")
-            if not isinstance(branch, str):
-                branch = self._default_branch_for_repo(fn, token)
-            files_data.extend(self._files_from_repo_zip(fn, branch, token))
-
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-        return {"files": files_data, "subdata": generated_subdata}
+        Args:
+            x_github_token: token
+        Returns: True / False"""
+        if x_github_token is None:
+            return False
+        token_url = f"{self.api_base}user"
+        response = self._request(token_url, x_github_token)
+        return response.status_code == HTTP_OK
 
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:

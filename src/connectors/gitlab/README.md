@@ -11,6 +11,7 @@ The following needs to be exported in local environment:
     CONGITLAB_GITLAB_CLIENT_ID=<Clienct ID of DMIS application in GitLab>
     CONGITLAB_GITLAB_CLIENT_SECRET=<Clienct secret of DMIS application in GitLab>
     CONGITLAB_STATE_SIGNING_SECRET=<Secret in string format used for state signing.>
+    CONGITLAB_CONNECT_SERVICE_CALLBACK=<Service to refere GitLab to send redirect to>
 
 # Response structure
 

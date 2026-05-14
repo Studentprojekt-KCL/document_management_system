@@ -86,8 +86,9 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
+        token = x_gitlab_token.lower().lstrip("bearer ") if x_gitlab_token else None
         return await self.gitlab_instance.get_files(
-            file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date
+            file_pointers.get("file_pointers", []), token, include_content, include_last_edit_date
         )
 
     async def stream_files_to_index(
@@ -99,15 +100,17 @@ class API:
         subdata: str | None
         subdata = body.get("subdata") if isinstance(body, dict) else None
 
+        token = x_gitlab_token.lower().lstrip("bearer ") if x_gitlab_token else None
+
         return StreamingResponse(
-            self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
+            self.gitlab_instance.stream_files_to_index(subdata, token), media_type="application/octet-stream"
         )
 
     async def defined_fields(self) -> list:
         """Retrieve fields delivered for file conent."""
         return list(self.gitlab_instance.defined_fields.keys())
 
-    def auth_user(self) -> JSONResponse:
+    def auth_user(self, request: Request) -> JSONResponse:
         """Callback endpoint to set in GitLab application.
 
         Required headers:
@@ -123,7 +126,7 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": self.auth_callback_url,
+            "redirect_uri": str(request.url_for("callback")),# self.auth_callback_url,
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
@@ -146,7 +149,7 @@ class API:
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": self.auth_callback_url,
+            "redirect_uri": str(request.url_for("callback")), #self.auth_callback_url,
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }
@@ -180,8 +183,10 @@ class API:
         Returns: response with true/false"""
         if x_gitlab_token is None:
             return JSONResponse(content={"valid": False}, status_code=200)
+        token = x_gitlab_token.lower().lstrip("bearer ") if x_gitlab_token else None
+
         token_url = f"{self.gitlab_url}/oauth/token/info"
-        data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {x_gitlab_token}"})
+        data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {token}"})
         return JSONResponse(content={"valid": bool(data)}, status_code=200)
 
 

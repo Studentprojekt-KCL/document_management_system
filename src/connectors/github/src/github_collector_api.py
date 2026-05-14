@@ -161,7 +161,7 @@ class API:
             x_github_token: token
         returns: true / false
         """
-        return JSONResponse(content=await self.github_instance.verify_token(x_github_token), status_code=200)
+        return JSONResponse(content={"valid": await self.github_instance.verify_token(x_github_token)}, status_code=200)
 
 
 def run() -> None:

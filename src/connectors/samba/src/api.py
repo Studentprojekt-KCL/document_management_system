@@ -134,7 +134,7 @@ class API:
             authorization: user credentials.
         Returns: response with true/false
         """
-        return JSONResponse(content=self.samba_service.check_auth(authorization), status_code=200)
+        return JSONResponse(content={"valid": self.samba_service.check_auth(authorization)}, status_code=200)
 
     @staticmethod
     async def get_defined_fields() -> list[str]:

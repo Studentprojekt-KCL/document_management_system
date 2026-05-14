@@ -108,7 +108,7 @@ const handleConnect = () => {
 
 .modal {
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
   background: #ffffff;
   border-radius: 16px;
   padding: 1.5rem;
@@ -117,7 +117,6 @@ const handleConnect = () => {
 .modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .close-btn {
@@ -132,14 +131,29 @@ const handleConnect = () => {
   cursor: pointer;
 }
 
-.modal-body {
-  margin-top: 1rem;
-}
-
 .credential-form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.credential-form input {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #dbe1ea;
+  background: #f8fafc;
+  font-size: 1rem;
+}
+
+.credential-form input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.credential-form input::placeholder {
+  color: #94a3b8;
 }
 
 .modal-footer {
@@ -150,7 +164,7 @@ const handleConnect = () => {
 
 .connect-btn {
   padding: 0.75rem 1.5rem;
-  background: #4f46e5;
+  background: #7c3aed;
   color: #ffffff;
   border: none;
   border-radius: 8px;

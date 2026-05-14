@@ -247,7 +247,6 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
   align-items: center;
   gap: 0.5rem;
   background: #eef2ff;
-  color: #3730a3;
   border: 1px solid #c7d2fe;
   padding: 0.5rem 0.75rem;
   border-radius: 999px;
@@ -290,7 +289,7 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
 .source-icon {
   width: 20px;
   height: 20px;
-  color: #4f46e5;
+  background: #7c3aed;
 }
 
 .status-pill {
@@ -336,6 +335,6 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
   border: 0;
   cursor: pointer;
   color: #ffffff;
-  background: #4f46e5;
+  background: #7c3aed;
 }
 </style>

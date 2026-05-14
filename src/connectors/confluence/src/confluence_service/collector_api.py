@@ -27,8 +27,6 @@ class GetFilesBody(BaseModel):
     """JSON body for ``POST /get_files``."""
 
     file_pointers: list[str] = Field(default_factory=list)
-    include_content: bool = False
-    include_last_edit_date: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +92,8 @@ class API:
     async def get_files(
         self,
         body: GetFilesBody,
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
         x_confluence_token: Annotated[str | None, Header()] = None,
     ) -> list[dict[str, Any]]:
         """Batch fetch pages by pointers (DMS ``POST /get_files``)."""
@@ -102,8 +102,8 @@ class API:
         return await self.confluence_instance.get_files(
             GetFilesInput(
                 file_pointers=body.file_pointers,
-                include_content=body.include_content,
-                include_last_edit_date=body.include_last_edit_date,
+                include_content=include_content,
+                include_last_edit_date=include_last_edit_date,
                 api_token=x_confluence_token,
             )
         )

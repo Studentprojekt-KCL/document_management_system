@@ -136,7 +136,6 @@ class IndexPipeline:
                 try:
                     async for file in self.connector.stream(stream_object):
                         await decode_queue.put(file)
-                    dms_info(f"Finished streaming from: {stream_object.get("stream_url")}")
                 except httpx.HTTPError:
                     dms_warning(f"Failed to connect to {stream_url}.")
                 async with self.working_on_lock:

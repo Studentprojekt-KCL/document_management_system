@@ -6,7 +6,7 @@ from json import JSONDecodeError
 import json
 import shelve
 from typing import Any
-from asyncio import Queue
+from asyncio import Lock
 
 from httpx import AsyncClient
 import httpx
@@ -54,6 +54,7 @@ class Connector:
             dms_error(f"Failed to open file: {self.data_path}.")
         except dbm.error:
             dms_error(f"Failed opening file: {self.data_path}")
+        self.subdata_lock = Lock()
 
     async def close(self) -> None:
         """Close clients"""
@@ -73,12 +74,12 @@ class Connector:
             else:
                 f["subdata"] = self.subdata
 
-    async def connector_fetch(self, authorization: str | None) -> Queue:
+    async def connector_fetch(self, authorization: str | None) -> list:
         """Grab connectors from gateway.
 
         Returns: queue with stream urls.
         """
-        fetch_queue: Queue = Queue()
+        streams: list = []
         try:
             response = await self.client.get(
                 self.STREAM_ENDPOINT,
@@ -89,20 +90,18 @@ class Connector:
             content = response.json()
             if not isinstance(content, list):
                 dms_warning(f"Expected a list of dicts when calling: {self.STREAM_ENDPOINT}")
-                return fetch_queue
+                return streams
             if content and not isinstance(content[0], dict):
                 dms_warning(f"Expected a list of dicts when calling: {self.STREAM_ENDPOINT}")
-                return fetch_queue
-            connectors: list[dict] = content
-            for connector in connectors:
-                await fetch_queue.put(connector)
+                return streams
+            streams.extend(content)
         except httpx.TimeoutException:
             dms_warning(f"Request timed out, url: {self.GET_FILE_ENDPOINT}")
         except JSONDecodeError:
             dms_warning(f"Failed to parse JSON, url: {self.GET_FILE_ENDPOINT}.")
         except httpx.HTTPError:
             dms_warning(f"Invalid HTTP response, url: {self.GET_FILE_ENDPOINT}.")
-        return fetch_queue
+        return streams
 
     async def get_fields(self) -> list[str] | None:
         """Fetch fields from connector.
@@ -162,7 +161,7 @@ class Connector:
                         subdata = data.get("subdata")
                         continue
                     yield data
-            self.subdata[stream_url] = subdata
+                self.subdata[stream_url] = subdata
 
     async def fetch_files(self, pointers: list[str], authorization: str | None) -> list[dict] | None:
         """Grab all files from the connectors pointed at by the pointers.

@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Queue, QueueShutDown, Task, create_task, gather, to_thread
+from asyncio import Lock, Queue, QueueShutDown, Task, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -25,7 +25,7 @@ from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
-from shared_functions.dmis_logger import datetime, dms_info, dms_warning
+from shared_functions.dmis_logger import dms_info, dms_warning
 
 
 @dataclass
@@ -46,47 +46,26 @@ class IndexPipeline:
     queues: Queues
     _tasks: list[Task]
 
+    working_on: list
+    working_on_lock: Lock
+
     def __init__(self, search_engine: SearchEngine, connector: Connector, classifier: Classifier) -> None:
         """Constructor"""
         self.search_engine = search_engine
         self.connector = connector
         self.classifier = classifier
         self._tasks = []
+        self.working_on = []
+        self.working_on_lock = Lock()
 
-    async def stop(self) -> None:
-        """Stop indexing and wait for workers to exit."""
-        for queue in (
-            self.queues.fetch_queue,
-            self.queues.decode_queue,
-            self.queues.index_queue,
-            self.queues.lookup_queue,
-            self.queues.classify_queue,
-            self.queues.reindex_queue,
-        ):
-            queue.shutdown(immediate=True)
-        for task in self._tasks:
-            task.cancel()
-        if self._tasks:
-            await gather(*self._tasks, return_exceptions=True)
-
-    async def run(self, authorization: str | None) -> None:
-        """Run indexing pipeline.
-
-        Args:
-            search_engine: the search engine object.
-            connector: connector object.
-            classifier: classifier object.
-        """
-        dms_info("Indexing started.")
-        start = datetime.now()
-
-        fetch_queue: Queue = await self.connector.connector_fetch(authorization)
+    async def start(self) -> None:
+        """Start the indexing pipeline."""
+        fetch_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
         classify_queue: Queue = Queue(CLASSIFICATION_QUEUE_SIZE)
         reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
-
         self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
         fetch_tasks: list[Task] = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
         decode_tasks: list[Task] = [
@@ -109,44 +88,32 @@ class IndexPipeline:
             classifier_refresh_task,
         ]
 
-        # Wait for fetching job to finish.
-        await fetch_queue.join()
-        for _ in fetch_tasks:
-            await fetch_queue.put(None)
-        dms_info(f"Finished fetching from connector, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
+    async def stop(self) -> None:
+        """Stop indexing and wait for workers to exit."""
+        for queue in (
+            self.queues.fetch_queue,
+            self.queues.decode_queue,
+            self.queues.index_queue,
+            self.queues.lookup_queue,
+            self.queues.classify_queue,
+            self.queues.reindex_queue,
+        ):
+            queue.shutdown(immediate=True)
+        for task in self._tasks:
+            task.cancel()
+        if self._tasks:
+            await gather(*self._tasks, return_exceptions=True)
+        self.working_on = []
 
-        # Wait for decode job to finish.
-        await decode_queue.join()
-        for _ in decode_tasks:
-            await decode_queue.put(None)
-        dms_info(f"Finished decoding, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
+    async def add(self, authorization: str | None) -> None:
+        """Add request to indexing pipeline.
 
-        # Wait for index job to finish.
-        await index_queue.join()
-        await index_queue.put(None)
-        await index_queue.join()
-        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-        dms_info("Ingestion stage completed.")
-
-        # Wait for fetching job to finish.
-        await fetch_queue.join()
-        await fetch_queue.put(None)
-        await fetch_queue.join()
-        dms_info(f"Finished fetching from index, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for classification job to finish.
-        await classify_queue.join()
-        for _ in classify_tasks:
-            await classify_queue.put(None)
-        await classify_queue.join()
-        dms_info(f"Finished classifying, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for reindex job to finish.
-        await reindex_queue.join()
-        await reindex_queue.put(None)
-        await reindex_queue.join()
-        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-        dms_info("Ingestion stage completed.")
+        Args:
+            authorization: user authorization token.
+        """
+        streams: list = await self.connector.connector_fetch(authorization)
+        for stream in streams:
+            await self.queues.fetch_queue.put(stream)
 
     async def _ingest_fetch(self, fetch_queue: Queue, decode_queue: Queue) -> None:
         """Fetch files from stream.
@@ -161,12 +128,19 @@ class IndexPipeline:
                 stream_object: dict | None = await fetch_queue.get()
                 if stream_object is None:
                     break
+                stream_url = stream_object.get("stream_url")
+                async with self.working_on_lock:
+                    if stream_url in self.working_on:
+                        continue
+                    self.working_on.append(stream_object.get("stream_url"))
                 try:
                     async for file in self.connector.stream(stream_object):
                         await decode_queue.put(file)
-                    dms_info(f"Finished streaming from: {stream_object.get("stream_url")}")
                 except httpx.HTTPError:
-                    dms_warning(f"Failed to connect to {stream_object.get("stream_url")}.")
+                    dms_warning(f"Failed to connect to {stream_url}.")
+                async with self.working_on_lock:
+                    self.working_on.remove(stream_url)
+                    dms_info(f"Finished streaming from {stream_url}")
                 fetch_queue.task_done()
             except QueueShutDown:
                 break

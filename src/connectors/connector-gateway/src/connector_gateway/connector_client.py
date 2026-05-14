@@ -105,7 +105,7 @@ class ConnectorClient:
             try:
                 decoded_response = response.json()
             except json.JSONDecodeError:
-                dms_warning("Gatewat recieved response from connector layer which could not be decoded.")
+                dms_warning("Gateway recieved response from connector layer which could not be decoded.")
                 continue
             for result in decoded_response:
                 unique_pointer = result.get("unique_pointer")

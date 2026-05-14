@@ -17,8 +17,8 @@ from shared_functions.dmis_logger import dms_warning
 class AuthRoutes:
     """Authentication route handlers."""
 
-    ACCESS_COOKIE_MAX_AGE = 3600
-    REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
+    ACCESS_COOKIE_MAX_AGE = int(read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE"))
+    REFRESH_COOKIE_MAX_AGE = int(read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE"))
     _session: aiohttp.ClientSession | None
 
     def __init__(self, token_verifier: Any) -> None:

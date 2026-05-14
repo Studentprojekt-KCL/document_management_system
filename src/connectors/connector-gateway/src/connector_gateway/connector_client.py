@@ -195,6 +195,39 @@ class ConnectorClient:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
         return None
 
+    async def verify_tokens(self, tokens: dict[str, str]) -> dict:
+        statuses: dict = {}
+        for system in self.source_systems:
+            name = system.get("name")
+            if not name:
+                continue
+
+            token = tokens.get(name)
+            if token is None:
+                statuses[name] = False
+            url = f"{system.get("connector_url")}/validate_token"
+            try:
+                response = await self.http_client.get(
+                    url, 
+                    headers=(
+                        {system.get("authentication_header"): f"{system.get('token_type')} {token}"} # type: ignore
+                    )
+                )
+                response.raise_for_status()
+                validity = response.json()
+            except httpx.TimeoutException:
+                dms_warning(f"Request timed out: {url}")
+                validity = {}
+            except httpx.HTTPError:
+                dms_warning(f"Failed to connect to connector, url: {url}")
+                validity = {}
+
+            if not isinstance(validity, dict):
+                dms_warning(f"Service: {name} returned a faulty structure, expected dict got: {type(validity)}.")
+            print(f"{name}: {validity}")
+        return statuses
+
+
     async def auth_code_callback(self, service_url: str, code: str) -> dict:
         """Callback to connector layer service."""
         url = f"{service_url}/callback?{code}"

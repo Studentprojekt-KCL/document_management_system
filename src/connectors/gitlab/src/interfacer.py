@@ -410,7 +410,9 @@ class GitLab:
             response = {}
         return response
 
-    async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None, recursion: int = 0) -> dict:
+    async def execute_post_request(
+        self, url: str, headers: dict | None = None, data: dict | None = None, recursion: int = 0
+    ) -> dict:
         """Execute POST request to supplied URL."""
         if headers is None:
             headers = {}

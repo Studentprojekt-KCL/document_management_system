@@ -11,11 +11,12 @@
  * This view is rendered at the /search route of the application.
  */
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
+import PagingButtons from '@/components/PagingButtons.vue'
 import { resolveDocumentExtension, resolveSecurityClass, resolveSource } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
@@ -33,7 +34,8 @@ const documentsOnlyMode = ref(true)
 
 /* Number of search results to fetch, possible to change. */
 const SEARCH_COUNT = 20
-const SEARCH_OFFSET = 0
+const currentPage = ref(1)
+const offset = computed(() => (currentPage.value - 1) * SEARCH_COUNT)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -79,11 +81,15 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
     return
   }
 
+  if (resetPreview) {
+    currentPage.value = 1
+  }
+
   isSearching.value = true
   try {
     const params = new URLSearchParams({
       count: String(SEARCH_COUNT),
-      offset: String(SEARCH_OFFSET)
+      offset: String(offset.value)
     })
     const payload = searchPayload(query, documentsOnly, file_type, source_system, security_class)
 
@@ -214,6 +220,24 @@ const refreshCurrentSearch = async () => {
     resetPreview: false
   })
 }
+
+const nextPage = async () => {
+  currentPage.value++
+  await searchWithFilters({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value
+  })
+}
+
+const previousPage = async () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    await searchWithFilters({
+      query: lastQuery.value,
+      documentsOnly: documentsOnlyMode.value
+    })
+  }
+}
 </script>
 
 <template>
@@ -242,6 +266,14 @@ const refreshCurrentSearch = async () => {
         @update-security="refreshCurrentSearch"
       />
     </div>
+
+    <!-- Paging functionality? -->
+    <PagingButtons
+      :current-page="currentPage"
+      :has-next-page="matches.length >= SEARCH_COUNT"
+      @next="nextPage"
+      @previous="previousPage"
+    />
 
     <!-- Search Preview Drawer Component -->
     <SearchPreviewDrawer

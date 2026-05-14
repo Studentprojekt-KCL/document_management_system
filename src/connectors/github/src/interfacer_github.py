@@ -148,16 +148,6 @@ class GitHub:
             return unpack_values(data[0], ("commit", "committer", "date"))
         return None
 
-    def check_index_needed(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
-        """Check whether any repo has been updated since the provided subdata timestamp."""
-        provided_date = self._provided_date(subdata)
-        for change_time in self.get_repo_ids(token).values():
-            if not isinstance(change_time, str):
-                continue
-            if datetime.fromisoformat(change_time.replace("Z", "+00:00")) > provided_date:
-                return {"index_needed": True}
-        return {"index_needed": False}
-
     def get_file(
         self, pointer: str, include_content: bool = True, include_last_edit_date: bool = True, token: str | None = None
     ) -> dict:
@@ -342,31 +332,17 @@ class GitHub:
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
-    def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
-        """Same contract as GitLab.files_to_index: {"files", "subdata"}."""
-        provided_date = self._provided_date(subdata)
-        files_data: list = []
-        repos = self._get_repos(token)
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+    async def verify_token(self, x_github_token: str | None) -> bool:
+        """Verifies token validity
 
-        for repo in repos:
-            fn = repo.get("full_name")
-            if not isinstance(fn, str):
-                continue
-            ts = repo.get("pushed_at")
-            if not isinstance(ts, str):
-                continue
-            ts_obj = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if ts_obj <= provided_date:
-                continue
-            latest_update = max(latest_update, ts_obj)
-            branch = repo.get("default_branch")
-            if not isinstance(branch, str):
-                branch = self._default_branch_for_repo(fn, token)
-            files_data.extend(self._files_from_repo_zip(fn, branch, token))
-
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-        return {"files": files_data, "subdata": generated_subdata}
+        Args:
+            x_github_token: token
+        Returns: True / False"""
+        if x_github_token is None:
+            return False
+        token_url = f"{self.api_base}user"
+        response = self._request(token_url, x_github_token)
+        return response.status_code == HTTP_OK
 
     @staticmethod
     def _provided_date(subdata: str | None) -> datetime:

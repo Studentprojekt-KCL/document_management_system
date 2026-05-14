@@ -2,10 +2,12 @@
 
 import asyncio
 import json
+from typing import Any
+
 import httpx
 
-from fastapi.responses import RedirectResponse
-from shared_functions.dmis_logger import dms_error, dms_warning, dms_info
+from fastapi.responses import JSONResponse
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class ConnectorClient:
@@ -28,8 +30,15 @@ class ConnectorClient:
             system["source_system_url"] = system["source_system_url"].rstrip("/")
             source_system_structure[system.get("source_system_url")] = system
 
-        self.source_systems: list = source_systems  # NOTE; Try to depricate this.
+        self.source_systems: list[dict] = source_systems  # NOTE; Try to depricate this.
         self.source_system_structure = source_system_structure
+
+    def find_service(self, service_value: str) -> dict:
+        """Retrieve specific service for any value specified in source_systems."""
+        for service in self.source_systems:
+            if service_value.lower() in [v.lower() if isinstance(v, str) else v for v in service.values()]:
+                return service
+        return {}
 
     def _load_source_systems_from_file(self, path: str) -> list:
         """Reads config file and loads it into the program"""
@@ -40,24 +49,27 @@ class ConnectorClient:
     def split_pointers(self, pointers: list[str] | None) -> list[dict]:
         """Split pointers based on head service and retrieve names of required services.
 
-        ADR:
+        ADR 1:
             Instead of indexing based on urlsplit.netloc,
               it was determined that the current solution is more dynamic when integrating new connectors.
+        ADR 2:
+            System order should not be dependent on mapping pointers.
         """
         if not pointers:
             return []
         system_pointers: dict = {}
-        for pointer in pointers:
+        for index, pointer in enumerate(pointers):
             for system in self.source_system_structure:
                 if system not in pointer:
                     continue
                 if system in system_pointers:
-                    system_pointers[system].append(pointer)
+                    system_pointers[system][pointer] = index
                     break
                 if not isinstance(system_pointers.get(system), list):
-                    system_pointers[system] = [pointer]
+                    system_pointers[system] = {pointer: index}
+                    break
             else:
-                dms_info(f"No source system found for {pointer}")
+                dms_warning(f"No source system found for {pointer}")
         system_list: list = []
         for system, file_pointers in system_pointers.items():
             source = self.source_system_structure.get(system)
@@ -81,30 +93,59 @@ class ConnectorClient:
         host = rest.split("/", 1)[0]
         return f"{scheme}//{host}"
 
+    @staticmethod
+    def _sort_responses(responses: list[Any], original_pointers: list[dict]) -> list:
+        combined_systems: dict = {}
+        for system in original_pointers:
+            pointers = system.get("file_pointers") if isinstance(system.get("file_pointers"), dict) else {}
+            combined_systems |= pointers  # type: ignore
+        sorted_result = [None] * len(combined_systems)
+
+        for response in responses:
+            try:
+                decoded_response = response.json()
+            except json.JSONDecodeError:
+                dms_warning("Gateway recieved response from connector layer which could not be decoded.")
+                continue
+            for result in decoded_response:
+                unique_pointer = result.get("unique_pointer")
+                if not unique_pointer in combined_systems:
+                    dms_warning(f"Gateway could not map {unique_pointer} against sorted structure.")
+                    continue
+
+                sorted_result[combined_systems.get(unique_pointer)] = result  # type: ignore
+
+        return [item for item in sorted_result if item is not None]
+
     async def fetch_files_metadata(
         self, pointers: list[dict], include_content: bool, include_last_edit_date: bool, authentication_tokens: dict[str, str]
     ) -> list:
         """makes http requests to all source systems to gather meta data from pointers"""
         tasks: list = []
+        return_system_order: list = []
         try:
             for system in pointers:
-                auth_header = authentication_tokens.get(system.get("name"))  # type: ignore
+                system_name = system.get("name") if isinstance(system.get("name"), str) else ""
+                return_system_order.append(system_name)
+                auth_header = authentication_tokens.get(system_name.lower())  # type: ignore
+                s_pointers = system.get("file_pointers")
+                file_pointers = list(s_pointers.keys()) if isinstance(s_pointers, dict) else []  # type: ignore
+
                 response = self.http_client.post(
                     f"{system.get("connector_url")}/get_files",
                     params=[
                         ("include_content", include_content),
                         ("include_last_edit_date", include_last_edit_date),
                     ],
-                    json={"file_pointers": system.get("file_pointers")},
+                    json={"file_pointers": file_pointers},
                     headers=(
                         {system.get("authentication_header"): f"{system.get('token_type')} {auth_header}"} if auth_header else None
                     ),
                     timeout=self.timeout,
                 )
                 tasks.append(response)
+            return self._sort_responses(await asyncio.gather(*tasks), pointers)
 
-            responses = await asyncio.gather(*tasks)
-            return [item for r in responses for item in r.json()]
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:
@@ -167,9 +208,9 @@ class ConnectorClient:
         """takes referer header in original request and sets the auth_callback endpoint"""
         return f"{self._slice_url_to_host_and_port(referer)}/auth_callback"
 
-    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
+    async def get_auth_redirect(self, source_system: str, referer: str) -> JSONResponse | None:
         """redirects user to source system for authentication"""
-        auth_url = ""
+        auth_url: str = ""
         for system in self.source_systems:
             if system["name"].lower() == source_system.lower():
                 auth_url = f"{system["connector_url"]}/auth_user"
@@ -179,9 +220,24 @@ class ConnectorClient:
         get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
         try:
             response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
-            return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
+            return JSONResponse(content=response.json(), status_code=307)
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
         return None
+
+    async def auth_code_callback(self, service_url: str, code: str) -> dict:
+        """Callback to connector layer service."""
+        url = f"{service_url}/callback?{code}"
+        try:
+            response = await self.http_client.get(url, follow_redirects=False)
+        except httpx.TimeoutException:
+            dms_warning("Request timed out")
+        except httpx.HTTPError:
+            dms_warning(f"Failed to connect to connector, url: {url} ")
+
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {}

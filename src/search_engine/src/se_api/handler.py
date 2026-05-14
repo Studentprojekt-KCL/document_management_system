@@ -36,11 +36,13 @@ class Handler:
         self.index_pipeline = None
         self.indexing = Lock()
 
-    async def init(self) -> None:
+    async def build(self) -> None:
         """Init handler"""
 
         fields: list[str] | None = await self.connector.get_fields()
-        self.search_engine.init(fields)
+        rebuild = self.search_engine.load_index(fields)
+        if rebuild:
+            self.connector.write_subdata({})
 
     async def close(self) -> None:
         """Clean up"""

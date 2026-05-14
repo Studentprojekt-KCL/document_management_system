@@ -275,12 +275,16 @@ const previousPage = async () => {
     </div>
 
     <!-- Paging functionality? -->
-    <div class="pagination">
-      <button :disabled="currentPage <= 1" @click="previousPage"><ChevronLeft /></button>
+    <div v-if="matches.length > 0" class="pagination">
+      <div class="button-slot">
+        <button v-if="currentPage > 1" @click="previousPage"><ChevronLeft /></button>
+      </div>
 
       <span>Page {{ currentPage }}</span>
 
-      <button :disabled="matches.length < SEARCH_COUNT" @click="nextPage"><ChevronRight /></button>
+      <div class="button-slot">
+        <button v-if="matches.length >= SEARCH_COUNT" @click="nextPage"><ChevronRight /></button>
+      </div>
     </div>
 
     <!-- Search Preview Drawer Component -->
@@ -319,13 +323,24 @@ const previousPage = async () => {
 
 .pagination {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
+  gap: 1.5rem;
   padding: 1rem 0;
+}
+
+.button-slot {
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  display: flex;
 }
 
 .pagination button {
   padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  color: #ffffff;
 }
 </style>

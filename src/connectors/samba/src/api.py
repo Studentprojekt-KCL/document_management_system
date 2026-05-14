@@ -37,7 +37,7 @@ class API:
 
     def __init__(self) -> None:
         """constructor"""
-        self.host: str = read_env_variable("CONSMB_BIND_ADDR")
+        self.host: str = read_env_variable("CONSMB_BIND_ADDR")  # type: ignore
         self.port: int = read_port("CONSMB_BIND_PORT")
 
         logging.basicConfig()
@@ -62,6 +62,7 @@ class API:
         self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
         self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
         self.app.add_api_route("/defined_fields", self.get_defined_fields, methods=["GET"])
+        self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
@@ -125,6 +126,15 @@ class API:
         """Endpoint retrieving a pointer to a JSON file containing all content and metadata to index."""
         subdata: str | None = body.get("subdata") if body is not None else None
         return StreamingResponse(self.samba_service.stream_files_to_index(subdata), media_type="application/octet-stream")
+
+    async def validate_token(self, authorization: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Validate user auth.
+
+        Args:
+            authorization: user credentials.
+        Returns: response with true/false
+        """
+        return JSONResponse(content={"valid": self.samba_service.check_auth(authorization)}, status_code=200)
 
     @staticmethod
     async def get_defined_fields() -> list[str]:

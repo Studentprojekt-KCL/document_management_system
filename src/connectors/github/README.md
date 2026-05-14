@@ -53,6 +53,20 @@ that org, not by any additional permission.
 4. GitHub Apps always issue expiring tokens — call `GET /refresh_token` with a `refresh-token` header
    to obtain a new token pair before expiry (tokens last 8 hours, refresh tokens 6 months).
 
+### Incremental `subdata` for `/stream_files_to_index`
+
+The first NDJSON line is `{"subdata": "<base64>"}`. Decode with URL-safe Base64 → UTF-8:
+
+- **Current format:** a JSON **object** whose keys are repo `full_name` strings (`owner/repo`)
+  and values are that repo’s **`pushed_at`** ISO timestamp **from the previous successful index**
+  (same idea as the GitLab connector’s per‑project map). Only repos whose **current**
+  `pushed_at` is **newer** than the stored snapshot are archived again — so another user who
+  can see different repos keeps **their** entries when the indexer passes the blob back next time.
+  See [issue #620](https://github.com/Studentprojekt-KCL/document_management_system/issues/620).
+- **Legacy format:** if the decoded payload is a **single** ISO datetime string (not JSON),
+  it is interpreted as **one global** “only index pushes after this time” floor and is **migrated**
+  to per-repo timestamps on the next run.
+
 ## Endpoints
 
 | Endpoint | Method | Description |

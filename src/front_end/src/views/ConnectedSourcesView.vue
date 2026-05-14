@@ -11,7 +11,7 @@ import ConnectModal from '@/components/ConnectModal.vue'
 
 const sources = ref([])
 const sourceAuthEntries = ref([])
-const connectedSources = ref([])
+const activeSessions = ref([])
 const showModal = ref(false)
 const selectedSource = ref(null)
 const modalLoading = ref(false)
@@ -22,9 +22,11 @@ const normalizeAuthMethod = (method) => {
   return String(method).toLowerCase()
 }
 
+const normalizeSourceName = (source) => String(source || '').toLowerCase()
+
 const getAuthEndpoint = (source) => {
-  const sourceName = String(source || '').toLowerCase()
-  return sourceAuthEntries.value.find((entry) => String(entry?.name || '').toLowerCase() === sourceName) || null
+  const sourceName = normalizeSourceName(source)
+  return sourceAuthEntries.value.find((entry) => normalizeSourceName(entry?.name) === sourceName) || null
 }
 
 const resolveAuthEndpointUrl = (endpoint) => {
@@ -74,14 +76,33 @@ const fetchAuthUserUrls = async () => {
   }
 }
 
+const fetchActiveSessions = async () => {
+  try {
+    const res = await authFetch(API_PATHS.activeSessions)
+
+    if (!res.ok) {
+      console.error(`Failed to fetch active sessions: ${res.statusText}`)
+      activeSessions.value = {}
+      return
+    }
+
+    const data = await res.json()
+    activeSessions.value = data && typeof data === 'object' ? data : {}
+    console.log('Active sessions:', data)
+  } catch (error) {
+    console.error(`Error fetching active sessions: ${error}`)
+    activeSessions.value = {}
+  }
+}
 fetchSources()
 fetchAuthUserUrls()
+fetchActiveSessions()
 
 const connectedCount = computed(() => sources.value.filter((source) => isConnected(source)).length)
 const selectedSourceAuthEntry = computed(() => getAuthEndpoint(selectedSource.value))
 const selectedSourceAuthMethod = computed(() => normalizeAuthMethod(selectedSourceAuthEntry.value?.authentication_method))
 
-const isConnected = (source) => connectedSources.value.includes(source)
+const isConnected = (source) => Boolean(activeSessions.value[normalizeSourceName(source)])
 
 const connectSource = (source) => {
   document.cookie = `source=${encodeURIComponent(source)}; path=/; max-age=3600`
@@ -112,12 +133,6 @@ const closeConnectModal = () => {
   selectedSource.value = null
   modalError.value = ''
   modalLoading.value = false
-}
-
-const markConnected = (source) => {
-  if (!connectedSources.value.includes(source)) {
-    connectedSources.value = [...connectedSources.value, source]
-  }
 }
 
 const handleConnect = async ({ source, endpoint, method, username, password }) => {
@@ -155,7 +170,7 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
         return
       }
 
-      markConnected(source)
+      fetchActiveSessions()
       closeConnectModal()
     } catch (error) {
       modalError.value = `Connection failed: ${String(error)}`

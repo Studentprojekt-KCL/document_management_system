@@ -366,7 +366,7 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    async def execute_get_request(self, url: str, headers: dict | None = None) -> dict:
+    async def execute_get_request(self, url: str, headers: dict | None = None, recursion: int = 0) -> dict:
         """Execute GET request to supplied URL."""
         if headers is None:
             headers = {}
@@ -382,11 +382,13 @@ class GitLab:
         except (ValueError, aiohttp.InvalidURL) as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         except (aiohttp.ClientResponseError, aiohttp.ClientError):
-            response = {}
+            if recursion == 0:
+                return await self.execute_get_request(url, headers={}, recursion=1)
             dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response
 
-    async def execute_head_request(self, url: str, headers: dict | None = None) -> dict:
+    async def execute_head_request(self, url: str, headers: dict | None = None, recursion: int = 0) -> dict:
         """Execute HEAD request to supplied URL."""
         if headers is None:
             headers = {}
@@ -402,10 +404,15 @@ class GitLab:
         except (ValueError, aiohttp.InvalidURL) as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         except (aiohttp.ClientResponseError, aiohttp.ClientError):
-            dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            if recursion == 0:
+                return await self.execute_head_request(url, headers={}, recursion=1)
+            dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response
 
-    async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None) -> dict:
+    async def execute_post_request(
+        self, url: str, headers: dict | None = None, data: dict | None = None, recursion: int = 0
+    ) -> dict:
         """Execute POST request to supplied URL."""
         if headers is None:
             headers = {}
@@ -423,6 +430,8 @@ class GitLab:
         except (ValueError, aiohttp.InvalidURL) as err:
             dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
         except (aiohttp.ClientResponseError, aiohttp.ClientError):
-            response = {}
+            if recursion == 0:
+                return await self.execute_post_request(url, headers={}, data=data, recursion=1)
             dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response

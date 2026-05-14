@@ -267,7 +267,7 @@ class ConfluenceInterfacer:
             "size": len(encoded),
             "last_edit_date": when,
             "type": SOURCE_FILE,
-            "clickable_url": (urljoin(self.address + "/wiki/", webui.lstrip("/")) if isinstance(webui, str) else None),
+            "clickable_url": (urljoin(self.address, webui.lstrip("/")) if isinstance(webui, str) else None),
         }
         if include_content:
             out_structure["content"] = base64.b64encode(encoded).decode("utf-8")

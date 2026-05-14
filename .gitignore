@@ -218,6 +218,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+#Deno stuff
+deno.lock
+
 # OS, unsure if this is needed
 .DS_Store
 Thumbs.db

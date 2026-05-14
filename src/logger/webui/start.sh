@@ -11,10 +11,10 @@ if [ -z "$LOGWEB_BIND_PORT" ]; then
   exit 1
 fi
 
-if [ -z "$LOGWEB_API_ADDR" ]; then
-  echo "ERROR: LOGWEB_API_ADDR is not set" >&2
+if [ -z "$LOGWEB_API_URL" ]; then
+  echo "ERROR: LOGWEB_API_URL is not set" >&2
   exit 1
 fi
 
-echo "Starting Fresh server on $LOGWEB_BIND_ADDR:$LOGWEB_BIND_PORT (API=$LOGWEBB_API_ADDR)..."
+echo "Starting Fresh server on $LOGWEB_BIND_ADDR:$LOGWEB_BIND_PORT (API=$LOGWEB_API_URL)..."
 exec deno serve -A --host="$LOGWEB_BIND_ADDR" --port="$LOGWEB_BIND_PORT" _fresh/server.js

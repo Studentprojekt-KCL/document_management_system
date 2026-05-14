@@ -126,7 +126,7 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": str(request.url_for("callback")),# self.auth_callback_url,
+            "redirect_uri": self.auth_callback_url,
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
@@ -149,7 +149,7 @@ class API:
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": str(request.url_for("callback")), #self.auth_callback_url,
+            "redirect_uri": self.auth_callback_url,
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }

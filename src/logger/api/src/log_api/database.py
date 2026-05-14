@@ -57,16 +57,22 @@ class Database:
 
         return Log(id=log_id, occured=occured, message=message, event_type=event_type, service=service)
 
-    def database_get_logs(self, start: datetime, end: datetime) -> list[Log]:
-        """Grab all logs."""
+    def database_get_logs(self, start: datetime, end: datetime, page: int, limit: int) -> tuple[list[Log], int]:
+        """Grab page."""
 
         db = self.connect()
         cursor = db.cursor()
-        query: str = "SELECT * FROM logs WHERE occured BETWEEN %s AND %s"
+        query: str = "SELECT COUNT(*) FROM logs WHERE occured BETWEEN %s AND %s"
         _ = cursor.execute(query, (start, end))
+        count_row = cursor.fetchone()
+        total: int = count_row[0] if count_row and isinstance(count_row[0], int) else 0
+        offset = (page - 1) * limit
+        query = "SELECT * FROM logs WHERE occured BETWEEN %s AND %s ORDER BY occured DESC LIMIT %s OFFSET %s"
+        _ = cursor.execute(query, (start, end, limit, offset))
         result = cursor.fetchall()
 
-        return [self.extract_row_data(row) for row in result]
+        logs = [self.extract_row_data(row) for row in result]
+        return logs, total
 
     def database_add_log(self, log: Log) -> Log:
         """Add new log to database and return a Log."""

@@ -12,11 +12,11 @@
  */
 
 import { ref, computed } from 'vue'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
 import SearchPreviewDrawer from '@/components/SearchPreviewDrawer.vue'
-import PagingButtons from '@/components/PagingButtons.vue'
 import { resolveDocumentExtension, resolveSecurityClass, resolveSource } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 
@@ -111,7 +111,7 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
     allMatches.value = resultArray
     matches.value = resultArray
 
-    if (matches.value.length === 0) {
+    if (matches.value.length === 0 && currentPage.value === 1) {
       error.value = 'No matching files found.'
       return
     }
@@ -128,10 +128,11 @@ const searchParams = () => ({
   security_class: selectedFilters.value.security.join(' ')
 })
 
-const searchWithFilters = async ({ query, documentsOnly }) => {
+const searchWithFilters = async ({ query, documentsOnly, resetPreview = true }) => {
   await handleSearch({
     query,
     documentsOnly,
+    resetPreview,
     ...searchParams()
   })
 }
@@ -225,8 +226,13 @@ const nextPage = async () => {
   currentPage.value++
   await searchWithFilters({
     query: lastQuery.value,
-    documentsOnly: documentsOnlyMode.value
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false
   })
+
+  if (matches.value.length === 0) {
+    currentPage.value--
+  }
 }
 
 const previousPage = async () => {
@@ -234,7 +240,8 @@ const previousPage = async () => {
     currentPage.value--
     await searchWithFilters({
       query: lastQuery.value,
-      documentsOnly: documentsOnlyMode.value
+      documentsOnly: documentsOnlyMode.value,
+      resetPreview: false
     })
   }
 }
@@ -268,12 +275,13 @@ const previousPage = async () => {
     </div>
 
     <!-- Paging functionality? -->
-    <PagingButtons
-      :current-page="currentPage"
-      :has-next-page="matches.length >= SEARCH_COUNT"
-      @next="nextPage"
-      @previous="previousPage"
-    />
+    <div class="pagination">
+      <button :disabled="currentPage === 1" @click="previousPage"><ChevronLeft /></button>
+
+      <span>Page {{ currentPage }}</span>
+
+      <button :disabled="matches.length < SEARCH_COUNT" @click="nextPage">></button>
+    </div>
 
     <!-- Search Preview Drawer Component -->
     <SearchPreviewDrawer
@@ -307,5 +315,17 @@ const previousPage = async () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
 }
 </style>

@@ -61,18 +61,19 @@ const handleConnect = () => {
       </div>
       <div class="modal-body">
         <template v-if="usesBasicAuth">
-          <div class="credential-form">
+          <form class="credential-form" @submit.prevent="handleConnect">
             <label for="username">Username</label>
-            <input id="username" v-model="username" type="text" placeholder="Enter username" />
+            <input id="username" v-model="username" autocomplete="username" type="text" placeholder="Enter username" />
 
             <label for="password">Password</label>
-            <input id="password" v-model="password" type="password" placeholder="Enter password" />
-          </div>
-          <div class="modal-footer">
-            <button class="connect-btn" :disabled="!submitConnection || loading" @click="handleConnect">
-              {{ loading ? 'Connecting...' : 'Connect' }}
-            </button>
-          </div>
+            <input id="password" v-model="password" autocomplete="current-password" type="password" placeholder="Enter password" />
+
+            <div class="modal-footer">
+              <button class="connect-btn" :disabled="!submitConnection || loading" type="submit" @click="handleConnect">
+                {{ loading ? 'Connecting...' : 'Connect' }}
+              </button>
+            </div>
+          </form>
         </template>
 
         <template v-else-if="usesSessionAuth">
@@ -154,6 +155,11 @@ const handleConnect = () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.connect-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .error-message {

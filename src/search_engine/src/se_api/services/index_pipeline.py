@@ -136,6 +136,7 @@ class IndexPipeline:
                 try:
                     async for file in self.connector.stream(stream_object):
                         await decode_queue.put(file)
+                    dms_info(f"Finished streaming from: {stream_object.get("stream_url")}")
                 except httpx.HTTPError:
                     dms_warning(f"Failed to connect to {stream_url}.")
                 async with self.working_on_lock:
@@ -319,7 +320,7 @@ class IndexPipeline:
             flat_file: dict = IndexPipeline._flatten_dict(file)
             content: str | None = flat_file.get(CONTENT)
             if content is None:
-                dms_warning("File is missing content.")
+                dms_warning(f"File is missing content: {flat_file.get(UNIQUE_POINTER)}")
                 return (None, None)
             content_bytes = base64.b64decode(content)
             flat_file[CONTENT] = ""

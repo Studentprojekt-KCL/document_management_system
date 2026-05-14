@@ -23,6 +23,7 @@ export const API_PATHS = {
   /* Connected source system auth endpoints */
   authUserUrl: `${FRONTEND_DMISAPI_BASE_URL}/connector/get_auth_user_urls`,
   authUser: `${FRONTEND_DMISAPI_BASE_URL}/connector/auth_user`,
+  activeSessions: `${FRONTEND_DMISAPI_BASE_URL}/connector/active-sessions`,
 
   /* General auth endpoints */
   authCheck: `${FRONTEND_DMISAPI_BASE_URL}/auth/check`,

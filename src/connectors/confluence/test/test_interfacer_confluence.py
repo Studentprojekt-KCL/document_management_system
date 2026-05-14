@@ -1,31 +1,13 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law.
 
 Unit tests for ConfluenceInterfacer static helpers — no Live HTTP.
+The connector uses Atlassian's ``api.atlassian.com`` gateway; URL shaping is internal to that stack.
 """
 
 import json
 import unittest
 
 from confluence_service.interfacer_confluence import ConfluenceInterfacer
-
-
-class TestConfluenceApiBase(unittest.TestCase):
-    """Exercise URL shaping for wiki vs non-wiki tenants."""
-
-    def test_api_base_plain_tenant_appends_wiki_rest(self) -> None:
-        self.assertEqual(
-            ConfluenceInterfacer._api_base("https://acme.atlassian.net"),
-            "https://acme.atlassian.net/wiki/rest/api/",
-        )
-
-    def test_api_base_already_has_wiki_uses_rest_without_duplication(self) -> None:
-        self.assertEqual(
-            ConfluenceInterfacer._api_base("https://acme.atlassian.net/wiki"),
-            "https://acme.atlassian.net/wiki/rest/api/",
-        )
-
-    def test_empty_address_returns_empty_base(self) -> None:
-        self.assertEqual(ConfluenceInterfacer._api_base(""), "")
 
 
 class TestConfluenceSubdataRoundTrip(unittest.TestCase):

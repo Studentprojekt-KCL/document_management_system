@@ -1,6 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law.
 
 Route-level tests — ``ConfluenceInterfacer`` is mocked (no Live env or Confluence hosts).
+OAuth env vars are stubbed so ``API()`` can construct ``_OAuthConfig``.
 """
 
 import unittest
@@ -10,9 +11,19 @@ from fastapi.testclient import TestClient
 
 from confluence_service.collector_api import API
 
+_FAKE_OAUTH_ENV: dict[str, str] = {
+    "CONCONFLUENCE_CLIENT_ID": "test-client-id",
+    "CONCONFLUENCE_CLIENT_SECRET": "test-client-secret",
+    "CONCONFLUENCE_STATE_SIGNING_SECRET": "x" * 32,
+    "CONCONFLUENCE_AUTH_URL": "https://auth.atlassian.com/authorize",
+    "CONCONFLUENCE_TOKEN_URL": "https://auth.atlassian.com/oauth/token",
+    "CONCONFLUENCE_SCOPES": "read:space:confluence read:page:confluence offline_access",
+    "CONCONFLUENCE_CONNECT_SERVICE_CALLBACK": "https://connector.example.com/callback",
+}
+
 
 class TestCollectorAuthUserAndDefinedFields(unittest.TestCase):
-    """Covers `/auth_user` contract and `/defined_fields` union keys."""
+    """Covers `/auth_user` OAuth redirect and `/defined_fields` union keys."""
 
     def setUp(self) -> None:
         mock_inst = MagicMock()
@@ -25,35 +36,37 @@ class TestCollectorAuthUserAndDefinedFields(unittest.TestCase):
         }
 
         self._ci = patch("confluence_service.collector_api.ConfluenceInterfacer", return_value=mock_inst)
+        self._env = patch(
+            "confluence_service.collector_api.read_env_variable",
+            side_effect=lambda name, *_a, **_k: _FAKE_OAUTH_ENV[name],
+        )
         self._ci.start()
+        self._env.start()
         self.mock_inst = mock_inst
 
     def tearDown(self) -> None:
+        self._env.stop()
         self._ci.stop()
 
-    def test_auth_user_returns_gateway_contract(self) -> None:
+    def test_auth_user_redirects_to_atlassian_oauth(self) -> None:
         api = API()
         with TestClient(api.app) as client:
-            res = client.get("/auth_user")
-        self.assertEqual(res.status_code, 200)
-        body = res.json()
-        self.assertEqual(body.get("schema_version"), 1)
-        self.assertEqual(body.get("connector"), "confluence")
-        self.assertEqual(body.get("flow"), "request_headers_credentials")
-        self.assertIn("required_headers", body)
-        self.assertIn("oauth", body)
-        self.assertIn("documentation_url", body["oauth"])
-        self.assertEqual(body.get("type"), "api_token")
-        self.assertEqual(body.get("method"), "manual")
-        names = {h["name"] for h in body["required_headers"]}
-        self.assertEqual(names, {"X-Confluence-Email", "X-Confluence-Token"})
+            res = client.get("/auth_user", follow_redirects=False)
+        self.assertIn(res.status_code, (302, 307, 303))
+        loc = res.headers.get("location")
+        self.assertIsNotNone(loc)
+        assert loc is not None
+        self.assertIn("auth.atlassian.com", loc)
+        self.assertIn("client_id=test-client-id", loc)
+        self.assertIn("redirect_uri=https%3A%2F%2Fconnector.example.com%2Fcallback", loc)
 
-    def test_defined_fields_returns_sorted_keys_from_interfacer(self) -> None:
+    def test_defined_fields_returns_keys_from_interfacer(self) -> None:
         api = API()
+        expected = list(self.mock_inst.defined_fields.keys())
         with TestClient(api.app) as client:
             res = client.get("/defined_fields")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json(), ["content", "name", "unique_pointer"])
+        self.assertEqual(res.json(), expected)
 
     def test_get_files_without_headers_returns_empty_list(self) -> None:
         api = API()

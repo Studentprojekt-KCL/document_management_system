@@ -71,7 +71,14 @@ class ConfluenceInterfacer:
         except binascii.Error:
             dms_warning("Request where subdata was invalid base64 encoding made to Confluence connector: %s", subdata)
             return {}
-        subdata_str = subdata_bytes.decode("utf-8")
+        try:
+            subdata_str = subdata_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            dms_warning(
+                "Request where decoded subdata was not valid UTF-8 made to Confluence connector: %r",
+                subdata_bytes[:64],
+            )
+            return {}
         try:
             return json.loads(subdata_str)
         except json.decoder.JSONDecodeError:

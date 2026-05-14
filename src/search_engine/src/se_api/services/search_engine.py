@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import json
-from os import listdir, mkdir, path, remove
+from os import listdir, remove
 from asyncio import Lock, to_thread
 from tantivy import (
     Document,
@@ -57,6 +57,12 @@ class SearchEngine:
         self.writer_lock = Lock()
 
     def _load_fields(self, fetched_fields: list | None) -> list:
+        """Prepear fields for usage.
+
+        Args:
+            fetched_fields: fields from connector.
+        Returns: sorted list of fields
+        """
         fields: set = BOOLEAN_CATEGORIES
         fields = fields.union(RAW_CATEGORIES)
         fields = fields.union(COOKED_CATEGORIES)
@@ -67,6 +73,12 @@ class SearchEngine:
         return sorted(list(fields))
 
     def load_index(self, fetched_fields: list | None) -> bool:
+        """Load index and build schema.
+
+        Args:
+            fetched_fields: Fetched fields from connectors.
+        Returns: true if rebuild, else false.
+        """
         rebuild = False
         fields = self._load_fields(fetched_fields)
         schema_builder = SchemaBuilder()

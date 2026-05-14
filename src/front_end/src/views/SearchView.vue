@@ -280,7 +280,7 @@ const previousPage = async () => {
 
       <span>Page {{ currentPage }}</span>
 
-      <button :disabled="matches.length < SEARCH_COUNT" @click="nextPage">></button>
+      <button :disabled="matches.length < SEARCH_COUNT" @click="nextPage"><ChevronRight /></button>
     </div>
 
     <!-- Search Preview Drawer Component -->

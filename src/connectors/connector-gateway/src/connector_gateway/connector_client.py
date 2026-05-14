@@ -2,8 +2,6 @@
 
 import asyncio
 import json
-from typing import Any
-
 import httpx
 
 from fastapi.responses import JSONResponse
@@ -49,24 +47,22 @@ class ConnectorClient:
     def split_pointers(self, pointers: list[str] | None) -> list[dict]:
         """Split pointers based on head service and retrieve names of required services.
 
-        ADR 1:
+        ADR:
             Instead of indexing based on urlsplit.netloc,
               it was determined that the current solution is more dynamic when integrating new connectors.
-        ADR 2:
-            System order should not be dependent on mapping pointers.
         """
         if not pointers:
             return []
         system_pointers: dict = {}
-        for index, pointer in enumerate(pointers):
+        for pointer in pointers:
             for system in self.source_system_structure:
                 if system not in pointer:
                     continue
                 if system in system_pointers:
-                    system_pointers[system][pointer] = index
+                    system_pointers[system].append(pointer)
                     break
                 if not isinstance(system_pointers.get(system), list):
-                    system_pointers[system] = {pointer: index}
+                    system_pointers[system] = [pointer]
                     break
             else:
                 dms_warning(f"No source system found for {pointer}")
@@ -93,59 +89,31 @@ class ConnectorClient:
         host = rest.split("/", 1)[0]
         return f"{scheme}//{host}"
 
-    @staticmethod
-    def _sort_responses(responses: list[Any], original_pointers: list[dict]) -> list:
-        combined_systems: dict = {}
-        for system in original_pointers:
-            pointers = system.get("file_pointers") if isinstance(system.get("file_pointers"), dict) else {}
-            combined_systems |= pointers  # type: ignore
-        sorted_result = [None] * len(combined_systems)
-
-        for response in responses:
-            try:
-                decoded_response = response.json()
-            except json.JSONDecodeError:
-                dms_warning("Gateway recieved response from connector layer which could not be decoded.")
-                continue
-            for result in decoded_response:
-                unique_pointer = result.get("unique_pointer")
-                if not unique_pointer in combined_systems:
-                    dms_warning(f"Gateway could not map {unique_pointer} against sorted structure.")
-                    continue
-
-                sorted_result[combined_systems.get(unique_pointer)] = result  # type: ignore
-
-        return [item for item in sorted_result if item is not None]
-
     async def fetch_files_metadata(
         self, pointers: list[dict], include_content: bool, include_last_edit_date: bool, authentication_tokens: dict[str, str]
     ) -> list:
         """makes http requests to all source systems to gather meta data from pointers"""
         tasks: list = []
-        return_system_order: list = []
         try:
             for system in pointers:
                 system_name = system.get("name") if isinstance(system.get("name"), str) else ""
-                return_system_order.append(system_name)
                 auth_header = authentication_tokens.get(system_name.lower())  # type: ignore
-                s_pointers = system.get("file_pointers")
-                file_pointers = list(s_pointers.keys()) if isinstance(s_pointers, dict) else []  # type: ignore
-
                 response = self.http_client.post(
                     f"{system.get("connector_url")}/get_files",
                     params=[
                         ("include_content", include_content),
                         ("include_last_edit_date", include_last_edit_date),
                     ],
-                    json={"file_pointers": file_pointers},
+                    json={"file_pointers": system.get("file_pointers")},
                     headers=(
                         {system.get("authentication_header"): f"{system.get('token_type')} {auth_header}"} if auth_header else None
                     ),
                     timeout=self.timeout,
                 )
                 tasks.append(response)
-            return self._sort_responses(await asyncio.gather(*tasks), pointers)
 
+            responses = await asyncio.gather(*tasks)
+            return [item for r in responses for item in r.json()]
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:
@@ -228,37 +196,32 @@ class ConnectorClient:
         return None
 
     async def verify_tokens(self, tokens: dict[str, str]) -> dict:
+        """Verify tokens agains connector layer."""
         statuses: dict = {}
         for system in self.source_systems:
             name = system.get("name")
             if not name:
                 continue
 
-            token = tokens.get(name)
+            token = tokens.get(name.lower())
             if token is None:
                 statuses[name] = False
             url = f"{system.get("connector_url")}/validate_token"
+            header: dict = {system.get("authentication_header"): f"{token}"}  # type: ignore
+            data = {}
             try:
-                response = await self.http_client.get(
-                    url, 
-                    headers=(
-                        {system.get("authentication_header"): f"{system.get('token_type')} {token}"} # type: ignore
-                    )
-                )
+                response = await self.http_client.get(url, headers=header)
                 response.raise_for_status()
-                validity = response.json()
+                data = response.json()
             except httpx.TimeoutException:
                 dms_warning(f"Request timed out: {url}")
-                validity = {}
             except httpx.HTTPError:
                 dms_warning(f"Failed to connect to connector, url: {url}")
-                validity = {}
 
-            if not isinstance(validity, dict):
-                dms_warning(f"Service: {name} returned a faulty structure, expected dict got: {type(validity)}.")
-            print(f"{name}: {validity}")
+            if not isinstance(data, dict):
+                dms_warning(f"Service: {name} returned a faulty structure, expected dict got: {type(data)}.")
+            statuses[name] = data.get("valid", False)
         return statuses
-
 
     async def auth_code_callback(self, service_url: str, code: str) -> dict:
         """Callback to connector layer service."""

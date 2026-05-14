@@ -166,22 +166,25 @@ class API:
 
         return JSONResponse(status_code=200, content="")
 
-    async def check_sessions(self, authorization: str | None = Header(default=None)):
+    async def check_sessions(self, authorization: str | None = Header(default=None)) -> JSONResponse:
+        """Check stored user sessions."""
         connectors = self.down_stream_client.source_systems
         service_names = [
             service.get("name").lower() if isinstance(service.get("name"), str) else "" for service in connectors  # type: ignore
         ]
-        headers: dict = {"authorization": authorization.strip()} if authorization else {}
-        authentication_tokens: dict = {}
 
+        authentication_tokens: dict = {}
         if authorization:
-            tokens = await self.refresh_client.send_post_request("/get_session_tokens", params=None, headers=headers, body=service_names)
+            headers: dict = {"authorization": authorization.strip()} if authorization else {}
+            tokens = await self.refresh_client.send_post_request(
+                "/get_session_tokens", params=None, headers=headers, body=service_names
+            )
             if isinstance(tokens, dict):
                 authentication_tokens = tokens
             else:
                 dms_warning(f"Recieved unexpeced structure from refresh-service (expected dict): ({type(tokens)})")
-            return JSONResponse(status_code=200, content= await self.down_stream_client.verify_tokens(authentication_tokens))
-        return JSONResponse(status_code=200, content="")
+        return JSONResponse(status_code=200, content=await self.down_stream_client.verify_tokens(authentication_tokens))
+
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

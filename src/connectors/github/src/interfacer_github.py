@@ -3,6 +3,11 @@
 GitHub connector following same structure as GitLab connector.
 Exposes the same payloads: files + subdata, file_pointers + subdata, and
 per-file metadata/content compatible with GitLab's indexer contract.
+
+Indexing ``subdata`` is a JSON object (base64, URL-safe) mapping ``full_name``
+(e.g. ``org/repo``) to the repo's ``pushed_at`` ISO timestamp last indexed —
+mirroring GitLab's per-project map. Older deployments may still send a single
+legacy ISO timestamp (global floor); see ``_decode_subdata``.
 """
 
 import asyncio
@@ -84,6 +89,69 @@ class GitHub:
             if isinstance(fn, str):
                 ids[fn] = pushed
         return ids
+
+    @staticmethod
+    def _create_date_object(date_string: str) -> datetime:
+        """UTC-normalized datetime from GitHub/GitLab-style ISO timestamps."""
+        date = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date
+
+    @staticmethod
+    def _decode_subdata(subdata: str | None) -> tuple[dict[str, str], datetime | None]:
+        """Decode stored indexing state: repo ``full_name`` -> ``pushed_at`` ISO strings.
+
+        Older clients sent a single ISO timestamp only (global ``pushed_at`` floor). That is
+        returned as ``(_, legacy_floor_datetime)``.
+        """
+        utc_min = datetime.min.replace(tzinfo=timezone.utc)
+        if subdata is None:
+            return {}, None
+
+        raw: bytes | None = None
+        for decoder in (base64.urlsafe_b64decode, base64.standard_b64decode):
+            try:
+                raw = decoder(subdata)
+                break
+            except binascii.Error:
+                continue
+        if raw is None:
+            dms_info("Request with invalid base64 encoding made to GitHub connector: %s", subdata)
+            return {}, utc_min
+
+        try:
+            text = raw.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            dms_error("GitHub connector could not interpret subdata (utf-8): %s", subdata)
+            return {}, utc_min
+
+        if text.startswith("{"):
+            try:
+                obj = json.loads(text)
+            except json.JSONDecodeError:
+                dms_warning(
+                    "GitHub subdata looked like JSON but failed to parse; trying legacy iso: %s",
+                    text[:120],
+                )
+            else:
+                if isinstance(obj, dict):
+                    repo_map: dict[str, str] = {}
+                    for key, val in obj.items():
+                        repo_key = key if isinstance(key, str) else str(key)
+                        if isinstance(val, str):
+                            repo_map[repo_key] = val
+                    return repo_map, None
+
+        try:
+            return {}, GitHub._create_date_object(text)
+        except ValueError:
+            dms_error("GitHub connector could not interpret subdata: %s", text[:120])
+            return {}, utc_min
+
+    @staticmethod
+    def _generate_subdata(snapshot: dict[str, str]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(snapshot, sort_keys=True).encode("utf-8")).decode()
 
     @staticmethod
     def _encode_content_path(path: str) -> str:
@@ -264,9 +332,38 @@ class GitHub:
             await output_queue.put(unpacked)
             zip_queue.task_done()
 
-    async def _enqueue_repos(self, repos: list, provided_date: datetime, token: str | None, task_queue: asyncio.Queue) -> datetime:
-        """Filter repos by timestamp, enqueue zip download tasks, return the latest push time seen."""
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+    def _github_repo_needs_rearchive(
+        self,
+        repo_floor: dict[str, str],
+        legacy_floor: datetime | None,
+        full_name: str,
+        pushed_dt: datetime,
+    ) -> bool:
+        """Return True when the repo archive should be downloaded again."""
+        if legacy_floor is not None:
+            return pushed_dt > legacy_floor
+        stored = repo_floor.get(full_name)
+        if not isinstance(stored, str):
+            return True
+        try:
+            stored_dt = self._create_date_object(stored)
+        except ValueError:
+            return True
+        return pushed_dt > stored_dt
+
+    def _repo_zipball_url(self, full_name: str, branch: str) -> str:
+        owner, _, name = full_name.partition("/")
+        return urljoin(self.api_base, f"repos/{owner}/{name}/zipball/refs/heads/{branch}")
+
+    async def _enqueue_repos(self, repos: list, subdata: str | None, token: str | None, task_queue: asyncio.Queue) -> str:
+        """Select repos needing a new archive fetch; persist per-repo ``pushed_at`` in outbound subdata.
+
+        Mirrors GitLab's incremental map keyed by integration id — here repo ``full_name``.
+        Legacy subdata remains a single timestamp floor for migration.
+        """
+        repo_floor, legacy_floor = self._decode_subdata(subdata)
+        new_subdata = dict(repo_floor)
+
         for repo in repos:
             fn = repo.get("full_name")
             if not isinstance(fn, str):
@@ -274,17 +371,26 @@ class GitHub:
             ts = repo.get("pushed_at")
             if not isinstance(ts, str):
                 continue
-            ts_obj = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if ts_obj <= provided_date:
+            try:
+                ts_obj = self._create_date_object(ts)
+            except ValueError:
                 continue
-            latest_update = max(latest_update, ts_obj)
+
+            if legacy_floor is not None and ts_obj <= legacy_floor:
+                new_subdata[fn] = ts
+                continue
+
+            if not self._github_repo_needs_rearchive(repo_floor, legacy_floor, fn, ts_obj):
+                continue
+
             branch = repo.get("default_branch")
             if not isinstance(branch, str):
                 branch = self._default_branch_for_repo(fn, token)
-            owner, _, name = fn.partition("/")
-            zip_url = urljoin(self.api_base, f"repos/{owner}/{name}/zipball/refs/heads/{branch}")
+            zip_url = self._repo_zipball_url(fn, branch)
             await task_queue.put((zip_url, fn, branch))
-        return latest_update
+            new_subdata[fn] = ts
+
+        return self._generate_subdata(new_subdata)
 
     async def stream_files_to_index(self, subdata: str | None = None, token: str | None = None) -> AsyncGenerator[bytes, None]:
         """Streaming equivalent of files_to_index: yields subdata header then one file per chunk."""
@@ -293,8 +399,7 @@ class GitHub:
         output_queue: asyncio.Queue = asyncio.Queue()
 
         repos = await asyncio.to_thread(self._get_repos, token)
-        latest_update = await self._enqueue_repos(repos, self._provided_date(subdata), token, task_queue)
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
+        generated_subdata = await self._enqueue_repos(repos, subdata, token, task_queue)
 
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
             download_tasks = [
@@ -343,22 +448,6 @@ class GitHub:
         token_url = f"{self.api_base}user"
         response = self._request(token_url, x_github_token)
         return response.status_code == HTTP_OK
-
-    @staticmethod
-    def _provided_date(subdata: str | None) -> datetime:
-        if subdata is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
-        try:
-            subdata_bytes = base64.b64decode(subdata)
-        except binascii.Error:
-            dms_info("Request with invalid base64 encoding made to GitHub connector: %s", subdata)
-            return datetime.min.replace(tzinfo=timezone.utc)
-        try:
-            subdata_str = subdata_bytes.decode("utf-8")
-            return datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
-        except (UnicodeDecodeError, ValueError):
-            dms_error("GitHub connector could not interpret subdata: %s", subdata)
-            return datetime.min.replace(tzinfo=timezone.utc)
 
     def _request(self, url: str, token: str | None = None) -> httpx.Response:
         """Execute a clean GET request with all headers explicit and no cookie carry-over."""

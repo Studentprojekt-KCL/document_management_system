@@ -12,6 +12,7 @@ import io
 import json
 import unittest
 import zipfile
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from interfacer_github import GitHub
@@ -60,11 +61,30 @@ class TestGitHubHelpers(unittest.TestCase):
         parsed = self.github._parse_file_pointer(pointer)
         self.assertEqual(parsed, ("owner/repo", "src/file.py", "main"))
 
-    def test_provided_date_invalid_base64_returns_min_datetime(self) -> None:
-        """Invalid subdata base64 falls back to minimum UTC datetime."""
-        dt = GitHub._provided_date("this-is-not-base64")
-        encoded = base64.b64encode(dt.isoformat().encode("utf-8")).decode("utf-8")
-        self.assertTrue(isinstance(encoded, str))
+    def test_decode_invalid_base64_maps_to_legacy_floor(self) -> None:
+        """Invalid subdata base64 is treated like a legacy watermark at UTC minimum (re-index all)."""
+        repo_map, legacy_floor = GitHub._decode_subdata("this-is-not-base64")
+        self.assertEqual(repo_map, {})
+        self.assertEqual(legacy_floor, datetime.min.replace(tzinfo=timezone.utc))
+
+    def test_decode_json_repo_map_preserves_legacy_absent(self) -> None:
+        """JSON object subdata behaves like GitLab — per-repo last ``pushed_at`` snapshot."""
+        payload = {"org/a": "2024-06-01T12:00:00Z", "org/b": "2025-01-02T09:00:00+00:00"}
+        encoded = GitHub._generate_subdata(payload)
+        repo_map, legacy = GitHub._decode_subdata(encoded)
+        self.assertIsNone(legacy)
+        self.assertEqual(repo_map, payload)
+
+    def test_decode_legacy_single_iso_timestamp(self) -> None:
+        """Older deployments encoded a single global ISO watermark only."""
+        token = base64.urlsafe_b64encode(b"2026-04-01T00:00:00+00:00").decode()
+        repo_map, legacy = GitHub._decode_subdata(token)
+        self.assertEqual(repo_map, {})
+        assert legacy is not None
+        self.assertEqual(
+            legacy,
+            datetime(2026, 4, 1, tzinfo=timezone.utc),
+        )
 
 
 class TestGitHubStreaming(unittest.TestCase):
@@ -75,7 +95,7 @@ class TestGitHubStreaming(unittest.TestCase):
         "pushed_at": "2026-03-01T00:00:00Z",
         "default_branch": "main",
     }
-    _OLD_SUBDATA = base64.urlsafe_b64encode("2026-04-01T00:00:00+00:00".encode()).decode()
+    _STALE_WATERMARK_SUBDATA = GitHub._generate_subdata({"owner/repo": "2026-04-01T00:00:00+00:00"})
 
     def setUp(self) -> None:
         self.github = GitHub()
@@ -95,16 +115,18 @@ class TestGitHubStreaming(unittest.TestCase):
             chunks = self._collect(self.github.stream_files_to_index())
 
         self.assertIn("subdata", chunks[0])
+        first_map = json.loads(base64.urlsafe_b64decode(chunks[0]["subdata"]))
+        self.assertEqual(first_map["owner/repo"], "2026-03-01T00:00:00Z")
         self.assertGreater(len(chunks), 1)
         self.assertIn("content", chunks[1])
         self.assertIn("metadata", chunks[1])
 
     def test_stream_filters_repos_older_than_subdata(self) -> None:
-        """Repos with pushed_at before subdata timestamp produce no file chunks."""
+        """Repos with pushed_at older than recorded subdata watermark produce no file chunks."""
         old_repo = {**self._REPO, "pushed_at": "2026-01-01T00:00:00Z"}
         self.github._get_repos = lambda _=None: [old_repo]
 
-        chunks = self._collect(self.github.stream_files_to_index(subdata=self._OLD_SUBDATA))
+        chunks = self._collect(self.github.stream_files_to_index(subdata=self._STALE_WATERMARK_SUBDATA))
 
         self.assertEqual(len(chunks), 1)
         self.assertIn("subdata", chunks[0])

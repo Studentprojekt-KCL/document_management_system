@@ -137,7 +137,7 @@ class API:
             "state": signed_state,
         }
 
-        return RedirectResponse(f"{self.oauth.auth_url}?{urlencode(params)}")
+        return JSONResponse(content={"redirect": f"{self.oauth.auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Exchange Atlassian authorization code for access and refresh tokens."""

@@ -108,9 +108,8 @@ class SearchEngine:
 
     async def close(self) -> None:
         """Graceful shutdown."""
-        await self.writer_lock.acquire()
-        await asyncio.to_thread(self.writer.wait_merging_threads)
-        self.writer_lock.release()
+        async with self.writer_lock:
+            self.writer.wait_merging_threads()
 
     def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
@@ -224,8 +223,8 @@ class SearchEngine:
         await self.writer_lock.acquire()
         try:
             yield
-        finally:
             await asyncio.to_thread(self.writer.commit)
+        finally:
             self.writer_lock.release()
 
     def grab_file(self, unique_pointer: str) -> dict:

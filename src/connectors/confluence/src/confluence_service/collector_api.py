@@ -56,6 +56,7 @@ class API:
             scopes=read_env_variable("CONCONFLUENCE_SCOPES"),
         )
         self.auth_callback_url = read_env_variable("CONCONFLUENCE_CONNECT_SERVICE_CALLBACK")
+        self.auth_check_url = read_env_variable("CONCONFLUENDE_CHECK_AUTH_URL")
         session = self.confluence_instance.session
 
         @asynccontextmanager
@@ -72,6 +73,7 @@ class API:
         API.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         API.app.add_api_route("/callback", self.callback, methods=["GET"])
         API.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        API.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Return a JSON error payload for FastAPI request validation failures."""
@@ -184,6 +186,18 @@ class API:
                 timeout=120,
             )
         return JSONResponse(content=resp.json(), status_code=200)
+
+    async def validate_token(self, x_confluence_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Check token validity.
+
+        Args:
+            x_confluence_token: token
+        Returns: response with true/false
+        """
+        if x_confluence_token is None:
+            return JSONResponse(content={"valid": False}, status_code=200)
+        data = await self.confluence_instance.execute_get_request(self.auth_check_url, params={}, api_token=x_confluence_token)
+        return JSONResponse(content={"valid": bool(data)}, status_code=200)
 
 
 def run() -> None:

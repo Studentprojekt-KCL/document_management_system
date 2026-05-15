@@ -71,7 +71,7 @@ class IndexPipeline:
         decode_tasks: list[Task] = [create_task(self._ingest_decode()) for _ in range(GENERIC_WORKER_COUNT)]
         ingest_index_task: Task = create_task(self._ingest_index())
 
-        classifier_load_task: Task = create_task(self._classifier_load_index())
+        classifier_load_tasks: list[Task] = [create_task(self._classifier_load_index()) for _ in range(GENERIC_WORKER_COUNT)]
         classify_tasks: list[Task] = [create_task(self._classifier_execute()) for _ in range(GENERIC_WORKER_COUNT)]
         classifier_refresh_task: Task = create_task(self._classifier_refresh_index())
 
@@ -79,8 +79,8 @@ class IndexPipeline:
             *fetch_tasks,
             *decode_tasks,
             *classify_tasks,
+            *classifier_load_tasks,
             ingest_index_task,
-            classifier_load_task,
             classifier_refresh_task,
         ]
 
@@ -218,7 +218,9 @@ class IndexPipeline:
             try:
                 file: dict = await self.queues.classify_queue.get()
                 batch.append(file)
-                if len(batch) >= self.classifier.BATCH_SIZE or self.queues.lookup_queue.qsize() <= 0:
+                if len(batch) >= self.classifier.BATCH_SIZE or (
+                    self.queues.lookup_queue.qsize() <= 0 and self.queues.classify_queue.qsize() <= 0
+                ):
                     await self.classifier.classify(batch)
                     for file in batch:
                         await self.queues.reindex_queue.put(file)

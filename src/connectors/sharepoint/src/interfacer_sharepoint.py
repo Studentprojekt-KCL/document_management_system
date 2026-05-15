@@ -169,7 +169,6 @@ class SharePoint:
             dms_info(f"SharePoint: indexing file with unrecognised extension: {repr(name)}")
         item_id = item.get("id", "")
         return {
-            "metadata": {
                 "unique_pointer": f"{self.graph_base}/drives/{drive_id}/items/{item_id}",
                 "name": name,
                 "size": item.get("size", 0),
@@ -177,19 +176,17 @@ class SharePoint:
                 "source_system": self.source_system,
                 "last_edit_date": item.get("lastModifiedDateTime"),
                 "clickable_url": item.get("webUrl", ""),
-            }
-            | extension,
-        }
+        }| extension,
 
     async def _fetch_record_content(self, ctx: _HttpCtx, record: dict) -> None:
         """Fetch file bytes and base64-encode them into record['content'] in-place."""
         record["content"] = None
-        content_url = f"{record['metadata']['unique_pointer']}/content"
+        content_url = f"{record['unique_pointer']}/content"
         response = await self._request_with_retry(ctx, content_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
         if response.status_code == httpx.codes.OK:
             record["content"] = base64.b64encode(response.content).decode("utf-8")
         else:
-            dms_warning(f"SharePoint: could not fetch content for {record['metadata'].get('name')}")
+            dms_warning(f"SharePoint: could not fetch content for {record.get('name')}")
 
     async def _process_drive(self, ctx: _HttpCtx, drive_id: str, delta_url: str) -> tuple[str, list[dict], str]:
         """Run delta query for one drive. Returns (drive_id, qualifying_records, new_delta_link)."""

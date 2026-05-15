@@ -30,6 +30,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
+        self.auth_callback_url = read_env_variable("CONSHAREPOINT_CONNECT_SERVICE_CALLBACK")
         self.tenant_id = read_env_variable("CONSHAREPOINT_TENANT_ID")
         self.client_id = read_env_variable("CONSHAREPOINT_CLIENT_ID")
         self.client_secret = read_env_variable("CONSHAREPOINT_CLIENT_SECRET")
@@ -82,7 +83,7 @@ class API:
             media_type="application/octet-stream",
         )
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self, request: Request) -> JSONResponse:
         """Redirect user to Microsoft OAuth login."""
         payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
         signed_state = sign_encode_state(payload, self.state_secret)
@@ -90,12 +91,13 @@ class API:
         auth_url = f"{MS_LOGIN_BASE}/{self.tenant_id}/oauth2/v2.0/authorize"
         params = {
             "client_id": self.client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "response_type": "code",
             "scope": "Sites.Read.All Files.Read.All offline_access",
             "state": signed_state,
         }
-        return RedirectResponse(f"{auth_url}?{urlencode(params)}")
+
+        return JSONResponse(content={"redirect": f"{auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Exchange Microsoft authorization code for access and refresh tokens."""
@@ -115,7 +117,7 @@ class API:
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
-                    "redirect_uri": str(request.url_for("callback")),
+                    "redirect_uri": self.auth_callback_url,
                     "client_id": self.client_id,
                     "client_secret": self.client_secret,
                 },

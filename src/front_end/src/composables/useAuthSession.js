@@ -8,11 +8,11 @@ export function useAuthSession() {
   let heartbeatLoop = null
 
   /**
-   36 min
-   4 min 30s
+   30 min
+   4 min
    15s 
    */
-  const IDLE_TIMEOUT = 36 * 60 * 1000
+  const IDLE_TIMEOUT = 30 * 60 * 1000
   const REFRESH_INTERVAL = 4 * 60 * 1000
   const LEADER_TIMEOUT = 15000
 

@@ -7,29 +7,33 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import { FRONTEND_AD_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
+import { getOidcMetadata, OIDC_CLIENT_ID, SESSION_KEY_OIDC_STATE, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
 
 /* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)
 
 /* Initiates the Microsoft Entra ID login flow using PKCE. */
-const handleEntraIdLogin = async () => {
+const handleOidcLogin = async () => {
   isLoading.value = true
+  const metadata = await getOidcMetadata()
+
+  if (!metadata.authorization_endpoint) {
+    throw new Error('Missing authorization_endpoint from OIDC metadata')
+  }
   const { verifier, challenge } = await createPkcePair()
+  const state = generateState()
 
   localStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
-
-  const state = generateState()
   localStorage.setItem(SESSION_KEY_OIDC_STATE, state)
 
   const redirectUri = `${window.location.origin}/auth/callback`
 
   const authUrl =
-    keycloakAuthUrl() +
-    `?client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}` +
+    metadata.authorization_endpoint +
+    `?client_id=${encodeURIComponent(OIDC_CLIENT_ID)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
-    `&scope=openid` +
+    `&scope=${encodeURIComponent('openid profile email')}` +
     `&state=${encodeURIComponent(state)}` +
     `&code_challenge=${encodeURIComponent(challenge)}` +
     `&code_challenge_method=S256`
@@ -47,7 +51,7 @@ const handleEntraIdLogin = async () => {
       </div>
 
       <div class="login-content">
-        <button @click="handleEntraIdLogin" :disabled="isLoading" class="entra-btn">
+        <button @click="handleOidcLogin" :disabled="isLoading" class="entra-btn">
           <svg v-if="!isLoading" class="microsoft-icon" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="11" height="11" fill="#F25022" />
             <rect x="12" width="11" height="11" fill="#7FBA00" />

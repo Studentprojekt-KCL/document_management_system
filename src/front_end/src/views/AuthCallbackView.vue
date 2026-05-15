@@ -13,6 +13,11 @@ const route = useRoute()
 const router = useRouter()
 const errorMsg = ref('')
 
+const clearOidcSessionValues = () => {
+  localStorage.removeItem(SESSION_KEY_PKCE_VERIFIER)
+  localStorage.removeItem(SESSION_KEY_OIDC_STATE)
+}
+
 const logoutAfterError = async (message) => {
   errorMsg.value = message
   setTimeout(async () => {
@@ -26,23 +31,27 @@ onMounted(async () => {
 
   if (route.query.error) {
     errorMsg.value = `${route.query.error}: ${route.query.error_description || ''}`
+    clearOidcSessionValues()
     return
   }
 
   if (!code) {
     errorMsg.value = 'No authorization code'
+    clearOidcSessionValues()
     return
   }
 
   const expectedState = localStorage.getItem(SESSION_KEY_OIDC_STATE)
   if (!expectedState || returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
+    clearOidcSessionValues()
     return
   }
 
   const verifier = localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
+    clearOidcSessionValues()
     return
   }
 
@@ -50,8 +59,13 @@ onMounted(async () => {
     code,
     codeVerifier: verifier
   })
+  clearOidcSessionValues()
 
   if (!result.ok) {
+    if (result.status === 403) {
+      logoutAfterError('You dont have access to this application')
+      return
+    }
     errorMsg.value = `Login failed: ${result.message}`
     return
   }

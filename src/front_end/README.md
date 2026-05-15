@@ -99,9 +99,8 @@ Before running the service, you must create a `.env` file in the /front_end/ dir
 Create `.env` file following this structure:
 
 ```
-FRONTEND_AD_URL= Keycloak Base URL
-FRONTEND_AD_REALM=master
-FRONTEND_AD_CLIENT_ID= Keyloak Client ID
-FRONTEND_DMISAPI_BASE_URL=/api/
-FRONTEND_DMISAPI_URL= The develop API URL for frontend
+OIDC_ISSUER_URL={issuer}/.well-known/openid-configuration
+OIDC_CLIENT_ID= <client_id>
+FRONTEND_DMISAPI_BASE_URL= Base path to use by frontend api proxy
+FRONTEND_DMISAPI_URL= Backend DMIS Api.
 ```

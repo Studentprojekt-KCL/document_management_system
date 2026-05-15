@@ -1,20 +1,28 @@
 /**
- * Includes all Keycloak-related configuration and session/local storage key names
- * Used several times across, so centralized here to avoid duplication and ensure consistency.
+ * Generic OIDC config.
+ * Works with Keycloak, Microsoft Entra ID, or another OIDC-compliant provider.
  */
 
-/* Keycloak / OIDC config from runtime environment */
-export const FRONTEND_AD_URL = window.__ENV__.FRONTEND_AD_URL
-export const FRONTEND_AD_REALM = window.__ENV__.FRONTEND_AD_REALM
-export const FRONTEND_AD_CLIENT_ID = window.__ENV__.FRONTEND_AD_CLIENT_ID
+export const OIDC_ISSUER_URL = window.__ENV__.OIDC_ISSUER_URL.replace(/\/$/, '')
+export const OIDC_CLIENT_ID = window.__ENV__.OIDC_CLIENT_ID
 
-/* Keycloak OIDC endpoint builders */
-export const keycloakAuthUrl = () => `${FRONTEND_AD_URL}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/auth`
-export const keycloakLogoutUrl = () => `${FRONTEND_AD_URL}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/logout`
-
-/* SessionStorage key names */
-export const SESSION_KEY_PKCE_VERIFIER = 'pkce_verifier'
+export const SESSION_KEY_PKCE_VERIFIER = 'oidc_pkce_verifier'
 export const SESSION_KEY_OIDC_STATE = 'oidc_state'
-
-/* LocalStorage key names */
 export const LOCAL_KEY_LOGOUT_EVENT = 'logout-event'
+
+let cachedMetadata = null
+
+export async function getOidcMetadata() {
+  if (cachedMetadata) {
+    return cachedMetadata
+  }
+
+  const response = await fetch(`${OIDC_ISSUER_URL}/.well-known/openid-configuration`)
+
+  if (!response.ok) {
+    throw new Error('Failed to load OIDC metadata')
+  }
+
+  cachedMetadata = await response.json()
+  return cachedMetadata
+}

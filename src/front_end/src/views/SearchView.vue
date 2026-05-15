@@ -188,12 +188,6 @@ const closePreview = () => {
   isPreviewOpen.value = false
 }
 
-/* Handle changes to search filters  */
-const handleFilterChange = (filters) => {
-  selectedFilters.value = filters
-  matches.value = filterMatches(allMatches.value, filters)
-}
-
 /* Sends down a new request to the backend if the user changes the filters */
 const handleFilterChangeAndSearch = async (filters) => {
   selectedFilters.value = filters

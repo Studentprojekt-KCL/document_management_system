@@ -143,16 +143,10 @@ class GitLab:
                 urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token)
             )
             lower_content = {key.lower(): value for key, value in content.items()}
-            file_name_str = lower_content.get("x-gitlab-file-name")
-            file_path_str = lower_content.get("x-gitlab-file-path")
-            if isinstance(file_name_str, str):
-                file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
-            if isinstance(file_path_str, str):
-                file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
             file = {
-                "file_name": file_name_str,
+                "file_name": lower_content.get("x-gitlab-file-name"),
                 "size": lower_content.get("x-gitlab-size"),
-                "file_path": file_path_str,
+                "file_path": lower_content.get("x-gitlab-file-path"),
             }
         if isinstance(file, list):
             file = {}

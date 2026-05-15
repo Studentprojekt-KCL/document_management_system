@@ -14,7 +14,7 @@ import uvicorn
 from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from interfacer_github import GitHub
 
@@ -33,6 +33,7 @@ class API:
     def __init__(self) -> None:
         """Constructor."""
         self.github_instance = GitHub()
+        self.auth_callback_url = read_env_variable("CONGITLAB_CONNECT_SERVICE_CALLBACK")
         self.client_id = read_env_variable("CONGITHUB_CLIENT_ID")
         self.client_secret = read_env_variable("CONGITHUB_CLIENT_SECRET")
         self.state_secret = read_env_variable("CONGITHUB_STATE_SIGNING_SECRET")
@@ -92,16 +93,16 @@ class API:
             media_type="application/octet-stream",
         )
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self) -> JSONResponse:
         """Redirect the user to GitHub OAuth authorization."""
         payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
         signed_state = sign_encode_state(payload, self.state_secret)
         params = {
             "client_id": self.client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "state": signed_state,
         }
-        return RedirectResponse(f"{self.github_base_url}/login/oauth/authorize?{urlencode(params)}")
+        return JSONResponse(content={"redirect": f"{self.github_base_url}/login/oauth/authorize?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Exchange GitHub authorization code for access and refresh tokens."""
@@ -127,7 +128,7 @@ class API:
                     "client_id": self.client_id,
                     "client_secret": self.client_secret,
                     "code": code,
-                    "redirect_uri": str(request.url_for("callback")),
+                    "redirect_uri": self.auth_callback_url,
                 },
                 headers={"Accept": "application/json"},
                 timeout=120,

@@ -71,7 +71,7 @@ class IndexPipeline:
         decode_tasks: list[Task] = [create_task(self._ingest_decode()) for _ in range(GENERIC_WORKER_COUNT)]
         ingest_index_task: Task = create_task(self._ingest_index())
 
-        classifier_load_tasks: list[Task] = [create_task(self._classifier_load_index()) for _ in range(GENERIC_WORKER_COUNT)]
+        classifier_load_task: Task = create_task(self._classifier_load_index())
         classify_tasks: list[Task] = [create_task(self._classifier_execute()) for _ in range(GENERIC_WORKER_COUNT)]
         classifier_refresh_task: Task = create_task(self._classifier_refresh_index())
 
@@ -79,7 +79,7 @@ class IndexPipeline:
             *fetch_tasks,
             *decode_tasks,
             *classify_tasks,
-            *classifier_load_tasks,
+            classifier_load_task,
             ingest_index_task,
             classifier_refresh_task,
         ]

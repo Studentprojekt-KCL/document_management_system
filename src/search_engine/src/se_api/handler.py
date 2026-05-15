@@ -56,7 +56,7 @@ class Handler:
             delay = min(delay * 2, MAX_RETRY_DELAY)
 
         dms_error(f"Connector unreachable after {MAX_RETRY_ATTEMPTS} attempts; aborting setup")
-        raise RuntimeError("Connector unreachable; cannot load schema fields")
+        return []
 
     async def build(self) -> None:
         """Init handler"""

@@ -17,7 +17,7 @@ class Classifier:
     CLASSIFY_ENDPOINT: str = "/predict"
 
     MAX_CHARS: int = 2000
-    BATCH_SIZE: int = 4
+    BATCH_SIZE: int = 64
     ESCALATION_THRESHOLD: float = 0.2
 
     LABELS = ["Public", "Internal", "Sensitive", "Confidential"]

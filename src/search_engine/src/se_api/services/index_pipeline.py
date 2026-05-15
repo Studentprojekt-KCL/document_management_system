@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Queue, QueueShutDown, Task, create_task, gather, to_thread
+from asyncio import Lock, Queue, QueueShutDown, Task, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -25,7 +25,7 @@ from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
-from shared_functions.dmis_logger import datetime, dms_info, dms_warning
+from shared_functions.dmis_logger import dms_info, dms_warning
 
 
 @dataclass
@@ -46,12 +46,43 @@ class IndexPipeline:
     queues: Queues
     _tasks: list[Task]
 
+    working_on: list
+    working_on_lock: Lock
+
     def __init__(self, search_engine: SearchEngine, connector: Connector, classifier: Classifier) -> None:
         """Constructor"""
         self.search_engine = search_engine
         self.connector = connector
         self.classifier = classifier
         self._tasks = []
+        self.working_on = []
+        self.working_on_lock = Lock()
+
+    async def start(self) -> None:
+        """Start the indexing pipeline."""
+        fetch_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+        decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+        index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+        lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
+        classify_queue: Queue = Queue(CLASSIFICATION_QUEUE_SIZE)
+        reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+        self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
+        fetch_tasks: list[Task] = [create_task(self._ingest_fetch()) for _ in range(GENERIC_WORKER_COUNT)]
+        decode_tasks: list[Task] = [create_task(self._ingest_decode()) for _ in range(GENERIC_WORKER_COUNT)]
+        ingest_index_task: Task = create_task(self._ingest_index())
+
+        classifier_load_task: Task = create_task(self._classifier_load_index())
+        classify_tasks: list[Task] = [create_task(self._classifier_execute()) for _ in range(GENERIC_WORKER_COUNT)]
+        classifier_refresh_task: Task = create_task(self._classifier_refresh_index())
+
+        self._tasks = [
+            *fetch_tasks,
+            *decode_tasks,
+            *classify_tasks,
+            ingest_index_task,
+            classifier_load_task,
+            classifier_refresh_task,
+        ]
 
     async def stop(self) -> None:
         """Stop indexing and wait for workers to exit."""
@@ -68,87 +99,19 @@ class IndexPipeline:
             task.cancel()
         if self._tasks:
             await gather(*self._tasks, return_exceptions=True)
+        self.working_on = []
 
-    async def run(self, authorization: str | None) -> None:
-        """Run indexing pipeline.
+    async def add(self, authorization: str | None) -> None:
+        """Add request to indexing pipeline.
 
         Args:
-            search_engine: the search engine object.
-            connector: connector object.
-            classifier: classifier object.
+            authorization: user authorization token.
         """
-        dms_info("Indexing started.")
-        start = datetime.now()
+        streams: list = await self.connector.connector_fetch(authorization)
+        for stream in streams:
+            await self.queues.fetch_queue.put(stream)
 
-        fetch_queue: Queue = await self.connector.connector_fetch(authorization)
-        decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
-        index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
-        lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
-        classify_queue: Queue = Queue(CLASSIFICATION_QUEUE_SIZE)
-        reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
-
-        self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)
-        fetch_tasks: list[Task] = [create_task(self._ingest_fetch(fetch_queue, decode_queue)) for _ in range(GENERIC_WORKER_COUNT)]
-        decode_tasks: list[Task] = [
-            create_task(self._ingest_decode(decode_queue, index_queue)) for _ in range(GENERIC_WORKER_COUNT)
-        ]
-        ingest_index_task: Task = create_task(self._ingest_index(index_queue, lookup_queue))
-
-        classifier_load_task: Task = create_task(self._classifier_load_index(lookup_queue, classify_queue))
-        classify_tasks: list[Task] = [
-            create_task(self._classifier_execute(classify_queue, reindex_queue)) for _ in range(GENERIC_WORKER_COUNT)
-        ]
-        classifier_refresh_task: Task = create_task(self._classifier_refresh_index(reindex_queue))
-
-        self._tasks = [
-            *fetch_tasks,
-            *decode_tasks,
-            *classify_tasks,
-            ingest_index_task,
-            classifier_load_task,
-            classifier_refresh_task,
-        ]
-
-        # Wait for fetching job to finish.
-        await fetch_queue.join()
-        for _ in fetch_tasks:
-            await fetch_queue.put(None)
-        dms_info(f"Finished fetching from connector, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for decode job to finish.
-        await decode_queue.join()
-        for _ in decode_tasks:
-            await decode_queue.put(None)
-        dms_info(f"Finished decoding, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for index job to finish.
-        await index_queue.join()
-        await index_queue.put(None)
-        await index_queue.join()
-        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-        dms_info("Ingestion stage completed.")
-
-        # Wait for fetching job to finish.
-        await fetch_queue.join()
-        await fetch_queue.put(None)
-        await fetch_queue.join()
-        dms_info(f"Finished fetching from index, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for classification job to finish.
-        await classify_queue.join()
-        for _ in classify_tasks:
-            await classify_queue.put(None)
-        await classify_queue.join()
-        dms_info(f"Finished classifying, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-
-        # Wait for reindex job to finish.
-        await reindex_queue.join()
-        await reindex_queue.put(None)
-        await reindex_queue.join()
-        dms_info(f"Finished indexing, time: {round((datetime.now() - start).total_seconds(), 3)}s.")
-        dms_info("Ingestion stage completed.")
-
-    async def _ingest_fetch(self, fetch_queue: Queue, decode_queue: Queue) -> None:
+    async def _ingest_fetch(self) -> None:
         """Fetch files from stream.
 
         Args:
@@ -158,19 +121,25 @@ class IndexPipeline:
         """
         while True:
             try:
-                stream_object: dict | None = await fetch_queue.get()
-                if stream_object is None:
-                    break
+                stream_object: dict = await self.queues.fetch_queue.get()
+                stream_url = stream_object.get("stream_url")
+                async with self.working_on_lock:
+                    if stream_url in self.working_on:
+                        continue
+                    self.working_on.append(stream_object.get("stream_url"))
                 try:
                     async for file in self.connector.stream(stream_object):
-                        await decode_queue.put(file)
+                        await self.queues.decode_queue.put(file)
                 except httpx.HTTPError:
-                    dms_warning(f"Failed to connect to {stream_object.get("stream_url")}.")
-                fetch_queue.task_done()
+                    dms_warning(f"Failed to connect to {stream_url}.")
+                async with self.working_on_lock:
+                    self.working_on.remove(stream_url)
+                dms_info(f"Finished streaming from {stream_url}")
+                self.queues.fetch_queue.task_done()
             except QueueShutDown:
                 break
 
-    async def _ingest_decode(self, decode_queue: Queue, index_queue: Queue) -> None:
+    async def _ingest_decode(self) -> None:
         """Format and doecode files.
 
         Args:
@@ -179,21 +148,18 @@ class IndexPipeline:
         """
         while True:
             try:
-                file: dict | None = await decode_queue.get()
-                if file is None:
-                    break
+                file: dict = await self.queues.decode_queue.get()
                 file, raw_content = await self._decode_base64(file)
-                if file is None or raw_content is None:
-                    continue
-                file[CONTENT] = await self._convert_content(raw_content)
-                file[CLASSIFICATION] = "Pending"
-                file[MODIFIED] = False
-                await index_queue.put(file)
-                decode_queue.task_done()
+                if file is not None and raw_content is not None:
+                    file[CONTENT] = await self._convert_content(raw_content)
+                    file[CLASSIFICATION] = "Pending"
+                    file[MODIFIED] = False
+                    await self.queues.index_queue.put(file)
+                self.queues.decode_queue.task_done()
             except QueueShutDown:
                 break
 
-    async def _ingest_index(self, index_queue: Queue, classify_queue: Queue) -> None:
+    async def _ingest_index(self) -> None:
         """Index file batches of files.
 
         Args:
@@ -205,26 +171,23 @@ class IndexPipeline:
         batch: list[dict] = []
         while True:
             try:
-                file: dict | None = await index_queue.get()
-                if file is not None:
-                    size = file.get("size", 0)
-                    batch.append(file)
-                    content_total_size += int(size)
-                if content_total_size >= MAX_PENDING_CONTENT_SIZE or file is None:
+                file: dict = await self.queues.index_queue.get()
+                size = file.get("size", 0)
+                batch.append(file)
+                content_total_size += int(size)
+                if content_total_size >= MAX_PENDING_CONTENT_SIZE or self._open_index():
                     await self._index_batch(self.search_engine, batch)
                     dms_info(f"Ingest: Batch of {len(batch)} ({round(content_total_size/1024, 2)}KB) commited.")
                     for item in batch:
                         unique_pointer: str = item.get(UNIQUE_POINTER, "")
-                        await classify_queue.put(unique_pointer)
+                        await self.queues.lookup_queue.put(unique_pointer)
                     batch = []
                     content_total_size = 0
-                index_queue.task_done()
-                if file is None:
-                    break
+                self.queues.index_queue.task_done()
             except QueueShutDown:
                 break
 
-    async def _classifier_load_index(self, fetch_queue: Queue, classify_queue: Queue) -> None:
+    async def _classifier_load_index(self) -> None:
         """Fetch files from search engine.
 
         Args:
@@ -235,16 +198,14 @@ class IndexPipeline:
 
         while True:
             try:
-                pointer: str | None = await fetch_queue.get()
-                if pointer is None:
-                    break
+                pointer: str = await self.queues.lookup_queue.get()
                 file: dict = await self._grab_files_from_index(self.search_engine, pointer)
-                await classify_queue.put(file)
-                fetch_queue.task_done()
+                await self.queues.classify_queue.put(file)
+                self.queues.lookup_queue.task_done()
             except QueueShutDown:
                 break
 
-    async def _classifier_execute(self, classify_queue: Queue, index_queue: Queue) -> None:
+    async def _classifier_execute(self) -> None:
         """Classify batch of files.
 
         Args:
@@ -255,21 +216,18 @@ class IndexPipeline:
         batch: list = []
         while True:
             try:
-                file: dict | None = await classify_queue.get()
-                if file is not None:
-                    batch.append(file)
-                if len(batch) >= self.classifier.BATCH_SIZE or file is None:
+                file: dict = await self.queues.classify_queue.get()
+                batch.append(file)
+                if len(batch) >= self.classifier.BATCH_SIZE or self.queues.lookup_queue.qsize() <= 0:
                     await self.classifier.classify(batch)
                     for file in batch:
-                        await index_queue.put(file)
+                        await self.queues.reindex_queue.put(file)
                     batch = []
-                classify_queue.task_done()
-                if file is None:
-                    break
+                self.queues.classify_queue.task_done()
             except QueueShutDown:
                 break
 
-    async def _classifier_refresh_index(self, index_queue: Queue) -> None:
+    async def _classifier_refresh_index(self) -> None:
         """Reindex batch of files with classification.
 
         Args:
@@ -280,21 +238,28 @@ class IndexPipeline:
         batch: list[dict] = []
         while True:
             try:
-                file: dict | None = await index_queue.get()
-                if file is not None:
-                    size = file.get("size", 0)
-                    batch.append(file)
-                    content_total_size += int(size)
-                if content_total_size >= MAX_PENDING_CONTENT_SIZE or file is None:
+                file: dict = await self.queues.reindex_queue.get()
+                size = file.get("size", 0)
+                batch.append(file)
+                content_total_size += int(size)
+                if content_total_size >= MAX_PENDING_CONTENT_SIZE or self._open_reindex():
                     await self._index_batch(self.search_engine, batch)
                     dms_info(f"Classification: Batch of {len(batch)} ({round(content_total_size/1024, 2)}KB) commited.")
                     batch = []
                     content_total_size = 0
-                index_queue.task_done()
-                if file is None:
-                    break
+                self.queues.reindex_queue.task_done()
             except QueueShutDown:
                 break
+
+    def _open_index(self) -> bool:
+        return len(self.working_on) <= 0 and self.queues.decode_queue.qsize() <= 0 and self.queues.index_queue.qsize() <= 0
+
+    def _open_reindex(self) -> bool:
+        return (
+            self.queues.lookup_queue.qsize() <= 0
+            and self.queues.classify_queue.qsize() <= 0
+            and self.queues.reindex_queue.qsize() <= 0
+        )
 
     @staticmethod
     async def _grab_files_from_index(search_engine: SearchEngine, unique_pointer: str) -> dict:
@@ -332,7 +297,7 @@ class IndexPipeline:
             dms_warning("Failed to write file to index.")
 
     @staticmethod
-    async def _decode_base64(file: dict) -> tuple[dict | None, bytes | None]:
+    async def _decode_base64(file: dict) -> tuple[dict, bytes | None]:
         """Decode file content.
 
         Args:
@@ -340,12 +305,12 @@ class IndexPipeline:
         Returns: dict with decoded file content, or none on failure.
         """
 
-        def task() -> tuple[dict | None, bytes | None]:
+        def task() -> tuple[dict, bytes | None]:
             flat_file: dict = IndexPipeline._flatten_dict(file)
             content: str | None = flat_file.get(CONTENT)
             if content is None:
-                dms_warning("File is missing content.")
-                return (None, None)
+                dms_warning(f"File is missing content: {flat_file.get(UNIQUE_POINTER)}")
+                return (flat_file, None)
             content_bytes = base64.b64decode(content)
             flat_file[CONTENT] = ""
             return flat_file, content_bytes

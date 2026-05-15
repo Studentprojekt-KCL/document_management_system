@@ -10,7 +10,7 @@ COPY src/connectors/confluence ./connectors/confluence
 
 WORKDIR /app/connectors/confluence
 
-RUN pip install --upgrade pip
-RUN pip install .
+RUN pip install --upgrade pip \
+    && pip install .
 
 CMD ["confluence_connector"]

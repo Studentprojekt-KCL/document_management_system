@@ -2,6 +2,8 @@
 /**
  * ConnectedSourcesView
  * Displays all supported integrations and whether the user is connected.
+ * Fetches available sources, active sessions, and auth endpoints.
+ * Allows users to connect new sources via session-based or basic auth.
  */
 
 import { computed, ref } from 'vue'
@@ -11,7 +13,7 @@ import ConnectModal from '@/components/ConnectModal.vue'
 
 const sources = ref([])
 const sourceAuthEntries = ref([])
-const connectedSources = ref([])
+const activeSessions = ref({})
 const showModal = ref(false)
 const selectedSource = ref(null)
 const modalLoading = ref(false)
@@ -22,9 +24,19 @@ const normalizeAuthMethod = (method) => {
   return String(method).toLowerCase()
 }
 
+const normalizeSourceName = (source) => String(source || '').toLowerCase()
+
+const mapNormalizeSources = (sessions) => {
+  if (!sessions || typeof sessions !== 'object') return {}
+
+  return Object.fromEntries(
+    Object.entries(sessions).map(([serviceName, isActive]) => [normalizeSourceName(serviceName), Boolean(isActive)])
+  )
+}
+
 const getAuthEndpoint = (source) => {
-  const sourceName = String(source || '').toLowerCase()
-  return sourceAuthEntries.value.find((entry) => String(entry?.name || '').toLowerCase() === sourceName) || null
+  const sourceName = normalizeSourceName(source)
+  return sourceAuthEntries.value.find((entry) => normalizeSourceName(entry?.name) === sourceName) || null
 }
 
 const resolveAuthEndpointUrl = (endpoint) => {
@@ -74,16 +86,37 @@ const fetchAuthUserUrls = async () => {
   }
 }
 
+const fetchActiveSessions = async () => {
+  try {
+    const res = await authFetch(API_PATHS.activeSessions)
+
+    if (!res.ok) {
+      console.error(`Failed to fetch active sessions: ${res.statusText}`)
+      activeSessions.value = {}
+      return
+    }
+
+    const data = await res.json()
+    activeSessions.value = mapNormalizeSources(data)
+    console.log('Active sessions:', data)
+  } catch (error) {
+    console.error(`Error fetching active sessions: ${error}`)
+    activeSessions.value = {}
+  }
+}
 fetchSources()
 fetchAuthUserUrls()
+fetchActiveSessions()
 
 const connectedCount = computed(() => sources.value.filter((source) => isConnected(source)).length)
 const selectedSourceAuthEntry = computed(() => getAuthEndpoint(selectedSource.value))
 const selectedSourceAuthMethod = computed(() => normalizeAuthMethod(selectedSourceAuthEntry.value?.authentication_method))
 
-const isConnected = (source) => connectedSources.value.includes(source)
+const isConnected = (source) => Boolean(activeSessions.value[normalizeSourceName(source)])
 
 const connectSource = (source) => {
+  document.cookie = `source=${encodeURIComponent(source)}; path=/; max-age=3600`
+
   const authEntry = getAuthEndpoint(source)
   const method = normalizeAuthMethod(authEntry?.authentication_method)
   const targetUrl = resolveAuthEndpointUrl(authEntry?.endpoint)
@@ -110,12 +143,6 @@ const closeConnectModal = () => {
   selectedSource.value = null
   modalError.value = ''
   modalLoading.value = false
-}
-
-const markConnected = (source) => {
-  if (!connectedSources.value.includes(source)) {
-    connectedSources.value = [...connectedSources.value, source]
-  }
 }
 
 const handleConnect = async ({ source, endpoint, method, username, password }) => {
@@ -153,7 +180,7 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
         return
       }
 
-      markConnected(source)
+      await fetchActiveSessions()
       closeConnectModal()
     } catch (error) {
       modalError.value = `Connection failed: ${String(error)}`
@@ -222,7 +249,6 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
   align-items: center;
   gap: 0.5rem;
   background: #eef2ff;
-  color: #3730a3;
   border: 1px solid #c7d2fe;
   padding: 0.5rem 0.75rem;
   border-radius: 999px;
@@ -265,7 +291,7 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
 .source-icon {
   width: 20px;
   height: 20px;
-  color: #4f46e5;
+  background: #7c3aed;
 }
 
 .status-pill {
@@ -311,6 +337,6 @@ const handleConnect = async ({ source, endpoint, method, username, password }) =
   border: 0;
   cursor: pointer;
   color: #ffffff;
-  background: #4f46e5;
+  background: #7c3aed;
 }
 </style>

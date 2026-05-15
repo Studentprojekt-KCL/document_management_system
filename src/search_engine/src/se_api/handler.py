@@ -60,7 +60,7 @@ class Handler:
 
     async def build(self) -> None:
         """Init handler"""
-        fields = await self._fetch_fields_blocking()
+        fields = await self._fetch_fields()
         rebuild = self.search_engine.load_index(fields)
         if rebuild:
             self.connector.write_subdata({})

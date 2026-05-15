@@ -22,7 +22,7 @@ export function LogTable({ logs }: LogTableProps) {
           {logs.length === 0 ? (
             <tr>
               <td colSpan={4} class="px-6 py-8 text-center text-gray-500">
-                No logs recorded in the last hour.
+                No logs found.
               </td>
             </tr>
           ) : (

@@ -47,6 +47,7 @@ class API:
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
         self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
+        self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
 
     async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Overwrite FastAPI exception handler."""
@@ -164,6 +165,9 @@ class API:
         """
         return JSONResponse(content={"valid": await self.github_instance.verify_token(x_github_token)}, status_code=200)
 
+    async def defined_fields(self) -> list:
+        """Retrieve fields delivered for file conent."""
+        return list(self.github_instance.defined_fields.keys())
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""

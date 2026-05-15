@@ -98,18 +98,16 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return
     }
 
     const data = await res.json()
-    console.log('Search response:', data)
     const resultArray = Array.isArray(data) ? data : data.results || data.matches || []
 
     allMatches.value = resultArray
-    matches.value = resultArray
+    matches.value = filterMatches(resultArray, selectedFilters.value)
 
     if (matches.value.length === 0 && currentPage.value === 1) {
       error.value = 'No matching files found.'
@@ -128,12 +126,41 @@ const searchParams = () => ({
   security_class: selectedFilters.value.security.join(' ')
 })
 
-const searchWithFilters = async ({ query, documentsOnly, resetPreview = true }) => {
+const filterMatches = (results, filters) => {
+  if (!filters.source.length && !filters.type.length && !filters.security.length) {
+    return results
+  }
+
+  return results.filter((match) => {
+    const filetype = resolveDocumentExtension(match).toLowerCase()
+    const securityClass = resolveSecurityClass(match).toLowerCase()
+    const source = resolveSource(match).toLowerCase()
+
+    const typeMatch =
+      filters.type.length === 0 ||
+      filters.type.some((selected) => {
+        const extensions = selected.split('|')
+        return extensions.some((ext) => filetype === ext.toLowerCase())
+      })
+
+    const sourceMatch = filters.source.length === 0 || filters.source.some((selected) => source === selected.toLowerCase())
+
+    const securityMatch =
+      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+
+    return typeMatch && sourceMatch && securityMatch
+  })
+}
+
+const searchWithFilters = async ({ query, documentsOnly, resetPreview = true, file_type, source_system, security_class }) => {
   await handleSearch({
     query,
     documentsOnly,
     resetPreview,
-    ...searchParams()
+    ...searchParams(),
+    file_type,
+    source_system,
+    security_class
   })
 }
 
@@ -161,53 +188,21 @@ const closePreview = () => {
   isPreviewOpen.value = false
 }
 
-/* Handle changes to search filters  */
-const handleFilterChange = (filters) => {
-  selectedFilters.value = filters
-  // If no filters → show everything
-  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
-    matches.value = allMatches.value
-    return
-  }
-  matches.value = allMatches.value.filter((match) => {
-    const filetype = resolveDocumentExtension(match).toLowerCase()
-    const securityClass = resolveSecurityClass(match).toLowerCase()
-    const source = resolveSource(match).toLowerCase()
-
-    // TYPE FILTER
-    const typeMatch =
-      filters.type.length === 0 ||
-      filters.type.some((selected) => {
-        // Split the group string from json file (e.g., ".docx .doc .odt") and check if filetype is in it
-        const extensions = selected.split('|')
-        return extensions.some((ext) => filetype === ext.toLowerCase())
-      })
-
-    // SOURCE FILTER
-    const sourceMatch = filters.source.length === 0 || filters.source.some((selected) => source === selected.toLowerCase())
-
-    // SECURITY FILTER
-    const securityMatch =
-      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
-
-    return typeMatch && sourceMatch && securityMatch
-  })
-}
-
 /* Sends down a new request to the backend if the user changes the filters */
 const handleFilterChangeAndSearch = async (filters) => {
   selectedFilters.value = filters
+  currentPage.value = 1
+
   if (lastQuery.value && lastQuery.value.trim()) {
-    await handleSearch({
+    await searchWithFilters({
       query: lastQuery.value,
       documentsOnly: documentsOnlyMode.value,
+      resetPreview: false,
       file_type: filters.type.join(' '),
       source_system: filters.source.join(' '),
       security_class: filters.security.join(' ')
     })
   }
-  // Apply filter AFTER server results are loaded
-  handleFilterChange(filters)
 }
 
 // searching a second time automatically to update the security levels
@@ -227,7 +222,8 @@ const nextPage = async () => {
   await searchWithFilters({
     query: lastQuery.value,
     documentsOnly: documentsOnlyMode.value,
-    resetPreview: false
+    resetPreview: false,
+    ...searchParams()
   })
 
   if (matches.value.length === 0) {
@@ -241,7 +237,8 @@ const previousPage = async () => {
     await searchWithFilters({
       query: lastQuery.value,
       documentsOnly: documentsOnlyMode.value,
-      resetPreview: false
+      resetPreview: false,
+      ...searchParams()
     })
   }
 }

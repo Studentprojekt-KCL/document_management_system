@@ -100,7 +100,8 @@ class Handler:
             available: list[dict] | None = await self.connector.fetch_files(list(matches.keys()), authorization)
             if available is None:
                 break
-            elif not available:
+
+            if not available:
                 fails += 1
             else:
                 fails = 0

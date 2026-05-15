@@ -1,5 +1,5 @@
 // schema for database structure
-interface LogEntry {
+export interface LogEntry {
   id: number;
   occured: string;
   message: string;

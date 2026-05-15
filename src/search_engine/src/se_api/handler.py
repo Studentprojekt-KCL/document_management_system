@@ -2,15 +2,22 @@
 
 from copy import deepcopy
 
-from asyncio import Task, create_task
+from asyncio import Task, create_task, sleep
 
-from se_api.constants import CLASSIFICATION, MAX_FAIL_COUNT, UNIQUE_POINTER
+from se_api.constants import (
+    CLASSIFICATION,
+    INITIAL_RETRY_DELAY,
+    MAX_FAIL_COUNT,
+    MAX_RETRY_ATTEMPTS,
+    MAX_RETRY_DELAY,
+    UNIQUE_POINTER,
+)
 from se_api.services.index_pipeline import IndexPipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class Handler:
@@ -35,9 +42,25 @@ class Handler:
         self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
         self.indexing = create_task(self.index_pipeline.start())
 
+    async def _fetch_fields_blocking(self) -> list[str]:
+        """Fetch fields from connector, retrying with backoff until it responds."""
+        delay = INITIAL_RETRY_DELAY
+        for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+            fields = await self.connector.get_fields()
+            if fields is not None:
+                return fields
+            if attempt == MAX_RETRY_ATTEMPTS:
+                break
+            dms_warning(f"Connector not ready (attempt {attempt}/{MAX_RETRY_ATTEMPTS}), " f"retrying in {delay:.0f}s...")
+            await sleep(delay)
+            delay = min(delay * 2, MAX_RETRY_DELAY)
+
+        dms_error(f"Connector unreachable after {MAX_RETRY_ATTEMPTS} attempts; aborting setup")
+        raise RuntimeError("Connector unreachable; cannot load schema fields")
+
     async def build(self) -> None:
         """Init handler"""
-        fields: list[str] | None = await self.connector.get_fields()
+        fields = await self._fetch_fields_blocking()
         rebuild = self.search_engine.load_index(fields)
         if rebuild:
             self.connector.write_subdata({})
@@ -59,7 +82,7 @@ class Handler:
         self.search_engine = SearchEngine()
         self.connector = Connector()
         self.classifier = Classifier()
-        fields: list[str] | None = await self.connector.get_fields()
+        fields = await self._fetch_fields_blocking()
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
         self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)

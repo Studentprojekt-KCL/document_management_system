@@ -11,7 +11,7 @@ import uvicorn
 from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from interfacer_sharepoint import SharePoint
 
@@ -83,7 +83,7 @@ class API:
             media_type="application/octet-stream",
         )
 
-    def auth_user(self, request: Request) -> JSONResponse:
+    def auth_user(self) -> JSONResponse:
         """Redirect user to Microsoft OAuth login."""
         payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
         signed_state = sign_encode_state(payload, self.state_secret)

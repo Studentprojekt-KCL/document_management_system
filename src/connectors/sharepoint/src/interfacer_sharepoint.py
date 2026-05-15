@@ -169,14 +169,14 @@ class SharePoint:
             dms_info(f"SharePoint: indexing file with unrecognised extension: {repr(name)}")
         item_id = item.get("id", "")
         return {
-                "unique_pointer": f"{self.graph_base}/drives/{drive_id}/items/{item_id}",
-                "name": name,
-                "size": item.get("size", 0),
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
-                "last_edit_date": item.get("lastModifiedDateTime"),
-                "clickable_url": item.get("webUrl", ""),
-        }| extension,
+            "unique_pointer": f"{self.graph_base}/drives/{drive_id}/items/{item_id}",
+            "name": name,
+            "size": item.get("size", 0),
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
+            "last_edit_date": item.get("lastModifiedDateTime"),
+            "clickable_url": item.get("webUrl", ""),
+        } | extension
 
     async def _fetch_record_content(self, ctx: _HttpCtx, record: dict) -> None:
         """Fetch file bytes and base64-encode them into record['content'] in-place."""

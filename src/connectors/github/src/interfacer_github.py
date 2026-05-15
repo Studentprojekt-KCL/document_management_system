@@ -240,12 +240,12 @@ class GitHub:
         last_edit = self._last_commit_date_for_path(full_name, path, ref, token) if include_last_edit_date else None
 
         base_structure: dict[Any, Any] = {
-                "unique_pointer": pointer,
-                "name": name,
-                "size": size,
-                "last_edit_date": last_edit,
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
+            "unique_pointer": pointer,
+            "name": name,
+            "size": size,
+            "last_edit_date": last_edit,
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
         }
         if isinstance(path, str):
             base_structure["clickable_url"] = self._get_clickable_url(full_name, path, ref)

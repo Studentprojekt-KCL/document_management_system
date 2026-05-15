@@ -223,7 +223,7 @@ class GitHub:
         parsed = self._parse_file_pointer(pointer)
         if not parsed:
             dms_info(f"Could not parse GitHub file pointer: {pointer}")
-            return {"metadata": {"unique_pointer": pointer, "type": SOURCE_FILE}}
+            return {"unique_pointer": pointer, "type": SOURCE_FILE}
 
         full_name, path, ref = parsed
         req_url = self._make_file_pointer(full_name, path, ref)
@@ -240,17 +240,15 @@ class GitHub:
         last_edit = self._last_commit_date_for_path(full_name, path, ref, token) if include_last_edit_date else None
 
         base_structure: dict[Any, Any] = {
-            "metadata": {
-                "unique_pointer": pointer,
-                "name": name,
-                "size": size,
-                "last_edit_date": last_edit,
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
-            }
+            "unique_pointer": pointer,
+            "name": name,
+            "size": size,
+            "last_edit_date": last_edit,
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
         }
         if isinstance(path, str):
-            base_structure["metadata"]["clickable_url"] = self._get_clickable_url(full_name, path, ref)
+            base_structure["clickable_url"] = self._get_clickable_url(full_name, path, ref)
         if include_content and isinstance(file.get("content"), str):
             base_structure["content"] = file["content"].replace("\n", "")
 
@@ -285,12 +283,10 @@ class GitHub:
                 files_data.append(
                     {
                         "content": base64.b64encode(zip_file.read(name)).decode("utf-8"),
-                        "metadata": {
-                            "name": Path(intermediate_path).name,
-                            "unique_pointer": unique_pointer,
-                            "size": info.file_size,
-                            "source_system": self.source_system,
-                        },
+                        "name": Path(intermediate_path).name,
+                        "unique_pointer": unique_pointer,
+                        "size": info.file_size,
+                        "source_system": self.source_system,
                     }
                 )
         return files_data

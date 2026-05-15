@@ -119,7 +119,6 @@ class TestGitHubStreaming(unittest.TestCase):
         self.assertEqual(first_map["owner/repo"], "2026-03-01T00:00:00Z")
         self.assertGreater(len(chunks), 1)
         self.assertIn("content", chunks[1])
-        self.assertIn("metadata", chunks[1])
 
     def test_stream_filters_repos_older_than_subdata(self) -> None:
         """Repos with pushed_at older than recorded subdata watermark produce no file chunks."""
@@ -166,7 +165,7 @@ class TestGitHubStreaming(unittest.TestCase):
         """_unzip_files runs _unpack_zip via asyncio.to_thread to avoid blocking the event loop."""
         zip_queue: asyncio.Queue = asyncio.Queue()
         output_queue: asyncio.Queue = asyncio.Queue()
-        fake_files = [{"content": "abc", "metadata": {"name": "file.py"}}]
+        fake_files = [{"content": "abc", "name": "file.py"}]
 
         asyncio.run(zip_queue.put({"data": b"zip", "full_name": "owner/repo", "branch": "main"}))
         asyncio.run(zip_queue.put(None))

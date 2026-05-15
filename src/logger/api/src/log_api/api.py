@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -66,7 +66,12 @@ class API:
         return JSONResponse(status_code=422, content=content)
 
     async def get_logs(
-        self, start: datetime | None = None, end: datetime | None = None, page: int = 1, limit: int = 50
+        self,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        page: int = 1,
+        limit: int = 50,
+        event_type: list[str] | None = Query(None),
     ) -> LogsResponse:
         """Get paginated logs."""
         if start is None:
@@ -74,7 +79,7 @@ class API:
         if end is None:
             end = datetime.now()
 
-        logs, total = self.database.database_get_logs(start, end, page, limit)
+        logs, total = self.database.database_get_logs(start, end, page, limit, event_type or [])
         return LogsResponse(logs=logs, total=total)
 
     async def add_log(self, log: Log) -> Log:

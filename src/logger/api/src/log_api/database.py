@@ -57,18 +57,26 @@ class Database:
 
         return Log(id=log_id, occured=occured, message=message, event_type=event_type, service=service)
 
-    def database_get_logs(self, start: datetime, end: datetime, page: int, limit: int) -> tuple[list[Log], int]:
+    def database_get_logs(self, start: datetime, end: datetime, page: int, limit: int, event_types: list[str]) -> tuple[list[Log], int]:
         """Grab page."""
 
         db = self.connect()
         cursor = db.cursor()
-        query: str = "SELECT COUNT(*) FROM logs WHERE occured BETWEEN %s AND %s"
-        _ = cursor.execute(query, (start, end))
+
+        type_clause = ""
+        type_params: tuple = ()
+        if event_types:
+            placeholders = ",".join(["%s"] * len(event_types))
+            type_clause = f" AND event_type IN ({placeholders})"
+            type_params = tuple(event_types)
+
+        query: str = f"SELECT COUNT(*) FROM logs WHERE occured BETWEEN %s AND %s{type_clause}"
+        _ = cursor.execute(query, (start, end) + type_params)
         count_row = cursor.fetchone()
         total: int = count_row[0] if count_row and isinstance(count_row[0], int) else 0
         offset = (page - 1) * limit
-        query = "SELECT * FROM logs WHERE occured BETWEEN %s AND %s ORDER BY occured DESC LIMIT %s OFFSET %s"
-        _ = cursor.execute(query, (start, end, limit, offset))
+        query = f"SELECT * FROM logs WHERE occured BETWEEN %s AND %s{type_clause} ORDER BY occured DESC LIMIT %s OFFSET %s"
+        _ = cursor.execute(query, (start, end) + type_params + (limit, offset))
         result = cursor.fetchall()
 
         logs = [self.extract_row_data(row) for row in result]

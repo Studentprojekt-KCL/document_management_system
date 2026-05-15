@@ -82,7 +82,7 @@ class Handler:
         self.search_engine = SearchEngine()
         self.connector = Connector()
         self.classifier = Classifier()
-        fields = await self._fetch_fields_blocking()
+        fields = await self._fetch_fields()
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
         self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)

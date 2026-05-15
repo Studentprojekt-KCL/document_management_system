@@ -88,24 +88,35 @@ class Handler:
         offset: int = 0
         available_offset: int = 0
         fails: int = 0
+        score: float = 0
 
         while missing > 0 and fails < MAX_FAIL_COUNT:
-            matches, metadata = await self.search_engine.find_matching(pointer, missing + offset)
+            matches = await self.search_engine.find_matching(pointer, missing, offset)
             if not matches:
                 break
-            available: list[dict] | None = await self.connector.fetch_files(matches, authorization)
+            if pointer in matches:
+                score = matches.get(pointer, 0)
+                matches.pop(pointer)
+            available: list[dict] | None = await self.connector.fetch_files(list(matches.keys()), authorization)
             if available is None:
-                return []
-            for file in available[available_offset:]:
-                file.update({"score": metadata.get(file.get(UNIQUE_POINTER, ""), 0)})
-                files.append(file)
-            missing = count - len(files)
-            if not files:
+                break
+            elif not available:
                 fails += 1
             else:
                 fails = 0
+
+            for file in available:
+                file.update({"score": matches.get(file.get(UNIQUE_POINTER, ""), 0)})
+                files.append(file)
+            missing = count - len(files)
             offset += count
             available_offset += len(available)
+
+        if score == 0:
+            return []
+
+        for file in files:
+            file["score"] /= score
         return files
 
     def grab_searchable_fields(self) -> set:

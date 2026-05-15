@@ -169,6 +169,7 @@ class API:
         """Retrieve fields delivered for file conent."""
         return list(self.github_instance.defined_fields.keys())
 
+
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()

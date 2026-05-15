@@ -42,7 +42,7 @@ class Handler:
         self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
         self.indexing = create_task(self.index_pipeline.start())
 
-    async def _fetch_fields_blocking(self) -> list[str]:
+    async def _fetch_fields(self) -> list[str]:
         """Fetch fields from connector, retrying with backoff until it responds."""
         delay = INITIAL_RETRY_DELAY
         for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):

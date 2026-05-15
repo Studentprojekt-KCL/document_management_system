@@ -33,7 +33,7 @@ class API:
     def __init__(self) -> None:
         """Constructor."""
         self.github_instance = GitHub()
-        self.auth_callback_url = read_env_variable("CONGITLAB_CONNECT_SERVICE_CALLBACK")
+        self.auth_callback_url = read_env_variable("CONGITHUB_CONNECT_SERVICE_CALLBACK")
         self.client_id = read_env_variable("CONGITHUB_CLIENT_ID")
         self.client_secret = read_env_variable("CONGITHUB_CLIENT_SECRET")
         self.state_secret = read_env_variable("CONGITHUB_STATE_SIGNING_SECRET")

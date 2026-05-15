@@ -157,7 +157,7 @@ class Connector:
                         raw = ""
                     except json.JSONDecodeError:
                         continue
-                    if subdata is None and data.get("subdata") is not None:
+                    if subdata is None and "subdata" in data:
                         subdata = data.get("subdata")
                         continue
                     yield data

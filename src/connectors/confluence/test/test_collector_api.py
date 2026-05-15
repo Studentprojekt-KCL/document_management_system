@@ -19,6 +19,8 @@ _FAKE_OAUTH_ENV: dict[str, str] = {
     "CONCONFLUENCE_TOKEN_URL": "https://location/oauth/token",
     "CONCONFLUENCE_SCOPES": "read:space:confluence,read:page:confluence,offline_access",
     "CONCONFLUENCE_CONNECT_SERVICE_CALLBACK": "https://somelocation/callback",
+    # Must match ``read_env_variable`` name in ``collector_api`` (currently CONCONFLUENDE_…).
+    "CONCONFLUENDE_CHECK_AUTH_URL": "https://location/token/validate",
 }
 
 

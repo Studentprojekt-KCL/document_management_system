@@ -1,4 +1,10 @@
 <script setup>
+/**
+ * ConnectModal Component
+ * A modal used for connecting our different source systems.
+ * It supports both basic auth (username/password) and sessionbased auth.
+ * Used in ConnectedSourcesView.vue when user clicks "Connect" on a source that is not yet connected.
+ */
 import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 
@@ -61,18 +67,19 @@ const handleConnect = () => {
       </div>
       <div class="modal-body">
         <template v-if="usesBasicAuth">
-          <div class="credential-form">
+          <form class="credential-form" @submit.prevent="handleConnect">
             <label for="username">Username</label>
-            <input id="username" v-model="username" type="text" placeholder="Enter username" />
+            <input id="username" v-model="username" autocomplete="username" type="text" placeholder="Enter username" />
 
             <label for="password">Password</label>
-            <input id="password" v-model="password" type="password" placeholder="Enter password" />
-          </div>
-          <div class="modal-footer">
-            <button class="connect-btn" :disabled="!submitConnection || loading" @click="handleConnect">
-              {{ loading ? 'Connecting...' : 'Connect' }}
-            </button>
-          </div>
+            <input id="password" v-model="password" autocomplete="current-password" type="password" placeholder="Enter password" />
+
+            <div class="modal-footer">
+              <button class="connect-btn" :disabled="!submitConnection || loading" type="submit" @click="handleConnect">
+                {{ loading ? 'Connecting...' : 'Connect' }}
+              </button>
+            </div>
+          </form>
         </template>
 
         <template v-else-if="usesSessionAuth">
@@ -107,7 +114,7 @@ const handleConnect = () => {
 
 .modal {
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
   background: #ffffff;
   border-radius: 16px;
   padding: 1.5rem;
@@ -116,7 +123,6 @@ const handleConnect = () => {
 .modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .close-btn {
@@ -131,14 +137,29 @@ const handleConnect = () => {
   cursor: pointer;
 }
 
-.modal-body {
-  margin-top: 1rem;
-}
-
 .credential-form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.credential-form input {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #dbe1ea;
+  background: #f8fafc;
+  font-size: 1rem;
+}
+
+.credential-form input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.credential-form input::placeholder {
+  color: #94a3b8;
 }
 
 .modal-footer {
@@ -149,11 +170,16 @@ const handleConnect = () => {
 
 .connect-btn {
   padding: 0.75rem 1.5rem;
-  background: #4f46e5;
+  background: #7c3aed;
   color: #ffffff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.connect-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .error-message {

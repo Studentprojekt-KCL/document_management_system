@@ -106,7 +106,9 @@ class ConfluenceInterfacer:
     ) -> list[dict[str, Any]]:
         """Collect all paginated results from the v2 pages endpoint."""
         url = urljoin(self.base, "pages")
-        payload = await self._execute_get_request(url, params, api_token)
+        payload = await self.execute_get_request(url, params, api_token)
+        if not isinstance(payload, dict):
+            return []
         out: list[dict[str, Any]] = []
 
         while payload:
@@ -117,7 +119,9 @@ class ConfluenceInterfacer:
             next_link = links.get("next") if isinstance(links, dict) else None
             if not isinstance(next_link, str) or not next_link:
                 break
-            payload = await self._execute_get_request(self._next_url(next_link), {}, api_token)
+            payload = await self.execute_get_request(self._next_url(next_link), {}, api_token)
+            if not isinstance(payload, dict):
+                return []
 
         return out
 
@@ -142,8 +146,8 @@ class ConfluenceInterfacer:
     async def get_spaces(self, api_token: str | None = None) -> list[dict[str, Any]] | None:
         """Return Confluence spaces (key, id, name, clickable_url), or None if the request failed."""
         url = urljoin(self.base, "spaces")
-        payload = await self._execute_get_request(url, {"limit": 250}, api_token)
-        if not payload:
+        payload = await self.execute_get_request(url, {"limit": 250}, api_token)
+        if not isinstance(payload, dict):
             return None
         results = payload.get("results", [])
         if not isinstance(results, list):
@@ -234,12 +238,12 @@ class ConfluenceInterfacer:
         api_token: str | None = None,
     ) -> dict[str, Any]:
         """Fetch one page by pointer; metadata plus optional base64-encoded plain text."""
-        payload = await self._execute_get_request(
+        payload = await self.execute_get_request(
             file_pointer,
             {"body-format": "storage"},
             api_token,
         )
-        if not payload:
+        if not isinstance(payload, dict):
             return {}
         return self._format_page_payload(payload, file_pointer, include_content)
 
@@ -267,7 +271,7 @@ class ConfluenceInterfacer:
             "size": len(encoded),
             "last_edit_date": when,
             "type": SOURCE_FILE,
-            "clickable_url": (urljoin(self.address + "/wiki/", webui.lstrip("/")) if isinstance(webui, str) else None),
+            "clickable_url": (urljoin(self.address + "/", webui.lstrip("/")) if isinstance(webui, str) else None),
         }
         if include_content:
             out_structure["content"] = base64.b64encode(encoded).decode("utf-8")
@@ -325,15 +329,18 @@ class ConfluenceInterfacer:
         new_subdata = self._generate_subdata(decoded_subdata)
         return {"subdata": new_subdata, "file_pointers": pointers}
 
-    async def _execute_get_request(self, url: str, params: dict, api_token: str | None) -> dict[str, Any]:
+    async def execute_get_request(self, url: str, params: dict, api_token: str | None) -> dict[str, Any] | list:
+        """Execute request to URL."""
         token = self._resolve_auth(api_token)
         if not token:
             return {}
         try:
-            response = await self.session.get(url, params=params, headers={"Authorization": f"Bearer {token}"})
+            response = await self.session.get(
+                url, params=params, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            )
             response.raise_for_status()
             payload = response.json()
-            if isinstance(payload, dict):
+            if isinstance(payload, (dict, list)) and payload:
                 return payload
         except (httpx.HTTPError, ValueError) as err:
             dms_warning(f"Request to {url} was not successful due to: {err}")

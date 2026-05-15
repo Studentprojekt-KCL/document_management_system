@@ -6,6 +6,7 @@ The following must be exported in the local environment:
     CONGITHUB_GITHUB_BASE_URL=<GITHUB_BASE_URL>           # Web root for OAuth redirects — github.com: https://github.com  |  GHE: https://<host>
     CONGITHUB_GITHUB_SYSTEM_NAME=<SOURCE_SYSTEM_NAME>
     CONGITHUB_GITHUB_API_VERSION=<API_VERSION>            # e.g. 2022-11-28
+    CONGITLAB_CONNECT_SERVICE_CALLBACK=<Service to refere GitLab to send redirect to>
 
 Note: GITHUB_API_URL and GITHUB_BASE_URL are different because on github.com the REST API
 lives on a separate subdomain (api.github.com) from the OAuth endpoints (github.com).

@@ -126,15 +126,15 @@ class TestSharePointRecordBuilding(SharePointTestCase):
         self.assertEqual(
             record,
             {
-                    "unique_pointer": graph_url("/drives/drive-456/items/item-123"),
-                    "name": "Quarterly Report.pdf",
-                    "size": 2048,
-                    "type": "source_file",
-                    "source_system": "SharePoint",
-                    "last_edit_date": "2026-05-01T10:20:30Z",
-                    "clickable_url": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
-                    "file_type": ".pdf",
-                    "file_type_description": "PDF",
+                "unique_pointer": graph_url("/drives/drive-456/items/item-123"),
+                "name": "Quarterly Report.pdf",
+                "size": 2048,
+                "type": "source_file",
+                "source_system": "SharePoint",
+                "last_edit_date": "2026-05-01T10:20:30Z",
+                "clickable_url": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
+                "file_type": ".pdf",
+                "file_type_description": "PDF",
             },
         )
 

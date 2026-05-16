@@ -113,7 +113,6 @@ class IndexPipeline:
         for stream in streams:
             await self.queues.fetch_queue.put(stream)
 
-
     async def _ingest_fetch(self) -> None:
         """Fetch files from stream.
 

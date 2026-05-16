@@ -126,7 +126,9 @@ class SearchEngine:
         searcher = self.index.searcher()
         offset = 0
         while True:
-            result = searcher.search(Query.term_query(self.index.schema, field_name=CLASSIFICATION, field_value="Pending"), limit=100, offset=offset)
+            result = searcher.search(
+                Query.term_query(self.index.schema, field_name=CLASSIFICATION, field_value="Pending"), limit=100, offset=offset
+            )
             offset += 100
             if not result.hits:
                 break

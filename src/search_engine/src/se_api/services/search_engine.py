@@ -117,6 +117,27 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.load_index(fields)
 
+    async def grab_pending(self) -> AsyncGenerator[str]:
+        """Fetch pending files from the index.
+
+        Returns: list of unique pointers.
+        """
+        self.index.reload()
+        searcher = self.index.searcher()
+        offset = 0
+        while True:
+            result = searcher.search(Query.term_query(self.index.schema, field_name=CLASSIFICATION, field_value="Pending"), limit=100, offset=offset)
+            offset += 100
+            if not result.hits:
+                break
+            for _, doc_id in result.hits:
+                doc: Document = searcher.doc(doc_id)
+                try:
+                    unique_pointer = doc[UNIQUE_POINTER][0]
+                    yield unique_pointer
+                except IndexError:
+                    dms_warning(f"Missing unique_pointer: {doc}")
+
     async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
 

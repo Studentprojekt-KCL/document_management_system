@@ -32,18 +32,16 @@ def insert_session(user: str, service_name: str, refresh_url: str, session_varia
     """Insert new session token for given user and service in database."""
     enc_session_vars = SESSION_ENCRYPTION.encrypt_session_vars(session_variables)
     expiry_time = session_variables.get("expires_in")
-    if expiry_time is None:
+    if not isinstance(expiry_time, int):
         dms_warning(f"Refresh service recieved Oauth token without expiry_time ({session_variables})")
         expiry_time = DEFAULT_EXPIRY_TIME
+
+    expiry_time = min(expiry_time, DEFAULT_EXPIRY_TIME)
 
     insert_status = REDIS_DATABASE.insert_session_token(user, service_name, expiry_time, refresh_url, enc_session_vars)
     if insert_status is False:
         return False
-    adjusted_expiry_time = 30  # NOTE; This might need to be more dynamic
-    dms_warning(
-        f"New {service_name} refresh token recived, will refresh in: {adjusted_expiry_time} seconds,"
-        f" ({session_variables.get("expires_in")} was specified)"
-    )
+    adjusted_expiry_time = expiry_time - 300  # NOTE; This might need to be more dynamic
     session_refresh_task.apply_async(args=[user, service_name], countdown=adjusted_expiry_time)
     return True
 

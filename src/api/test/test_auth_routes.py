@@ -27,7 +27,7 @@ class HttpClient:
     async def post(self, *_args, **_kwargs):
         return self.response
 
-    def close(self):
+    async def close(self):
         self.closed = True
 
 

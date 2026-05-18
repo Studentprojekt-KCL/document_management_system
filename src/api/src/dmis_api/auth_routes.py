@@ -227,7 +227,7 @@ class AuthRoutes:
                 "user": {
                     "username": claims.get("preferred_username") or claims.get("name"),
                     "email": claims.get("email"),
-                    "roles": client_roles,
+                    "client_roles": client_roles,
                     "realm_roles": realm_roles,
                 },
             },

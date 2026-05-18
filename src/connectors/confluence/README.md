@@ -18,6 +18,7 @@ The following should be exported in local environment:
     #OAuth scopes to request
     CONCONFLUENCE_SCOPES=read:space:confluence read:page:confluence offline_access
     CONCONFLUENCE_CONNECT_SERVICE_CALLBACK:callback for token
+    CONCONFLUENDE_CHECK_AUTH_URL: #e.g. https://api.atlassian.com/oauth/token/accessible-resources
 
 
 ## Atlassian developer console setup

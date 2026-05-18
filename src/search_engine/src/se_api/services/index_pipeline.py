@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Lock, Queue, QueueShutDown, Task, create_task, gather, to_thread
+from asyncio import Lock, Queue, QueueFull, QueueShutDown, Task, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -79,10 +79,12 @@ class IndexPipeline:
             *fetch_tasks,
             *decode_tasks,
             *classify_tasks,
-            ingest_index_task,
             classifier_load_task,
+            ingest_index_task,
             classifier_refresh_task,
         ]
+
+        await self._load_pending()
 
     async def stop(self) -> None:
         """Stop indexing and wait for workers to exit."""
@@ -187,6 +189,18 @@ class IndexPipeline:
             except QueueShutDown:
                 break
 
+    async def _load_pending(self) -> None:
+        """Fetch pending classifications and add them to the queue."""
+        dms_info("Looking for pending classifications in the index.")
+        try:
+            async for pointer in self.search_engine.grab_pending():
+                await self.queues.lookup_queue.put(pointer)
+            dms_info(f"Done, {self.queues.lookup_queue.qsize()} pointers in queue.")
+        except QueueFull:
+            dms_warning("Failed to add pointer to queue, queue is full.")
+        except QueueShutDown:
+            dms_warning("Failed to add pointer to queue, queue is closed.")
+
     async def _classifier_load_index(self) -> None:
         """Fetch files from search engine.
 
@@ -218,7 +232,9 @@ class IndexPipeline:
             try:
                 file: dict = await self.queues.classify_queue.get()
                 batch.append(file)
-                if len(batch) >= self.classifier.BATCH_SIZE or self.queues.lookup_queue.qsize() <= 0:
+                if len(batch) >= self.classifier.BATCH_SIZE or (
+                    self.queues.lookup_queue.qsize() <= 0 and self.queues.classify_queue.qsize() <= 0
+                ):
                     await self.classifier.classify(batch)
                     for file in batch:
                         await self.queues.reindex_queue.put(file)

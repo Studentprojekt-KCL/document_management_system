@@ -117,6 +117,29 @@ class SearchEngine:
             remove(f"{self.index_path}/{file}")
         self.load_index(fields)
 
+    async def grab_pending(self) -> AsyncGenerator[str]:
+        """Fetch pending files from the index.
+
+        Returns: list of unique pointers.
+        """
+        self.index.reload()
+        searcher = self.index.searcher()
+        offset = 0
+        while True:
+            result = searcher.search(
+                Query.term_query(self.index.schema, field_name=CLASSIFICATION, field_value="Pending"), limit=100, offset=offset
+            )
+            offset += 100
+            if not result.hits:
+                break
+            for _, doc_id in result.hits:
+                doc: Document = searcher.doc(doc_id)
+                try:
+                    unique_pointer = doc[UNIQUE_POINTER][0]
+                    yield unique_pointer
+                except IndexError:
+                    dms_warning(f"Missing unique_pointer: {doc}")
+
     async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
 
@@ -190,7 +213,7 @@ class SearchEngine:
                 dms_warning(f"Missing unique_pointer: {doc}")
         return (pointers, metadata)
 
-    async def find_matching(self, unique_pointer: str, count: int) -> tuple[list[str], dict[str, dict]]:
+    async def find_matching(self, unique_pointer: str, count: int, offset: int) -> dict[str, float]:
         """Search for matching files.
 
         Args:
@@ -202,20 +225,14 @@ class SearchEngine:
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
         if not result.hits:
-            return ([], {})
+            return matching
         doc_address = result.hits[0][1]
-        result = searcher.search(Query.more_like_this_query(doc_address), limit=count + 1)
-        original_score: int | None = None
+        result = searcher.search(Query.more_like_this_query(doc_address), offset=offset, limit=count)
         for score, doc_id in result.hits:
-            if original_score is None:
-                if score == 0:
-                    break
-                original_score = score
-                continue
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
-            matching.update({unique_pointer: score / original_score})
-        return (list(matching.keys()), matching)
+            matching.update({unique_pointer: score})
+        return matching
 
     @asynccontextmanager
     async def open_writer(self) -> AsyncGenerator[None]:

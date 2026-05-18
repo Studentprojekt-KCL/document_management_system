@@ -33,8 +33,7 @@ class HttpClient:
 
 class TestAuthRoutes(IsolatedAsyncioTestCase):
     ENV = {
-        "DMISAPI_AD_TOKEN_URL": "https://identity-provider.test/token",
-        "DMISAPI_AD_LOGOUT_URL": "https://identity-provider.test/logout",
+        "DMISAPI_AD_URL": "https://identity-provider.test/token",
         "DMISAPI_AD_CLIENT_ID": "dmis-api",
         "DMISAPI_ADMIN_ROLES": "admin, owner",
     }

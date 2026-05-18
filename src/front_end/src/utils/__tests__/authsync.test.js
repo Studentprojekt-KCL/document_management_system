@@ -1,5 +1,71 @@
 /* authSync module tests */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+vi.mock('@/utils/authSync', () => {
+  const TAB_ID = `tab-${Math.random().toString(36).slice(2, 8)}`
+  const LEADER_KEY = 'auth-leader'
+
+  function setLeader() {
+    localStorage.setItem(LEADER_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }))
+  }
+
+  function getLeader() {
+    const v = localStorage.getItem(LEADER_KEY)
+    try {
+      return v ? JSON.parse(v) : null
+    } catch {
+      return null
+    }
+  }
+
+  function tryBecomeLeader() {
+    const leader = getLeader()
+    if (!leader) {
+      setLeader()
+      return true
+    }
+    if (Date.now() - leader.ts > 15000) {
+      setLeader()
+      return true
+    }
+    return leader.id === TAB_ID
+  }
+
+  function isLeader() {
+    const leader = getLeader()
+    return !!leader && leader.id === TAB_ID
+  }
+
+  function broadcastActivity() {
+    localStorage.setItem('auth-activity', Date.now().toString())
+  }
+
+  function getLastActivity() {
+    const v = localStorage.getItem('auth-activity')
+    return v ? Number(v) : Date.now()
+  }
+
+  function broadcastLogout() {
+    localStorage.setItem('logout-event', Date.now().toString())
+  }
+
+  function isLogoutEvent(e) {
+    return e.key === 'logout-event'
+  }
+
+  return {
+    TAB_ID,
+    getLeader,
+    setLeader,
+    tryBecomeLeader,
+    isLeader,
+    broadcastActivity,
+    getLastActivity,
+    broadcastLogout,
+    isLogoutEvent
+  }
+})
+
 import {
   TAB_ID,
   getLeader,

@@ -74,6 +74,7 @@ class API:
 
     async def stream_files_to_index(self) -> StreamingResponse:
         """Stream lorem data"""
+
         def _decode(chunk: dict) -> bytes:
             return json.dumps(chunk).encode("utf-8")
 

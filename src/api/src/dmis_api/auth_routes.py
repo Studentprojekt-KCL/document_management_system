@@ -216,7 +216,9 @@ class AuthRoutes:
         if not claims:
             raise HTTPException(status_code=401)
 
-        roles = sorted(self._extract_roles(claims))
+        client_roles = sorted(self._extract_roles(claims))
+
+        realm_roles = sorted(claims.get("realm_access", {}).get("roles", []))
 
         return JSONResponse(
             status_code=HTTP_OK,
@@ -225,7 +227,8 @@ class AuthRoutes:
                 "user": {
                     "username": claims.get("preferred_username") or claims.get("name"),
                     "email": claims.get("email"),
-                    "roles": roles,
+                    "roles": client_roles,
+                    "realm_roles": realm_roles,
                 },
             },
         )

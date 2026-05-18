@@ -36,8 +36,7 @@ def insert_session(user: str, service_name: str, refresh_url: str, session_varia
         dms_warning(f"Refresh service recieved Oauth token without expiry_time ({session_variables})")
         expiry_time = DEFAULT_EXPIRY_TIME
 
-    if expiry_time > DEFAULT_EXPIRY_TIME:
-        expiry_time = DEFAULT_EXPIRY_TIME
+    expiry_time = min(expiry_time, DEFAULT_EXPIRY_TIME)
 
     insert_status = REDIS_DATABASE.insert_session_token(user, service_name, expiry_time, refresh_url, enc_session_vars)
     if insert_status is False:

@@ -9,10 +9,11 @@ from json.decoder import JSONDecodeError
 import aiohttp
 from fastapi import Cookie, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from .oidc_config import OidcConfig
 
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
+
+from .oidc_config import OidcConfig
 
 
 class AuthRoutes:
@@ -24,35 +25,42 @@ class AuthRoutes:
         self.token_verifier = token_verifier
         self.oidc = OidcConfig()
         self.client_id = self.oidc.client_id
-        admin_roles_list = read_env_variable("DMISAPI_ADMIN_ROLES", required=False)
-        self.admin_roles = {role.strip() for role in admin_roles_list.split(",") if role.strip()} if admin_roles_list else set()
-        user_roles_list = read_env_variable("DMISAPI_USER_ROLES", required=False)
-        self.user_roles = {role.strip() for role in user_roles_list.split(",") if role.strip()} if user_roles_list else set()
-        allowed_origin_raw = read_env_variable("DMISAPI_ALLOWED_ORIGINS")
-        self.allowed_origins = {origin.strip().rstrip("/") for origin in allowed_origin_raw.split(",") if origin.strip()}
-        role_strategy = read_env_variable("DMISAPI_ROLE_STRATEGY", required=False) or "keycloak"
-        self.role_strategy = role_strategy.strip().lower()
-
-        scope_claim = read_env_variable("DMISAPI_SCOPE_CLAIM", required=False)
-        self.scope_claim = scope_claim.strip() if scope_claim else None
-
-        self.access_cookie_max_age = int(
-            read_env_variable(
-                "DMISAPI_ACCESS_COOKIE_MAX_AGE",
-                required=False,
-            )
-            or "300"
-        )
-
-        self.refresh_cookie_max_age = int(
-            read_env_variable(
-                "DMISAPI_REFRESH_COOKIE_MAX_AGE",
-                required=False,
-            )
-            or "1800"
-        )
+        self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
+        self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
+        self.allowed_origins = {
+            origin.rstrip("/")
+            for origin in self._read_csv_env("DMISAPI_ALLOWED_ORIGINS")
+        }
+        self.role_strategy = self._read_string_env("DMISAPI_ROLE_STRATEGY", "keycloak").lower()
+        self.access_cookie_max_age = self._read_int_env("DMISAPI_ACCESS_COOKIE_MAX_AGE", 300)
+        self.refresh_cookie_max_age = self._read_int_env("DMISAPI_REFRESH_COOKIE_MAX_AGE", 1800)
         self._session = None
+    
+    # Fixing too many arguments
+    def _read_csv_env(self, key: str) -> set[str]:
+        raw = read_env_variable(key, required=False)
 
+        if not raw:
+            return set()
+
+        return {
+            value.strip()
+            for value in raw.split(",")
+            if value.strip()
+        }
+
+    def _read_string_env(self, key: str, default: str) -> str:
+        return read_env_variable(key, required=False) or default
+
+
+    def _read_int_env(self, key: str, default: int) -> int:
+        raw = read_env_variable(key, required=False)
+
+        if not raw:
+            return default
+
+        return int(raw)
+    
     async def close_session(self) -> None:
         """Tear down session."""
         if self._session is not None and not self._session.closed:

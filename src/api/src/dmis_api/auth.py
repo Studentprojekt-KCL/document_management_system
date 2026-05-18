@@ -19,10 +19,10 @@ class TokenVerifier:
 
     def __init__(self) -> None:
         """Initialize token verifier with AD settings."""
-        self.issuer = read_env_variable("DMISAPI_OIDC_ISSUER_URL").rstrip("/")
-        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_OIDC_JWKS_URL"))
+        self.issuer = read_env_variable("DMISAPI_AD_URL").rstrip("/")
+        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_AD_JWKS_URL"))
 
-        audience = read_env_variable("DMISAPI_OIDC_AUDIENCE", required=False)
+        audience = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
         expected_audience = [value.strip() for value in audience.split(",") if value.strip()] if audience else None
         self.expected_audience = expected_audience
 
@@ -33,7 +33,7 @@ class TokenVerifier:
         else:
             self.expected_audience = list(expected_audience)
 
-        allowed_azp_raw = read_env_variable("DMISAPI_OIDC_ALLOWED_AZP", required=False)
+        allowed_azp_raw = read_env_variable("DMISAPI_AD_ALLOWED_AZP", required=False)
         allowed_azp = [value.strip() for value in allowed_azp_raw.split(",") if value.strip()] if allowed_azp_raw else []
 
         self.allowed_azp = set(allowed_azp) if allowed_azp else None

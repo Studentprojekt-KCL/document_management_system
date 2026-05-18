@@ -76,10 +76,11 @@ class API:
         """Stream lorem data"""
 
         def _decode(chunk: dict) -> bytes:
-            return json.dumps({"data": chunk}).encode("utf-8")
+            return json.dumps(chunk).encode("utf-8")
 
         async def _stream() -> AsyncGenerator:
             total_size = 0
+            yield json.dumps({"subdata": "subdata"}).encode("utf-8")
             while total_size < self.cap:
                 text = lorem.words(500)
                 size = len(text.encode("utf-8"))

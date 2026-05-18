@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from json.decoder import JSONDecodeError
 from typing import Any
 from urllib.parse import urlencode
+from json.decoder import JSONDecodeError
 
 import aiohttp
 from fastapi import Cookie, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from shared_functions.dmis_logger import dms_warning
 from shared_functions.initialisation_tools import read_env_variable
+from shared_functions.dmis_logger import dms_warning
 
 HTTP_OK = 200
 
@@ -60,7 +60,7 @@ class AuthRoutes:
             await self._session.close()
 
     async def get_session(self) -> aiohttp.ClientSession:
-        """Set up AIO HTTP client if not initialized."""
+        """Set up AIO http client if not initialized."""
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
 
@@ -207,7 +207,7 @@ class AuthRoutes:
         return response
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if authenticated user is valid and authorized."""
+        """Check if yser us authenticated."""
         claims = self._verify_cookie_token(access_token)
 
         if not claims:
@@ -280,7 +280,7 @@ class AuthRoutes:
         )
 
     async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if authenticated user has an admin role."""
+        """Check if authenticated user has an admin role"""
         claims = self._verify_cookie_token(access_token)
 
         if not claims:
@@ -304,7 +304,7 @@ class AuthRoutes:
         code: str = Form(...),
         code_verifier: str = Form(...),
     ) -> JSONResponse:
-        """Exchange authorization code for tokens via OIDC provider."""
+        """Exchange authorization code for tokens via provided AD."""
         origin = self._get_origin(request)
 
         token_data = await self._request_tokens(
@@ -358,7 +358,7 @@ class AuthRoutes:
         return response
 
     async def logout_auth(self, request: Request, id_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Generate logout URL from OIDC provider and clear authentication cookies."""
+        """Generate logout URL from AD and clear authentication cookies."""
         origin = self._get_origin(request)
         post_logout_redirect_uri = origin + "/"
 

@@ -7,7 +7,7 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import { getOidcMetadata, OIDC_CLIENT_ID, SESSION_KEY_OIDC_STATE, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
+import { getOidcMetadata, FROTNEND_OIDC_CLIENT_ID, SESSION_KEY_OIDC_STATE, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
 
 /* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)

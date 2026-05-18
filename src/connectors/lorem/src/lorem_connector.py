@@ -76,7 +76,7 @@ class API:
         """Stream lorem data"""
 
         def _decode(chunk: dict) -> bytes:
-            return json.dumps(chunk).encode("utf-8")
+            return (json.dumps(chunk) + "\n").encode("utf-8")
 
         async def _stream() -> AsyncGenerator:
             total_size = 0

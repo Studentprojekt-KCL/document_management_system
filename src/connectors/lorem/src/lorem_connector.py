@@ -75,11 +75,11 @@ class API:
     async def stream_files_to_index(self) -> StreamingResponse:
         """Stream lorem data"""
 
-        def _decode(chunk: dict) -> bytes:
-            return json.dumps({"data": chunk}).encode("utf-8")
+            
 
         async def _stream() -> AsyncGenerator:
             total_size = 0
+            yield json.dumps({"subdata": "subdata"}).encode("utf-8")
             while total_size < self.cap:
                 text = lorem.words(500)
                 size = len(text.encode("utf-8"))
@@ -94,7 +94,7 @@ class API:
                     "size": size,
                     "type": "source_file",
                 }
-                yield await to_thread(_decode, chunk)
+                yield json.dumps(chunk).encode("utf-8")
 
         return StreamingResponse(_stream(), media_type="application/octet-stream")
 

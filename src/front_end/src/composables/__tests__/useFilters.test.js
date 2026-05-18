@@ -2,17 +2,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /* Mock the api module before importing useFilters */
-const mockAuthFetch = vi.hoisted(() => vi.fn())
+const mockApiFetch = vi.hoisted(() => vi.fn())
+let useSourceFilters
+let useSecurityFilters
 
 vi.mock('@/utils/api', () => ({
-  authFetch: mockAuthFetch,
+  apiFetch: mockApiFetch,
   API_PATHS: {
     connectedSourceSystems: '/api/connector/connected_source_systems',
     classifications: '/api/stochastic-analyzer/classifications'
   }
 }))
 
-import { useSourceFilters, useSecurityFilters } from '../useFilters'
+async function reloadUseFilters() {
+  vi.resetModules()
+  const module = await import('../useFilters')
+  useSourceFilters = module.useSourceFilters
+  useSecurityFilters = module.useSecurityFilters
+}
 
 /* Helper: create a fake successful Response */
 function fakeResponse(data, ok = true) {
@@ -24,25 +31,26 @@ function fakeResponse(data, ok = true) {
 }
 
 describe('useSourceFilters', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    await reloadUseFilters()
   })
 
   it('returns a ref that starts as an empty array', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {})) // never resolves
+    mockApiFetch.mockReturnValue(new Promise(() => {})) // never resolves
     const result = useSourceFilters()
     expect(result.value).toEqual([])
   })
 
   it('fetches from the connectedSourceSystems endpoint', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {}))
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
     useSourceFilters()
-    expect(mockAuthFetch).toHaveBeenCalledWith('/api/connector/connected_source_systems')
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/connector/connected_source_systems')
   })
 
   it('populates the ref with fetched source systems', async () => {
     const sources = ['GitLab', 'GitHub', 'Network File System']
-    mockAuthFetch.mockResolvedValue(fakeResponse(sources))
+    mockApiFetch.mockResolvedValue(fakeResponse(sources))
 
     const result = useSourceFilters()
 
@@ -53,7 +61,7 @@ describe('useSourceFilters', () => {
   })
 
   it('keeps empty array when response is not ok', async () => {
-    mockAuthFetch.mockResolvedValue(fakeResponse(null, false))
+    mockApiFetch.mockResolvedValue(fakeResponse(null, false))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = useSourceFilters()
@@ -66,7 +74,7 @@ describe('useSourceFilters', () => {
   })
 
   it('keeps empty array when fetch throws a network error', async () => {
-    mockAuthFetch.mockRejectedValue(new Error('Network error'))
+    mockApiFetch.mockRejectedValue(new Error('Network error'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = useSourceFilters()
@@ -79,7 +87,7 @@ describe('useSourceFilters', () => {
   })
 
   it('creates a new ref on each call (not shared)', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {}))
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
     const a = useSourceFilters()
     const b = useSourceFilters()
     expect(a).not.toBe(b)
@@ -87,25 +95,26 @@ describe('useSourceFilters', () => {
 })
 
 describe('useSecurityFilters', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    await reloadUseFilters()
   })
 
   it('returns a ref that starts as an empty array', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {}))
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
     const result = useSecurityFilters()
     expect(result.value).toEqual([])
   })
 
   it('fetches from the classifications endpoint', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {}))
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
     useSecurityFilters()
-    expect(mockAuthFetch).toHaveBeenCalledWith('/api/stochastic-analyzer/classifications')
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/stochastic-analyzer/classifications')
   })
 
   it('populates the ref with fetched classifications', async () => {
     const levels = ['Public', 'Internal', 'Sensitive', 'Confidential']
-    mockAuthFetch.mockResolvedValue(fakeResponse(levels))
+    mockApiFetch.mockResolvedValue(fakeResponse(levels))
 
     const result = useSecurityFilters()
 
@@ -115,7 +124,7 @@ describe('useSecurityFilters', () => {
   })
 
   it('keeps empty array when response is not ok', async () => {
-    mockAuthFetch.mockResolvedValue(fakeResponse(null, false))
+    mockApiFetch.mockResolvedValue(fakeResponse(null, false))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = useSecurityFilters()
@@ -128,7 +137,7 @@ describe('useSecurityFilters', () => {
   })
 
   it('keeps empty array when fetch throws a network error', async () => {
-    mockAuthFetch.mockRejectedValue(new Error('Network error'))
+    mockApiFetch.mockRejectedValue(new Error('Network error'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = useSecurityFilters()
@@ -141,7 +150,7 @@ describe('useSecurityFilters', () => {
   })
 
   it('logs error message when response is not ok', async () => {
-    mockAuthFetch.mockResolvedValue(fakeResponse(null, false))
+    mockApiFetch.mockResolvedValue(fakeResponse(null, false))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     useSecurityFilters()
@@ -153,7 +162,7 @@ describe('useSecurityFilters', () => {
   })
 
   it('logs error message when fetch throws', async () => {
-    mockAuthFetch.mockRejectedValue(new Error('Connection refused'))
+    mockApiFetch.mockRejectedValue(new Error('Connection refused'))
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     useSecurityFilters()
@@ -164,10 +173,10 @@ describe('useSecurityFilters', () => {
     consoleSpy.mockRestore()
   })
 
-  it('creates a new ref on each call (not shared)', () => {
-    mockAuthFetch.mockReturnValue(new Promise(() => {}))
+  it('returns the same ref on each call (shared cache)', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
     const a = useSecurityFilters()
     const b = useSecurityFilters()
-    expect(a).not.toBe(b)
+    expect(a).toBe(b)
   })
 })

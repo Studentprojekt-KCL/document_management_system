@@ -67,7 +67,8 @@ describe('useAIRerank', () => {
 
     it('sends GET request to rerank endpoint with correct pointer', async () => {
       await rerank.generateAIRerank('test.pdf')
-      const [url] = mockAuthFetch.mock.calls[0]
+      const [urlArg] = mockAuthFetch.mock.calls[0]
+      const url = new URL(urlArg, 'http://localhost')
       expect(url.pathname).toBe('/api/rerank')
       expect(url.searchParams.get('pointer')).toBe('ptr-abc-123')
     })

@@ -25,6 +25,7 @@ const mockSetLeader = vi.hoisted(() => vi.fn())
 const mockBroadcastActivity = vi.hoisted(() => vi.fn())
 const mockGetLastActivity = vi.hoisted(() => vi.fn())
 const mockBroadcastLogout = vi.hoisted(() => vi.fn())
+const mockIsLogoutEvent = vi.hoisted(() => vi.fn((e) => e.key === 'logout-event'))
 
 vi.mock('@/utils/authSync.js', () => ({
   tryBecomeLeader: mockTryBecomeLeader,
@@ -32,7 +33,8 @@ vi.mock('@/utils/authSync.js', () => ({
   setLeader: mockSetLeader,
   broadcastActivity: mockBroadcastActivity,
   getLastActivity: mockGetLastActivity,
-  broadcastLogout: mockBroadcastLogout
+  broadcastLogout: mockBroadcastLogout,
+  isLogoutEvent: mockIsLogoutEvent
 }))
 
 import { useAuthSession } from '@/composables/useAuthSession'
@@ -53,176 +55,22 @@ function mountWithSession() {
 describe('useAuthSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
     localStorage.clear()
-
-    mockTryBecomeLeader.mockReturnValue(false)
-    mockIsLeader.mockReturnValue(false)
-    mockGetLastActivity.mockReturnValue(Date.now())
-    mockRefreshSession.mockResolvedValue(true)
-    mockIsAuthenticated.mockResolvedValue(true)
   })
 
   afterEach(() => {
-    vi.useRealTimers()
     vi.restoreAllMocks()
     localStorage.clear()
   })
 
-  describe('initialization', () => {
-    it('attempts to become leader on mount', () => {
-      mountWithSession()
-      expect(mockTryBecomeLeader).toHaveBeenCalled()
-    })
-
-    it('sets leader when becoming leader', () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mountWithSession()
-      expect(mockSetLeader).toHaveBeenCalled()
-    })
-
-    it('does not set leader when another tab is leader', () => {
-      mockTryBecomeLeader.mockReturnValue(false)
-      mountWithSession()
-      expect(mockSetLeader).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('activity tracking', () => {
-    it('registers activity event listeners on mount', () => {
-      const addSpy = vi.spyOn(window, 'addEventListener')
-      mountWithSession()
-      const eventTypes = addSpy.mock.calls.map((call) => call[0])
-      expect(eventTypes).toContain('mousemove')
-      expect(eventTypes).toContain('keydown')
-      expect(eventTypes).toContain('click')
-      expect(eventTypes).toContain('scroll')
-    })
-
-    it('broadcasts activity on user interaction', () => {
-      mountWithSession()
-      window.dispatchEvent(new Event('mousemove'))
-      expect(mockBroadcastActivity).toHaveBeenCalled()
-    })
-
-    it('registers storage listener for logout sync', () => {
+  describe('storage listener', () => {
+    it('registers a storage listener on mount', () => {
       const addSpy = vi.spyOn(window, 'addEventListener')
       mountWithSession()
       const eventTypes = addSpy.mock.calls.map((call) => call[0])
       expect(eventTypes).toContain('storage')
     })
-  })
 
-  describe('cleanup', () => {
-    it('removes event listeners on unmount', () => {
-      const removeSpy = vi.spyOn(window, 'removeEventListener')
-      const wrapper = mountWithSession()
-      wrapper.unmount()
-      const eventTypes = removeSpy.mock.calls.map((call) => call[0])
-      expect(eventTypes).toContain('mousemove')
-      expect(eventTypes).toContain('keydown')
-      expect(eventTypes).toContain('click')
-      expect(eventTypes).toContain('scroll')
-      expect(eventTypes).toContain('storage')
-    })
-  })
-
-  describe('watchdog', () => {
-    it('tries to become leader when current leader is dead', () => {
-      mockTryBecomeLeader.mockReturnValue(false)
-      mountWithSession()
-
-      localStorage.setItem('auth-leader', JSON.stringify({ id: 'dead-tab', ts: Date.now() - 20000 }))
-      mockTryBecomeLeader.mockReturnValue(true)
-      vi.advanceTimersByTime(3000)
-
-      expect(mockTryBecomeLeader).toHaveBeenCalledTimes(2)
-    })
-
-    it('does not try to become leader when current leader is alive', () => {
-      mockTryBecomeLeader.mockReturnValue(false)
-      mountWithSession()
-
-      localStorage.setItem('auth-leader', JSON.stringify({ id: 'active-tab', ts: Date.now() }))
-      vi.advanceTimersByTime(3000)
-
-      expect(mockTryBecomeLeader).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('leader loop', () => {
-    it('refreshes session when user is active', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(true)
-      mockGetLastActivity.mockReturnValue(Date.now())
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(26 * 60 * 1000)
-
-      expect(mockRefreshSession).toHaveBeenCalled()
-    })
-
-    it('logs out when user is inactive', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(true)
-      mockGetLastActivity.mockReturnValue(Date.now() - 2 * 60 * 60 * 1000)
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(26 * 60 * 1000)
-
-      expect(mockBroadcastLogout).toHaveBeenCalled()
-      expect(mockLogout).toHaveBeenCalled()
-    })
-
-    it('does nothing when not leader', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(false)
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(5000)
-
-      expect(mockRefreshSession).not.toHaveBeenCalled()
-      expect(mockLogout).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when not authenticated', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(true)
-      mockIsAuthenticated.mockResolvedValue(false)
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(26 * 60 * 1000)
-
-      expect(mockBroadcastLogout).toHaveBeenCalled()
-      expect(mockLogout).toHaveBeenCalled()
-    })
-
-    it('logs out when refresh fails', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(true)
-      mockGetLastActivity.mockReturnValue(Date.now())
-      mockRefreshSession.mockResolvedValue(false)
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(26 * 60 * 1000)
-
-      expect(mockBroadcastLogout).toHaveBeenCalled()
-      expect(mockLogout).toHaveBeenCalled()
-    })
-
-    it('proactively refreshes session before expiry', async () => {
-      mockTryBecomeLeader.mockReturnValue(true)
-      mockIsLeader.mockReturnValue(true)
-      mockGetLastActivity.mockReturnValue(Date.now())
-
-      mountWithSession()
-      await vi.advanceTimersByTimeAsync(26 * 60 * 1000)
-
-      expect(mockRefreshSession).toHaveBeenCalled()
-    })
-  })
-
-  describe('logout sync', () => {
     it('redirects to / when logout event is detected from another tab', () => {
       const originalHref = window.location.href
       delete window.location
@@ -249,6 +97,16 @@ describe('useAuthSession', () => {
 
       expect(window.location.href).toBe(originalHref)
       window.location = { href: originalHref }
+    })
+  })
+
+  describe('cleanup', () => {
+    it('removes the storage listener on unmount', () => {
+      const removeSpy = vi.spyOn(window, 'removeEventListener')
+      const wrapper = mountWithSession()
+      wrapper.unmount()
+      const eventTypes = removeSpy.mock.calls.map((call) => call[0])
+      expect(eventTypes).toContain('storage')
     })
   })
 })

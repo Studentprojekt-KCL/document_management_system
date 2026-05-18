@@ -1,5 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
+from asyncio import to_thread
 from typing import Any
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -73,6 +74,8 @@ class API:
 
     async def stream_files_to_index(self) -> StreamingResponse:
         """Stream lorem data"""
+        def _decode(chunk: dict) -> bytes:
+            return json.dumps(chunk).encode("utf-8")
 
         async def _stream() -> AsyncGenerator:
             total_size = 0
@@ -91,7 +94,7 @@ class API:
                     "size": size,
                     "type": "source_file",
                 }
-                yield json.dumps(chunk).encode("utf-8")
+                yield await to_thread(_decode, chunk)
 
         return StreamingResponse(_stream(), media_type="application/octet-stream")
 

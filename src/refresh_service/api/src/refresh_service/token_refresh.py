@@ -39,8 +39,11 @@ def insert_session(user: str, service_name: str, refresh_url: str, session_varia
     insert_status = REDIS_DATABASE.insert_session_token(user, service_name, expiry_time, refresh_url, enc_session_vars)
     if insert_status is False:
         return False
-    adjusted_expiry_time = 30 # NOTE; This might need to be more dynamic
-    dms_warning(f"New {service_name} refresh token recived, will refresh in: {adjusted_expiry_time} seconds")
+    adjusted_expiry_time = 30  # NOTE; This might need to be more dynamic
+    dms_warning(
+        f"New {service_name} refresh token recived, will refresh in: {adjusted_expiry_time} seconds,"
+        f" ({session_variables.get("expires_in")} was specified)"
+    )
     session_refresh_task.apply_async(args=[user, service_name], countdown=adjusted_expiry_time)
     return True
 

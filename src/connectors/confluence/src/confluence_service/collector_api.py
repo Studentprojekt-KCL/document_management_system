@@ -27,8 +27,6 @@ class GetFilesBody(BaseModel):
     """JSON body for ``POST /get_files``."""
 
     file_pointers: list[str] = Field(default_factory=list)
-    include_content: bool = False
-    include_last_edit_date: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +56,7 @@ class API:
             scopes=read_env_variable("CONCONFLUENCE_SCOPES"),
         )
         self.auth_callback_url = read_env_variable("CONCONFLUENCE_CONNECT_SERVICE_CALLBACK")
+        self.auth_check_url = read_env_variable("CONCONFLUENDE_CHECK_AUTH_URL")
         session = self.confluence_instance.session
 
         @asynccontextmanager
@@ -74,6 +73,7 @@ class API:
         API.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         API.app.add_api_route("/callback", self.callback, methods=["GET"])
         API.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        API.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Return a JSON error payload for FastAPI request validation failures."""
@@ -94,6 +94,8 @@ class API:
     async def get_files(
         self,
         body: GetFilesBody,
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
         x_confluence_token: Annotated[str | None, Header()] = None,
     ) -> list[dict[str, Any]]:
         """Batch fetch pages by pointers (DMS ``POST /get_files``)."""
@@ -102,8 +104,8 @@ class API:
         return await self.confluence_instance.get_files(
             GetFilesInput(
                 file_pointers=body.file_pointers,
-                include_content=body.include_content,
-                include_last_edit_date=body.include_last_edit_date,
+                include_content=include_content,
+                include_last_edit_date=include_last_edit_date,
                 api_token=x_confluence_token,
             )
         )
@@ -132,11 +134,12 @@ class API:
             "client_id": self.oauth.client_id,
             "redirect_uri": self.auth_callback_url,
             "response_type": "code",
-            "scope": self.oauth.scopes,
+            "scope": self.oauth.scopes.replace(",", " "),
             "audience": "api.atlassian.com",
             "state": signed_state,
         }
-        return RedirectResponse(f"{self.oauth.auth_url}?{urlencode(params)}")
+
+        return JSONResponse(content={"redirect": f"{self.oauth.auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Exchange Atlassian authorization code for access and refresh tokens."""
@@ -183,6 +186,18 @@ class API:
                 timeout=120,
             )
         return JSONResponse(content=resp.json(), status_code=200)
+
+    async def validate_token(self, x_confluence_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Check token validity.
+
+        Args:
+            x_confluence_token: token
+        Returns: response with true/false
+        """
+        if x_confluence_token is None:
+            return JSONResponse(content={"valid": False}, status_code=200)
+        data = await self.confluence_instance.execute_get_request(self.auth_check_url, params={}, api_token=x_confluence_token)
+        return JSONResponse(content={"valid": bool(data)}, status_code=200)
 
 
 def run() -> None:

@@ -11,7 +11,8 @@
  * This view is rendered at the /search route of the application.
  */
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import SearchBar from '@/components/SearchBar.vue'
 import SearchFiltersCard from '@/components/SearchFiltersCard.vue'
 import SearchMatches from '@/components/SearchMatches.vue'
@@ -33,7 +34,8 @@ const documentsOnlyMode = ref(true)
 
 /* Number of search results to fetch, possible to change. */
 const SEARCH_COUNT = 20
-const SEARCH_OFFSET = 0
+const currentPage = ref(1)
+const offset = computed(() => (currentPage.value - 1) * SEARCH_COUNT)
 
 /* Filters so it can access matches */
 const selectedFilters = ref({
@@ -79,11 +81,15 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
     return
   }
 
+  if (resetPreview) {
+    currentPage.value = 1
+  }
+
   isSearching.value = true
   try {
     const params = new URLSearchParams({
       count: String(SEARCH_COUNT),
-      offset: String(SEARCH_OFFSET)
+      offset: String(offset.value)
     })
     const payload = searchPayload(query, documentsOnly, file_type, source_system, security_class)
 
@@ -92,20 +98,18 @@ const handleSearch = async ({ query, documentsOnly, file_type, source_system, se
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    console.log(res)
     if (!res.ok) {
       error.value = `Search failed: ${res.status} ${await res.text()}`
       return
     }
 
     const data = await res.json()
-    console.log('Search response:', data)
     const resultArray = Array.isArray(data) ? data : data.results || data.matches || []
 
     allMatches.value = resultArray
-    matches.value = resultArray
+    matches.value = filterMatches(resultArray, selectedFilters.value)
 
-    if (matches.value.length === 0) {
+    if (matches.value.length === 0 && currentPage.value === 1) {
       error.value = 'No matching files found.'
       return
     }
@@ -122,11 +126,41 @@ const searchParams = () => ({
   security_class: selectedFilters.value.security.join(' ')
 })
 
-const searchWithFilters = async ({ query, documentsOnly }) => {
+const filterMatches = (results, filters) => {
+  if (!filters.source.length && !filters.type.length && !filters.security.length) {
+    return results
+  }
+
+  return results.filter((match) => {
+    const filetype = resolveDocumentExtension(match).toLowerCase()
+    const securityClass = resolveSecurityClass(match).toLowerCase()
+    const source = resolveSource(match).toLowerCase()
+
+    const typeMatch =
+      filters.type.length === 0 ||
+      filters.type.some((selected) => {
+        const extensions = selected.split('|')
+        return extensions.some((ext) => filetype === ext.toLowerCase())
+      })
+
+    const sourceMatch = filters.source.length === 0 || filters.source.some((selected) => source === selected.toLowerCase())
+
+    const securityMatch =
+      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
+
+    return typeMatch && sourceMatch && securityMatch
+  })
+}
+
+const searchWithFilters = async ({ query, documentsOnly, resetPreview = true, file_type, source_system, security_class }) => {
   await handleSearch({
     query,
     documentsOnly,
-    ...searchParams()
+    resetPreview,
+    ...searchParams(),
+    file_type,
+    source_system,
+    security_class
   })
 }
 
@@ -154,53 +188,21 @@ const closePreview = () => {
   isPreviewOpen.value = false
 }
 
-/* Handle changes to search filters  */
-const handleFilterChange = (filters) => {
-  selectedFilters.value = filters
-  // If no filters → show everything
-  if (filters.source.length === 0 && filters.type.length === 0 && filters.security.length === 0) {
-    matches.value = allMatches.value
-    return
-  }
-  matches.value = allMatches.value.filter((match) => {
-    const filetype = resolveDocumentExtension(match).toLowerCase()
-    const securityClass = resolveSecurityClass(match).toLowerCase()
-    const source = resolveSource(match).toLowerCase()
-
-    // TYPE FILTER
-    const typeMatch =
-      filters.type.length === 0 ||
-      filters.type.some((selected) => {
-        // Split the group string from json file (e.g., ".docx .doc .odt") and check if filetype is in it
-        const extensions = selected.split('|')
-        return extensions.some((ext) => filetype === ext.toLowerCase())
-      })
-
-    // SOURCE FILTER
-    const sourceMatch = filters.source.length === 0 || filters.source.some((selected) => source === selected.toLowerCase())
-
-    // SECURITY FILTER
-    const securityMatch =
-      filters.security.length === 0 || filters.security.some((selected) => securityClass === selected.toLowerCase())
-
-    return typeMatch && sourceMatch && securityMatch
-  })
-}
-
 /* Sends down a new request to the backend if the user changes the filters */
 const handleFilterChangeAndSearch = async (filters) => {
   selectedFilters.value = filters
+  currentPage.value = 1
+
   if (lastQuery.value && lastQuery.value.trim()) {
-    await handleSearch({
+    await searchWithFilters({
       query: lastQuery.value,
       documentsOnly: documentsOnlyMode.value,
+      resetPreview: false,
       file_type: filters.type.join(' '),
       source_system: filters.source.join(' '),
       security_class: filters.security.join(' ')
     })
   }
-  // Apply filter AFTER server results are loaded
-  handleFilterChange(filters)
 }
 
 // searching a second time automatically to update the security levels
@@ -213,6 +215,32 @@ const refreshCurrentSearch = async () => {
     documentsOnly: documentsOnlyMode.value,
     resetPreview: false
   })
+}
+
+const nextPage = async () => {
+  currentPage.value++
+  await searchWithFilters({
+    query: lastQuery.value,
+    documentsOnly: documentsOnlyMode.value,
+    resetPreview: false,
+    ...searchParams()
+  })
+
+  if (matches.value.length === 0) {
+    currentPage.value--
+  }
+}
+
+const previousPage = async () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    await searchWithFilters({
+      query: lastQuery.value,
+      documentsOnly: documentsOnlyMode.value,
+      resetPreview: false,
+      ...searchParams()
+    })
+  }
 }
 </script>
 
@@ -241,6 +269,19 @@ const refreshCurrentSearch = async () => {
         @select="selectMatch"
         @update-security="refreshCurrentSearch"
       />
+    </div>
+
+    <!-- Paging functionality? -->
+    <div v-if="matches.length > 0" class="pagination">
+      <div class="button-slot">
+        <button v-if="currentPage > 1" @click="previousPage"><ChevronLeft /></button>
+      </div>
+
+      <span>Page {{ currentPage }}</span>
+
+      <div class="button-slot">
+        <button v-if="matches.length >= SEARCH_COUNT" @click="nextPage"><ChevronRight /></button>
+      </div>
     </div>
 
     <!-- Search Preview Drawer Component -->
@@ -275,5 +316,28 @@ const refreshCurrentSearch = async () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.button-slot {
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  color: #ffffff;
 }
 </style>

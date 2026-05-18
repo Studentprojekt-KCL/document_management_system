@@ -40,7 +40,6 @@ class Handler:
         self.search_engine = SearchEngine()
         self.classifier = Classifier()
         self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
-        self.indexing = create_task(self.index_pipeline.start())
 
     async def _fetch_fields(self) -> list[str]:
         """Fetch fields from connector, retrying with backoff until it responds."""
@@ -58,12 +57,13 @@ class Handler:
         dms_error(f"Connector unreachable after {MAX_RETRY_ATTEMPTS} attempts; aborting setup")
         return []
 
-    async def build(self) -> None:
+    async def start(self) -> None:
         """Init handler"""
         fields = await self._fetch_fields()
         rebuild = self.search_engine.load_index(fields)
         if rebuild:
             self.connector.write_subdata({})
+        self.indexing = create_task(self.index_pipeline.start())
 
     async def close(self) -> None:
         """Clean up"""

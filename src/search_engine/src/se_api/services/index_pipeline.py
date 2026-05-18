@@ -1,6 +1,6 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law"""
 
-from asyncio import Lock, Queue, QueueShutDown, Task, create_task, gather, to_thread
+from asyncio import Lock, Queue, QueueFull, QueueShutDown, Task, create_task, gather, to_thread
 
 from dataclasses import dataclass
 import io
@@ -83,6 +83,8 @@ class IndexPipeline:
             ingest_index_task,
             classifier_refresh_task,
         ]
+
+        await self._load_pending()
 
     async def stop(self) -> None:
         """Stop indexing and wait for workers to exit."""
@@ -186,6 +188,18 @@ class IndexPipeline:
                 self.queues.index_queue.task_done()
             except QueueShutDown:
                 break
+
+    async def _load_pending(self) -> None:
+        """Fetch pending classifications and add them to the queue."""
+        dms_info("Looking for pending classifications in the index.")
+        try:
+            async for pointer in self.search_engine.grab_pending():
+                await self.queues.lookup_queue.put(pointer)
+            dms_info(f"Done, {self.queues.lookup_queue.qsize()} pointers in queue.")
+        except QueueFull:
+            dms_warning("Failed to add pointer to queue, queue is full.")
+        except QueueShutDown:
+            dms_warning("Failed to add pointer to queue, queue is closed.")
 
     async def _classifier_load_index(self) -> None:
         """Fetch files from search engine.

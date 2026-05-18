@@ -4,7 +4,7 @@
  */
 
 export const FRONTEND_OIDC_ISSUER_URL = window.__ENV__.FRONTEND_OIDC_ISSUER_URL.replace(/\/$/, '')
-export const FRONTEND_OIDC_CLIENT_ID = window.__ENV__.FRONTNED_OIDC_CLIENT_ID
+export const FRONTEND_OIDC_CLIENT_ID = window.__ENV__.FRONTEND_OIDC_CLIENT_ID
 
 export const SESSION_KEY_PKCE_VERIFIER = 'oidc_pkce_verifier'
 export const SESSION_KEY_OIDC_STATE = 'oidc_state'

@@ -7,7 +7,7 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import { getOidcMetadata, FROTNEND_OIDC_CLIENT_ID, SESSION_KEY_OIDC_STATE, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
+import { getOidcMetadata, FRONTEND_OIDC_CLIENT_ID, SESSION_KEY_OIDC_STATE, SESSION_KEY_PKCE_VERIFIER } from '@/utils/config'
 
 /* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)
@@ -30,7 +30,7 @@ const handleOidcLogin = async () => {
 
   const authUrl =
     metadata.authorization_endpoint +
-    `?client_id=${encodeURIComponent(OIDC_CLIENT_ID)}` +
+    `?client_id=${encodeURIComponent(FRONTEND_OIDC_CLIENT_ID)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&response_type=code` +
     `&scope=${encodeURIComponent('openid profile email')}` +

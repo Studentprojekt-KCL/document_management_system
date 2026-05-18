@@ -162,6 +162,7 @@ class AuthRoutes:
         return response
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+        """Check if authentiacted user ivalid and authorized"""
         claims = self._verify_cookie_token(access_token)
 
         if not claims:

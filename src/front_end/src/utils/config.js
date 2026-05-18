@@ -3,8 +3,8 @@
  * Works with Keycloak, Microsoft Entra ID, or another OIDC-compliant provider.
  */
 
-export const OIDC_ISSUER_URL = window.__ENV__.OIDC_ISSUER_URL.replace(/\/$/, '')
-export const OIDC_CLIENT_ID = window.__ENV__.OIDC_CLIENT_ID
+export const FRONTEND_OIDC_ISSUER_URL = window.__ENV__.FRONTEND_OIDC_ISSUER_URL.replace(/\/$/, '')
+export const FRONTEND_OIDC_CLIENT_ID = window.__ENV__.FRONTNED_OIDC_CLIENT_ID
 
 export const SESSION_KEY_PKCE_VERIFIER = 'oidc_pkce_verifier'
 export const SESSION_KEY_OIDC_STATE = 'oidc_state'
@@ -17,7 +17,7 @@ export async function getOidcMetadata() {
     return cachedMetadata
   }
 
-  const response = await fetch(`${OIDC_ISSUER_URL}/.well-known/openid-configuration`)
+  const response = await fetch(`${FRONTEND_OIDC_ISSUER_URL}/.well-known/openid-configuration`)
 
   if (!response.ok) {
     throw new Error('Failed to load OIDC metadata')

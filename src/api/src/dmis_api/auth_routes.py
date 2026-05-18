@@ -135,7 +135,7 @@ class AuthRoutes:
         key: str,
         fallback: int,
     ) -> int:
-        """Get token max age from token response."""
+        """Get token max age."""
         max_age = token_data.get(key)
         return max_age if isinstance(max_age, int) else fallback
 
@@ -182,7 +182,7 @@ class AuthRoutes:
             )
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
-        """Request tokens from OIDC provider using provided form data."""
+        """Request tokens from AD provider using provided form data."""
         token_url = await self._token_endpoint()
 
         try:
@@ -207,7 +207,7 @@ class AuthRoutes:
         return response
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if yser us authenticated."""
+        """Check if user is authenticated."""
         claims = self._verify_cookie_token(access_token)
 
         if not claims:

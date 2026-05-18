@@ -46,16 +46,9 @@ describe('SessionCallbackView.vue', () => {
     mount(SessionCallbackView)
     await nextTick()
 
-    expect(mockApiFetch).toHaveBeenCalledWith(
-      '/api/connector/session/callback',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.any(URLSearchParams)
-      })
-    )
-    const body = mockApiFetch.mock.calls[0][1].body
-    expect(body.get('code')).toBe('test-code')
-    expect(body.get('state')).toBe('test-state')
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/connector/session/callback?code=test-code&state=test-state&source=null', {
+      method: 'GET'
+    })
   })
 
   it('redirects to /connections on success', async () => {

@@ -27,15 +27,12 @@ class AuthRoutes:
         self.client_id = self.oidc.client_id
         self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
         self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
-        self.allowed_origins = {
-            origin.rstrip("/")
-            for origin in self._read_csv_env("DMISAPI_ALLOWED_ORIGINS")
-        }
+        self.allowed_origins = {origin.rstrip("/") for origin in self._read_csv_env("DMISAPI_ALLOWED_ORIGINS")}
         self.role_strategy = self._read_string_env("DMISAPI_ROLE_STRATEGY", "keycloak").lower()
         self.access_cookie_max_age = self._read_int_env("DMISAPI_ACCESS_COOKIE_MAX_AGE", 300)
         self.refresh_cookie_max_age = self._read_int_env("DMISAPI_REFRESH_COOKIE_MAX_AGE", 1800)
         self._session = None
-    
+
     # Fixing too many arguments
     def _read_csv_env(self, key: str) -> set[str]:
         raw = read_env_variable(key, required=False)
@@ -43,15 +40,10 @@ class AuthRoutes:
         if not raw:
             return set()
 
-        return {
-            value.strip()
-            for value in raw.split(",")
-            if value.strip()
-        }
+        return {value.strip() for value in raw.split(",") if value.strip()}
 
     def _read_string_env(self, key: str, default: str) -> str:
         return read_env_variable(key, required=False) or default
-
 
     def _read_int_env(self, key: str, default: int) -> int:
         raw = read_env_variable(key, required=False)
@@ -60,7 +52,7 @@ class AuthRoutes:
             return default
 
         return int(raw)
-    
+
     async def close_session(self) -> None:
         """Tear down session."""
         if self._session is not None and not self._session.closed:

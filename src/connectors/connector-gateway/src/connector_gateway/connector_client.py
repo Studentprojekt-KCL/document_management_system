@@ -4,8 +4,8 @@ import asyncio
 import json
 import httpx
 
-from fastapi.responses import RedirectResponse
-from shared_functions.dmis_logger import dms_error, dms_warning, dms_info
+from fastapi.responses import JSONResponse
+from shared_functions.dmis_logger import dms_error, dms_warning
 
 
 class ConnectorClient:
@@ -28,8 +28,15 @@ class ConnectorClient:
             system["source_system_url"] = system["source_system_url"].rstrip("/")
             source_system_structure[system.get("source_system_url")] = system
 
-        self.source_systems: list = source_systems  # NOTE; Try to depricate this.
+        self.source_systems: list[dict] = source_systems  # NOTE; Try to depricate this.
         self.source_system_structure = source_system_structure
+
+    def find_service(self, service_value: str) -> dict:
+        """Retrieve specific service for any value specified in source_systems."""
+        for service in self.source_systems:
+            if service_value.lower() in [v.lower() if isinstance(v, str) else v for v in service.values()]:
+                return service
+        return {}
 
     def _load_source_systems_from_file(self, path: str) -> list:
         """Reads config file and loads it into the program"""
@@ -56,8 +63,9 @@ class ConnectorClient:
                     break
                 if not isinstance(system_pointers.get(system), list):
                     system_pointers[system] = [pointer]
+                    break
             else:
-                dms_info(f"No source system found for {pointer}")
+                dms_warning(f"No source system found for {pointer}")
         system_list: list = []
         for system, file_pointers in system_pointers.items():
             source = self.source_system_structure.get(system)
@@ -88,7 +96,8 @@ class ConnectorClient:
         tasks: list = []
         try:
             for system in pointers:
-                auth_header = authentication_tokens.get(system.get("name"))  # type: ignore
+                system_name = system.get("name") if isinstance(system.get("name"), str) else ""
+                auth_header = authentication_tokens.get(system_name.lower())  # type: ignore
                 response = self.http_client.post(
                     f"{system.get("connector_url")}/get_files",
                     params=[
@@ -167,9 +176,9 @@ class ConnectorClient:
         """takes referer header in original request and sets the auth_callback endpoint"""
         return f"{self._slice_url_to_host_and_port(referer)}/auth_callback"
 
-    async def get_auth_redirect(self, source_system: str, referer: str) -> RedirectResponse | None:
+    async def get_auth_redirect(self, source_system: str, referer: str) -> JSONResponse | None:
         """redirects user to source system for authentication"""
-        auth_url = ""
+        auth_url: str = ""
         for system in self.source_systems:
             if system["name"].lower() == source_system.lower():
                 auth_url = f"{system["connector_url"]}/auth_user"
@@ -179,9 +188,52 @@ class ConnectorClient:
         get_headers = {"callback-url": f"{self._set_callback_url(referer)}"}
         try:
             response = await self.http_client.get(auth_url, headers=get_headers, follow_redirects=False)
-            return RedirectResponse(url=response.headers["location"], status_code=response.status_code)
+            return JSONResponse(content=response.json(), status_code=307)
         except httpx.TimeoutException:
             dms_warning("Request timed out")
         except httpx.HTTPError:
             dms_warning(f"Failed to connect to connector, url: {auth_url} ")
         return None
+
+    async def verify_tokens(self, tokens: dict[str, str]) -> dict:
+        """Verify tokens agains connector layer."""
+        statuses: dict = {}
+        for system in self.source_systems:
+            name = system.get("name")
+            if not name:
+                continue
+
+            token = tokens.get(name.lower())
+            if token is None:
+                statuses[name] = False
+            url = f"{system.get("connector_url")}/validate_token"
+            header: dict = {system.get("authentication_header"): f"{token}"}  # type: ignore
+            data = {}
+            try:
+                response = await self.http_client.get(url, headers=header)
+                response.raise_for_status()
+                data = response.json()
+            except httpx.TimeoutException:
+                dms_warning(f"Request timed out: {url}")
+            except httpx.HTTPError:
+                dms_warning(f"Failed to connect to connector, url: {url}")
+
+            if not isinstance(data, dict):
+                dms_warning(f"Service: {name} returned a faulty structure, expected dict got: {type(data)}.")
+            statuses[name] = data.get("valid", False)
+        return statuses
+
+    async def auth_code_callback(self, service_url: str, code: str) -> dict:
+        """Callback to connector layer service."""
+        url = f"{service_url}/callback?{code}"
+        try:
+            response = await self.http_client.get(url, follow_redirects=False)
+        except httpx.TimeoutException:
+            dms_warning("Request timed out")
+        except httpx.HTTPError:
+            dms_warning(f"Failed to connect to connector, url: {url} ")
+
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {}

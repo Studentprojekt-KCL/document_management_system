@@ -9,7 +9,7 @@ setup(
     install_requires=[
         "fastapi[standard]>=0.128",
         "mysql-connector-python>=9.5",
-        "cryptography>=46.0.7",
+        "cryptography>=48.0",
         "pyjwt",
         "celery>=5.6",
         "redis>=7.4",

@@ -2,15 +2,22 @@
 
 from copy import deepcopy
 
-from asyncio import Lock, get_event_loop
+from asyncio import Task, create_task, sleep
 
-from se_api.constants import CLASSIFICATION, MAX_FAIL_COUNT, UNIQUE_POINTER
+from se_api.constants import (
+    CLASSIFICATION,
+    INITIAL_RETRY_DELAY,
+    MAX_FAIL_COUNT,
+    MAX_RETRY_ATTEMPTS,
+    MAX_RETRY_DELAY,
+    UNIQUE_POINTER,
+)
 from se_api.services.index_pipeline import IndexPipeline
 from se_api.services.classifier import Classifier
 from se_api.services.connector import Connector
 from se_api.services.search_engine import SearchEngine
 
-from shared_functions.dmis_logger import dms_info, dms_warning
+from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 
 
 class Handler:
@@ -24,28 +31,44 @@ class Handler:
     connector: Connector
     classifier: Classifier
     search_engine: SearchEngine
-    index_pipeline: IndexPipeline | None
-
-    indexing: Lock
+    index_pipeline: IndexPipeline
+    indexing: Task
 
     def __init__(self) -> None:
         """Constructor"""
         self.connector = Connector()
         self.search_engine = SearchEngine()
         self.classifier = Classifier()
-        self.index_pipeline = None
-        self.indexing = Lock()
+        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
 
-    async def init(self) -> None:
+    async def _fetch_fields(self) -> list[str]:
+        """Fetch fields from connector, retrying with backoff until it responds."""
+        delay = INITIAL_RETRY_DELAY
+        for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+            fields = await self.connector.get_fields()
+            if fields is not None:
+                return fields
+            if attempt == MAX_RETRY_ATTEMPTS:
+                break
+            dms_warning(f"Connector not ready (attempt {attempt}/{MAX_RETRY_ATTEMPTS}), " f"retrying in {delay:.0f}s...")
+            await sleep(delay)
+            delay = min(delay * 2, MAX_RETRY_DELAY)
+
+        dms_error(f"Connector unreachable after {MAX_RETRY_ATTEMPTS} attempts; aborting setup")
+        return []
+
+    async def start(self) -> None:
         """Init handler"""
-
-        fields: list[str] | None = await self.connector.get_fields()
-        self.search_engine.init(fields)
+        fields = await self._fetch_fields()
+        rebuild = self.search_engine.load_index(fields)
+        if rebuild:
+            self.connector.write_subdata({})
+        self.indexing = create_task(self.index_pipeline.start())
 
     async def close(self) -> None:
         """Clean up"""
-        if self.index_pipeline is not None:
-            await self.index_pipeline.stop()
+        await self.index_pipeline.stop()
+        await self.indexing
         await self.connector.close()
         await self.classifier.close()
         await self.search_engine.close()
@@ -59,11 +82,11 @@ class Handler:
         self.search_engine = SearchEngine()
         self.connector = Connector()
         self.classifier = Classifier()
-        fields: list[str] | None = await self.connector.get_fields()
+        fields = await self._fetch_fields()
         self.search_engine.reset(fields)
         self.connector.write_subdata({})
-        if self.indexing.locked():
-            self.indexing.release()
+        self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
+        self.indexing = create_task(self.index_pipeline.start())
         dms_info("Search engine was reset.")
 
     def get_classifications(self) -> list[str]:
@@ -88,24 +111,36 @@ class Handler:
         offset: int = 0
         available_offset: int = 0
         fails: int = 0
+        score: float = 0
 
         while missing > 0 and fails < MAX_FAIL_COUNT:
-            matches, metadata = await self.search_engine.find_matching(pointer, missing + offset)
+            matches = await self.search_engine.find_matching(pointer, missing, offset)
             if not matches:
                 break
-            available: list[dict] | None = await self.connector.fetch_files(matches, authorization)
+            if pointer in matches:
+                score = matches.get(pointer, 0)
+                matches.pop(pointer)
+            available: list[dict] | None = await self.connector.fetch_files(list(matches.keys()), authorization)
             if available is None:
-                return []
-            for file in available[available_offset:]:
-                file.update({"score": metadata.get(file.get(UNIQUE_POINTER, ""), 0)})
-                files.append(file)
-            missing = count - len(files)
-            if not files:
+                break
+
+            if not available:
                 fails += 1
             else:
                 fails = 0
+
+            for file in available:
+                file.update({"score": matches.get(file.get(UNIQUE_POINTER, ""), 0)})
+                files.append(file)
+            missing = count - len(files)
             offset += count
             available_offset += len(available)
+
+        if score == 0:
+            return []
+
+        for file in files:
+            file["score"] /= score
         return files
 
     def grab_searchable_fields(self) -> set:
@@ -160,10 +195,7 @@ class Handler:
             dms_warning(f"Offset is invalid. (offset: {offset}).")
             return []
 
-        if not self.indexing.locked():
-            loop = get_event_loop()
-            loop.create_task(self._handle_new(authorization))
-
+        await self.index_pipeline.add(authorization)
         files: list[dict] = []
         missing: int = count
         actual_offset: int = offset
@@ -184,9 +216,3 @@ class Handler:
                 fails += 1
             actual_offset += count
         return files
-
-    async def _handle_new(self, authorization: str | None) -> None:
-        """Grab connector stream output and pipe it into search engine."""
-        async with self.indexing:
-            self.index_pipeline = IndexPipeline(self.search_engine, self.connector, self.classifier)
-            await self.index_pipeline.run(authorization)

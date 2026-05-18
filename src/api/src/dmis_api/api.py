@@ -111,10 +111,6 @@ class API:
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if (
-            authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
-        ):  # NOTE; THIS MUST BE REMOVED LATER
-            return {}
         claims = self.token_verifier.verify_access_token(
             authorization,
             required_scopes=required_scopes,

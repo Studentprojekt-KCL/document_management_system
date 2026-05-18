@@ -33,7 +33,7 @@ def insert_session(user: str, service_name: str, refresh_url: str, session_varia
     enc_session_vars = SESSION_ENCRYPTION.encrypt_session_vars(session_variables)
     expiry_time = session_variables.get("expires_in")
     if not isinstance(expiry_time, int):
-        dms_warning(f"Refresh service recieved Oauth token without expiry_time ({session_variables})")
+        dms_warning(f"Refresh service recieved Oauth token without expiry_time.")
         expiry_time = DEFAULT_EXPIRY_TIME
 
     expiry_time = min(expiry_time, DEFAULT_EXPIRY_TIME)

@@ -33,7 +33,7 @@ class HttpClient:
 
 class TestAuthRoutes(IsolatedAsyncioTestCase):
     ENV = {
-        "DMISAPI_AD_URL": "https://identity-provider.test/token",
+        "DMISAPI_AD_URL": "https://identity-provider.test",
         "DMISAPI_AD_CLIENT_ID": "dmis-api",
         "DMISAPI_ADMIN_ROLES": "admin, owner",
     }
@@ -75,6 +75,13 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
         verifier.verify_access_token.return_value = self.CLAIMS if claims is None else claims
 
         routes = AuthRoutes(verifier)
+        routes.oidc.token_endpoint = mock.AsyncMock(
+            return_value ="https://identity-provider.test/token"
+        )
+
+        routes.oidc.logout_endpoint = mock.AsyncMock(
+            return_value ="https://identity-provider.test/logout"
+        )
 
         if token_response is not None:
             routes._session = HttpClient(token_response)

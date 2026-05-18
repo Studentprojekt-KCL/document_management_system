@@ -15,6 +15,8 @@ from shared_functions.dmis_logger import dms_warning
 
 from .oidc_config import OidcConfig
 
+HTTP_OK = 200
+
 
 class AuthRoutes:
     """Authentication route handlers."""
@@ -22,15 +24,17 @@ class AuthRoutes:
     _session: aiohttp.ClientSession | None
 
     def __init__(self, token_verifier: Any) -> None:
-        self.token_verifier = token_verifier
         self.oidc = OidcConfig()
-        self.client_id = self.oidc.client_id
-        self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
-        self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
-        self.allowed_origins = {origin.rstrip("/") for origin in self._read_csv_env("DMISAPI_ALLOWED_ORIGINS")}
-        self.role_strategy = self._read_string_env("DMISAPI_ROLE_STRATEGY", "keycloak").lower()
-        self.access_cookie_max_age = self._read_int_env("DMISAPI_ACCESS_COOKIE_MAX_AGE", 300)
-        self.refresh_cookie_max_age = self._read_int_env("DMISAPI_REFRESH_COOKIE_MAX_AGE", 1800)
+        self.config = {
+            "client_id": self.oidc.client_id,
+            "admin_roles": self._read_csv_env("DMISAPI_ADMIN_ROLES"),
+            "user_roles": self._read_csv_env("DMISAPI_USER_ROLES"),
+            "allowed_origins": {origin.rstrip("/") for origin in self._read_csv_env("DMISAPI_ALLOWED_ORIGINS")},
+            "role_strategy": self._read_string_env("DMISAPI_ROLE_STRATEGY", "keycloak").lower(),
+            "access_cookie_max_age": self._read_int_env("DMISAPI_ACCESS_COOKIE_MAX_AGE", 300),
+            "refresh_cookie_max_age": self._read_int_env("DMISAPI_REFRESH_COOKIE_MAX_AGE", 1800),
+        }
+        self.token_verifier = token_verifier
         self._session = None
 
     # Fixing too many arguments
@@ -104,8 +108,8 @@ class AuthRoutes:
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
-        access_max_age = self._get_token_max_age(token_data, "expires_in", self.access_cookie_max_age)
-        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.refresh_cookie_max_age)
+        access_max_age = self._get_token_max_age(token_data, "expires_in", self.config["access_cookie_max_age"])
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.config["refresh_cookie_max_age"])
 
         if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, access_max_age)
@@ -148,7 +152,7 @@ class AuthRoutes:
             dms_warning(f"Received response which could not be JSON decoded from {token_url}, err: {err}")
             raise HTTPException(status_code=502) from err
 
-        if resp.status != 200:
+        if resp.status != HTTP_OK:
             dms_warning(f"Received unexpected response code ({resp.status}) from {token_url}: {response}")
             raise HTTPException(status_code=502)
 
@@ -167,7 +171,7 @@ class AuthRoutes:
             raise HTTPException(status_code=403)
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={
                 "authenticated": True,
                 "user": {
@@ -179,13 +183,13 @@ class AuthRoutes:
     def _extract_roles(self, claims: dict[str, Any]) -> set[str]:
         roles: set[str] = set()
 
-        if self.role_strategy == "keycloak":
-            keycloak_client_roles = claims.get("resource_access", {}).get(self.client_id, {}).get("roles", [])
+        if self.config["role_strategy"] == "keycloak":
+            keycloak_client_roles = claims.get("resource_access", {}).get(self.config["client_id"], {}).get("roles", [])
 
             if isinstance(keycloak_client_roles, list):
                 roles.update(str(role) for role in keycloak_client_roles)
 
-        elif self.role_strategy == "entra":
+        elif self.config["role_strategy"] == "entra":
             entra_roles = claims.get("roles", [])
 
             if isinstance(entra_roles, list):
@@ -199,10 +203,10 @@ class AuthRoutes:
     def _has_user_access(self, claims: dict[str, Any]) -> bool:
         roles = self._extract_roles(claims)
 
-        if not self.user_roles:
+        if not self.config["user_roles"]:
             return bool(roles)
 
-        return bool(roles & self.user_roles)
+        return bool(roles & self.config["user_roles"])
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Return authenticated user details and roles."""
@@ -214,7 +218,7 @@ class AuthRoutes:
         roles = sorted(self._extract_roles(claims))
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={
                 "authenticated": True,
                 "user": {
@@ -233,7 +237,7 @@ class AuthRoutes:
             raise HTTPException(status_code=401)
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={
                 "admin": self._is_admin(claims),
             },
@@ -241,7 +245,7 @@ class AuthRoutes:
 
     def _is_admin(self, claims: dict[str, Any]) -> bool:
         roles = self._extract_roles(claims)
-        return bool(roles & self.admin_roles)
+        return bool(roles & self.config["admin_roles"])
 
     async def code_exchange(self, request: Request, code: str = Form(...), code_verifier: str = Form(...)) -> JSONResponse:
         """Exchange authorization code for tokens via provided AD."""
@@ -249,7 +253,7 @@ class AuthRoutes:
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
-                "client_id": self.client_id,
+                "client_id": self.config["client_id"],
                 "code": code,
                 "redirect_uri": f"{origin}/auth/callback",
                 "code_verifier": code_verifier,
@@ -266,7 +270,7 @@ class AuthRoutes:
             raise HTTPException(status_code=403, detail="User does not have access to this application")
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"message": "Login successful"},
         )
         self._set_auth_cookies(response, token_data)
@@ -283,13 +287,13 @@ class AuthRoutes:
         token_data = await self._request_tokens(
             {
                 "grant_type": "refresh_token",
-                "client_id": self.client_id,
+                "client_id": self.config["client_id"],
                 "refresh_token": refresh_token,
             }
         )
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"message": "Session refreshed"},
         )
         self._set_auth_cookies(response, token_data)
@@ -304,7 +308,7 @@ class AuthRoutes:
 
         normalized_origin = origin.rstrip("/")
 
-        if normalized_origin not in self.allowed_origins:
+        if normalized_origin not in self.config["allowed_origins"]:
             raise HTTPException(status_code=403, detail="Invalid origin")
 
         return normalized_origin
@@ -321,7 +325,7 @@ class AuthRoutes:
         if logout_endpoint:
             params = {
                 "post_logout_redirect_uri": post_logout_redirect_uri,
-                "client_id": self.client_id,
+                "client_id": self.config["client_id"],
             }
 
             if id_token:
@@ -330,7 +334,7 @@ class AuthRoutes:
             logout_url = f"{logout_endpoint}?{urlencode(params)}"
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"logout_url": logout_url},
         )
 

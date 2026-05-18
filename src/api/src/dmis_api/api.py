@@ -107,14 +107,9 @@ class API:
     def authorize(
         self,
         authorization: str | None,
-        host: str | None,
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        if (
-            authorization is not None and host is not None and ("127.0.0.1" in host or "localhost" in host)
-        ):  # NOTE; THIS MUST BE REMOVED LATER
-            return {}
         claims = self.token_verifier.verify_access_token(
             authorization,
             required_scopes=required_scopes,
@@ -207,7 +202,7 @@ class API:
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
-        self.authorize(authorization, request.headers.get("Referer"), required_scopes=self.required_scopes["searcheng"])
+        self.authorize(authorization, required_scopes=self.required_scopes["searcheng"])
         return await self.execute_get_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
     async def search_engine_post(
@@ -220,7 +215,6 @@ class API:
         authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
             required_scopes=self.required_scopes["searcheng"],
         )
         return await self.execute_post_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
@@ -235,7 +229,6 @@ class API:
         authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
             required_scopes=self.required_scopes["stochan"],
         )
         return await self.execute_get_request(f"{self.upstream_urls['stochan']}/{endpoint}", request, authorization)
@@ -250,7 +243,6 @@ class API:
         authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
             required_scopes=self.required_scopes["stochan"],
         )
         return await self.execute_post_request(f"{self.upstream_urls['stochan']}/{endpoint}", request, authorization)
@@ -267,7 +259,6 @@ class API:
         referer = request.headers.get("Referer")
         self.authorize(
             authorization,
-            referer,
             required_scopes=self.required_scopes["congateway"],
         )
         headers = {"x-connector-authorization": x_connector_authorization} if x_connector_authorization else {}
@@ -284,7 +275,6 @@ class API:
         authorization = self.resolve_authorization(access_token)
         self.authorize(
             authorization,
-            request.headers.get("Referer"),
             required_scopes=self.required_scopes["congateway"],
         )
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)

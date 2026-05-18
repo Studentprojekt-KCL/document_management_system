@@ -28,7 +28,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
-        self.pointer_base = read_env_variable("CONLOREM_POINTER_BASE") #type: ignore
+        self.pointer_base = read_env_variable("CONLOREM_POINTER_BASE")  # type: ignore
         self.app = FastAPI()
         self.cap = read_int_env_variable("CONLOREM_STREAM_CAP") * 1024 * 1024
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)

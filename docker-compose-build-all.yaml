@@ -28,6 +28,11 @@ services:
     build:
       dockerfile: src/connectors/gitlab/Dockerfile
 
+  connector-lorem:
+    image: connector-lorem:pr
+    build:
+      dockerfile: src/connectors/lorem/Dockerfile
+
   connector-samba:
     image: connector-samba:pr
     build:

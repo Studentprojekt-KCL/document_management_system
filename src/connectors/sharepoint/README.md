@@ -8,6 +8,7 @@ The following needs to be exported in local environment:
     CONSHAREPOINT_CLIENT_ID=<Client ID of DMIS application registered in Azure AD>
     CONSHAREPOINT_CLIENT_SECRET=<Client secret of DMIS application in Azure AD>
     CONSHAREPOINT_STATE_SIGNING_SECRET=<Secret string used for OAuth state signing>
+    CONSHAREPOINT_CONNECT_SERVICE_CALLBACK=<Service to refere Sharepoint to send redirect to>
 
 # Azure AD App Registration
 

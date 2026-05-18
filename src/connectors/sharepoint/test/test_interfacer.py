@@ -126,17 +126,15 @@ class TestSharePointRecordBuilding(SharePointTestCase):
         self.assertEqual(
             record,
             {
-                "metadata": {
-                    "unique_pointer": graph_url("/drives/drive-456/items/item-123"),
-                    "name": "Quarterly Report.pdf",
-                    "size": 2048,
-                    "type": "source_file",
-                    "source_system": "SharePoint",
-                    "last_edit_date": "2026-05-01T10:20:30Z",
-                    "clickable_url": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
-                    "file_type": ".pdf",
-                    "file_type_description": "PDF",
-                }
+                "unique_pointer": graph_url("/drives/drive-456/items/item-123"),
+                "name": "Quarterly Report.pdf",
+                "size": 2048,
+                "type": "source_file",
+                "source_system": "SharePoint",
+                "last_edit_date": "2026-05-01T10:20:30Z",
+                "clickable_url": "https://tenant.sharepoint.com/sites/team/Quarterly%20Report.pdf",
+                "file_type": ".pdf",
+                "file_type_description": "PDF",
             },
         )
 
@@ -145,8 +143,8 @@ class TestSharePointRecordBuilding(SharePointTestCase):
         record = self.sharepoint._build_file_record({"id": "item-1", "name": "build.lock", "size": 12}, "drive-1")
 
         self.assertIsNotNone(record)
-        self.assertEqual(record["metadata"]["file_type"], "Unknown")
-        self.assertEqual(record["metadata"]["file_type_description"], "Unknown")
+        self.assertEqual(record["file_type"], "Unknown")
+        self.assertEqual(record["file_type_description"], "Unknown")
 
     def test_build_file_record_ignores_non_file_delta_items(self) -> None:
         """Folder entries and delete tombstones are not documents to index."""
@@ -388,8 +386,8 @@ class TestSharePointFileFetching(SharePointTestCase, IsolatedAsyncioTestCase):
 
     async def test_fetch_record_content_sets_base64_content_or_none_without_changing_metadata(self) -> None:
         """Streamed records should always keep a predictable content field."""
-        successful = {"metadata": {"unique_pointer": graph_url("/drives/drive-a/items/item-a"), "name": "Plan.docx"}}
-        failed = {"metadata": {"unique_pointer": graph_url("/drives/drive-a/items/item-b"), "name": "Secret.docx"}}
+        successful = {"unique_pointer": graph_url("/drives/drive-a/items/item-a"), "name": "Plan.docx"}
+        failed = {"unique_pointer": graph_url("/drives/drive-a/items/item-b"), "name": "Secret.docx"}
         self.sharepoint._request_with_retry = mock.AsyncMock(side_effect=[response(200, content=b"bytes"), response(403)])
 
         await self.sharepoint._fetch_record_content(http_context(), successful)
@@ -397,7 +395,7 @@ class TestSharePointFileFetching(SharePointTestCase, IsolatedAsyncioTestCase):
 
         self.assertEqual(successful["content"], base64.b64encode(b"bytes").decode("utf-8"))
         self.assertIsNone(failed["content"])
-        self.assertEqual(failed["metadata"]["name"], "Secret.docx")
+        self.assertEqual(failed["name"], "Secret.docx")
 
 
 class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
@@ -432,7 +430,7 @@ class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
         self.assertEqual(len(chunks), 2)
         self.assertIn("subdata", chunks[0])
         self.assertEqual(SharePoint._decode_subdata(chunks[0]["subdata"]), {"drive-a": "new-token"})
-        self.assertEqual(chunks[1]["metadata"]["name"], "Plan.docx")
+        self.assertEqual(chunks[1]["name"], "Plan.docx")
         self.assertEqual(chunks[1]["content"], "base64-content")
 
     async def test_stream_uses_stored_subdata_when_collecting_drive_tasks(self) -> None:
@@ -474,7 +472,7 @@ class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
             chunks = await self.collect_stream()
 
         self.assertEqual(SharePoint._decode_subdata(chunks[0]["subdata"]), {"drive-good": "good-token"})
-        self.assertEqual([chunk["metadata"]["name"] for chunk in chunks[1:]], ["ok.pdf"])
+        self.assertEqual([chunk["name"] for chunk in chunks[1:]], ["ok.pdf"])
 
     async def test_process_drive_filters_delta_items_before_streaming(self) -> None:
         """Only real file items are returned from a drive delta page."""
@@ -496,5 +494,5 @@ class TestSharePointStreaming(SharePointTestCase, IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(drive_id, "drive-a")
-        self.assertEqual([record["metadata"]["name"] for record in records], ["report.pdf"])
+        self.assertEqual([record["name"] for record in records], ["report.pdf"])
         self.assertEqual(parse_qs(urlparse(delta_link).query)["token"], ["next"])

@@ -10,6 +10,11 @@ const router = useRouter()
 const route = useRoute()
 const errorMSG = ref('')
 
+const getCookie = (name) => {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? decodeURIComponent(match[2]) : null
+}
+
 onMounted(async () => {
   const code = route.query.code
   const state = route.query.state
@@ -18,16 +23,17 @@ onMounted(async () => {
     await router.push('/login')
     return
   }
+  const sourceCookie = getCookie('source')
+
+  const params = new URLSearchParams({
+    code,
+    state,
+    source: sourceCookie
+  })
+
   try {
-    const response = await apiFetch(API_PATHS.sessionCallback, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        code,
-        state
-      })
+    const response = await apiFetch(`${API_PATHS.sessionCallback}?${params.toString()}`, {
+      method: 'GET'
     })
     if (!response.ok) {
       errorMSG.value = 'Session Callback Failed'

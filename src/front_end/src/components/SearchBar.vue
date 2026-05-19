@@ -32,7 +32,7 @@ const handleSearch = () => {
     return
   }
 
-  if (query.length > 1024) {
+  if (query.length > 512) {
     throw new Error('Search query exceeds the character limit')
   }
 

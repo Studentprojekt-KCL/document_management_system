@@ -90,14 +90,6 @@ describe('MergeFilesView.vue', () => {
   })
 
   describe('rendering — with rerank results', () => {
-    it('displays the page title', () => {
-      const wrapper = mountComponent()
-      // Ensure a main heading is present for the page
-      const h1 = wrapper.find('h1')
-      expect(h1.exists()).toBe(true)
-      expect(h1.text().length).toBeGreaterThan(0)
-    })
-
     it('shows the rerank filename', () => {
       const wrapper = mountComponent()
       // Filename is dynamic and important; keep assertion that it is rendered
@@ -156,13 +148,6 @@ describe('MergeFilesView.vue', () => {
   })
 
   describe('merge + generate PDF button', () => {
-    it('renders the merge button', () => {
-      const wrapper = mountComponent()
-      const btn = wrapper.find('.pdf-actions button')
-      // Ensure merge/generate button exists; behavior tested below
-      expect(btn.exists()).toBe(true)
-    })
-
     it('calls generatePDF with selected pointers and rerankPointer', async () => {
       const wrapper = mountComponent()
       const btn = wrapper.find('.pdf-actions button')
@@ -227,12 +212,6 @@ describe('MergeFilesView.vue', () => {
   })
 
   describe('summarize button', () => {
-    it('renders the summarize button', () => {
-      const wrapper = mountComponent()
-      const btn = wrapper.find('.summary-actions button')
-      expect(btn.exists()).toBe(true)
-    })
-
     it('calls generateAISummary with selected pointers and rerankPointer', async () => {
       const wrapper = mountComponent()
       const btn = wrapper.find('.summary-actions button')

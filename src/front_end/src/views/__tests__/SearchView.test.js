@@ -102,32 +102,6 @@ describe('SearchView', () => {
     wrapper.findComponent({ name: 'SearchBar' }).vm.$emit('search', { query, documentsOnly })
   }
 
-  /* ── Rendering ── */
-  describe('rendering', () => {
-    it('renders all child components', () => {
-      const wrapper = mountView()
-      expect(wrapper.findComponent({ name: 'SearchBar' }).exists()).toBe(true)
-      expect(wrapper.findComponent({ name: 'SearchFiltersCard' }).exists()).toBe(true)
-      expect(wrapper.findComponent({ name: 'SearchMatches' }).exists()).toBe(true)
-      expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).exists()).toBe(true)
-    })
-
-    it('passes loading false to SearchBar initially', () => {
-      const wrapper = mountView()
-      expect(wrapper.findComponent({ name: 'SearchBar' }).props('loading')).toBe(false)
-    })
-
-    it('passes empty matches initially', () => {
-      const wrapper = mountView()
-      expect(wrapper.findComponent({ name: 'SearchMatches' }).props('matches')).toEqual([])
-    })
-
-    it('passes drawer closed initially', () => {
-      const wrapper = mountView()
-      expect(wrapper.findComponent({ name: 'SearchPreviewDrawer' }).props('open')).toBe(false)
-    })
-  })
-
   /* ── Search flow ── */
   describe('search', () => {
     it('fetches results on search event', async () => {

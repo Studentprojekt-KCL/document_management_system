@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request, Header
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 
 from interfacer import GitLab
@@ -31,6 +31,7 @@ class API:
 
     def __init__(self) -> None:
         """Constructor."""
+        self.auth_callback_url = read_env_variable("CONGITLAB_CONNECT_SERVICE_CALLBACK")
         self.gitlab_url = read_env_variable("CONGITLAB_GITLAB_URL").rstrip("/")
         self.gitlab_instance = GitLab(self.gitlab_url)
 
@@ -46,6 +47,7 @@ class API:
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[None]:
@@ -84,8 +86,9 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
+        token = x_gitlab_token.lower().replace("bearer ", "") if x_gitlab_token else None
         return await self.gitlab_instance.get_files(
-            file_pointers.get("file_pointers", []), x_gitlab_token, include_content, include_last_edit_date
+            file_pointers.get("file_pointers", []), token, include_content, include_last_edit_date
         )
 
     async def stream_files_to_index(
@@ -97,15 +100,15 @@ class API:
         subdata: str | None
         subdata = body.get("subdata") if isinstance(body, dict) else None
 
-        return StreamingResponse(
-            self.gitlab_instance.stream_files_to_index(subdata, x_gitlab_token), media_type="application/octet-stream"
-        )
+        token = x_gitlab_token.lower().replace("bearer ", "") if x_gitlab_token else None
+
+        return StreamingResponse(self.gitlab_instance.stream_files_to_index(subdata, token), media_type="application/octet-stream")
 
     async def defined_fields(self) -> list:
         """Retrieve fields delivered for file conent."""
         return list(self.gitlab_instance.defined_fields.keys())
 
-    def auth_user(self, request: Request) -> RedirectResponse:
+    def auth_user(self) -> JSONResponse:
         """Callback endpoint to set in GitLab application.
 
         Required headers:
@@ -121,13 +124,13 @@ class API:
 
         params = {
             "client_id": self.gitlab_client_id,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "response_type": "code",
             "scope": "read_api",
             "state": signed_state,
         }
 
-        return RedirectResponse(f"{auth_url}?{urlencode(params)}")
+        return JSONResponse(content={"redirect": f"{auth_url}?{urlencode(params)}"})
 
     async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
         """Callback endpoint to set in GitLab application."""
@@ -144,10 +147,11 @@ class API:
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": str(request.url_for("callback")),
+            "redirect_uri": self.auth_callback_url,
             "client_id": self.gitlab_client_id,
             "client_secret": self.gitlab_client_secret,
         }
+
         token_json = await self.gitlab_instance.execute_post_request(token_url, data=data)
 
         if not token_json.get("access_token"):
@@ -168,6 +172,20 @@ class API:
         new_tokens = await self.gitlab_instance.execute_post_request(token_url, data=payload)
 
         return JSONResponse(content=new_tokens, status_code=200)
+
+    async def validate_token(self, x_gitlab_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Check token validity.
+
+        Args:
+            x_gitlab_token: token
+        Returns: response with true/false"""
+        if x_gitlab_token is None:
+            return JSONResponse(content={"valid": False}, status_code=200)
+        token = x_gitlab_token.lower().replace("bearer ", "") if x_gitlab_token else None
+
+        token_url = f"{self.gitlab_url}/oauth/token/info"
+        data = await self.gitlab_instance.execute_get_request(token_url, {"Authorization": f"Bearer {token}"})
+        return JSONResponse(content={"valid": bool(data)}, status_code=200)
 
 
 def run() -> None:

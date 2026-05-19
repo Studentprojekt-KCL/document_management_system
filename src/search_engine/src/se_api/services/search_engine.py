@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import json
-from os import listdir, mkdir, path, remove
+from os import listdir, remove
 from asyncio import Lock, to_thread
 from tantivy import (
     Document,
@@ -56,22 +56,33 @@ class SearchEngine:
             self.documents_only_extension.extend(extention.get("extension", []))
         self.writer_lock = Lock()
 
-    def init(self, fields: list[str] | None) -> None:
-        """Initialize the index schema with the saved categories."""
-        if not path.exists(self.index_path):
-            mkdir(self.index_path)
-        if not path.isdir(self.index_path):
-            dms_error(f"{self.index_path} is not a directory.")
-            return
-        self.categories = BOOLEAN_CATEGORIES
-        self.categories = self.categories.union(RAW_CATEGORIES)
-        self.categories = self.categories.union(COOKED_CATEGORIES)
-        if fields is not None:
-            for field in fields:
-                self.categories.add(field)
-        categories = sorted(self.categories)
+    def _load_fields(self, fetched_fields: list | None) -> list:
+        """Prepear fields for usage.
+
+        Args:
+            fetched_fields: fields from connector.
+        Returns: sorted list of fields
+        """
+        fields: set = BOOLEAN_CATEGORIES
+        fields = fields.union(RAW_CATEGORIES)
+        fields = fields.union(COOKED_CATEGORIES)
+        if fetched_fields is not None:
+            for field in fetched_fields:
+                fields.add(field)
+        self.categories = fields
+        return sorted(list(fields))
+
+    def load_index(self, fetched_fields: list | None) -> bool:
+        """Load index and build schema.
+
+        Args:
+            fetched_fields: Fetched fields from connectors.
+        Returns: true if rebuild, else false.
+        """
+        rebuild = False
+        fields = self._load_fields(fetched_fields)
         schema_builder = SchemaBuilder()
-        for category in categories:
+        for category in fields:
             if category in RAW_CATEGORIES:
                 schema_builder.add_text_field(category, stored=True, tokenizer_name="raw", fast=True)
             elif category in BOOLEAN_CATEGORIES:
@@ -89,21 +100,45 @@ class SearchEngine:
                 remove(f"{self.index_path}/{file}")
             try:
                 self.index = Index(schema, path=self.index_path)
+                rebuild = True
             except ValueError:
                 dms_error(f"Failed loading index directory, path: {self.index_path}.")
         self.writer = self.index.writer()
+        return rebuild
 
     async def close(self) -> None:
         """Graceful shutdown."""
-        await self.writer_lock.acquire()
-        await asyncio.to_thread(self.writer.wait_merging_threads)
-        self.writer_lock.release()
+        async with self.writer_lock:
+            self.writer.wait_merging_threads()
 
     def reset(self, fields: list[str] | None) -> None:
         """Reset the search engine."""
         for file in listdir(self.index_path):
             remove(f"{self.index_path}/{file}")
-        self.init(fields)
+        self.load_index(fields)
+
+    async def grab_pending(self) -> AsyncGenerator[str]:
+        """Fetch pending files from the index.
+
+        Returns: list of unique pointers.
+        """
+        self.index.reload()
+        searcher = self.index.searcher()
+        offset = 0
+        while True:
+            result = searcher.search(
+                Query.term_query(self.index.schema, field_name=CLASSIFICATION, field_value="Pending"), limit=100, offset=offset
+            )
+            offset += 100
+            if not result.hits:
+                break
+            for _, doc_id in result.hits:
+                doc: Document = searcher.doc(doc_id)
+                try:
+                    unique_pointer = doc[UNIQUE_POINTER][0]
+                    yield unique_pointer
+                except IndexError:
+                    dms_warning(f"Missing unique_pointer: {doc}")
 
     async def set_classification(self, unique_pointer: str, classification: str) -> tuple[str, str] | None:
         """Set the classification of a file in the index.
@@ -176,10 +211,9 @@ class SearchEngine:
                 pointers.append(unique_pointer)
             except IndexError:
                 dms_warning(f"Missing unique_pointer: {doc}")
-
         return (pointers, metadata)
 
-    async def find_matching(self, unique_pointer: str, count: int) -> dict:
+    async def find_matching(self, unique_pointer: str, count: int, offset: int) -> dict[str, float]:
         """Search for matching files.
 
         Args:
@@ -191,19 +225,13 @@ class SearchEngine:
         searcher = self.index.searcher()
         result = searcher.search(Query.term_query(self.index.schema, field_name=UNIQUE_POINTER, field_value=unique_pointer))
         if not result.hits:
-            return {}
+            return matching
         doc_address = result.hits[0][1]
-        result = searcher.search(Query.more_like_this_query(doc_address), limit=count + 1)
-        original_score: int | None = None
+        result = searcher.search(Query.more_like_this_query(doc_address), offset=offset, limit=count)
         for score, doc_id in result.hits:
-            if original_score is None:
-                if score == 0:
-                    break
-                original_score = score
-                continue
             doc: Document = searcher.doc(doc_id)
             unique_pointer = doc[UNIQUE_POINTER][0]
-            matching.update({unique_pointer: score / original_score})
+            matching.update({unique_pointer: score})
         return matching
 
     @asynccontextmanager
@@ -212,8 +240,8 @@ class SearchEngine:
         await self.writer_lock.acquire()
         try:
             yield
-        finally:
             await asyncio.to_thread(self.writer.commit)
+        finally:
             self.writer_lock.release()
 
     def grab_file(self, unique_pointer: str) -> dict:

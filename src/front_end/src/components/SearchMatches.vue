@@ -27,7 +27,7 @@ const props = defineProps({
 /* Emit to parent component when a match is selected or selection is toggled */
 const emit = defineEmits(['select', 'update:selectedPointers'])
 
-const getPointer = (match) => match?.unique_pointer || ''
+const getPointer = (match) => match?.unique_pointer || match?.metadata?.unique_pointer || ''
 
 const isSelectedPointer = (pointer) => props.selectedPointers.includes(pointer)
 
@@ -85,7 +85,7 @@ const resolveBadgeClass = (match) => {
 
     <!-- List of search result matches with titles, types, dates and source -->
     <ul class="results-list">
-      <li v-for="item in normalizedMatches" :key="item.filename" class="result-item">
+      <li v-for="item in normalizedMatches" :key="getPointer(item.rawMatch) || item.filename" class="result-item">
         <button
           class="result-card"
           :class="{ active: selected === item.filename, selected: selectable && isSelected(item.rawMatch) }"
@@ -183,7 +183,6 @@ const resolveBadgeClass = (match) => {
 }
 
 .result-title {
-  margin: 0;
   font-size: 1.1rem;
   line-height: 1.25;
   color: #0f172a;

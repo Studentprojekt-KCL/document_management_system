@@ -60,10 +60,10 @@ class IndexPipeline:
 
     async def start(self) -> None:
         """Start the indexing pipeline."""
-        fetch_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
+        fetch_queue: Queue = Queue()
         decode_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         index_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
-        lookup_queue: Queue = Queue(POINTER_QUEUE_SIZE)
+        lookup_queue: Queue = Queue()
         classify_queue: Queue = Queue(CLASSIFICATION_QUEUE_SIZE)
         reindex_queue: Queue = Queue(GENERIC_QUEUE_SIZE)
         self.queues = Queues(fetch_queue, decode_queue, index_queue, lookup_queue, classify_queue, reindex_queue)

@@ -1,6 +1,6 @@
 """File for shared service-level types"""
 
-from pydantic import BaseModel, StrictStr
+from pydantic import BaseModel, Field, StrictStr
 
 
 class MetadataTemplate(BaseModel):
@@ -18,9 +18,19 @@ class InputItem(BaseModel):
 
 
 class MarkdownRequest(BaseModel):
-    """Request schema for markdown logic."""
+    """Request schema for markdown logic.
 
-    markdown: StrictStr
+    Validation rules:
+    - `markdown` must be a UTF-8 string (enforced by FastAPI's JSON decoder).
+    - Must be a string, not bool/int/float (enforced by StrictStr).
+    - Must not be empty.
+    """
+
+    markdown: StrictStr = Field(
+        ...,
+        min_length=1,
+        description="Markdown content to convert to PDF. UTF-8, non-empty.",
+    )
 
 
 class PointerRequest(BaseModel):

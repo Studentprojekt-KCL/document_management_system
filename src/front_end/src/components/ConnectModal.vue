@@ -69,10 +69,24 @@ const handleConnect = () => {
         <template v-if="usesBasicAuth">
           <form class="credential-form" @submit.prevent="handleConnect">
             <label for="username">Username</label>
-            <input id="username" v-model="username" autocomplete="username" type="text" placeholder="Enter username" />
+            <input
+              id="username"
+              v-model="username"
+              autocomplete="username"
+              type="text"
+              placeholder="Enter username"
+              maxlength="256"
+            />
 
             <label for="password">Password</label>
-            <input id="password" v-model="password" autocomplete="current-password" type="password" placeholder="Enter password" />
+            <input
+              id="password"
+              v-model="password"
+              autocomplete="current-password"
+              type="password"
+              placeholder="Enter password"
+              maxlength="256"
+            />
 
             <div class="modal-footer">
               <button class="connect-btn" :disabled="!submitConnection || loading" type="submit" @click="handleConnect">

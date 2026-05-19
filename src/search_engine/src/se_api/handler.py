@@ -201,6 +201,11 @@ class Handler:
         actual_offset: int = offset
         fails: int = 0
 
+        for field, value in content.items():
+            if len(value) > 1024:
+                dms_warning(f"Search query for '{field}' exceeds the character limit.")
+                return []
+
         while missing > 0 and fails < MAX_FAIL_COUNT:
             matches, metadata = self.search_engine.query_files(content, missing, actual_offset)
             if not matches:

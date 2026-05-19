@@ -5,6 +5,7 @@ from typing import Any
 from collections.abc import AsyncGenerator
 from datetime import datetime
 import json
+import base64
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -23,9 +24,11 @@ class API:
 
     log_level: str | None = None
     session_states: dict = {}
+    pointer_base: str
 
     def __init__(self) -> None:
         """Constructor."""
+        self.pointer_base = read_env_variable("CONLOREM_POINTER_BASE")  # type: ignore
         self.app = FastAPI()
         self.cap = read_int_env_variable("CONLOREM_STREAM_CAP") * 1024 * 1024
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
@@ -76,7 +79,7 @@ class API:
         """Stream lorem data"""
 
         def _decode(chunk: dict) -> bytes:
-            return json.dumps(chunk).encode("utf-8")
+            return (json.dumps(chunk)).encode("utf-8")
 
         async def _stream() -> AsyncGenerator:
             total_size = 0
@@ -85,13 +88,13 @@ class API:
                 text = lorem.words(500)
                 size = len(text.encode("utf-8"))
                 total_size += size
-                pointer = lorem.words(5).replace(" ", "-")
+                pointer = lorem.words(30).replace(" ", "-")
                 chunk = {
                     "source_system": "lorem",
                     "last_edit_date": datetime.now().isoformat(),
-                    "content": text,
+                    "content": base64.b64encode(text.encode("utf-8")).decode("utf-8"),
                     "name": pointer,
-                    "unique_pointer": pointer,
+                    "unique_pointer": self.pointer_base + pointer,
                     "size": size,
                     "type": "source_file",
                 }

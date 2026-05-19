@@ -8,6 +8,7 @@ from se_api.constants import (
     CLASSIFICATION,
     INITIAL_RETRY_DELAY,
     MAX_FAIL_COUNT,
+    MAX_SEARCH_QUERY_LENGTH,
     MAX_RETRY_ATTEMPTS,
     MAX_RETRY_DELAY,
     UNIQUE_POINTER,
@@ -202,7 +203,7 @@ class Handler:
         fails: int = 0
 
         for field, value in content.items():
-            if len(value) > 1024:
+            if len(value) > MAX_SEARCH_QUERY_LENGTH:
                 dms_warning(f"Search query for '{field}' exceeds the character limit.")
                 return []
 

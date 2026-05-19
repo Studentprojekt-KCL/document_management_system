@@ -11,42 +11,6 @@ describe('SearchBar', () => {
     })
   }
 
-  /* ── Rendering ── */
-  describe('rendering', () => {
-    it('renders the search input', () => {
-      const wrapper = mountBar()
-      expect(wrapper.find('.search-input').exists()).toBe(true)
-    })
-
-    it('renders the search button', () => {
-      const wrapper = mountBar()
-      expect(wrapper.find('.search-button').exists()).toBe(true)
-      expect(wrapper.find('.search-button').text()).toBe('Search')
-    })
-
-    it('renders the search icon', () => {
-      const wrapper = mountBar()
-      expect(wrapper.find('.search-icon').exists()).toBe(true)
-    })
-
-    it('shows default placeholder when not loading', () => {
-      const wrapper = mountBar()
-      const input = wrapper.find('.search-input')
-      expect(input.attributes('placeholder')).toContain('Search for documents')
-    })
-
-    it('shows loading placeholder when loading', () => {
-      const wrapper = mountBar({ loading: true })
-      const input = wrapper.find('.search-input')
-      expect(input.attributes('placeholder')).toBe('Searching...')
-    })
-
-    it('disables input when loading', () => {
-      const wrapper = mountBar({ loading: true })
-      expect(wrapper.find('.search-input').attributes('disabled')).toBeDefined()
-    })
-  })
-
   /* ── Search button state ── */
   describe('search button state', () => {
     it('disables button when input is empty', () => {

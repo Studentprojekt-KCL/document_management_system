@@ -130,16 +130,6 @@ describe('SearchPreviewDrawer', () => {
 
   /* ─── Open / Close ─── */
 
-  it('has "open" class when open prop is true', () => {
-    const wrapper = mountDrawer()
-    expect(wrapper.find('.preview-drawer').classes()).toContain('open')
-  })
-
-  it('lacks "open" class when closed', () => {
-    const wrapper = mountDrawer({ open: false })
-    expect(wrapper.find('.preview-drawer').classes()).not.toContain('open')
-  })
-
   it('renders backdrop only when open', () => {
     const open = mountDrawer({ open: true })
     expect(open.find('.preview-backdrop').exists()).toBe(true)

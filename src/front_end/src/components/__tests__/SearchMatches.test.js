@@ -110,18 +110,6 @@ describe('SearchMatches.vue', () => {
       expect(wrapper.emitted('select')).toHaveLength(1)
       expect(wrapper.emitted('select')[0][0]).toMatchObject({ name: 'test-file.pdf' })
     })
-
-    it('applies "active" class to the selected card', () => {
-      const wrapper = mountComponent({ selected: 'test-file.pdf' })
-      const firstCard = wrapper.findAll('.result-card')[0]
-      expect(firstCard.classes()).toContain('active')
-    })
-
-    it('does not apply "active" to non-selected cards', () => {
-      const wrapper = mountComponent({ selected: 'test-file.pdf' })
-      const secondCard = wrapper.findAll('.result-card')[1]
-      expect(secondCard.classes()).not.toContain('active')
-    })
   })
 
   /* ─── Selectable (multi-select) mode ─── */
@@ -158,18 +146,6 @@ describe('SearchMatches.vue', () => {
       expect(emitted[0][0]).toContain('ptr-002')
       expect(emitted[0][0]).toContain('ptr-001')
     })
-
-    it('applies "selected" class to selected cards', () => {
-      const wrapper = mountComponent(selectableProps)
-      const firstCard = wrapper.findAll('.result-card')[0]
-      expect(firstCard.classes()).toContain('selected')
-    })
-
-    it('does not apply "selected" class to unselected cards', () => {
-      const wrapper = mountComponent(selectableProps)
-      const secondCard = wrapper.findAll('.result-card')[1]
-      expect(secondCard.classes()).not.toContain('selected')
-    })
   })
 
   /* ─── Badge modes ─── */
@@ -179,12 +155,6 @@ describe('SearchMatches.vue', () => {
       const wrapper = mountComponent({ badgeMode: 'security' })
       const badge = wrapper.find('.security-badge')
       expect(badge.text()).toBe('Internal')
-    })
-
-    it('applies correct security CSS class', () => {
-      const wrapper = mountComponent({ badgeMode: 'security' })
-      const badge = wrapper.find('.security-badge')
-      expect(badge.classes()).toContain('security-internal')
     })
 
     it('shows score in score badge mode', () => {

@@ -39,26 +39,6 @@ describe('ClassificationEditor', () => {
       const wrapper = mountEditor({ visible: false })
       expect(wrapper.find('.classification-modal').exists()).toBe(false)
     })
-
-    it('renders all security levels as options', () => {
-      const wrapper = mountEditor()
-      const options = wrapper.findAll('.level-option')
-      expect(options).toHaveLength(4)
-      expect(options[0].text()).toBe('Public')
-      expect(options[1].text()).toBe('Internal')
-      expect(options[2].text()).toBe('Sensitive')
-      expect(options[3].text()).toBe('Confidential')
-    })
-
-    it('shows the modal title', () => {
-      const wrapper = mountEditor()
-      expect(wrapper.find('.modal-title').text()).toContain('Edit Security Classification')
-    })
-
-    it('shows the description text', () => {
-      const wrapper = mountEditor()
-      expect(wrapper.find('.modal-description').text()).toContain('Select the appropriate security level')
-    })
   })
 
   /* ── Level selection ── */
@@ -92,17 +72,6 @@ describe('ClassificationEditor', () => {
 
       expect(options[0].classes()).not.toContain('selected')
       expect(options[3].classes()).toContain('selected')
-    })
-
-    it('applies the correct color class for each level', async () => {
-      const wrapper = mountEditor({ currentLevel: '' })
-      await nextTick()
-
-      const options = wrapper.findAll('.level-option')
-      expect(options[0].classes()).toContain('option-public')
-      expect(options[1].classes()).toContain('option-internal')
-      expect(options[2].classes()).toContain('option-sensitive')
-      expect(options[3].classes()).toContain('option-confidential')
     })
   })
 

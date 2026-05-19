@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useSearchMetadata } from '@/composables/useSearchMetadata'
 import { authFetch, API_PATHS } from '@/utils/api'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 export function useMdToPdf(props = {}) {
   /* Unique pointer from metadata */
@@ -65,7 +66,7 @@ export function useMdToPdf(props = {}) {
     }
 
     mergedMarkdown.value = markdownText
-    mergedHtmlRaw.value = marked.parse(markdownText)
+    mergedHtmlRaw.value = DOMPurify.sanitize(marked.parse(markdownText))
     return markdownText
   }
 

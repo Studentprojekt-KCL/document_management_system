@@ -52,7 +52,8 @@ vi.mock('@/composables/aiRerank', () => {
 
 const mockHasRole = vi.fn(() => false)
 vi.mock('@/utils/auth', () => ({
-  hasRole: (...args) => mockHasRole(...args)
+  hasRole: (...args) => mockHasRole(...args),
+  isAdmin: async () => mockHasRole('admin')
 }))
 
 /* Component uses authFetch + API_PATHS, not saveClassification */
@@ -199,21 +200,24 @@ describe('SearchPreviewDrawer', () => {
       expect(wrapper.find('.edit-btn').exists()).toBe(false)
     })
 
-    it('shows edit button for admin', () => {
+    it('shows edit button for admin', async () => {
       mockHasRole.mockReturnValue(true)
       const wrapper = mountDrawer()
+      await flushPromises()
       expect(wrapper.find('.edit-btn').exists()).toBe(true)
     })
 
-    it('checks the admin role specifically', () => {
+    it('checks the admin role specifically', async () => {
       mockHasRole.mockReturnValue(true)
       mountDrawer()
+      await flushPromises()
       expect(mockHasRole).toHaveBeenCalledWith('admin')
     })
 
     it('opens editor on edit click', async () => {
       mockHasRole.mockReturnValue(true)
       const wrapper = mountDrawer()
+      await flushPromises()
 
       expect(wrapper.find('.mock-editor').exists()).toBe(false)
       await wrapper.find('.edit-btn').trigger('click')
@@ -223,6 +227,7 @@ describe('SearchPreviewDrawer', () => {
     it('closes editor on cancel', async () => {
       mockHasRole.mockReturnValue(true)
       const wrapper = mountDrawer()
+      await flushPromises()
 
       await wrapper.find('.edit-btn').trigger('click')
       expect(wrapper.find('.mock-editor').exists()).toBe(true)
@@ -237,6 +242,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: true })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -256,6 +262,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: true })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -269,6 +276,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: true })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -285,6 +293,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: false, status: 403 })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -299,6 +308,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockRejectedValue(new Error('timeout'))
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -313,6 +323,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: true })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -327,6 +338,7 @@ describe('SearchPreviewDrawer', () => {
       mockAuthFetch.mockResolvedValue({ ok: true })
 
       const wrapper = mountDrawer()
+      await flushPromises()
       await wrapper.find('.edit-btn').trigger('click')
       await wrapper.find('.save-btn').trigger('click')
       await flushPromises()
@@ -390,6 +402,7 @@ describe('SearchPreviewDrawer', () => {
   it('hides editor when selectedFile changes', async () => {
     mockHasRole.mockReturnValue(true)
     const wrapper = mountDrawer()
+    await flushPromises()
 
     await wrapper.find('.edit-btn').trigger('click')
     expect(wrapper.find('.mock-editor').exists()).toBe(true)

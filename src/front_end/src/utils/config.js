@@ -9,15 +9,6 @@ export const FRONTEND_AD_CLIENT_ID = window.__ENV__.FRONTEND_AD_CLIENT_ID
 export const FRONTEND_AD_STRATEGY = window.__ENV__.FRONTEND_AD_STRATEGY || 'keycloak'
 export const FRONTEND_AD_AUDIENCE = window.__ENV__.FRONTEND_AD_AUDIENCE || ''
 
-export const oidcAuthUrl = () => {
-  /* Depending on strategy the endpoint changes. */
-  if (FRONTEND_AD_STRATEGY === 'auth0') {
-    return `${FRONTEND_AD_URL}/authorize`
-  }
-
-  return `${FRONTEND_AD_URL}/protocol/openid-connect/auth`
-}
-
 export const oidcLogoutUrl = () => {
   /* Depending on strategy the endpoint changes. */
   if (FRONTEND_AD_STRATEGY === 'auth0') {

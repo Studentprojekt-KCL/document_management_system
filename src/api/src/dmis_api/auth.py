@@ -18,13 +18,10 @@ from shared_functions.initialisation_tools import read_env_variable
 class TokenVerifier:
     """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(self) -> None:
+    def __init__(self, oidc_config: dict[str,Any]|None=None) -> None:
         """Initialize token verifier with AD settings."""
-        well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
+        config = oidc_config or self._load_oidc_config()
 
-        response = requests.get(well_known_url, timeout=10)
-        response.raise_for_status()
-        config = response.json()
         self.issuer = config["issuer"]
         self.jwks_client = PyJWKClient(config["jwks_uri"])
 
@@ -40,6 +37,19 @@ class TokenVerifier:
 
         allowed_azp = [value.strip() for value in read_env_variable("DMISAPI_AD_ALLOWED_AZP").split(",") if value.strip()]
         self.allowed_azp = set(allowed_azp) if allowed_azp else None
+
+    def _load_oidc_config(self) -> dict[str, Any]:
+        """Load OIDC configuration from well-known endpoint."""
+        well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
+
+        response = requests.get(well_known_url, timeout=10)
+        response.raise_for_status()
+
+        config = response.json()
+        if not isinstance(config, dict):
+            raise RuntimeError("OIDC well-known configuration was not a JSON object")
+
+        return config
 
     def verify_access_token(
         self,
@@ -67,7 +77,7 @@ class TokenVerifier:
                 algorithms=["RS256"],
                 issuer=self.issuer,
                 audience=self.expected_audience,
-                options={"verify_aud": False},
+                options={"verify_aud": self.expected_audience is not None},
             )
         except jwt.InvalidTokenError as exc:
             dms_info(f"Invalid access token: {exc}")

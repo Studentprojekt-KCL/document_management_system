@@ -115,7 +115,7 @@ const selectedSourceAuthMethod = computed(() => normalizeAuthMethod(selectedSour
 const isConnected = (source) => Boolean(activeSessions.value[normalizeSourceName(source)])
 
 const connectSource = (source) => {
-  document.cookie = `source=${encodeURIComponent(source)}; path=/; max-age=3600`
+  document.cookie = `__Secure-source=${encodeURIComponent(source)}; path=/; max-age=3600`
 
   const authEntry = getAuthEndpoint(source)
   const method = normalizeAuthMethod(authEntry?.authentication_method)

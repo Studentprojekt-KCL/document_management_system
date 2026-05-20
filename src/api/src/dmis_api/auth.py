@@ -18,7 +18,7 @@ from shared_functions.initialisation_tools import read_env_variable
 class TokenVerifier:
     """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(self, oidc_config: dict[str,Any]|None=None) -> None:
+    def __init__(self, oidc_config: dict[str, Any] | None = None) -> None:
         """Initialize token verifier with AD settings."""
         config = oidc_config or self._load_oidc_config()
 

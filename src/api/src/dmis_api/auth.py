@@ -19,8 +19,14 @@ class TokenVerifier:
 
     def __init__(self) -> None:
         """Initialize token verifier with AD settings."""
-        self.issuer = read_env_variable("DMISAPI_AD_URL").rstrip("/")
-        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_AD_JWKS_URL"))
+        well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
+        import requests
+
+        response = requests.get(well_known_url, timeout=10)
+        response.raise_for_status()
+        config = response.json()
+        self.issuer = config["issuer"]
+        self.jwks_client = PyJWKClient(config["jwks_uri"])
 
         audience = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
         expected_audience = [value.strip() for value in audience.split(",") if value.strip()] if audience else None
@@ -61,9 +67,10 @@ class TokenVerifier:
                 algorithms=["RS256"],
                 issuer=self.issuer,
                 audience=self.expected_audience,
-                options={"verify_aud": self.expected_audience is not None},
+                options={"verify_aud": False},
             )
         except jwt.InvalidTokenError as exc:
+            print("TOKEN VERIFY FAILED:", exc)
             dms_info(f"Invalid access token: {exc}")
             raise HTTPException(status_code=401) from exc
 

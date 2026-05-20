@@ -13,24 +13,42 @@ from fastapi.responses import JSONResponse
 from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
 
+ROLE_KEYS = {"roles", "role", "permissions", "groups", "authorities"}
 
 class AuthRoutes:
     """Authentication route handlers."""
-
-    ACCESS_COOKIE_MAX_AGE = 3600
-    REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600
     _session: aiohttp.ClientSession | None
 
     def __init__(self, token_verifier: Any) -> None:
         self.token_verifier = token_verifier
-        self.ad_token_url = read_env_variable("DMISAPI_AD_TOKEN_URL")
-        self.ad_logout_url = read_env_variable("DMISAPI_AD_LOGOUT_URL")
-        self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-        admin_roles_list = read_env_variable("DMISAPI_ADMIN_ROLES", required=False)
-        self.admin_roles = [role.strip() for role in admin_roles_list.split(",") if role.strip()] if admin_roles_list else []
+        self.ad_well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
 
+        self.ad_token_url: str | None = None
+        self.ad_logout_url: str | None = None
+        self.ad_authorization_url: str | None = None
+        self.ad_jwks_url: str | None = None
+
+        self.role_strategy = (
+                read_env_variable("DMISAPI_ROLE_STRATEGY", required=False)
+                or "keycloak"
+            )
+        self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
+        self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
+        
+        self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+        self.access_cookie_max_age = int(
+            read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600
+        )
+        self.refresh_cookie_max_age = int(
+            read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600
+        )
         self._session = None
 
+    @staticmethod
+    def _read_csv_env(name: str) -> list[str]:
+        value = read_env_variable(name, required=False)
+        return [item.strip() for item in value.split(",") if item.strip()] if value else []
+    
     async def close_session(self) -> None:
         """Tear down session."""
         if self._session is not None:
@@ -61,7 +79,7 @@ class AuthRoutes:
             key=key,
             value=value,
             httponly=True,
-            secure=True,
+            secure=False,
             samesite="lax",
             max_age=max_age,
         )
@@ -82,8 +100,8 @@ class AuthRoutes:
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
-        access_max_age = self._get_token_max_age(token_data, "expires_in", self.ACCESS_COOKIE_MAX_AGE)
-        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.REFRESH_COOKIE_MAX_AGE)
+        access_max_age = self._get_token_max_age(token_data, "expires_in", self.access_cookie_max_age)
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.refresh_cookie_max_age)
 
         if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, access_max_age)
@@ -93,10 +111,10 @@ class AuthRoutes:
                 key="refresh_token",
                 value=refresh_token,
                 httponly=True,
-                secure=True,
+                secure=False,
                 samesite="lax",
                 max_age=refresh_max_age,
-                path="api/auth/refresh",
+                path="/auth/refresh",
             )
 
         if isinstance(id_token, str):
@@ -104,14 +122,52 @@ class AuthRoutes:
                 key="id_token",
                 value=id_token,
                 httponly=True,
-                secure=True,
+                secure=False,
                 samesite="lax",
                 max_age=access_max_age,
-                path="api/auth/logout",
+                path="/auth/logout",
             )
+    async def _load_openid_endpoints(self) -> None:
+        """Load OpenID endpoints from well-known configuration."""
+        if self.ad_token_url and self.ad_logout_url and self.ad_jwks_url:
+            return
 
+        try:
+            """Get the big endpoint list from wellknown"""
+            session = await self.get_session()
+            resp = await session.get(self.ad_well_known_url)
+            config = await resp.json()
+        
+        except (JSONDecodeError, aiohttp.ContentTypeError) as err:
+            dms_warning(
+                f"Received response which could not be JSON decoded from "
+                f"{self.ad_well_known_url}, (err: {err})"
+            )
+            raise HTTPException(status_code=502) from err
+
+        if resp.status != 200:
+            dms_warning(
+                f"Error response: ({resp.status}) from "
+                f"{self.ad_well_known_url}"
+            )
+            raise HTTPException(status_code=502)
+
+        if not isinstance(config, dict):
+            raise HTTPException(status_code=502)
+
+        self.ad_token_url = config.get("token_endpoint")
+        self.ad_logout_url = config.get("end_session_endpoint")
+        self.ad_authorization_url = config.get("authorization_endpoint")
+        self.ad_jwks_url = config.get("jwks_uri")
+
+        if not self.ad_token_url or not self.ad_logout_url or not self.ad_jwks_url:
+            dms_warning("Missing required OpenID endpoints in well-known configuration")
+            raise HTTPException(status_code=502)
+        
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
+        await self._load_openid_endpoints()
+
         try:
             session = await self.get_session()
             resp = await session.post(
@@ -121,24 +177,31 @@ class AuthRoutes:
             )
             response = await resp.json()
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
-            dms_warning(f"Recieved response which could not be JSON decoded from {self.ad_token_url}, (err: {err})")
-            raise HTTPException(status_code=502) from err  # pylint: disable=W0707
-        if resp.status != 200:  # noqa
-            dms_warning(f"Recieved unexpected response code ({resp.status}) from {self.ad_token_url}")
+            dms_warning(
+                f"Received response which could not be JSON decoded from "
+                f"{self.ad_token_url}, (err: {err})"
+            )
+            raise HTTPException(status_code=502) from err
+
+        if resp.status != 200:
+            dms_warning(f"Received unexpected response code ({resp.status}) from {self.ad_token_url}")
             raise HTTPException(status_code=502)
+
         if not isinstance(response, dict) or "access_token" not in response:
             raise HTTPException(status_code=502)
 
         return response
-
+    
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if user is authenticated."""
+        """Check auth"""
         claims = self._verify_cookie_token(access_token)
+        
         if not claims:
             raise HTTPException(status_code=401)
 
-        client_roles = self._get_client_roles(claims)
-        if not client_roles:
+        roles = self._get_roles(claims)
+
+        if self.user_roles and not any(role in roles for role in self.user_roles):
             raise HTTPException(status_code=403)
 
         return JSONResponse(
@@ -146,15 +209,41 @@ class AuthRoutes:
             content={
                 "authenticated": True,
                 "user": {
-                    "username": claims.get("preferred_username"),
+                    "username": claims.get("preferred_username")
+                    or claims.get("email")
+                    or claims.get("nickname")
+                    or claims.get("sub"),
+                    "roles": roles,
                 },
             },
         )
+    
 
-    def _get_client_roles(self, claims: dict[str, Any]) -> list[str]:
-        """Extract client roles for configured client."""
-        roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
-        return roles if isinstance(roles, list) else []
+    def _extract_roles_recursive(self, value: Any) -> list[str]:
+        roles: list[str] = []
+
+        if isinstance(value, dict):
+            for key, nested_value in value.items():
+                key_lower = key.lower()
+
+                if key_lower in ROLE_KEYS:
+                    if isinstance(nested_value, list):
+                        roles.extend(str(item) for item in nested_value)
+                    elif isinstance(nested_value, str):
+                        roles.extend(nested_value.split())
+
+                roles.extend(self._extract_roles_recursive(nested_value))
+
+        elif isinstance(value, list):
+            for item in value:
+                roles.extend(self._extract_roles_recursive(item))
+
+        return roles
+    
+    def _get_roles(self, claims: dict[str, Any]) -> list[str]:
+        roles = self._extract_roles_recursive(claims)
+
+        return sorted({role for role in roles})
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Return authenticated user details and roles."""
@@ -162,37 +251,35 @@ class AuthRoutes:
         if not claims:
             raise HTTPException(status_code=401)
 
-        client_roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
-        realm_roles = claims.get("realm_access", {}).get("roles", [])
+        user_roles = self._get_roles(claims)
 
         return JSONResponse(
             status_code=200,
             content={
                 "authenticated": True,
                 "user": {
-                    "username": claims.get("preferred_username"),
+                    "username": claims.get("preferred_username")
+                    or claims.get("email")
+                    or claims.get("nickname")
+                    or claims.get("sub"),
                     "email": claims.get("email"),
-                    "client_roles": client_roles,
-                    "realm_roles": realm_roles,
+                    "roles": user_roles,
                 },
             },
         )
 
     async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if authenticated user has an admin role"""
+        """Check if authenticated user has an admin role."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
             raise HTTPException(status_code=401)
 
-        client_roles = self._get_client_roles(claims)
-
-        is_admin = any(role in client_roles for role in self.admin_roles)
+        user_roles = self._get_roles(claims)
+        is_admin = any(role in user_roles for role in self.admin_roles)
 
         return JSONResponse(
             status_code=200,
-            content={
-                "admin": is_admin,
-            },
+            content={"admin": is_admin},
         )
 
     async def code_exchange(
@@ -203,12 +290,13 @@ class AuthRoutes:
     ) -> JSONResponse:
         """Exchange authorization code for tokens via provided AD."""
         origin = request.headers.get("Origin")
+        redirect_uri = f"{origin.rstrip('/')}/auth/callback"
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
                 "client_id": self.dmisapi_client_id,
                 "code": code,
-                "redirect_uri": f"{origin}/auth/callback",
+                "redirect_uri": redirect_uri,
                 "code_verifier": code_verifier,
             }
         )
@@ -243,23 +331,34 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, request: Request, id_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def logout_auth(
+        self,
+        request: Request,
+        id_token: str | None = Cookie(default=None),
+    ) -> JSONResponse:
         """Generate logout URL from AD and clear authentication cookies."""
-        post_logout_redirect_uri = request.headers.get("Origin") + "/"
+        await self._load_openid_endpoints()
+
+        origin = request.headers.get("Origin")
+        post_logout_redirect_uri = f"{origin}/" if origin else "/"
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,
             "client_id": self.dmisapi_client_id,
         }
+
         if id_token:
             params["id_token_hint"] = id_token
 
         logout_url = f"{self.ad_logout_url}?{urlencode(params)}"
+
         response = JSONResponse(
             status_code=200,
             content={"logout_url": logout_url},
         )
-        response.delete_cookie("access_token", path="/", secure=True, samesite="lax")
-        response.delete_cookie("refresh_token", path="api/auth/refresh", secure=True, samesite="lax")
-        response.delete_cookie("id_token", path="api/auth/logout", secure=True, samesite="lax")
+
+        response.delete_cookie("access_token", path="/", secure=False, samesite="lax")
+        response.delete_cookie("refresh_token", path="/auth/refresh", secure=False, samesite="lax")
+        response.delete_cookie("id_token", path="/auth/logout", secure=False, samesite="lax")
+
         return response

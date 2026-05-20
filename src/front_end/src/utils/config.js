@@ -4,17 +4,34 @@
  */
 
 /* Keycloak / OIDC config from runtime environment */
-export const FRONTEND_AD_URL = window.__ENV__.FRONTEND_AD_URL
-export const FRONTEND_AD_REALM = window.__ENV__.FRONTEND_AD_REALM
-export const FRONTEND_AD_CLIENT_ID = window.__ENV__.FRONTEND_AD_CLIENT_ID
+export const FRONTEND_AD_URL =
+  window.__ENV__.FRONTEND_AD_URL.replace(/\/$/, '')
 
-/* Keycloak OIDC endpoint builders */
-export const keycloakAuthUrl = () => `${FRONTEND_AD_URL}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/auth`
-export const keycloakLogoutUrl = () => `${FRONTEND_AD_URL}/realms/${FRONTEND_AD_REALM}/protocol/openid-connect/logout`
+export const FRONTEND_AD_CLIENT_ID =
+  window.__ENV__.FRONTEND_AD_CLIENT_ID
 
-/* SessionStorage key names */
+export const FRONTEND_AD_STRATEGY =
+  window.__ENV__.FRONTEND_AD_STRATEGY || 'keycloak'
+
+export const FRONTEND_AD_AUDIENCE =
+  window.__ENV__.FRONTEND_AD_AUDIENCE || ''
+
+export const oidcAuthUrl = () => {
+  if (FRONTEND_AD_STRATEGY === 'auth0') {
+    return `${FRONTEND_AD_URL}/authorize`
+  }
+
+  return `${FRONTEND_AD_URL}/protocol/openid-connect/auth`
+}
+
+export const oidcLogoutUrl = () => {
+  if (FRONTEND_AD_STRATEGY === 'auth0') {
+    return `${FRONTEND_AD_URL}/v2/logout`
+  }
+
+  return `${FRONTEND_AD_URL}/protocol/openid-connect/logout`
+}
+
 export const SESSION_KEY_PKCE_VERIFIER = 'pkce_verifier'
 export const SESSION_KEY_OIDC_STATE = 'oidc_state'
-
-/* LocalStorage key names */
 export const LOCAL_KEY_LOGOUT_EVENT = 'logout-event'

@@ -101,5 +101,4 @@ build:
 ```
 
 ## NOTE
-We can install the newest packages, but some of their sub-dependencies can still be old or vulnerable.
-Because of this, we run regular Syft and Grype scans and review the reports
+We do install the newest packages during build time, but some of their sub-dependencies or even subsub-dependencies may still be old or vulnerable. With help of Syft and Grype scans it is possible to review the reports.

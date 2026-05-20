@@ -1,6 +1,6 @@
 """File for shared service-level types"""
 
-from pydantic import BaseModel, Field, StrictStr
+from pydantic import BaseModel, StrictStr, field_validator
 
 
 class MetadataTemplate(BaseModel):
@@ -18,19 +18,17 @@ class InputItem(BaseModel):
 
 
 class MarkdownRequest(BaseModel):
-    """Request schema for markdown logic.
+    """Request schema for markdown logic."""
 
-    Validation rules:
-    - `markdown` must be a UTF-8 string (enforced by FastAPI's JSON decoder).
-    - Must be a string, not bool/int/float (enforced by StrictStr).
-    - Must not be empty.
-    """
+    markdown: StrictStr
 
-    markdown: StrictStr = Field(
-        ...,
-        min_length=1,
-        description="Markdown content to convert to PDF. UTF-8, non-empty.",
-    )
+    @field_validator("markdown")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        """Reject empty or whitspace-only markdown"""
+        if not v.strip():
+            raise ValueError("markdown must not be empty")
+        return v
 
 
 class PointerRequest(BaseModel):

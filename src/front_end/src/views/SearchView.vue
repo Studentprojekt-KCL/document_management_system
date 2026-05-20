@@ -33,7 +33,7 @@ const isSearching = ref(false)
 const documentsOnlyMode = ref(true)
 
 /* Number of search results to fetch, possible to change. */
-const SEARCH_COUNT = 20
+const SEARCH_COUNT = 10
 const currentPage = ref(1)
 const offset = computed(() => (currentPage.value - 1) * SEARCH_COUNT)
 

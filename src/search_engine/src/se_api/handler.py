@@ -8,6 +8,7 @@ from se_api.constants import (
     CLASSIFICATION,
     INITIAL_RETRY_DELAY,
     MAX_FAIL_COUNT,
+    MAX_SEARCH_QUERY_LENGTH,
     MAX_RETRY_ATTEMPTS,
     MAX_RETRY_DELAY,
     UNIQUE_POINTER,
@@ -200,6 +201,11 @@ class Handler:
         missing: int = count
         actual_offset: int = offset
         fails: int = 0
+
+        for field, value in content.items():
+            if len(value) > MAX_SEARCH_QUERY_LENGTH:
+                dms_warning(f"Search query for '{field}' exceeds the character limit.")
+                return []
 
         while missing > 0 and fails < MAX_FAIL_COUNT:
             matches, metadata = self.search_engine.query_files(content, missing, actual_offset)

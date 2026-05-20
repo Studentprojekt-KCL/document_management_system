@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import json
-from os import listdir, remove
+from os import listdir, mkdir, path, remove
 from asyncio import Lock, to_thread
 from tantivy import (
     Document,
@@ -91,6 +91,9 @@ class SearchEngine:
                 schema_builder.add_text_field(category, stored=True)
             dms_info(f"Added field {category}")
         schema = schema_builder.build()
+        if not path.isdir(self.index_path):
+            mkdir(self.index_path)
+            dms_info(f"Created directory: {self.index_path}")
         try:
             self.index = Index(schema, path=self.index_path)
             dms_info(f"Loaded index from path {self.index_path}")

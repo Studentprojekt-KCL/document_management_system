@@ -69,7 +69,7 @@ class AuthRoutes:
             key=key,
             value=value,
             httponly=True,
-            secure=False,
+            secure=True,
             samesite="lax",
             max_age=max_age,
         )
@@ -101,7 +101,7 @@ class AuthRoutes:
                 key="refresh_token",
                 value=refresh_token,
                 httponly=True,
-                secure=False,
+                secure=True,
                 samesite="lax",
                 max_age=refresh_max_age,
                 path="/auth/refresh",
@@ -112,7 +112,7 @@ class AuthRoutes:
                 key="id_token",
                 value=id_token,
                 httponly=True,
-                secure=False,
+                secure=True,
                 samesite="lax",
                 max_age=access_max_age,
                 path="/auth/logout",
@@ -337,8 +337,8 @@ class AuthRoutes:
             content={"logout_url": logout_url},
         )
 
-        response.delete_cookie("access_token", path="/", secure=False, samesite="lax")
-        response.delete_cookie("refresh_token", path="/auth/refresh", secure=False, samesite="lax")
-        response.delete_cookie("id_token", path="/auth/logout", secure=False, samesite="lax")
+        response.delete_cookie("access_token", path="/", secure=True, samesite="lax")
+        response.delete_cookie("refresh_token", path="/auth/refresh", secure=True, samesite="lax")
+        response.delete_cookie("id_token", path="/auth/logout", secure=True, samesite="lax")
 
         return response

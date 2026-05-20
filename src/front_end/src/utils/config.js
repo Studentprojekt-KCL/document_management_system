@@ -4,19 +4,13 @@
  */
 
 /* Keycloak / OIDC config from runtime environment */
-export const FRONTEND_AD_URL =
-  window.__ENV__.FRONTEND_AD_URL.replace(/\/$/, '')
-
-export const FRONTEND_AD_CLIENT_ID =
-  window.__ENV__.FRONTEND_AD_CLIENT_ID
-
-export const FRONTEND_AD_STRATEGY =
-  window.__ENV__.FRONTEND_AD_STRATEGY || 'keycloak'
-
-export const FRONTEND_AD_AUDIENCE =
-  window.__ENV__.FRONTEND_AD_AUDIENCE || ''
+export const FRONTEND_AD_URL = window.__ENV__.FRONTEND_AD_URL.replace(/\/$/, '')
+export const FRONTEND_AD_CLIENT_ID = window.__ENV__.FRONTEND_AD_CLIENT_ID
+export const FRONTEND_AD_STRATEGY = window.__ENV__.FRONTEND_AD_STRATEGY || 'keycloak'
+export const FRONTEND_AD_AUDIENCE = window.__ENV__.FRONTEND_AD_AUDIENCE || ''
 
 export const oidcAuthUrl = () => {
+  /* Depending on strategy the endpoint changes. */
   if (FRONTEND_AD_STRATEGY === 'auth0') {
     return `${FRONTEND_AD_URL}/authorize`
   }
@@ -25,6 +19,7 @@ export const oidcAuthUrl = () => {
 }
 
 export const oidcLogoutUrl = () => {
+  /* Depending on strategy the endpoint changes. */
   if (FRONTEND_AD_STRATEGY === 'auth0') {
     return `${FRONTEND_AD_URL}/v2/logout`
   }

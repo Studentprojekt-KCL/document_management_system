@@ -15,8 +15,10 @@ from shared_functions.dmis_logger import dms_warning
 
 ROLE_KEYS = {"roles", "role", "permissions", "groups", "authorities"}
 
+
 class AuthRoutes:
     """Authentication route handlers."""
+
     _session: aiohttp.ClientSession | None
 
     def __init__(self, token_verifier: Any) -> None:
@@ -28,27 +30,20 @@ class AuthRoutes:
         self.ad_authorization_url: str | None = None
         self.ad_jwks_url: str | None = None
 
-        self.role_strategy = (
-                read_env_variable("DMISAPI_ROLE_STRATEGY", required=False)
-                or "keycloak"
-            )
+        self.role_strategy = read_env_variable("DMISAPI_ROLE_STRATEGY", required=False) or "keycloak"
         self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
         self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
-        
+
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
-        self.access_cookie_max_age = int(
-            read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600
-        )
-        self.refresh_cookie_max_age = int(
-            read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600
-        )
+        self.access_cookie_max_age = int(read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600)
+        self.refresh_cookie_max_age = int(read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600)
         self._session = None
 
     @staticmethod
     def _read_csv_env(name: str) -> list[str]:
         value = read_env_variable(name, required=False)
         return [item.strip() for item in value.split(",") if item.strip()] if value else []
-    
+
     async def close_session(self) -> None:
         """Tear down session."""
         if self._session is not None:
@@ -127,6 +122,7 @@ class AuthRoutes:
                 max_age=access_max_age,
                 path="/auth/logout",
             )
+
     async def _load_openid_endpoints(self) -> None:
         """Load OpenID endpoints from well-known configuration."""
         if self.ad_token_url and self.ad_logout_url and self.ad_jwks_url:
@@ -137,19 +133,13 @@ class AuthRoutes:
             session = await self.get_session()
             resp = await session.get(self.ad_well_known_url)
             config = await resp.json()
-        
+
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
-            dms_warning(
-                f"Received response which could not be JSON decoded from "
-                f"{self.ad_well_known_url}, (err: {err})"
-            )
+            dms_warning(f"Received response which could not be JSON decoded from " f"{self.ad_well_known_url}, (err: {err})")
             raise HTTPException(status_code=502) from err
 
         if resp.status != 200:
-            dms_warning(
-                f"Error response: ({resp.status}) from "
-                f"{self.ad_well_known_url}"
-            )
+            dms_warning(f"Error response: ({resp.status}) from " f"{self.ad_well_known_url}")
             raise HTTPException(status_code=502)
 
         if not isinstance(config, dict):
@@ -163,7 +153,7 @@ class AuthRoutes:
         if not self.ad_token_url or not self.ad_logout_url or not self.ad_jwks_url:
             dms_warning("Missing required OpenID endpoints in well-known configuration")
             raise HTTPException(status_code=502)
-        
+
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
         await self._load_openid_endpoints()
@@ -177,10 +167,7 @@ class AuthRoutes:
             )
             response = await resp.json()
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
-            dms_warning(
-                f"Received response which could not be JSON decoded from "
-                f"{self.ad_token_url}, (err: {err})"
-            )
+            dms_warning(f"Received response which could not be JSON decoded from " f"{self.ad_token_url}, (err: {err})")
             raise HTTPException(status_code=502) from err
 
         if resp.status != 200:
@@ -191,11 +178,11 @@ class AuthRoutes:
             raise HTTPException(status_code=502)
 
         return response
-    
+
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Check auth"""
         claims = self._verify_cookie_token(access_token)
-        
+
         if not claims:
             raise HTTPException(status_code=401)
 
@@ -217,7 +204,6 @@ class AuthRoutes:
                 },
             },
         )
-    
 
     def _extract_roles_recursive(self, value: Any) -> list[str]:
         roles: list[str] = []
@@ -239,7 +225,7 @@ class AuthRoutes:
                 roles.extend(self._extract_roles_recursive(item))
 
         return roles
-    
+
     def _get_roles(self, claims: dict[str, Any]) -> list[str]:
         roles = self._extract_roles_recursive(claims)
 

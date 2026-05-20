@@ -35,9 +35,9 @@ grype sbom:"$DOCS_DIR/sbom.json" \
 -o json > "$DOCS_DIR/vulnerabilities.json"
 
 echo "======================================"
-echo "✅ DONE"
+echo "DONE"
 echo "======================================"
-echo "📄 $DOCS_DIR/sbom.json"
-echo "📄 $DOCS_DIR/vulnerabilities.json"
+echo "$DOCS_DIR/sbom.json"
+echo "$DOCS_DIR/vulnerabilities.json"
 echo "======================================"
 

@@ -68,7 +68,7 @@ ALL_SCANS+=("$IMAGE_SCAN")
 done
 
 echo "======================================"
-echo "🧾 Creating Final Reports"
+echo "Creating Final Reports"
 echo "======================================"
 
 python3 - "$POLICY_FILE" "$SBOM_REPORT" "$SECURITY_REPORT" "${ALL_SBOMS[@]}" -- "${ALL_SCANS[@]}" <<'PY'
@@ -167,8 +167,8 @@ with open(security_output, "w") as f:
     json.dump(security_report, f, indent=2)
 PY
 echo "======================================"
-echo "✅ DONE"
+echo "DONE"
 echo "======================================"
-echo "📄 $SBOM_REPORT"
-echo "📄 $SECURITY_REPORT "
+echo "$SBOM_REPORT"
+echo "$SECURITY_REPORT "
 echo "======================================"

@@ -14,7 +14,7 @@ from shared_functions.initialisation_tools import read_env_variable
 from shared_functions.dmis_logger import dms_warning
 
 ROLE_KEYS = {"roles", "role", "permissions", "groups", "authorities"}
-
+HTTP_OK = 200
 
 class AuthRoutes:
     """Authentication route handlers."""
@@ -133,7 +133,7 @@ class AuthRoutes:
             dms_warning(f"Received response which could not be JSON decoded from " f"{self.ad_well_known_url}, (err: {err})")
             raise HTTPException(status_code=502) from err
 
-        if resp.status != 200:
+        if resp.status != HTTP_OK:
             dms_warning(f"Error response: ({resp.status}) from " f"{self.ad_well_known_url}")
             raise HTTPException(status_code=502)
 
@@ -145,7 +145,10 @@ class AuthRoutes:
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
         await self._load_openid_endpoints()
+
         token_url = self.oidc_config["token_endpoint"]
+        if self.oidc_config is None:
+            raise HTTPException(status_code=502)
 
         try:
             session = await self.get_session()
@@ -159,7 +162,7 @@ class AuthRoutes:
             dms_warning(f"Received response which could not be JSON decoded from " f"{token_url}, (err: {err})")
             raise HTTPException(status_code=502) from err
 
-        if resp.status != 200:
+        if resp.status != HTTP_OK:
             dms_warning(f"Received unexpected response code ({resp.status}) from {token_url}")
             raise HTTPException(status_code=502)
 
@@ -181,7 +184,7 @@ class AuthRoutes:
             raise HTTPException(status_code=403)
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={
                 "authenticated": True,
                 "user": {
@@ -229,7 +232,7 @@ class AuthRoutes:
         user_roles = self._get_roles(claims)
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={
                 "authenticated": True,
                 "user": {
@@ -253,7 +256,7 @@ class AuthRoutes:
         is_admin = any(role in user_roles for role in self.admin_roles)
 
         return JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"admin": is_admin},
         )
 
@@ -277,7 +280,7 @@ class AuthRoutes:
         )
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"message": "Login successful"},
         )
         self._set_auth_cookies(response, token_data)
@@ -300,7 +303,7 @@ class AuthRoutes:
         )
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"message": "Session refreshed"},
         )
         self._set_auth_cookies(response, token_data)
@@ -326,14 +329,17 @@ class AuthRoutes:
             params["id_token_hint"] = id_token
 
         logout_endpoint = self.oidc_config.get("end_session_endpoint")
+        if self.oidc_config is None:
+            raise HTTPException(status_code=502)
 
         if not logout_endpoint:
             raise HTTPException(status_code=502)
 
         logout_url = f"{logout_endpoint}?{urlencode(params)}"
+        
 
         response = JSONResponse(
-            status_code=200,
+            status_code=HTTP_OK,
             content={"logout_url": logout_url},
         )
 

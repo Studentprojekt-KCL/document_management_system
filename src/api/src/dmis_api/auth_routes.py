@@ -23,18 +23,13 @@ class AuthRoutes:
 
     def __init__(self, token_verifier: Any) -> None:
         self.token_verifier = token_verifier
+
         self.ad_well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
-
-        self.ad_token_url: str | None = None
-        self.ad_logout_url: str | None = None
-        self.ad_authorization_url: str | None = None
-        self.ad_jwks_url: str | None = None
-
-        self.role_strategy = read_env_variable("DMISAPI_ROLE_STRATEGY", required=False) or "keycloak"
         self.user_roles = self._read_csv_env("DMISAPI_USER_ROLES")
         self.admin_roles = self._read_csv_env("DMISAPI_ADMIN_ROLES")
-
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
+        self.oidc_config: dict[str, Any] | None = None
+
         self.access_cookie_max_age = int(read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600)
         self.refresh_cookie_max_age = int(read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600)
         self._session = None
@@ -125,7 +120,7 @@ class AuthRoutes:
 
     async def _load_openid_endpoints(self) -> None:
         """Load OpenID endpoints from well-known configuration."""
-        if self.ad_token_url and self.ad_logout_url and self.ad_jwks_url:
+        if self.oidc_config is not None:
             return
 
         try:
@@ -145,33 +140,27 @@ class AuthRoutes:
         if not isinstance(config, dict):
             raise HTTPException(status_code=502)
 
-        self.ad_token_url = config.get("token_endpoint")
-        self.ad_logout_url = config.get("end_session_endpoint")
-        self.ad_authorization_url = config.get("authorization_endpoint")
-        self.ad_jwks_url = config.get("jwks_uri")
-
-        if not self.ad_token_url or not self.ad_logout_url or not self.ad_jwks_url:
-            dms_warning("Missing required OpenID endpoints in well-known configuration")
-            raise HTTPException(status_code=502)
+        self.oidc_config = config
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
         """Request tokens from AD provider using provided form data."""
         await self._load_openid_endpoints()
+        token_url = self.oidc_config["token_endpoint"]
 
         try:
             session = await self.get_session()
             resp = await session.post(
-                self.ad_token_url,
+                token_url,
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             response = await resp.json()
         except (JSONDecodeError, aiohttp.ContentTypeError) as err:
-            dms_warning(f"Received response which could not be JSON decoded from " f"{self.ad_token_url}, (err: {err})")
+            dms_warning(f"Received response which could not be JSON decoded from " f"{token_url}, (err: {err})")
             raise HTTPException(status_code=502) from err
 
         if resp.status != 200:
-            dms_warning(f"Received unexpected response code ({resp.status}) from {self.ad_token_url}")
+            dms_warning(f"Received unexpected response code ({resp.status}) from {token_url}")
             raise HTTPException(status_code=502)
 
         if not isinstance(response, dict) or "access_token" not in response:
@@ -336,7 +325,12 @@ class AuthRoutes:
         if id_token:
             params["id_token_hint"] = id_token
 
-        logout_url = f"{self.ad_logout_url}?{urlencode(params)}"
+        logout_endpoint = self.oidc_config.get("end_session_endpoint")
+
+        if not logout_endpoint:
+            raise HTTPException(status_code=502)
+
+        logout_url = f"{logout_endpoint}?{urlencode(params)}"
 
         response = JSONResponse(
             status_code=200,

@@ -6,6 +6,7 @@ from typing import Any
 from collections.abc import Iterable
 
 import jwt
+import requests
 from fastapi import HTTPException
 from jwt import PyJWKClient
 
@@ -20,7 +21,6 @@ class TokenVerifier:
     def __init__(self) -> None:
         """Initialize token verifier with AD settings."""
         well_known_url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
-        import requests
 
         response = requests.get(well_known_url, timeout=10)
         response.raise_for_status()
@@ -70,7 +70,6 @@ class TokenVerifier:
                 options={"verify_aud": False},
             )
         except jwt.InvalidTokenError as exc:
-            print("TOKEN VERIFY FAILED:", exc)
             dms_info(f"Invalid access token: {exc}")
             raise HTTPException(status_code=401) from exc
 

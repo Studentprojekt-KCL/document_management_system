@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-20T12:23:03.773376",
+  "generated_at": "2026-05-20T12:40:23.622072",
   "policy": {
     "policy_name": "Dependency Remediation Policy",
     "remediation_timeframes_days": {
@@ -16,6 +16,7 @@
     "medium": 130,
     "low": 16
   },
+  "total_findings": 233,
   "compliance": {
     "timeframes_documented": true,
     "components_within_timeframes": false

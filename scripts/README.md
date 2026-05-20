@@ -92,10 +92,14 @@ Run `./full_scan.sh` to generate compliance reports in `../documentation/full_sc
 
 `full_scan.sh` scans each container image individually using Syft. For this to work, every service in `docker-compose-build-all.yaml` must have a `build.context` set. Without it Syft can't resolve the build files for that image.
 
-Each service should look like this: But Jesper approves cahnges in docker compose
+Each service should look like this:
 
 ```yaml
 build:
   context: .
   dockerfile: src/../Dockerfile
 ```
+
+## NOTE
+We can install the newest packages, but some of their sub-dependencies can still be old or vulnerable.
+Because of this, we run regular Syft and Grype scans and review the reports

@@ -11,9 +11,9 @@ Dependencies are monitored using:
 - Grype (vulnerability scanning)
 
 
-Simple helper scripts for SBOM and vulnerability scanning.
+## This folder contains
 
-## What this folder contains
+Simple helper scripts for SBOM and vulnerability scanning.
 
 - `scan.sh`: Basic scan flow (build containers, generate SBOM, run vulnerability scan).
 - `full_scan.sh`: Extended scan for each  flow with extra reporting logic.
@@ -43,7 +43,7 @@ chmod +x full_scan.sh
 ```
 
 **From the `document_management_system` folder:** 
-- Make sure there is a `remediation_policy.json` file.
+- Make sure there is a `remediation_policy.json` file containing remediation timeframes. Eg.
 
 ```json
 {
@@ -75,9 +75,9 @@ The scripts save output in `../documentation/`:
 
 ## Prerequisites for `full_scan.sh`
 
-`full_scan.sh` scans each container image individually using Syft. For this to work, every service in `docker-compose-build-all.yaml` must have a `build.context` set. Without it, Syft cannot resolve the build files for that image.
+`full_scan.sh` scans each container image individually using Syft. For this to work, every service in `docker-compose-build-all.yaml` must have a `build.context` set. Without it Syft can't resolve the build files for that image.
 
-Each service should look like this:
+Each service should look like this: But Jesper approves cahnges in docker compose
 
 ```yaml
 build:

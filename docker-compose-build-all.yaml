@@ -2,85 +2,102 @@ services:
   log-api:
     image: log-api:pr
     build:
+      context: .
       dockerfile: src/logger/api/Dockerfile
 
   log-database:
     image: log-database:pr
     build: 
+      context: .
       dockerfile: src/logger/database/Dockerfile
 
   search-engine:
     image: search-engine:pr
     build:
+      context: .
       dockerfile: src/search_engine/Dockerfile
 
   dmis-api:
     image: dmis-api:pr
     build:
+      context: .
       dockerfile: src/api/Dockerfile
 
   front-end:
     image: front-end:pr
-    build: ./src/front_end
+    build:
+      context: ./src/front_end
 
   connector-gitlab:
     image: connector-gitlab:pr
     build:
+      context: .
       dockerfile: src/connectors/gitlab/Dockerfile
 
   connector-lorem:
     image: connector-lorem:pr
     build:
+      context: .
       dockerfile: src/connectors/lorem/Dockerfile
 
   connector-samba:
     image: connector-samba:pr
     build:
+      context: .
       dockerfile: src/connectors/samba/Dockerfile
 
   connector-github:
     image: connector-github:pr
     build:
+      context: .
       dockerfile: src/connectors/github/Dockerfile
       
   connector-confluence:
     image: connector-confluence:pr
     build:
+      context: .
       dockerfile: src/connectors/confluence/Dockerfile
 
   connector-sharepoint:
-      image: connector-sharepoint:pr
-      build:
-        dockerfile: src/connectors/sharepoint/Dockerfile
+    image: connector-sharepoint:pr
+    build:
+      context: .
+      dockerfile: src/connectors/sharepoint/Dockerfile
 
   connector-minio:
     image: connector-minio:pr
     build:
+      context: .
       dockerfile: src/connectors/storage-infra/Dockerfile
 
   stochastic-analyzer:
     image: stochastic-analyzer:pr
     build:
+      context: .
       dockerfile: src/stochastic_analyzer/Dockerfile
 
   connector-gateway:
     image: connector-gateway:pr
     build:
+      context: .
       dockerfile: src/connectors/connector-gateway/Dockerfile
 
   refresh_service-service:
     command: /usr/local/bin/refresh-service
     image: refresh-service:pr
     build:
+      context: .
       dockerfile: src/refresh_service/api/Dockerfile
 
   refresh_service-worker:
     command: /usr/local/bin/refresh-worker
     image: refresh-service:pr
     build:
+      context: .
       dockerfile: src/refresh_service/api/Dockerfile
 
   refresh_service-redis:
     image: refresh_service-redis:pr
     build:
+      context: .
       dockerfile: src/refresh_service/redis/Dockerfile

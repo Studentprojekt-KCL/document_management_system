@@ -11,7 +11,13 @@ class PdfConverter:
     """Convert markdown text to pdf bytes"""
 
     def convert(self, md: str) -> bytes | None:
-        """same as above lol"""
+        """Convert a markdown string to PDF bytes."""
+        if not isinstance(md, str):
+            dms_warning(f"PDF conversion expected str, got {type(md).__name__}")
+            return None
+        if not md.strip():
+            dms_warning("PDF conversion received empty markdown")
+            return None
         try:
             pdf = MarkdownPdf()
             pdf.add_section(Section(md))

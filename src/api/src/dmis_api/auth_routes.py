@@ -16,6 +16,7 @@ from shared_functions.dmis_logger import dms_warning
 ROLE_KEYS = {"roles", "role", "permissions", "groups", "authorities"}
 HTTP_OK = 200
 
+
 class AuthRoutes:
     """Authentication route handlers."""
 
@@ -30,8 +31,6 @@ class AuthRoutes:
         self.dmisapi_client_id = read_env_variable("DMISAPI_AD_CLIENT_ID")
         self.oidc_config: dict[str, Any] | None = None
 
-        self.access_cookie_max_age = int(read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600)
-        self.refresh_cookie_max_age = int(read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600)
         self._session = None
 
     @staticmethod
@@ -83,8 +82,12 @@ class AuthRoutes:
         refresh_token = token_data.get("refresh_token")
         id_token = token_data.get("id_token")
 
-        access_max_age = self._get_token_max_age(token_data, "expires_in", self.access_cookie_max_age)
-        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.refresh_cookie_max_age)
+        max_age = int(read_env_variable("DMISAPI_ACCESS_COOKIE_MAX_AGE", required=False) or 3600)
+
+        access_max_age = self._get_token_max_age(token_data, "expires_in", max_age)
+
+        cookie_max_age = int(read_env_variable("DMISAPI_REFRESH_COOKIE_MAX_AGE", required=False) or 30 * 24 * 3600)
+        refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", cookie_max_age)
 
         if isinstance(access_token, str):
             self._set_cookie(response, "access_token", access_token, access_max_age)
@@ -117,7 +120,7 @@ class AuthRoutes:
             return
 
         try:
-            """Get the big endpoint list from wellknown"""
+            # Get the big endpoint list from wellknown
             session = await self.get_session()
             resp = await session.get(self.ad_well_known_url)
             config = await resp.json()
@@ -139,7 +142,7 @@ class AuthRoutes:
         """Request tokens from AD provider using provided form data."""
         await self._load_openid_endpoints()
 
-        token_url = self.oidc_config["token_endpoint"]
+        token_url = self.oidc_config["token_endpoint"]  # type: ignore
         if self.oidc_config is None:
             raise HTTPException(status_code=502)
 
@@ -166,8 +169,7 @@ class AuthRoutes:
 
     async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Verify authentication token is signed and contained in user roles."""
-        return JSONResponse(status_code=HTTP_OK, content={"authenticated": True}) #TODO; REVERT THIS.
-        claims =  self.token_verifier.verify_access_token(f"Bearer {access_token}")
+        claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
 
         if not claims:
             raise HTTPException(status_code=401)
@@ -203,11 +205,11 @@ class AuthRoutes:
     def _get_roles(self, claims: dict[str, Any]) -> list[str]:
         roles = self._extract_roles_recursive(claims)
 
-        return sorted({role for role in roles})
+        return sorted(set(roles))
 
     async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Return authenticated user details and roles."""
-        claims =  self.token_verifier.verify_access_token(f"Bearer {access_token}")
+        claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
         if not claims:
             raise HTTPException(status_code=401)
 
@@ -230,11 +232,7 @@ class AuthRoutes:
 
     async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
         """Check if authenticated user has an admin role."""
-        return JSONResponse( #TODO, revert this.
-            status_code=HTTP_OK,
-            content={"admin": False},
-        )
-        claims =  self.token_verifier.verify_access_token(f"Bearer {access_token}")
+        claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
         if not claims:
             raise HTTPException(status_code=401)
 
@@ -314,7 +312,7 @@ class AuthRoutes:
         if id_token:
             params["id_token_hint"] = id_token
 
-        logout_endpoint = self.oidc_config.get("end_session_endpoint")
+        logout_endpoint = self.oidc_config.get("end_session_endpoint")  # type: ignore
         if self.oidc_config is None:
             raise HTTPException(status_code=502)
 
@@ -322,7 +320,6 @@ class AuthRoutes:
             raise HTTPException(status_code=502)
 
         logout_url = f"{logout_endpoint}?{urlencode(params)}"
-        
 
         response = JSONResponse(
             status_code=HTTP_OK,

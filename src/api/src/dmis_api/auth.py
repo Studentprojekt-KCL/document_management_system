@@ -9,7 +9,7 @@ import jwt
 from fastapi import HTTPException
 from jwt import PyJWKClient
 
-from shared_functions.dmis_logger import dms_info
+from shared_functions.dmis_logger import dms_info, dms_error
 
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -20,6 +20,9 @@ class TokenVerifier:
     def __init__(self, oidc_config: dict[str, Any] | None = None) -> None:
         """Initialize token verifier with AD settings."""
         config = oidc_config
+        if not isinstance(config, dict):
+            dms_error("Could not fetch AD configuration.")
+            return
 
         self.issuer = config["issuer"]
         self.jwks_client = PyJWKClient(config["jwks_uri"])

@@ -24,7 +24,7 @@ from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
 
-class API:
+class API:  # pylint: disable=R0902
     """Management class for main API."""
 
     REDIRECT_STATUS_CODES: list = [307, 308]
@@ -69,7 +69,7 @@ class API:
             "congateway": congateway_scope_raw.split() if congateway_scope_raw else [],
         }
 
-        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"]) #TODO; revert all /api
+        self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_get, methods=["GET"])
         self.app.add_api_route("/search_engine/{endpoint}", self.search_engine_post, methods=["POST"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_get, methods=["GET"])
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
@@ -117,7 +117,6 @@ class API:
         required_scopes: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Validate bearer token and return claims."""
-        return {} #TODO; revert this.
         claims = self.token_verifier.verify_access_token(
             authorization,
             required_scopes=required_scopes,
@@ -289,15 +288,18 @@ class API:
 
     async def ad_configuration(self) -> dict:
         """Retrive AD configuration domains."""
-        return {"authorization_endpoint": self.ad_config.get("authorization_endpoint"), "end_session_endpoint": self.ad_config.get("authorization_endpoint")}
-
+        return {
+            "authorization_endpoint": self.ad_config.get("authorization_endpoint"),
+            "end_session_endpoint": self.ad_config.get("authorization_endpoint"),
+        }
 
 
 async def get_ad_config() -> dict:
+    """Retrieve configuration for ad specified by DMISAPI_AD_WELL_KNOWN_URL."""
     url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
     config: dict
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:  # noqa
             async with session.get(url) as response:
                 config = await response.json()
     except JSONDecodeError as exc:
@@ -328,14 +330,18 @@ async def async_run() -> None:
     log_level = "debug" if args.dev else None
     api = API(upstream_urls=upstream_urls, ad_config=ad_config, log_level=log_level)
 
-    config = uvicorn.Config(api.app,
+    config = uvicorn.Config(
+        api.app,
         host=read_env_variable("DMISAPI_BIND_ADDR"),
         port=read_port("DMISAPI_BIND_PORT"),
-        log_level=log_level,)
+        log_level=log_level,
+    )
 
     server = uvicorn.Server(config)
 
     await server.serve()
 
+
 def run() -> None:
+    """Entrypoint."""
     asyncio.run(async_run())

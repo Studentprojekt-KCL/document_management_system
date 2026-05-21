@@ -90,11 +90,11 @@ class AuthRoutes:
         refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", cookie_max_age)
 
         if isinstance(access_token, str):
-            self._set_cookie(response, "access_token", access_token, access_max_age)
+            self._set_cookie(response, "__Secure-access_token", access_token, access_max_age)
 
         if isinstance(refresh_token, str):
             response.set_cookie(
-                key="refresh_token",
+                key="__Secure-refresh_token",
                 value=refresh_token,
                 httponly=True,
                 secure=True,
@@ -105,7 +105,7 @@ class AuthRoutes:
 
         if isinstance(id_token, str):
             response.set_cookie(
-                key="id_token",
+                key="__Secure-id_token",
                 value=id_token,
                 httponly=True,
                 secure=True,
@@ -167,10 +167,9 @@ class AuthRoutes:
 
         return response
 
-    async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def check_auth(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
         """Verify authentication token is signed and contained in user roles."""
         claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
-
         if not claims:
             raise HTTPException(status_code=401)
 
@@ -207,7 +206,7 @@ class AuthRoutes:
 
         return sorted(set(roles))
 
-    async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def auth_me(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
         """Return authenticated user details and roles."""
         claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
         if not claims:
@@ -230,8 +229,8 @@ class AuthRoutes:
             },
         )
 
-    async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
-        """Check if authenticated user has an admin role."""
+    async def check_admin(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
+        """Check if authenticated user has an admin role"""
         claims = self.token_verifier.verify_access_token(f"Bearer {access_token}")
         if not claims:
             raise HTTPException(status_code=401)
@@ -270,7 +269,7 @@ class AuthRoutes:
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def refresh_auth(self, refresh_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def refresh_auth(self, refresh_token: str | None = Cookie(default=None, alias="__Secure-refresh_token")) -> JSONResponse:
         """Refresh session using the refresh token."""
         if not refresh_token:
             return JSONResponse(
@@ -296,7 +295,7 @@ class AuthRoutes:
     async def logout_auth(
         self,
         request: Request,
-        id_token: str | None = Cookie(default=None),
+        id_token: str | None = Cookie(default=None, alias="__Secure-id_token"),
     ) -> JSONResponse:
         """Generate logout URL from AD and clear authentication cookies."""
         await self._load_openid_endpoints()
@@ -325,9 +324,7 @@ class AuthRoutes:
             status_code=HTTP_OK,
             content={"logout_url": logout_url},
         )
-
-        response.delete_cookie("access_token", path="/", secure=True, samesite="lax")
-        response.delete_cookie("refresh_token", path="/auth/refresh", secure=True, samesite="lax")
-        response.delete_cookie("id_token", path="/auth/logout", secure=True, samesite="lax")
-
+        response.delete_cookie("__Secure-access_token", path="/", secure=True, samesite="lax")
+        response.delete_cookie("__Secure-refresh_token", path="/api/auth/refresh", secure=True, samesite="lax")
+        response.delete_cookie("__Secure-id_token", path="/api/auth/logout", secure=True, samesite="lax")
         return response

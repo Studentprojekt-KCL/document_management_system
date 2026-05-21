@@ -205,7 +205,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
@@ -216,7 +216,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.resolve_authorization(access_token)
@@ -230,7 +230,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
@@ -244,7 +244,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
@@ -258,7 +258,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
         x_connector_authorization: Annotated[str | None, Header()] = None,
     ) -> JSONResponse:
         """GET request to connector API."""
@@ -276,7 +276,7 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.resolve_authorization(access_token)

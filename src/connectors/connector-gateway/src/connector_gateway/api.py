@@ -2,6 +2,10 @@
 
 from typing import Annotated, Any
 
+import re
+import base64
+import binascii
+
 import uvicorn
 import fastapi
 
@@ -109,6 +113,27 @@ class API:
         """returns names of source systems and auth_user entrypoints"""
         return await self.down_stream_client.get_auth_urls()
 
+    @staticmethod
+    def _sanetize_ba_input(ba: str | None) -> None:
+        """Sanetize basic authentication token based on loose rules."""
+        if ba is None:
+            return
+
+        if len(ba) > 2046:  # noqa
+            dms_warning("Gateway recieved a new basic authentication token which was to long.")
+            raise HTTPException(status_code=400)
+        try:
+            encoded_bytes = ba.encode("utf-8")
+            decoded_bytes = base64.b64decode(encoded_bytes)
+            decoded_string = decoded_bytes.decode("utf-8")
+        except (AttributeError, binascii.Error):
+            dms_warning("Could not decode new basic authentication token.")
+            raise HTTPException(status_code=400) from None
+
+        if not re.match(r"^.+:.+$", decoded_string):  # Can not make assumtions about what underlying system allows.
+            dms_warning("Unacceptable password given in HTTP basic authentication.")
+            raise HTTPException(status_code=400)
+
     async def auth_user(
         self,
         source_system: str,
@@ -120,6 +145,8 @@ class API:
         source_system_info = self.down_stream_client.find_service(source_system)
 
         if source_system_info.get("authentication_method") == "BA":
+            self._sanetize_ba_input(x_connector_authorization)
+
             if not isinstance(x_connector_authorization, str):
                 raise HTTPException(status_code=400)
             body = {

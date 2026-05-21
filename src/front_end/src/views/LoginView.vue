@@ -7,14 +7,9 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import {
-  FRONTEND_AD_CLIENT_ID,
-  FRONTEND_AD_AUDIENCE,
-  SESSION_KEY_PKCE_VERIFIER,
-  SESSION_KEY_OIDC_STATE
-} from '@/utils/config'
+import { FRONTEND_AD_CLIENT_ID, FRONTEND_AD_AUDIENCE, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
 
-import {apiFetch, API_PATHS} from '@/utils/api'
+import { apiFetch, API_PATHS } from '@/utils/api'
 
 /* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)
@@ -51,7 +46,6 @@ const handleEntraIdLogin = async () => {
   const fullAuthUrl = `${URLdata.authorization_endpoint}?${params.toString()}`
   window.location.assign(fullAuthUrl)
 }
-
 </script>
 
 <template>

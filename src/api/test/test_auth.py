@@ -55,8 +55,9 @@ class TestTokenVerifier(TestCase):
         self.jwks_class.return_value = jwks_client
 
         self.decode.return_value = self.CLAIMS
+        config = {"issuer": "unittest", "jwks_uri": "unittest"}
 
-        return TokenVerifier(), jwks_client
+        return TokenVerifier(config), jwks_client
 
     def test_valid_bearer_token_returns_claims(self):
         verifier, jwks_client = self.make_verifier()
@@ -73,7 +74,7 @@ class TestTokenVerifier(TestCase):
             "valid-token",
             "public-key",
             algorithms=["RS256"],
-            issuer="https://identity-provider.test/tenant",
+            issuer="unittest",
             audience=["dmis-api"],
             options={"verify_aud": True},
         )

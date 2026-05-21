@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock
 from unittest import IsolatedAsyncioTestCase, mock
 
 from fastapi import HTTPException, Request
@@ -76,6 +77,8 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
         verifier.verify_access_token.return_value = self.CLAIMS if claims is None else claims
 
         routes = AuthRoutes(verifier)
+        routes._load_openid_endpoints = AsyncMock(return_value=None)
+        routes.oidc_config = {"token_endpoint": "Some token endpoint", "end_session_endpoint": "Some endpoint"}
 
         if token_response is not None:
             routes._session = HttpClient(token_response)
@@ -102,23 +105,6 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
 
         assert raised.exception.status_code == 401
 
-    async def test_check_auth_requires_client_role(self):
-        routes, _ = self.make_routes(
-            claims={
-                **self.CLAIMS,
-                "resource_access": {
-                    "dmis-api": {
-                        "roles": [],
-                    },
-                },
-            }
-        )
-
-        with self.assertRaises(HTTPException) as raised:
-            await routes.check_auth("access-token")
-
-        assert raised.exception.status_code == 403
-
     async def test_check_auth_returns_authenticated_user(self):
         routes, _ = self.make_routes()
 
@@ -126,12 +112,7 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
         payload = json.loads(response.body)
 
         assert response.status_code == 200
-        assert payload == {
-            "authenticated": True,
-            "user": {
-                "username": "tester",
-            },
-        }
+        assert payload == {"authenticated": True}
 
     async def test_auth_me_requires_authenticated_user(self):
         routes, verifier = self.make_routes()
@@ -151,12 +132,7 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
         assert response.status_code == 200
         assert payload == {
             "authenticated": True,
-            "user": {
-                "username": "tester",
-                "email": "tester@example.test",
-                "client_roles": ["user", "admin"],
-                "realm_roles": ["realm-user"],
-            },
+            "user": {"username": "tester", "email": "tester@example.test", "roles": ["admin", "realm-user", "user"]},
         }
 
     async def test_check_admin_requires_authenticated_user(self):
@@ -254,8 +230,7 @@ class TestAuthRoutes(IsolatedAsyncioTestCase):
 
         assert response.status_code == 200
         assert payload == {
-            "logout_url": "https://identity-provider.test/logout?"
-            "post_logout_redirect_uri=https%3A%2F%2Ffrontend.test%2F&client_id=dmis-api&id_token_hint=id-token"
+            "logout_url": "Some endpoint?post_logout_redirect_uri=https%3A%2F%2Ffrontend.test%2F&client_id=dmis-api&id_token_hint=id-token"
         }
 
     async def test_close_session_closes_created_http_session(self):

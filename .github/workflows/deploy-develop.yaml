@@ -24,7 +24,7 @@ jobs:
       - name: Push images to registry
         run: |
           set -euo pipefail
-          IMAGES="$(docker compose  config --images)"
+          IMAGES="$(docker compose -f docker-compose.yaml config --images)"
           echo "Images from compose:"
           echo "$IMAGES"
           

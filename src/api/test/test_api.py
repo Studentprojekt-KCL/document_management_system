@@ -96,7 +96,7 @@ class TestAPI(TestCase):
         auth_routes.logout_auth = mock.AsyncMock()
         self.auth_class.return_value = auth_routes
 
-        api = API(upstream_urls=self.URLS)
+        api = API(upstream_urls=self.URLS, ad_config={})
 
         http_client = HttpClient()
         api.create_http_client = mock.Mock(return_value=http_client)

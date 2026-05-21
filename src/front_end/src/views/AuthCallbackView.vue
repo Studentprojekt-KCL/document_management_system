@@ -34,13 +34,13 @@ onMounted(async () => {
     return
   }
 
-  const expectedState = localStorage.getItem(SESSION_KEY_OIDC_STATE)
+  const expectedState = sessionStorage.getItem(SESSION_KEY_OIDC_STATE)
   if (!expectedState || returnedState !== expectedState) {
     errorMsg.value = 'State mismatch. Please try again.'
     return
   }
 
-  const verifier = localStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
+  const verifier = sessionStorage.getItem(SESSION_KEY_PKCE_VERIFIER)
   if (!verifier) {
     errorMsg.value = 'Missing PKCE verifier. Please try again.'
     return

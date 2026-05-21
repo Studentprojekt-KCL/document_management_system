@@ -5,6 +5,7 @@ from datetime import datetime
 from os import scandir
 import json
 import os
+import tempfile
 from collections.abc import AsyncGenerator
 from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode, b64encode
 from pathlib import Path
@@ -128,7 +129,7 @@ class Samba:
         username: str | None = None
         password: str | None = None
         try:
-            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":", 1))
         except (UnicodeDecodeError, UnicodeEncodeError, ValueError) as err:
             dms_warning(f"Failed to decode authorization: {err}")
         if username is None or password is None:
@@ -159,7 +160,7 @@ class Samba:
         username: str | None = None
         password: str | None = None
         try:
-            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":"))
+            username, password = tuple(b64decode(authorization.lstrip("Basic").encode("utf-8")).decode("utf-8").split(":", 1))
         except UnicodeDecodeError:
             dms_warning("Failed to decode authorization header for base64 decoding.")
         except UnicodeEncodeError:
@@ -176,9 +177,13 @@ class Samba:
         except CalledProcessError:
             return []
 
+        mount_root = os.path.normpath(self.mount_options.user_mount)
         files: list[dict] = []
         for pointer in pointers:
-            path: str = f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}"
+            path: str = os.path.normpath(f"{self.mount_options.user_mount}{pointer[len(self.share_host.share):]}")
+            if not path.startswith(mount_root + os.sep) and path != mount_root:
+                dms_warning(f"Path traversal attempt detected for pointer: {pointer}")
+                continue
             try:
                 with open(path, "rb") as f:
                     status = os.stat(path)
@@ -343,16 +348,24 @@ class Samba:
 
         if not os.path.isdir(path):
             Path(path).mkdir(parents=True, exist_ok=True)
-        command = [
-            "mount",
-            "-t",
-            "cifs",
-            "-o",
-            f"username={username},password={password},port={self.share_host.port}",
-            self.share_host.share.replace("\\", "/"),
-            path,
-        ]
-        run(command, check=True)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cred", delete=False) as f:
+            f.write(f"username={username}\npassword={password}\n")
+            cred_path = f.name
+        os.chmod(cred_path, 0o600)
+        try:
+            command = [
+                "mount",
+                "-t",
+                "cifs",
+                "-o",
+                f"credentials={cred_path},port={self.share_host.port}",
+                self.share_host.share.replace("\\", "/"),
+                path,
+            ]
+            run(command, check=True)
+        finally:
+            os.unlink(cred_path)
 
     def _umount(self, path: str) -> None:
         """Unmounts a SMB Share.

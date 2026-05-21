@@ -1,7 +1,7 @@
 """Copyright (c) 2026, Studentprojekt Knowit Cybersecurity and Law."""
 
 import json
-
+import os
 import base64
 
 from cryptography.fernet import Fernet
@@ -19,10 +19,13 @@ class SessionEncryption:
     @staticmethod
     def _generate_suite(secret_key: str) -> Fernet:
         """Generate Fernet suite with secret key."""
+        raw_salt = os.environ.get("REFSERVICE_ENC_SALT", "")
+        # Salt must be set in the environment; a missing salt weakens key derivation.
+        salt = raw_salt.encode() if raw_salt else b"STATIC_SALT"
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b"STATIC_SALT",
+            salt=salt,
             iterations=100000,
         )
 

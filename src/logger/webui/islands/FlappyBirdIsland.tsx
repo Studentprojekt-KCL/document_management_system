@@ -16,10 +16,12 @@ export default function FlappyBird({ birdSrc = "/bird.png", pipeSrc = "/pipe.png
     let y = H / 2, v = 0, pipes: { x: number; gap: number; passed?: boolean }[] = [{ x: W, gap: 200 }];
     let alive = true, s = 0, frame = 0;
 
+    const reset = () => { y = H / 2; v = 0; pipes = [{ x: W, gap: 200 }]; s = 0; frame = 0; setScore(0); alive = true; };
+
     const jump = (e: KeyboardEvent | MouseEvent) => {
       if ("code" in e && e.code !== "Space") return;
       if ("code" in e) e.preventDefault();
-      if (!alive) { y = H / 2; v = 0; pipes = [{ x: W, gap: 200 }]; s = 0; setScore(0); alive = true; return; }
+      if (!alive) { reset(); return; }
       v = -7;
     };
     addEventListener("keydown", jump); canvas.addEventListener("click", jump);
@@ -37,17 +39,23 @@ export default function FlappyBird({ birdSrc = "/bird.png", pipeSrc = "/pipe.png
         ctx.scale(1, -1);
         ctx.drawImage(pipe, -PIPE_W / 2, -(H - bottomY) / 2, PIPE_W, H - bottomY);
         ctx.restore();
-        if (alive && p.x < 60 && p.x + PIPE_W > 50 && (y < p.gap || y > p.gap + GAP)) alive = false;
+        if (alive && p.x < 60 && p.x + PIPE_W > 50 && (y - 15 < p.gap || y + 15 > p.gap + GAP)) alive = false;
         if (alive && !p.passed && p.x + PIPE_W < 50) { p.passed = true; s++; setScore(s); }
       }
       pipes = pipes.filter((p) => p.x > -PIPE_W);
       ctx.drawImage(bird, 50, y - 15, 40, 30);
-      if (y > H || y < 0) alive = false;
+      if (y + 15 > H || y - 15 < 0) alive = false;
       if (!alive) { ctx.fillStyle = "#fff"; ctx.font = "30px sans-serif"; ctx.fillText("Click to restart", W / 2 - 110, H / 2); }
       raf = requestAnimationFrame(loop);
     };
-    loop();
-    return () => { cancelAnimationFrame(raf); removeEventListener("keydown", jump); };
+
+    // wait for both images before starting so first frame isn't blank
+    Promise.all([
+      new Promise((r) => { bird.onload = r; bird.onerror = r; }),
+      new Promise((r) => { pipe.onload = r; pipe.onerror = r; }),
+    ]).then(() => { raf = requestAnimationFrame(loop); });
+
+    return () => { cancelAnimationFrame(raf); removeEventListener("keydown", jump); canvas.removeEventListener("click", jump); };
   }, []);
 
   return (

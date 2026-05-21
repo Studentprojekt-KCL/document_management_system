@@ -32,8 +32,8 @@ export async function refreshSession() {
 export async function logout() {
   localStorage.setItem(LOCAL_KEY_LOGOUT_EVENT, Date.now().toString())
 
-  localStorage.removeItem('pkce_verifier')
-  localStorage.removeItem('oidc_state')
+  sessionStorage.removeItem('pkce_verifier')
+  sessionStorage.removeItem('oidc_state')
 
   try {
     const response = await apiFetch(API_PATHS.authLogout, {

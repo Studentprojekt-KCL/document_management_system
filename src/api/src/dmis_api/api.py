@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from json.decoder import JSONDecodeError
 import argparse
+import time
+from collections import defaultdict
 from typing import Any, Annotated
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -14,12 +16,72 @@ from fastapi import FastAPI, Request, HTTPException, Cookie, Header, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 
 from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
+
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose Content-Length exceeds the configured limit — ASVS 5.2.1."""
+
+    def __init__(self, app: FastAPI) -> None:
+        super().__init__(app)
+        mb = read_env_variable("DMISAPI_MAX_BODY_MB", required=False)
+        self.max_bytes = int(mb) * 1024 * 1024 if mb and mb.isdigit() else 100 * 1024 * 1024
+
+    async def dispatch(self, request: Request, call_next: Any) -> StarletteResponse:
+        cl = request.headers.get("content-length")
+        if cl and int(cl) > self.max_bytes:
+            return StarletteResponse(status_code=413, content="Request Too Large")
+        return await call_next(request)
+
+
+class CharsetMiddleware(BaseHTTPMiddleware):
+    """Append charset=utf-8 to JSON responses — ASVS 4.1.1."""
+
+    async def dispatch(self, request: Request, call_next: Any) -> StarletteResponse:
+        response = await call_next(request)
+        ct = response.headers.get("content-type", "")
+        if ct.startswith("application/json") and "charset" not in ct:
+            response.headers["content-type"] = ct + "; charset=utf-8"
+        return response
+
+
+class AuthRateLimitMiddleware(BaseHTTPMiddleware):
+    """Rate limit auth endpoints — ASVS V2.2.1 anti-automation control."""
+
+    MAX_CALLS = 20
+    PERIOD = 60  # seconds
+
+    def __init__(self, app: FastAPI) -> None:
+        super().__init__(app)
+        self._storage: dict[str, list[float]] = defaultdict(list)
+
+    def _get_client_ip(self, request: Request) -> str:
+        return (
+            request.headers.get("X-Real-IP")
+            or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+            or (request.client.host if request.client else "unknown")
+        )
+
+    async def dispatch(self, request: Request, call_next: Any) -> StarletteResponse:
+        if not request.url.path.startswith("/auth/"):
+            return await call_next(request)
+
+        client_ip = self._get_client_ip(request)
+        now = time.monotonic()
+        window = [t for t in self._storage[client_ip] if now - t < self.PERIOD]
+        if len(window) >= self.MAX_CALLS:
+            return StarletteResponse(status_code=429, content="Too Many Requests")
+
+        window.append(now)
+        self._storage[client_ip] = window
+        return await call_next(request)
 
 
 class API:
@@ -41,6 +103,9 @@ class API:
     ) -> None:
         """Constructor."""
         self.app = FastAPI(lifespan=self.lifespan)
+        self.app.add_middleware(CharsetMiddleware)
+        self.app.add_middleware(AuthRateLimitMiddleware)
+        self.app.add_middleware(MaxBodySizeMiddleware)
         self.log_level = log_level
         self.upstream_urls = upstream_urls
 
@@ -198,7 +263,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
@@ -209,7 +274,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.resolve_authorization(access_token)
@@ -223,7 +288,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
@@ -237,7 +302,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
@@ -251,7 +316,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
         x_connector_authorization: Annotated[str | None, Header()] = None,
     ) -> JSONResponse:
         """GET request to connector API."""
@@ -269,7 +334,7 @@ class API:
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None),
+        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
     ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.resolve_authorization(access_token)

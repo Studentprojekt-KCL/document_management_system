@@ -19,8 +19,12 @@ class RedisDataBase:
 
     def __init__(self) -> None:
         """Constructor."""
+        redis_password = read_env_variable("REFSERVICE_REDIS_PASSW", required=False)
         self.redis_instance = Redis(
-            host=read_env_variable("REFSERVICE_REDIS_HOST"), port=read_env_variable("REFSERVICE_REDIS_PORT"), decode_responses=True
+            host=read_env_variable("REFSERVICE_REDIS_HOST"),
+            port=read_env_variable("REFSERVICE_REDIS_PORT"),
+            password=redis_password if redis_password else None,
+            decode_responses=True,
         )
 
     def get_session_token(self, user: str, service: str) -> tuple:

@@ -29,7 +29,25 @@ class AuthRoutes:
         admin_roles_list = read_env_variable("DMISAPI_ADMIN_ROLES", required=False)
         self.admin_roles = [role.strip() for role in admin_roles_list.split(",") if role.strip()] if admin_roles_list else []
 
+        allowed_origins_raw = read_env_variable("DMISAPI_ALLOWED_ORIGINS", required=False)
+        self.allowed_origins: set[str] = (
+            {o.strip() for o in allowed_origins_raw.split(",") if o.strip()} if allowed_origins_raw else set()
+        )
+
         self._session = None
+
+    def _validate_origin(self, origin: str | None) -> str:
+        """Raise 403 if origin is absent or not in the configured allowlist."""
+        if not origin or (self.allowed_origins and origin not in self.allowed_origins):
+            raise HTTPException(status_code=403, detail="Origin not allowed")
+        return origin
+
+    @staticmethod
+    def _no_cache(response: JSONResponse) -> JSONResponse:
+        """Attach cache-inhibiting headers to an auth response."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        return response
 
     async def close_session(self) -> None:
         """Tear down session."""
@@ -86,28 +104,28 @@ class AuthRoutes:
         refresh_max_age = self._get_token_max_age(token_data, "refresh_expires_in", self.REFRESH_COOKIE_MAX_AGE)
 
         if isinstance(access_token, str):
-            self._set_cookie(response, "access_token", access_token, access_max_age)
+            self._set_cookie(response, "__Secure-access_token", access_token, access_max_age)
 
         if isinstance(refresh_token, str):
             response.set_cookie(
-                key="refresh_token",
+                key="__Secure-refresh_token",
                 value=refresh_token,
                 httponly=True,
                 secure=True,
                 samesite="lax",
                 max_age=refresh_max_age,
-                path="api/auth/refresh",
+                path="/api/auth/refresh",
             )
 
         if isinstance(id_token, str):
             response.set_cookie(
-                key="id_token",
+                key="__Secure-id_token",
                 value=id_token,
                 httponly=True,
                 secure=True,
                 samesite="lax",
                 max_age=access_max_age,
-                path="api/auth/logout",
+                path="/api/auth/logout",
             )
 
     async def _request_tokens(self, data: dict[str, str]) -> dict[str, Any]:
@@ -131,7 +149,7 @@ class AuthRoutes:
 
         return response
 
-    async def check_auth(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def check_auth(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
         """Check if user is authenticated."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
@@ -141,14 +159,16 @@ class AuthRoutes:
         if not client_roles:
             raise HTTPException(status_code=403)
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "authenticated": True,
-                "user": {
-                    "username": claims.get("preferred_username"),
+        return self._no_cache(
+            JSONResponse(
+                status_code=200,
+                content={
+                    "authenticated": True,
+                    "user": {
+                        "username": claims.get("preferred_username"),
+                    },
                 },
-            },
+            )
         )
 
     def _get_client_roles(self, claims: dict[str, Any]) -> list[str]:
@@ -156,7 +176,7 @@ class AuthRoutes:
         roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
         return roles if isinstance(roles, list) else []
 
-    async def auth_me(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def auth_me(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
         """Return authenticated user details and roles."""
         claims = self._verify_cookie_token(access_token)
         if not claims:
@@ -165,20 +185,22 @@ class AuthRoutes:
         client_roles = claims.get("resource_access", {}).get(self.dmisapi_client_id, {}).get("roles", [])
         realm_roles = claims.get("realm_access", {}).get("roles", [])
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "authenticated": True,
-                "user": {
-                    "username": claims.get("preferred_username"),
-                    "email": claims.get("email"),
-                    "client_roles": client_roles,
-                    "realm_roles": realm_roles,
+        return self._no_cache(
+            JSONResponse(
+                status_code=200,
+                content={
+                    "authenticated": True,
+                    "user": {
+                        "username": claims.get("preferred_username"),
+                        "email": claims.get("email"),
+                        "client_roles": client_roles,
+                        "realm_roles": realm_roles,
+                    },
                 },
-            },
+            )
         )
 
-    async def check_admin(self, access_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def check_admin(self, access_token: str | None = Cookie(default=None, alias="__Secure-access_token")) -> JSONResponse:
         """Check if authenticated user has an admin role"""
         claims = self._verify_cookie_token(access_token)
         if not claims:
@@ -202,7 +224,7 @@ class AuthRoutes:
         code_verifier: str = Form(...),
     ) -> JSONResponse:
         """Exchange authorization code for tokens via provided AD."""
-        origin = request.headers.get("Origin")
+        origin = self._validate_origin(request.headers.get("Origin"))
         token_data = await self._request_tokens(
             {
                 "grant_type": "authorization_code",
@@ -213,19 +235,23 @@ class AuthRoutes:
             }
         )
 
-        response = JSONResponse(
-            status_code=200,
-            content={"message": "Login successful"},
+        response = self._no_cache(
+            JSONResponse(
+                status_code=200,
+                content={"message": "Login successful"},
+            )
         )
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def refresh_auth(self, refresh_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def refresh_auth(self, refresh_token: str | None = Cookie(default=None, alias="__Secure-refresh_token")) -> JSONResponse:
         """Refresh session using the refresh token."""
         if not refresh_token:
-            return JSONResponse(
-                status_code=401,
-                content={"message": "Missing refresh token"},
+            return self._no_cache(
+                JSONResponse(
+                    status_code=401,
+                    content={"message": "Missing refresh token"},
+                )
             )
 
         token_data = await self._request_tokens(
@@ -236,16 +262,19 @@ class AuthRoutes:
             }
         )
 
-        response = JSONResponse(
-            status_code=200,
-            content={"message": "Session refreshed"},
+        response = self._no_cache(
+            JSONResponse(
+                status_code=200,
+                content={"message": "Session refreshed"},
+            )
         )
         self._set_auth_cookies(response, token_data)
         return response
 
-    async def logout_auth(self, request: Request, id_token: str | None = Cookie(default=None)) -> JSONResponse:
+    async def logout_auth(self, request: Request, id_token: str | None = Cookie(default=None, alias="__Secure-id_token")) -> JSONResponse:
         """Generate logout URL from AD and clear authentication cookies."""
-        post_logout_redirect_uri = request.headers.get("Origin") + "/"
+        origin = self._validate_origin(request.headers.get("Origin"))
+        post_logout_redirect_uri = origin + "/"
 
         params = {
             "post_logout_redirect_uri": post_logout_redirect_uri,
@@ -259,7 +288,7 @@ class AuthRoutes:
             status_code=200,
             content={"logout_url": logout_url},
         )
-        response.delete_cookie("access_token", path="/", secure=True, samesite="lax")
-        response.delete_cookie("refresh_token", path="api/auth/refresh", secure=True, samesite="lax")
-        response.delete_cookie("id_token", path="api/auth/logout", secure=True, samesite="lax")
+        response.delete_cookie("__Secure-access_token", path="/", secure=True, samesite="lax")
+        response.delete_cookie("__Secure-refresh_token", path="/api/auth/refresh", secure=True, samesite="lax")
+        response.delete_cookie("__Secure-id_token", path="/api/auth/logout", secure=True, samesite="lax")
         return response

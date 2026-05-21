@@ -5,6 +5,10 @@ server {
     # Security: Disable server tokens
     server_tokens off;
 
+    if ($request_method = TRACE) {
+        return 405;
+    }
+
     # Gzip compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss;
@@ -48,4 +52,8 @@ server {
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
+    # ASVS V14.4.5 / V9.1.1 — enforce HTTPS for all future connections
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # ASVS V14.4.3 — Content Security Policy
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';" always;
 }

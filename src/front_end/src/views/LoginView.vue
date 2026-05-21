@@ -17,10 +17,10 @@ const handleEntraIdLogin = async () => {
   isLoading.value = true
   const { verifier, challenge } = await createPkcePair()
 
-  localStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
+  sessionStorage.setItem(SESSION_KEY_PKCE_VERIFIER, verifier)
 
   const state = generateState()
-  localStorage.setItem(SESSION_KEY_OIDC_STATE, state)
+  sessionStorage.setItem(SESSION_KEY_OIDC_STATE, state)
 
   const redirectUri = `${window.location.origin}/auth/callback`
 

@@ -2,6 +2,8 @@
 
 ## System
 
+Note: Instructions on which environement variables can be found in each microservices respective README.
+
 1. Bulid all the images and pull down the latest base tag.
 ```
 docker compose build --pull

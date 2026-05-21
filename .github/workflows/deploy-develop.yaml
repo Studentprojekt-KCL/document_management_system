@@ -6,7 +6,6 @@ on:
 
 env:
   DEPLOY_DIR: "/opt/dev-dms-lookup/"
-  COMPOSE_FILE: "docker-compose-build-all.yaml"
   REGISTRY: "registry.dms-lookup.com"
 
 jobs:
@@ -25,7 +24,7 @@ jobs:
       - name: Push images to registry
         run: |
           set -euo pipefail
-          IMAGES="$(docker compose -f $COMPOSE_FILE config --images)"
+          IMAGES="$(docker compose  config --images)"
           echo "Images from compose:"
           echo "$IMAGES"
           

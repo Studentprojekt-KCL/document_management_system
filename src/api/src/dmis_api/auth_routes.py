@@ -328,3 +328,4 @@ class AuthRoutes:
         response.delete_cookie("__Secure-refresh_token", path="/api/auth/refresh", secure=True, samesite="lax")
         response.delete_cookie("__Secure-id_token", path="/api/auth/logout", secure=True, samesite="lax")
         return response
+

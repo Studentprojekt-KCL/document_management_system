@@ -6,6 +6,7 @@ on:
 
 env:
   DEPLOY_DIR: "/opt/dev-dms-lookup/"
+  COMPOSE_FILE: "docker-compose.yaml"
   REGISTRY: "registry.dms-lookup.com"
 
 jobs:
@@ -19,12 +20,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        run: docker compose -f docker-compose.yaml build
+        run: docker compose -f $COMPOSE_FILE build
 
       - name: Push images to registry
         run: |
           set -euo pipefail
-          IMAGES="$(docker compose -f docker-compose.yaml config --images)"
+          IMAGES="$(docker compose -f $COMPOSE_FILE config --images)"
           echo "Images from compose:"
           echo "$IMAGES"
           
@@ -53,5 +54,5 @@ jobs:
         run: |
           set -euo pipefail
           cd $DEPLOY_DIR
-          docker compose -f docker-compose.yaml pull
-          docker compose -f docker-compose.yaml up -d --remove-orphans
+          docker compose -f $COMPOSE_FILE pull
+          docker compose -f $COMPOSE_FILE up -d --remove-orphans

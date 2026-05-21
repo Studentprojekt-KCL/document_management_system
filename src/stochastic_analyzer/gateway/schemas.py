@@ -1,6 +1,6 @@
 """File for shared service-level types"""
 
-from pydantic import BaseModel, StrictStr
+from pydantic import BaseModel, StrictStr, field_validator
 
 
 class MetadataTemplate(BaseModel):
@@ -21,6 +21,14 @@ class MarkdownRequest(BaseModel):
     """Request schema for markdown logic."""
 
     markdown: StrictStr
+
+    @field_validator("markdown")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        """Reject empty or whitspace-only markdown"""
+        if not v.strip():
+            raise ValueError("markdown must not be empty")
+        return v
 
 
 class PointerRequest(BaseModel):

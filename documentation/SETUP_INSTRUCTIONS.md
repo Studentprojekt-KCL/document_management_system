@@ -24,3 +24,12 @@ To set up functioning session authentication for base systems, the following set
   4. Create a new application according to the picture below
 
 ![Configure GitLab application](images/add_gitlab_application.png)
+
+### Confluence
+
+  1. Go to https://developer.atlassian.com/console/myapps/
+  2. Click on 'Create' and then 'Oauth 2.0 integration'
+  3. Click on 'Authorization' in the left column, and under 'Action' click on Add (as seen in the picture below)
+  4. Configure your callback URL/s, and press save.
+
+![Configure Confluence application](images/add_confluence_application.png)

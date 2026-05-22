@@ -20,6 +20,7 @@ from shared_functions.initialisation_tools import read_env_variable, read_port
 from shared_functions.signing_tools import sign_encode_state, validate_decode_state
 
 MS_LOGIN_BASE = "https://login.microsoftonline.com"
+BEARER_PREFIX = "Bearer "
 
 
 class API:
@@ -39,7 +40,9 @@ class API:
 
         self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
         self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
+        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
+        self.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
+        self.app.add_api_route("/defined_fields", self.defined_fields, methods=["GET"])
         self.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
         self.app.add_api_route("/callback", self.callback, methods=["GET"])
         self.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
@@ -70,18 +73,32 @@ class API:
             "file_pointers": ["<FILE_PTR>"]
             }'
         """
+        token = x_sharepoint_token.removeprefix(BEARER_PREFIX).strip() if x_sharepoint_token else None
         return await self.sharepoint_instance.get_files(
-            file_pointers.get("file_pointers", []), x_sharepoint_token, include_content, include_last_edit_date
+            file_pointers.get("file_pointers", []), token, include_content, include_last_edit_date
         )
 
     def stream_files_to_index(
-        self, subdata: str | None = None, x_sharepoint_token: Annotated[str | None, Header()] = None
+        self,
+        body: dict[str, str | None] | None = None,
+        x_sharepoint_token: Annotated[str | None, Header()] = None,
     ) -> StreamingResponse:
         """Endpoint streaming all qualifying documents for indexing."""
+        subdata: str | None = body.get("subdata") if isinstance(body, dict) else None
+        token = x_sharepoint_token.removeprefix(BEARER_PREFIX).strip() if x_sharepoint_token else None
         return StreamingResponse(
-            self.sharepoint_instance.stream_files_to_index(subdata, x_sharepoint_token),
+            self.sharepoint_instance.stream_files_to_index(subdata, token),
             media_type="application/octet-stream",
         )
+
+    async def validate_token(self, x_sharepoint_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Verify that the provided token can access the Microsoft Graph API."""
+        token = x_sharepoint_token.removeprefix(BEARER_PREFIX).strip() if x_sharepoint_token else None
+        return JSONResponse(content={"valid": await self.sharepoint_instance.verify_token(token)}, status_code=200)
+
+    def defined_fields(self) -> list[str]:
+        """Return the list of field keys this connector can deliver."""
+        return list(self.sharepoint_instance.defined_fields.keys())
 
     def auth_user(self) -> JSONResponse:
         """Redirect user to Microsoft OAuth login."""

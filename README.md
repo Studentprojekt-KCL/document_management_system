@@ -6,7 +6,11 @@ A showcase of basic system functionality can be seen below:
 
 <p align="center">
   <a href="https://youtu.be/9-a6aLzqZM4">
-    <img src="https://youtube.com" alt="Watch the video" width="600">
+    <img 
+      src="https://img.youtube.com/vi/9-a6aLzqZM4/maxresdefault.jpg" 
+      alt="Watch the video" 
+      width="800"
+    >
   </a>
 </p>
 

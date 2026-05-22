@@ -76,13 +76,7 @@ The scripts save output in `../documentation/`:
 
 Vulnerability remediation follows a risk-based policy defined in [`remediation_policy.json`](/remediation_policy.json):
 
-| Severity | Timeframe | Rationale |
-|----------|-----------|-----------|
-| Critical | 7 days | Immediate patching required due to high exploitability |
-| High | 30 days | Significant risk, prioritize after critical |
-| Medium | 90 days | Moderate risk, address in regular updates |
-| Low | 180 days | Low risk, include in standard maintenance cycles |
-| Library updates (general) | 30 days | All dependency updates reviewed within 30 days |
+Policy is defined [here](https://github.com/Studentprojekt-KCL/document_management_system/blob/develop/documentation/SYSTEM_DOCUMENTATION.md#security--dependency-management-asvs-v131).
 
 Run `./full_scan.sh` to generate compliance reports in `../documentation/full_scan/`:
 - `security_report.json` — vulnerability findings with compliance status

@@ -1,9 +1,5 @@
 # Search Engine
 
-## Definitions
-
-- **Document**: a text file 
-
 ## Configuration
 
 ### Environment variables
@@ -22,7 +18,19 @@
 ## Behaviour
 
 Every search initializes a new indexing task in the index pipeline, unless an indexing task for an already streaming source connector is recieved.
-Then it'll skip that connector till it is finished and another request is performed.
+Then it'll skip that connector till it is finished and another request is performed. The pipeline is strutured in the following way, note these steps occur concurrently:
+
+- Fetch streaming endpoints from the connector gateway.
+- Recieve the stream from the connector.
+- Decode and format each file and detect potential documents.
+- Index a batch of file.
+- Fetch file content from index.
+- Classify batch of files.
+- Reindex the files in batches.
+
+The reason the files are re fetched from the index instead of storing them in memory until it's done, is the slow nature of the classifier.
+The memory will run out long before the classifications are finished and this allows the search engine to save memory by writing to storage
+while waiting for the next availabe classification spot. 
 
 ## Endpoints
 
@@ -42,16 +50,16 @@ Then it'll skip that connector till it is finished and another request is perfor
 
 Search through the files in the index.
 
-**Header**
+*Header*
 
 - `authorization`: Authorization token.
 
-**Params**
+*Params*
 
 - **Count**: maximum amount of results.
 - **Offset**: offset, used for e.g paging.
 
-**Body**
+*Body*
 
 ```json
 {
@@ -63,7 +71,7 @@ Search through the files in the index.
 }
 ```
 
-**Response**
+*Response*
 
 ```json
 [
@@ -82,7 +90,7 @@ Search through the files in the index.
 
 Check the status of the search engine.
 
-**Response**
+*Response*
 
 ```json
 {
@@ -98,11 +106,11 @@ Reset the search engine. Removes and rebuilds the index and stored data.
 
 Set the classification of a single file.
 
-**Header**
+*Header*
 
 - `authorization`: Authorization token.
 
-**Body**
+*Body*
 
 ```json
 {
@@ -111,7 +119,7 @@ Set the classification of a single file.
 }
 ```
 
-**Response**
+*Response*
 
 ```json
 {
@@ -124,7 +132,7 @@ Set the classification of a single file.
 
 Grab all available classifications.
 
-**Response**
+*Response*
 
 ```json
 [
@@ -138,7 +146,7 @@ Grab all available classifications.
 
 Grab all defined file types.
 
-**Response**
+*Response*
 
 ```json
 [
@@ -159,7 +167,7 @@ Grab all defined file types.
 
 Grab all document types.
 
-**Response**
+*Response*
 
 ```json
 [
@@ -186,16 +194,16 @@ Grab all document types.
 
 Search for matching files in the index.
 
-**Headers**
+*Headers*
 
 - `authorization`: Authorization token.
 
-**Params**
+*Params*
 
 - `pointer`: the unique pointer for the file.
 - `count`: the maximum number of results.
 
-**Response**
+*Response*
 
 ```json
 [
@@ -216,7 +224,7 @@ Search for matching files in the index.
 
 Get all searchable fields.
 
-**Response**
+*Response*
 
 ```json
 [

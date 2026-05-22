@@ -35,6 +35,8 @@ Communicates with a SMB server and manages file delivery.
 
 ### Get Files
 
+Fetch all specified files.
+
 *Headers*
 
 - **authorization**: basic authorization header.
@@ -60,12 +62,45 @@ Communicates with a SMB server and manages file delivery.
 
 ```json
 [
-
+    {
+        "unique_pointer": <STRING>,
+        "field-1": <STRING>
+    },
+    {
+        "unique_pointer": <STRING>,
+        "field-1": <STRING>
+    }
 ]
 ```
 
 ### Stream Files to Index
 
+Stream all files which the requesting user has access to.
+
+*Response*
+
+Note it is sent as a stream.
+
+```json
+{"subdata": <STRING>}
+{
+    "unique_pointer": <STRING>,
+    "field-1": <STRING>
+}
+```
+
 ### Defined Fields
+
+Fetch all defined file fields.
+
+*Response*:
+
+```json
+[
+    <STRING>,
+    <STRING>,
+    <STRING>
+]
+```
 
 ### Validate Token

@@ -23,6 +23,18 @@ Communicates with a SMB server and manages file delivery.
 
 ## Behaviour
 
+The connector uses the subdata variable to identify changed or new files, in this case the subdata is simply the last scan date.
+There are three events which could occur on a streaming call:
+
+- No subdata: full stream, the connector walks through the whole share and streams each file.
+- Subdata date is before the internal start date: full check, it walks through the whole share checking each files modification date and streams the ones with a
+newer than the subdata.
+- Subdata date is after the internal start date: only changed, it will use it's internal list of changed files instead of walking through the whole share.
+
+The internal list works by using the *Change Notifier* feature, which notifies the subscriber if there are any changes. The connector add these changes to an internal
+list, which gives the reason to why a service account is needed. This allows the later scans (event type 3) to be faster than having to walk through the whole
+share each time.
+
 ## Endpoints
 
 |Endpoint|Method|Description|
@@ -104,3 +116,17 @@ Fetch all defined file fields.
 ```
 
 ### Validate Token
+
+Validate the authentication token, in this case an basic authorization header.
+
+*Headers*
+
+- **authentication**: basic auth header.
+
+*Response*
+
+```json
+{
+    "valid": <BOOLEAN>
+}
+```

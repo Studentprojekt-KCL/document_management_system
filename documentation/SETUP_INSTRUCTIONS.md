@@ -60,8 +60,8 @@ The system connects to GitHub using a **GitHub App** with the OAuth user-to-serv
 
 #### Retrieve credentials
 
-  1. On the app's settings page, copy the **Client ID** — this is `CONGITHUB_CLIENT_ID`.
-  2. Scroll to **Client secrets** and click **Generate a new client secret** — this is `CONGITHUB_CLIENT_SECRET`. Store it securely; GitHub will only show it once.
+  1. On the app's settings page, copy the **Client ID** - this is `CONGITHUB_CLIENT_ID`.
+  2. Scroll to **Client secrets** and click **Generate a new client secret** - this is `CONGITHUB_CLIENT_SECRET`. Store it securely; GitHub will only show it once.
 
 #### Install the app on the target organization
 

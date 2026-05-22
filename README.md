@@ -2,7 +2,7 @@
 
 DMIS (Document Management Integration System) is a dynamic application allowing orginisation to connect multiple repository hosting services (currently ingegrated with GitHub, GitLab, Confluence, SharePoint and SMB). User authentication is handled through SSO, using any OAuth2-compatible Identity Provider.
 
-A showcase of basic system functionality can be seen below:
+A showcase of basic system functionality can be seen in the video below:
 
 <p align="center">
   <a href="https://youtu.be/9-a6aLzqZM4">

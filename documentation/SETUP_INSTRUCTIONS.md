@@ -9,7 +9,8 @@ Note: Instructions on which environement variables can be found in each microser
 docker compose build --pull
 ```
 2. In the docker-compose.yaml file, set all environment variables.
-3. Run the stack.
+3. Set up a source_systems.json config file according to [this](https://github.com/Studentprojekt-KCL/document_management_system/blob/develop/src/connectors/connector-gateway/README.md#build-and-run-container).
+4. Run the stack.
 ```
 docker compose up
 ```

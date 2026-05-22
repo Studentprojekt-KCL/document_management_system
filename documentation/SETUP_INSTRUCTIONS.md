@@ -84,3 +84,45 @@ Set the following environment variables for the GitHub connector service:
 | `CONGITHUB_GITHUB_API_URL` | `https://api.github.com` (or `https://<host>/api/v3/` for GitHub Enterprise) |
 | `CONGITHUB_GITHUB_BASE_URL` | `https://github.com` (or `https://<host>` for GitHub Enterprise) |
 | `CONGITHUB_GITHUB_ORG` | *(Optional)* The organization login slug to restrict indexing to that org's repositories |
+
+### SharePoint
+
+The system connects to SharePoint using an **Azure AD application registration** with OAuth 2.0 delegated permissions. Each user authenticates individually; the connector reads only what the user can access.
+
+#### Register an application in Azure AD
+
+  1. Log in to the [Azure portal](https://portal.azure.com) with an account that has permission to register applications.
+  2. Go to **Entra ID → App registrations** and click **New registration**.
+  3. Fill in the required fields:
+     - **Name**: e.g. `DMS Lookup`
+     - **Supported account types**: choose the option that matches your tenant (typically *Accounts in this organizational directory only*)
+     - **Redirect URI**: set the platform to **Web** and enter the public URL of the SharePoint connector's `/callback` endpoint. This must match `CONSHAREPOINT_CONNECT_SERVICE_CALLBACK`.
+  4. Click **Register**.
+
+#### Grant API permissions
+
+  1. In the app's left sidebar, click **API permissions → Add a permission → Microsoft Graph → Delegated permissions**.
+  2. Add the following permissions:
+     - `Sites.Read.All`
+     - `Files.Read.All`
+     - `offline_access`
+  3. Click **Grant admin consent** for your organization. `Sites.Read.All` requires admin consent in enterprise and education tenants.
+
+#### Retrieve credentials
+
+  1. On the app's **Overview** page, copy the **Application (client) ID** - this is `CONSHAREPOINT_CLIENT_ID`.
+  2. Copy the **Directory (tenant) ID** from the same page - this is `CONSHAREPOINT_TENANT_ID`.
+  3. Go to **Certificates & secrets → New client secret**, set an expiry, and click **Add**. Copy the generated value immediately - this is `CONSHAREPOINT_CLIENT_SECRET`. Azure will not show it again.
+
+#### Set environment variables
+
+Set the following environment variables for the SharePoint connector service:
+
+| Variable | Value |
+|---|---|
+| `CONSHAREPOINT_TENANT_ID` | Directory (tenant) ID from the app overview page |
+| `CONSHAREPOINT_CLIENT_ID` | Application (client) ID from the app overview page |
+| `CONSHAREPOINT_CLIENT_SECRET` | Client secret generated above |
+| `CONSHAREPOINT_CONNECT_SERVICE_CALLBACK` | Public URL of the connector's `/callback` endpoint |
+| `CONSHAREPOINT_STATE_SIGNING_SECRET` | A random secret used to sign CSRF state tokens (generate with e.g. `openssl rand -hex 32`) |
+| `CONSHAREPOINT_GRAPH_BASE` | `https://graph.microsoft.com/v1.0` |

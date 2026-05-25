@@ -1,13 +1,6 @@
 # Confluence Connector
 
-Communicates with the Atlassian Confluence Cloud REST API (v2) and manages delivery of Confluence pages as indexable documents. Authentication is **OAuth 2.0 (3LO) only** — API tokens or basic auth are not supported.
-
-## Requirements
-
-- **Atlassian Confluence Cloud** — the connector uses REST API v2 via the Atlassian API gateway (`api.atlassian.com`).
-- **OAuth 2.0 (3LO) app** — register an app in the [Atlassian developer console](https://developer.atlassian.com/console/myapps/) and configure the callback URL to match `CONCONFLUENCE_CONNECT_SERVICE_CALLBACK`.
-- **Required OAuth scopes** — `read:space:confluence`, `read:page:confluence`, and `offline_access` (needed for refresh tokens via `/refresh_token`).
-- **Per-user authorization** — each user completes the `/auth_user` → `/callback` flow; file-serving endpoints require the resulting access token in the `X-Confluence-Token` header.
+Communicates with the Atlassian Confluence Cloud REST API (v2) and manages delivery of Confluence pages as indexable documents.
 
 ## Configuration
 
@@ -22,7 +15,7 @@ Communicates with the Atlassian Confluence Cloud REST API (v2) and manages deliv
 
 OAuth (required for `/auth_user`, `/callback`, `/refresh_token`, and `/validate_token`):
 
-- **CONCONFLUENCE_CLIENT_ID**: OAuth 2.0 (3LO) client ID from the Atlassian developer console.
+- **CONCONFLUENCE_CLIENT_ID**: OAuth 2.0 client ID from the Atlassian developer console.
 - **CONCONFLUENCE_CLIENT_SECRET**: OAuth 2.0 client secret.
 - **CONCONFLUENCE_STATE_SIGNING_SECRET**: Random HMAC secret used to sign and validate CSRF state tokens.
 - **CONCONFLUENCE_AUTH_URL**: Atlassian authorization endpoint (default: `https://auth.atlassian.com/authorize`).
@@ -40,7 +33,7 @@ The connector operates in two modes:
 
 **Incremental indexing** (`/stream_files_to_index`):
 
-All Confluence spaces accessible to the authenticated user are discovered via the REST API v2 `/spaces` endpoint. For each space, pages are listed in pages of up to 200 via the `/pages` endpoint. The `subdata` field carries a URL-safe base64-encoded JSON object mapping each space key to the ISO timestamp of the latest page version seen in that space during the previous successful index run (e.g. `{ "TEAM": "2024-06-01T12:00:00.000Z" }`). Only pages whose `version.createdAt` is newer than the stored checkpoint for their space are included in the next run.
+All Confluence spaces accessible to the authenticated user are discovered via the REST API v2 `/spaces` endpoint. For each space, pages are fetched in batches of up to 200 via the `/pages` endpoint. The `subdata` field carries a URL-safe base64-encoded JSON object mapping each space key to the ISO timestamp of the latest page version seen in that space during the previous successful index run (e.g. `{ "TEAM": "2024-06-01T12:00:00.000Z" }`). Only pages whose `version.createdAt` is newer than the stored checkpoint for their space are included in the next run.
 
 Page bodies are fetched with `body-format=storage`. HTML tags are stripped and the remaining plain text is base64-encoded in the `content` field. Up to 20 page fetches run concurrently. The response is a stream of NDJSON lines: the first line carries the updated `subdata` header; each subsequent line is one page record.
 
@@ -89,7 +82,7 @@ docker compose build connector-confluence
 
 ### Atlassian OAuth App Setup
 
-The connector requires an OAuth 2.0 (3LO) app registered in the Atlassian developer console. See [SETUP_INSTRUCTIONS.md](../SETUP_INSTRUCTIONS.md#confluence) for step-by-step instructions on creating the app, configuring the callback URL, granting the required API permissions, and setting the required environment variables.
+The connector requires an OAuth 2.0 app registered in the Atlassian developer console. See [SETUP_INSTRUCTIONS.md](../SETUP_INSTRUCTIONS.md#confluence) for step-by-step instructions on creating the app, configuring the callback URL, granting the required API permissions, and setting the required environment variables.
 
 After the first OAuth login, retrieve the site cloud ID from `GET https://api.atlassian.com/oauth/token/accessible-resources` and set `CONCONFLUENCE_CLOUD_ID` to the `id` of the target Confluence site.
 
@@ -118,7 +111,7 @@ The `--dev` flag enables verbose debug logging.
 
 ### Auth User
 
-Start the OAuth 2.0 (3LO) authorization-code flow. Returns a redirect URL the client should open in a browser.
+Start the OAuth 2.0 authorization-code flow. Returns a redirect URL the client should open in a browser.
 
 *Response*
 
@@ -225,6 +218,8 @@ Fetch a specified list of pages by pointer URL.
 ```
 
 *Response*
+
+`last_edit_date` is only present when `include_last_edit_date=True` (the default). `content` is always present; its value is `null` when `include_content=False`.
 
 ```json
 [

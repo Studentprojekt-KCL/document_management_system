@@ -9,7 +9,7 @@ import jwt
 from fastapi import HTTPException
 from jwt import PyJWKClient
 
-from shared_functions.dmis_logger import dms_info
+from shared_functions.dmis_logger import dms_info, dms_error
 
 from shared_functions.initialisation_tools import read_env_variable
 
@@ -17,10 +17,15 @@ from shared_functions.initialisation_tools import read_env_variable
 class TokenVerifier:
     """Verify OAuth2/OIDC bearer access tokens and enforce audience, azp and scope-based authorization."""
 
-    def __init__(self) -> None:
+    def __init__(self, oidc_config: dict[str, Any] | None = None) -> None:
         """Initialize token verifier with AD settings."""
-        self.issuer = read_env_variable("DMISAPI_AD_URL").rstrip("/")
-        self.jwks_client = PyJWKClient(read_env_variable("DMISAPI_AD_JWKS_URL"))
+        config = oidc_config
+        if not isinstance(config, dict):
+            dms_error("Could not fetch AD configuration.")
+            return
+
+        self.issuer = config["issuer"]
+        self.jwks_client = PyJWKClient(config["jwks_uri"])
 
         audience = read_env_variable("DMISAPI_AD_AUDIENCE", required=False)
         expected_audience = [value.strip() for value in audience.split(",") if value.strip()] if audience else None

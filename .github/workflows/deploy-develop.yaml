@@ -6,7 +6,7 @@ on:
 
 env:
   DEPLOY_DIR: "/opt/dev-dms-lookup/"
-  COMPOSE_FILE: "docker-compose-build-all.yaml"
+  COMPOSE_FILE: "docker-compose.yaml"
   REGISTRY: "registry.dms-lookup.com"
 
 jobs:
@@ -54,5 +54,5 @@ jobs:
         run: |
           set -euo pipefail
           cd $DEPLOY_DIR
-          docker compose -f docker-compose.yaml pull
-          docker compose -f docker-compose.yaml up -d --remove-orphans
+          docker compose -f $COMPOSE_FILE pull
+          docker compose -f $COMPOSE_FILE up -d --remove-orphans

@@ -1,8 +1,7 @@
 """Handeling routes in the API."""
 
-import asyncio
 from fastapi import APIRouter, Header
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response
 from aiohttp import ClientError
 
 from gateway.services.md_pdf import PdfConverter
@@ -22,14 +21,9 @@ def create_router(
     router = APIRouter()
 
     @router.post("/md-to-pdf")
-    async def md_to_pdf(payload: MarkdownRequest) -> Response:
-        """Route that takes a markdown string and returns a PDF."""
-        pdf = await asyncio.to_thread(pdf_converter.convert, payload.markdown)
-        if pdf is None:
-            return JSONResponse(
-                status_code=502,
-                content={"error": "PDF conversion failed"},
-            )
+    def md_to_pdf(payload: MarkdownRequest) -> Response:
+        """Route that takes string as input and gives PDF."""
+        pdf = pdf_converter.convert(payload.markdown)
         return Response(
             content=pdf,
             status_code=200,

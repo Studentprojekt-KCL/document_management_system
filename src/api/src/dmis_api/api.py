@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from json.decoder import JSONDecodeError
 import argparse
 from typing import Any, Annotated
@@ -17,14 +15,14 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from shared_functions.dmis_logger import dms_warning, dms_info, dms_error
+from shared_functions.dmis_logger import dms_warning, dms_info
 from shared_functions.initialisation_tools import read_env_variable, read_port
 
 from .auth import TokenVerifier
 from .auth_routes import AuthRoutes
 
 
-class API:  # pylint: disable=R0902
+class API:
     """Management class for main API."""
 
     REDIRECT_STATUS_CODES: list = [307, 308]
@@ -34,23 +32,19 @@ class API:  # pylint: disable=R0902
     log_level: str | None = None
     upstream_urls: dict[str, str]
     token_verifier: TokenVerifier
-    auth_routes: AuthRoutes
     required_scopes: dict[str, list[str]]
-    setup_routs: bool
 
     def __init__(
         self,
         upstream_urls: dict[str, str],
-        ad_config: dict,
         log_level: str | None = None,
     ) -> None:
         """Constructor."""
         self.app = FastAPI(lifespan=self.lifespan)
         self.log_level = log_level
         self.upstream_urls = upstream_urls
-        self.ad_config = ad_config
 
-        self.token_verifier = TokenVerifier(ad_config)
+        self.token_verifier = TokenVerifier()
         self.auth_routes = AuthRoutes(token_verifier=self.token_verifier)
         self.http_client = None
 
@@ -75,14 +69,13 @@ class API:  # pylint: disable=R0902
         self.app.add_api_route("/stochastic-analyzer/{endpoint}", self.stochastic_analyzer_post, methods=["POST"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_get, methods=["GET"])
         self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
-        self.app.add_api_route("/connector/{endpoint}", self.connector_post, methods=["POST"])
 
         self.app.add_api_route("/auth/codeExchange", self.auth_routes.code_exchange, methods=["POST"])
         self.app.add_api_route("/auth/check", self.auth_routes.check_auth, methods=["GET"])
         self.app.add_api_route("/auth/checkAdmin", self.auth_routes.check_admin, methods=["GET"])
         self.app.add_api_route("/auth/me", self.auth_routes.auth_me, methods=["GET"])
         self.app.add_api_route("/auth/refresh", self.auth_routes.refresh_auth, methods=["POST"])
-        self.app.add_api_route("/auth/ad_configuration", self.ad_configuration, methods=["GET"])
+        self.app.add_api_route("/auth/logout", self.auth_routes.logout_auth, methods=["POST"])
 
     def create_http_client(self) -> aiohttp.ClientSession:
         """Create aiohttp client with timeout."""
@@ -111,7 +104,7 @@ class API:  # pylint: disable=R0902
 
         return JSONResponse(status_code=422, content=content)
 
-    async def authorize(
+    def authorize(
         self,
         authorization: str | None,
         required_scopes: Sequence[str] | None = None,
@@ -134,7 +127,7 @@ class API:  # pylint: disable=R0902
 
     async def execute_get_request(
         self, url: str, request: Request, authorization: str | None, additional_headers: dict | None = None
-    ) -> JSONResponse | RedirectResponse:
+    ) -> JSONResponse:
         """Execute GET request."""
         try:
             params = dict(request.query_params)
@@ -205,22 +198,22 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """GET request to search engine."""
         authorization = self.resolve_authorization(access_token)
-        await self.authorize(authorization, required_scopes=self.required_scopes["searcheng"])
+        self.authorize(authorization, required_scopes=self.required_scopes["searcheng"])
         return await self.execute_get_request(f"{self.upstream_urls['searcheng']}/{endpoint}", request, authorization)
 
     async def search_engine_post(
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to search engine."""
         authorization = self.resolve_authorization(access_token)
-        await self.authorize(
+        self.authorize(
             authorization,
             required_scopes=self.required_scopes["searcheng"],
         )
@@ -230,11 +223,11 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """GET request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
-        await self.authorize(
+        self.authorize(
             authorization,
             required_scopes=self.required_scopes["stochan"],
         )
@@ -244,11 +237,11 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to stochastic analyzer."""
         authorization = self.resolve_authorization(access_token)
-        await self.authorize(
+        self.authorize(
             authorization,
             required_scopes=self.required_scopes["stochan"],
         )
@@ -258,13 +251,13 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
         x_connector_authorization: Annotated[str | None, Header()] = None,
     ) -> JSONResponse:
         """GET request to connector API."""
         authorization = self.resolve_authorization(access_token)
         referer = request.headers.get("Referer")
-        await self.authorize(
+        self.authorize(
             authorization,
             required_scopes=self.required_scopes["congateway"],
         )
@@ -276,45 +269,18 @@ class API:  # pylint: disable=R0902
         self,
         endpoint: str,
         request: Request,
-        access_token: str | None = Cookie(default=None, alias="__Secure-access_token"),
+        access_token: str | None = Cookie(default=None),
     ) -> JSONResponse:
         """POST request to connector API."""
         authorization = self.resolve_authorization(access_token)
-        await self.authorize(
+        self.authorize(
             authorization,
             required_scopes=self.required_scopes["congateway"],
         )
         return await self.execute_post_request(f"{self.upstream_urls['congateway']}/{endpoint}", request, authorization)
 
-    async def ad_configuration(self) -> dict:
-        """Retrive AD configuration domains."""
-        return {
-            "authorization_endpoint": self.ad_config.get("authorization_endpoint"),
-            "end_session_endpoint": self.ad_config.get("authorization_endpoint"),
-        }
 
-
-async def get_ad_config() -> dict:
-    """Retrieve configuration for ad specified by DMISAPI_AD_WELL_KNOWN_URL."""
-    url = read_env_variable("DMISAPI_AD_WELL_KNOWN_URL")
-    config: dict
-    try:
-        async with aiohttp.ClientSession() as session:  # noqa
-            async with session.get(url) as response:
-                config = await response.json()
-    except JSONDecodeError as exc:
-        dms_warning(f"Request to {url} returned invalid JSON: {exc}")
-        raise HTTPException(status_code=502) from exc
-    except aiohttp.ClientError as exc:
-        dms_warning(f"Request to {url} failed: {exc}")
-        raise HTTPException(status_code=502) from exc
-    if isinstance(config, dict):
-        return config
-    dms_error(f"Could not get configuration form AD at {url}.")
-    return {}
-
-
-async def async_run() -> None:
+def run() -> None:
     """Initiate FastAPI using Uvicorn."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true")
@@ -326,22 +292,12 @@ async def async_run() -> None:
         "congateway": read_env_variable("DMISAPI_CONGATEWAY_URL").rstrip("/"),
     }
 
-    ad_config = await get_ad_config()
     log_level = "debug" if args.dev else None
-    api = API(upstream_urls=upstream_urls, ad_config=ad_config, log_level=log_level)
+    api = API(upstream_urls=upstream_urls, log_level=log_level)
 
-    config = uvicorn.Config(
+    uvicorn.run(
         api.app,
         host=read_env_variable("DMISAPI_BIND_ADDR"),
         port=read_port("DMISAPI_BIND_PORT"),
         log_level=log_level,
     )
-
-    server = uvicorn.Server(config)
-
-    await server.serve()
-
-
-def run() -> None:
-    """Entrypoint."""
-    asyncio.run(async_run())

@@ -4,7 +4,7 @@ on:
     branches: ["develop"]
 
 env:
-  COMPOSE_FILE: "docker-compose.yaml"
+  COMPOSE_FILE: "docker-compose-build-all.yaml"
   
 jobs:
   build:

@@ -2,25 +2,25 @@ name: Push and Deploy Images
 
 on:
   push:
-    branches: ["develop"]
+    branches: ["main"]
 
 env:
-  DEPLOY_DIR: "/opt/dev-dms-lookup/"
+  DEPLOY_DIR: "/opt/prod/"
   COMPOSE_FILE: "docker-compose-build-all.yaml"
   REGISTRY: "registry.dms-lookup.com"
 
 jobs:
   deploy:
-    runs-on: development
+    runs-on: production
     permissions:
       contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Build
-        run: docker compose -f $COMPOSE_FILE build
+      
+      - name: Build images
+        run: docker compose -f docker-compose-build-all.yaml build --no-cache
 
       - name: Push images to registry
         run: |
@@ -30,7 +30,7 @@ jobs:
           echo "$IMAGES"
           
           # Give every image a tag
-          # <image>:latest
+          # <image>:prod
           #
           while IFS= read -r img; do
             [ -z "$img" ] && continue
@@ -44,10 +44,10 @@ jobs:
         
             full="$REGISTRY/$base_no_registry"
         
-            echo "Tagging $img -> $full:latest"
-            docker tag "$img" "$full:latest"
-            echo "Pushing $full:latest"
-            docker push "$full:latest"
+            echo "Tagging $img -> $full:prod"
+            docker tag "$img" "$full:prod"
+            echo "Pushing $full:prod"
+            docker push "$full:prod"
           done <<< "$IMAGES"
 
       - name: Redeploy images

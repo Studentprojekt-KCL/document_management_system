@@ -7,9 +7,7 @@
 
 import { ref } from 'vue'
 import { createPkcePair, generateState } from '@/utils/pkce'
-import { FRONTEND_AD_CLIENT_ID, FRONTEND_AD_AUDIENCE, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
-
-import { apiFetch, API_PATHS } from '@/utils/api'
+import { FRONTEND_AD_CLIENT_ID, keycloakAuthUrl, SESSION_KEY_PKCE_VERIFIER, SESSION_KEY_OIDC_STATE } from '@/utils/config'
 
 /* indicates login is in progress, diables button and shows loading text. */
 const isLoading = ref(false)
@@ -26,25 +24,17 @@ const handleEntraIdLogin = async () => {
 
   const redirectUri = `${window.location.origin}/auth/callback`
 
-  const params = new URLSearchParams({
-    client_id: FRONTEND_AD_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'openid profile email',
-    state,
-    code_challenge: challenge,
-    code_challenge_method: 'S256'
-  })
+  const authUrl =
+    keycloakAuthUrl() +
+    `?client_id=${encodeURIComponent(FRONTEND_AD_CLIENT_ID)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=openid` +
+    `&state=${encodeURIComponent(state)}` +
+    `&code_challenge=${encodeURIComponent(challenge)}` +
+    `&code_challenge_method=S256`
 
-  if (FRONTEND_AD_AUDIENCE) {
-    params.set('audience', FRONTEND_AD_AUDIENCE)
-  }
-
-  const authUrl = await apiFetch(API_PATHS.ad_configuration)
-  const URLdata = await authUrl.json()
-
-  const fullAuthUrl = `${URLdata.authorization_endpoint}?${params.toString()}`
-  window.location.assign(fullAuthUrl)
+  window.location.assign(authUrl)
 }
 </script>
 

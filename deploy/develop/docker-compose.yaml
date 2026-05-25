@@ -1,0 +1,216 @@
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: ./Caddy-front-end/Dockerfile
+    container_name: caddy-edge
+    restart: always
+    env_file:
+      - ./Caddy-front-end/.env
+    volumes:
+      - caddy-config:/config
+      - caddy-data:/data
+      - ./Caddy-front-end/Caddyfile:/etc/caddy/Caddyfile
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CADDY_EDGE}
+
+  log-api:
+    image: registry.dms-lookup.com/log-api:latest
+    container_name: log-api
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_LOG_API}
+    environment:
+      LOGAPI_BIND_ADDR: ${LOGAPI_BIND_ADDR}
+      LOGAPI_BIND_PORT: ${LOGAPI_BIND_PORT}
+      LOGAPI_LOGDB_URL: ${LOGAPI_LOGDB_URL}
+      LOGAPI_LOGDB_USER: ${LOGAPI_LOGDB_USER}
+      LOGAPI_LOGDB_PASSW: ${LOGAPI_LOGDB_PASSW}
+      LOGAPI_LOGDB_DATABASE: ${LOGAPI_LOGDB_DATABASE}
+
+  log-database:
+    image: registry.dms-lookup.com/log-database:latest
+    container_name: log-database
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_LOG_DB}
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: ${MYSQL_RANDOM_ROOT_PASSWORD}
+
+  search-engine:
+    image: registry.dms-lookup.com/search-engine:latest
+    container_name: search-engine
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_SEARCH_ENGINE}
+    environment:
+      SEARCHENG_BIND_PORT: ${SEARCHENG_BIND_PORT}
+      SEARCHENG_CONGATEWAY_URL: ${SEARCHENG_CONGATEWAY_URL}
+      SEARCHENG_BIND_ADDR: ${SEARCHENG_BIND_ADDR}
+      SEARCHENG_STOCHAN_URL: ${SEARCHENG_STOCHAN_URL}
+
+  dmis-api:
+    image: registry.dms-lookup.com/dmis-api:latest
+    container_name: dmis-api
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_DMIS_API}
+    environment:
+      DMISAPI_BIND_ADDR: ${DMISAPI_BIND_ADDR}
+      DMISAPI_BIND_PORT: ${DMISAPI_BIND_PORT}
+      DMISAPI_SEARCHENG_URL: ${DMISAPI_SEARCHENG_URL}
+      DMISAPI_STOCHAN_URL: ${DMISAPI_STOCHAN_URL}
+      DMISAPI_CONGATEWAY_URL: ${DMISAPI_CONGATEWAY_URL}
+      DMISAPI_AD_JWKS_URL: ${DMISAPI_AD_JWKS_URL}
+      DMISAPI_AD_AUTHORIZED_PARTY: ${DMISAPI_AD_AUTHORIZED_PARTY}
+      DMISAPI_LOGAPI_URL: ${DMISAPI_LOGAPI_URL}
+      LOGAPI_URL: ${DMISAPI_LOGAPI_URL}
+
+  front-end:
+    image: registry.dms-lookup.com/front-end:latest
+    container_name: front-end
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_FRONTEND}
+    environment:
+      FRONTEND_DMISAPI_URL: ${FRONTEND_DMISAPI_URL}
+      FRONTEND_AD_URL: ${FRONTEND_AD_URL}
+      FRONTEND_AD_REALM: ${FRONTEND_AD_REALM}
+      FRONTEND_AD_CLIENT_ID: ${FRONTEND_AD_CLIENT_ID}
+      FRONTEND_DMISAPI_BASE_URL: ${FRONTEND_DMISAPI_BASE_URL}
+
+  connector-gitlab:
+    image: registry.dms-lookup.com/connector-gitlab:latest
+    container_name: connector-gitlab
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONGITLAB}
+    environment:
+      CONGITLAB_BIND_PORT: ${CONGITLAB_BIND_PORT}
+      CONGITLAB_GITLAB_URL: ${CONGITLAB_GITLAB_URL}
+      CONGITLAB_MINIO_ACCESS_ADDRESS: ${CONGITLAB_MINIO_ACCESS_ADDRESS}
+      CONGITLAB_MINIO_USERNAME: ${CONGITLAB_MINIO_USERNAME}
+      CONGITLAB_MINIO_PASSWORD: ${CONGITLAB_MINIO_PASSWORD}
+      CONGITLAB_BIND_ADDR: ${CONGITLAB_BIND_ADDR}
+      CONGITLAB_SYSTEM_NAME: ${CONGITLAB_SYSTEM_NAME}
+
+  connector-github:
+    image: registry.dms-lookup.com/connector-github:latest
+    container_name: connector-github
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONGITHUB}
+    environment:
+      CONGITHUB_BIND_ADDR: ${CONGITHUB_BIND_ADDR}
+      CONGITHUB_BIND_PORT: ${CONGITHUB_BIND_PORT}
+      CONGITHUB_GITHUB_API_URL: ${CONGITHUB_GITHUB_API_URL}
+      CONGITHUB_GITHUB_SYSTEM_NAME: ${CONGITHUB_GITHUB_SYSTEM_NAME}
+      CONGITHUB_GITHUB_API_VERSION: ${CONGITHUB_GITHUB_API_VERSION}
+
+  connector-sharepoint:
+    image: registry.dms-lookup.com/connector-sharepoint:latest
+    container_name: connector-sharepoint
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONSHAREPOINT}
+    environment:
+      CONSHAREPOINT_BIND_ADDR: ${CONSHAREPOINT_BIND_ADDR}
+      CONSHAREPOINT_BIND_PORT: ${CONSHAREPOINT_BIND_PORT}
+      CONSHAREPOINT_SYSTEM_NAME: ${CONSHAREPOINT_SYSTEM_NAME}
+      CONSHAREPOINT_GRAPH_BASE: ${CONSHAREPOINT_GRAPH_BASE}
+      CONSHAREPOINT_TENANT_ID: ${CONSHAREPOINT_TENANT_ID}
+      CONSHAREPOINT_CLIENT_ID: ${CONSHAREPOINT_CLIENT_ID}
+      CONSHAREPOINT_CLIENT_SECRET: ${CONSHAREPOINT_CLIENT_SECRET}
+      CONSHAREPOINT_STATE_SIGNING_SECRET: ${CONSHAREPOINT_STATE_SIGNING_SECRET}
+
+  connector-minio:
+    image: registry.dms-lookup.com/connector-minio:latest
+    container_name: connector-minio
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_CONNECTOR_MINIO}
+    environment:
+      MINIO_ACCESS_ADDRESS: ${CONGITLAB_MINIO_ACCESS_ADDRESS_LOCAL}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_USERNAME: ${MINIO_USERNAME}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+
+  stochastic-analyzer:
+    image: registry.dms-lookup.com/stochastic-analyzer:latest
+    container_name: stochastic-analyzer
+    restart: always
+    networks:
+      dev_net:
+        ipv4_address: ${IP_STOCHASTIC_ANALYZER}
+    environment:
+      STOCHAN_BIND_ADDR: ${STOCHAN_BIND_ADDR}
+      STOCHAN_BIND_PORT: ${STOCHAN_BIND_PORT}
+      STOCHAN_CLASSIFIER_URL: ${STOCHAN_CLASSIFIER_URL}
+      STOCHAN_LLM_URL: ${STOCHAN_LLM_URL}
+      STOCHAN_LLM_MODEL: ${STOCHAN_LLM_MODEL}
+      STOCHAN_CONNECTOR_ADDRESS: ${STOCHAN_CONNECTOR_ADDRESS}
+      STOCHAN_ESCALATION_THRESHOLD: ${STOCHAN_ESCALATION_THRESHOLD}
+
+  refresh_service-service:
+      image: registry.dms-lookup.com/refresh-service:latest
+      container_name: refresh-service
+      command: /usr/local/bin/refresh-service
+      networks:
+        dev_net:
+          ipv4_address: ${IP_REFSERVICE}
+      environment:
+        REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
+        REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
+        REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
+        REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
+        REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+        REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
+        REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
+
+  refresh_service-worker:
+    image: registry.dms-lookup.com/refresh-service:latest
+    container_name: refresh-worker
+    command: /usr/local/bin/refresh-worker
+    networks:
+      dev_net:
+        ipv4_address: ${IP_REFSERVICE}
+    environment:
+      REFSERVICE_BIND_ADDR: ${REFSERVICE_BIND_ADDR}
+      REFSERVICE_BIND_PORT: ${REFSERVICE_BIND_PORT}
+      REFSERVICE_SESSION_ENC_PASSW: ${REFSERVICE_SESSION_ENC_PASSW}
+      REFSERVICE_REDIS_HOST: ${REFSERVICE_REDIS_HOST}
+      REFSERVICE_REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+      REFSERVICE_AD_JWKS_URL: ${REFSERVICE_AD_JWKS_URL}
+      REFSERVICE_AD_URL: ${REFSERVICE_AD_URL}
+
+  refresh_service-redis:
+      image: registry.dms-lookup.com/refresh_service-redis:latest
+      container_name: refresh_service-redis
+      networks:
+        dev_net:
+          ipv4_address: ${IP_REFSERVICE_REDIS}
+      environment:
+        REDIS_PORT: ${REFSERVICE_REDIS_PORT}
+        REDIS_PASSWORD: ${REFSERVICE_REDIS_PASSW}
+
+networks:
+  dev_net:
+    external: true
+
+volumes:
+  caddy-config:
+  caddy-data:

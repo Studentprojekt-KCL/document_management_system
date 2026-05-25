@@ -23,7 +23,7 @@ onMounted(async () => {
     await router.push('/login')
     return
   }
-  const sourceCookie = getCookie('__Secure-source')
+  const sourceCookie = getCookie('source')
 
   const params = new URLSearchParams({
     code,

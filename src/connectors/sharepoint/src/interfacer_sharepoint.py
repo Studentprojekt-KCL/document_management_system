@@ -44,6 +44,19 @@ class SharePoint:
         file_type_resource = get_file_resource()
         self.file_extensions = [t.get("extension") for t in file_type_resource]
         self.extension_descriptions = {t.get("extension"): t.get("description") for t in file_type_resource}
+        self.defined_fields = dict.fromkeys(
+            [
+                "unique_pointer",
+                "name",
+                "size",
+                "type",
+                "source_system",
+                "last_edit_date",
+                "clickable_url",
+                "content",
+                *determine_file_type("", self.file_extensions, self.extension_descriptions),
+            ]
+        )
 
     @staticmethod
     async def _request_with_retry(ctx: _HttpCtx, url: str, method: str = "get", **kwargs: Any) -> httpx.Response:
@@ -302,6 +315,15 @@ class SharePoint:
                 result["content"] = None
 
         return result
+
+    async def verify_token(self, token: str | None) -> bool:
+        """Return True if the token grants access to the Graph API, False otherwise."""
+        if token is None:
+            return False
+        async with httpx.AsyncClient(cookies={}) as client:
+            ctx = _HttpCtx(client, asyncio.Semaphore(1), token)
+            response = await self._request_with_retry(ctx, f"{self.graph_base}/me", timeout=REQUEST_TIMEOUT)
+        return response.status_code == httpx.codes.OK
 
     async def get_files(
         self,

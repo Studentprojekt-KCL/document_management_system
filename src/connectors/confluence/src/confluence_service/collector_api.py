@@ -1,72 +1,81 @@
-"""FastAPI service for the Confluence connector.
-
-Routes follow the student DMS GitLab connector shape: ``/index_needed_bool``,
-``/get_files`` (POST), ``/files_to_index`` (prefers MinIO ``file_url``, else inline
-``files``), ``/stream_files_to_index``, ``/connected_source_systems``. Legacy GET
-``/files``, ``/file``, and ``/files_to_index`` behaviour remain available.
-
-Authenticate with ``X-Confluence-Email`` and ``X-Confluence-Token`` (or env vars read by
-``ConfluenceInterfacer``). Requires ``CONFLUENCE_CONNECTOR_PORT`` and ``CONFLUENCE_ADDRESS``;
-optional MinIO env vars for uploads.
-"""
+"FastAPI service for the Confluence connector."
 
 import argparse
-import os
+import secrets
+import time
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
-from typing import Any
+from dataclasses import dataclass
+from typing import Annotated, Any, ClassVar
+from urllib.parse import urlencode
 
+import httpx
 import uvicorn
 from fastapi import FastAPI, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from shared_functions.boto_tools import upload_file
-from shared_functions.dmis_logger import dms_warning
-from shared_functions.initialisation_tools import read_port
+from shared_functions.initialisation_tools import read_port, read_env_variable
+from shared_functions.signing_tools import sign_encode_state, validate_decode_state
 
 from .interfacer_confluence import ConfluenceInterfacer, GetFilesInput
-
-# When compose interpolates unset ${CONFLUENCE_CONNECTOR_PORT} to "", it overrides Dockerfile ENV;
-# treat blank like unset so preview stacks still boot (override per env in real deployments).
-_CONF_PORT_FALLBACK = 8010
 
 
 class GetFilesBody(BaseModel):
     """JSON body for ``POST /get_files``."""
 
     file_pointers: list[str] = Field(default_factory=list)
-    include_content: bool = False
-    include_last_edit_date: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class _OAuthConfig:
+    client_id: str
+    client_secret: str
+    state_secret: str
+    auth_url: str
+    token_url: str
+    scopes: str
 
 
 class API:
     """Management class for Confluence connector API."""
 
+    app: ClassVar[FastAPI]
     log_level: str | None = None
 
     def __init__(self) -> None:
         self.confluence_instance = ConfluenceInterfacer()
-        self.app = FastAPI(lifespan=self.lifespan)
-        self.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
-        # Legacy (same as older GitLab connector in this repo)
-        self.app.add_api_route("/files", self.files, methods=["GET"])
-        self.app.add_api_route("/file", self.file, methods=["GET"])
-        # DMS-aligned routes
-        self.app.add_api_route("/index_needed_bool", self.index_needed_bool, methods=["GET"])
-        self.app.add_api_route("/get_files", self.get_files, methods=["POST"])
-        self.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["GET"])
-        self.app.add_api_route("/files_to_index", self.files_to_index, methods=["GET"])
+        self.oauth = _OAuthConfig(
+            client_id=read_env_variable("CONCONFLUENCE_CLIENT_ID"),
+            client_secret=read_env_variable("CONCONFLUENCE_CLIENT_SECRET"),
+            state_secret=read_env_variable("CONCONFLUENCE_STATE_SIGNING_SECRET"),
+            auth_url=read_env_variable("CONCONFLUENCE_AUTH_URL"),
+            token_url=read_env_variable("CONCONFLUENCE_TOKEN_URL"),
+            scopes=read_env_variable("CONCONFLUENCE_SCOPES"),
+        )
+        self.auth_callback_url = read_env_variable("CONCONFLUENCE_CONNECT_SERVICE_CALLBACK")
+        self.auth_check_url = read_env_variable("CONCONFLUENDE_CHECK_AUTH_URL")
+        session = self.confluence_instance.session
 
-    @asynccontextmanager
-    async def lifespan(self, _: FastAPI) -> AsyncGenerator:
-        """Handle startup and shutdown lifecycle for the API."""
-        yield
-        await self.confluence_instance.session.aclose()
+        @asynccontextmanager
+        async def _lifespan(_: FastAPI) -> AsyncGenerator:
+            yield
+            await session.aclose()
 
-    async def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
+        API.app = FastAPI(lifespan=_lifespan)
+        API.app.add_exception_handler(RequestValidationError, self.validation_exception_handler)
+
+        API.app.add_api_route("/get_files", self.get_files, methods=["POST"])
+        API.app.add_api_route("/stream_files_to_index", self.stream_files_to_index, methods=["POST"])
+        API.app.add_api_route("/defined_fields", self.defined_fields_route, methods=["GET"])
+        API.app.add_api_route("/auth_user", self.auth_user, methods=["GET"])
+        API.app.add_api_route("/callback", self.callback, methods=["GET"])
+        API.app.add_api_route("/refresh_token", self.refresh_token, methods=["GET"])
+        API.app.add_api_route("/validate_token", self.validate_token, methods=["GET"])
+
+    def validation_exception_handler(self, _: Request, exc: Exception) -> JSONResponse:
         """Return a JSON error payload for FastAPI request validation failures."""
         errors: dict[str, Any]
         if isinstance(exc, RequestValidationError):
@@ -78,116 +87,117 @@ class API:
             content = jsonable_encoder(errors)
         return JSONResponse(status_code=422, content=content)
 
-    @staticmethod
-    def _token(x_confluence_token: str | None) -> str | None:
-        if x_confluence_token is None:
-            return None
-        return x_confluence_token.removeprefix("Bearer ").strip()
-
-    async def files(
-        self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> Any:
-        """Return file pointers for incremental indexing (honours ``subdata`` checkpoint)."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {"subdata": subdata, "file_pointers": []}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.pointers_to_all_files_to_index(subdata, x_confluence_email.strip(), token)
-
-    async def file(
-        self,
-        file_pointer: str,
-        include_content: bool = True,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> Any:
-        """Return one page as metadata plus optional base64-encoded plain text."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.get_page(file_pointer, include_content, x_confluence_email.strip(), token)
-
-    async def index_needed_bool(
-        self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> dict[str, Any]:
-        """Whether a new index run has work (DMS ``/index_needed_bool``)."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {"index_needed": False}
-        token = self._token(x_confluence_token)
-        return await self.confluence_instance.check_index_needed(subdata, x_confluence_email.strip(), token)
+    def defined_fields_route(self) -> list[str]:
+        """Field keys for gateway ``retrieve_defined_fields`` union."""
+        return list(self.confluence_instance.defined_fields.keys())
 
     async def get_files(
         self,
         body: GetFilesBody,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        include_content: bool = False,
+        include_last_edit_date: bool = True,
+        x_confluence_token: Annotated[str | None, Header()] = None,
     ) -> list[dict[str, Any]]:
         """Batch fetch pages by pointers (DMS ``POST /get_files``)."""
-        if x_confluence_email is None or x_confluence_token is None:
+        if x_confluence_token is None:
             return []
-        token = self._token(x_confluence_token)
         return await self.confluence_instance.get_files(
             GetFilesInput(
                 file_pointers=body.file_pointers,
-                include_content=body.include_content,
-                include_last_edit_date=body.include_last_edit_date,
-                email=x_confluence_email.strip(),
-                api_token=token,
+                include_content=include_content,
+                include_last_edit_date=include_last_edit_date,
+                api_token=x_confluence_token,
             )
         )
 
-    async def stream_files_to_index(
+    def stream_files_to_index(
         self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
+        body: dict[str, str] | None = None,
+        x_confluence_token: Annotated[str | None, Header()] = None,
     ) -> StreamingResponse:
-        """Stream JSON chunks of pages to index (DMS ``/stream_files_to_index``)."""
-        token = self._token(x_confluence_token) if x_confluence_email and x_confluence_token else None
-        email = x_confluence_email.strip() if x_confluence_email else None
+        """Stream NDJSON: first line is subdata checkpoint, then one page object per line.
+        Body should be structured {'subdata': <SUBDATA>}."""
+
+        subdata: str | None = body.get("subdata") if isinstance(body, dict) else None
 
         async def stream() -> Any:
-            async for chunk in self.confluence_instance.stream_files_to_index(subdata, email, token):
+            async for chunk in self.confluence_instance.stream_files_to_index(subdata, x_confluence_token):
                 yield chunk
 
         return StreamingResponse(stream(), media_type="application/octet-stream")
 
-    async def files_to_index(
+    def auth_user(self) -> RedirectResponse:
+        """Redirect user to Atlassian OAuth login."""
+        payload = {"nonce": secrets.token_urlsafe(16), "iat": int(time.time())}
+        signed_state = sign_encode_state(payload, self.oauth.state_secret)
+        params = {
+            "client_id": self.oauth.client_id,
+            "redirect_uri": self.auth_callback_url,
+            "response_type": "code",
+            "scope": self.oauth.scopes.replace(",", " "),
+            "audience": "api.atlassian.com",
+            "state": signed_state,
+        }
+
+        return JSONResponse(content={"redirect": f"{self.oauth.auth_url}?{urlencode(params)}"})
+
+    async def callback(self, request: Request, code: str | None = None) -> JSONResponse:
+        """Exchange Atlassian authorization code for access and refresh tokens."""
+        signed_state = request.query_params.get("state")
+        if not signed_state:
+            return JSONResponse(content="ERROR", status_code=403)
+
+        valid, _ = validate_decode_state(signed_state, self.oauth.state_secret)
+        if not valid:
+            return JSONResponse(content="ERROR", status_code=403)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                self.oauth.token_url,
+                json={
+                    "grant_type": "authorization_code",
+                    "client_id": self.oauth.client_id,
+                    "client_secret": self.oauth.client_secret,
+                    "code": code,
+                    "redirect_uri": self.auth_callback_url,
+                },
+                timeout=120,
+            )
+
+        token_json = resp.json()
+        if not token_json.get("access_token"):
+            return JSONResponse(content="ERROR", status_code=400)
+        return JSONResponse(content=token_json, status_code=200)
+
+    async def refresh_token(
         self,
-        subdata: str | None = None,
-        x_confluence_email: str | None = Header(default=None, alias="X-Confluence-Email"),
-        x_confluence_token: str | None = Header(default=None, alias="X-Confluence-Token"),
-    ) -> dict[str, Any]:
-        """Full payload; prefers upload URL like DMS GitLab ``/files_to_index``."""
-        if x_confluence_email is None or x_confluence_token is None:
-            return {
-                "subdata": subdata,
-                "files": [],
-                "deleted": [],
-                "index_needed": False,
-            }
-        tok = self._token(x_confluence_token)
-        content = await self.confluence_instance.files_to_index(subdata, x_confluence_email.strip(), tok)
-        try:
-            url = upload_file(content, "confluence_content.json")
-            return {
-                "subdata": content.get("subdata"),
-                "index_needed": content.get("index_needed"),
-                "file_url": url,
-            }
-        except (OSError, ValueError) as err:
-            dms_warning(f"Could not upload confluence payload to object storage: {err}")
-            return {
-                "subdata": content.get("subdata"),
-                "index_needed": content.get("index_needed"),
-                "files": content.get("files", []),
-                "deleted": content.get("deleted", []),
-            }
+        refresh_token: Annotated[str | None, Header(alias="refresh-token")] = None,
+    ) -> JSONResponse:
+        """Refresh an Atlassian access token using a refresh token."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                self.oauth.token_url,
+                json={
+                    "grant_type": "refresh_token",
+                    "client_id": self.oauth.client_id,
+                    "client_secret": self.oauth.client_secret,
+                    "refresh_token": refresh_token,
+                },
+                timeout=120,
+            )
+        return JSONResponse(content=resp.json(), status_code=200)
+
+    async def validate_token(self, x_confluence_token: Annotated[str | None, Header()] = None) -> JSONResponse:
+        """Check token validity.
+
+        Args:
+            x_confluence_token: token
+        Returns: response with true/false
+        """
+        if x_confluence_token is None:
+            return JSONResponse(content={"valid": False}, status_code=200)
+        data = await self.confluence_instance.execute_get_request(self.auth_check_url, params={}, api_token=x_confluence_token)
+        return JSONResponse(content={"valid": bool(data)}, status_code=200)
 
 
 def run() -> None:
@@ -200,7 +210,9 @@ def run() -> None:
     if args.dev:
         api.log_level = "debug"
 
-    if not (os.environ.get("CONFLUENCE_CONNECTOR_PORT") or "").strip():
-        os.environ["CONFLUENCE_CONNECTOR_PORT"] = str(_CONF_PORT_FALLBACK)
-    port = read_port("CONFLUENCE_CONNECTOR_PORT")
-    uvicorn.run(api.app, host="0.0.0.0", log_level=api.log_level, port=port)
+    uvicorn.run(
+        api.app,
+        host=read_env_variable("CONCONFLUENCE_BIND_ADDR"),
+        log_level=api.log_level,
+        port=read_port("CONCONFLUENCE_BIND_PORT"),
+    )

@@ -1,14 +1,14 @@
 <script setup>
 /**
  * TheHeader Component
- * Application header displaying logo, logout (and notification) buttons.
+ * Application header displaying logo and logout button.
  * Handles user authentication through Keycloak.
  *
  * @component
  * @example usage:
  * <TheHeader />
  */
-import { Bell, LogOut } from 'lucide-vue-next'
+import { LogOut } from 'lucide-vue-next'
 import { logout } from '@/utils/auth'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -38,11 +38,8 @@ const handleLogout = () => {
     <!--- Spacer to push actions to the right -->
     <div class="spacer"></div>
 
-    <!--- Header actions (notifications, logout) -->
+    <!--- Header action (logout) -->
     <div class="header-actions">
-      <button class="notification-btn" title="Notifications" @click="handleNotification">
-        <Bell size="20" />
-      </button>
       <button class="logout-btn" title="Logout" @click="handleLogout">
         <LogOut size="20" />
       </button>
@@ -79,7 +76,6 @@ const handleLogout = () => {
   gap: 1rem;
 }
 
-.notification-btn,
 .logout-btn {
   background: none;
   border: none;
@@ -93,7 +89,6 @@ const handleLogout = () => {
   border-radius: 6px;
 }
 
-.notification-btn:hover,
 .logout-btn:hover,
 .menu-btn:hover {
   color: #1f2937;

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from log_api.database import Database
-from log_api.models import Log
+from log_api.models import Log, LogsResponse
 
 from shared_functions.initialisation_tools import read_port, read_env_variable
 
@@ -65,14 +65,17 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def get_logs(self, start: datetime | None = None, end: datetime | None = None) -> list[Log] | None:
-        """Get logs, either returns a list or None"""
+    async def get_logs(
+        self, start: datetime | None = None, end: datetime | None = None, page: int = 1, limit: int = 50
+    ) -> LogsResponse:
+        """Get paginated logs."""
         if start is None:
             start = datetime.now() + timedelta(hours=-1)
         if end is None:
             end = datetime.now()
 
-        return self.database.database_get_logs(start, end)
+        logs, total = self.database.database_get_logs(start, end, page, limit)
+        return LogsResponse(logs=logs, total=total)
 
     async def add_log(self, log: Log) -> Log:
         """Add a log to the database, returns the Log."""

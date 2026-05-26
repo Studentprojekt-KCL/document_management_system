@@ -143,16 +143,10 @@ class GitLab:
                 urljoin(url, self.GIT_HEAD), self._construct_request_headers(bearer_token)
             )
             lower_content = {key.lower(): value for key, value in content.items()}
-            file_name_str = lower_content.get("x-gitlab-file-name")
-            file_path_str = lower_content.get("x-gitlab-file-path")
-            if isinstance(file_name_str, str):
-                file_name_str = file_name_str.encode("iso-8859-1").decode("utf-8")
-            if isinstance(file_path_str, str):
-                file_path_str = file_path_str.encode("iso-8859-1").decode("utf-8")
             file = {
-                "file_name": file_name_str,
+                "file_name": lower_content.get("x-gitlab-file-name"),
                 "size": lower_content.get("x-gitlab-size"),
-                "file_path": file_path_str,
+                "file_path": lower_content.get("x-gitlab-file-path"),
             }
         if isinstance(file, list):
             file = {}
@@ -366,39 +360,53 @@ class GitLab:
             for file in chunk:
                 yield json.dumps(file).encode("utf-8")
 
-    async def execute_get_request(self, url: str, headers: dict | None = None) -> dict:
+    async def execute_get_request(self, url: str, headers: dict | None = None, recursion: int = 0) -> dict:
         """Execute GET request to supplied URL."""
         if headers is None:
             headers = {}
 
         session = await self.get_session()
-        async with session.get(url, headers=headers) as resp:
-            try:
+        try:
+            async with session.get(url, headers=headers) as resp:
                 resp.raise_for_status()
                 response = await resp.json()
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            if recursion == 0:
+                return await self.execute_get_request(url, headers={}, recursion=1)
+            dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response
 
-    async def execute_head_request(self, url: str, headers: dict | None = None) -> dict:
+    async def execute_head_request(self, url: str, headers: dict | None = None, recursion: int = 0) -> dict:
         """Execute HEAD request to supplied URL."""
         if headers is None:
             headers = {}
 
         session = await self.get_session()
-        async with session.head(url, headers=headers) as resp:
-            try:
+        try:
+            async with session.head(url, headers=headers) as resp:
                 resp.raise_for_status()
                 response = dict(resp.headers)
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                dms_info(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            if recursion == 0:
+                return await self.execute_head_request(url, headers={}, recursion=1)
+            dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response
 
-    async def execute_post_request(self, url: str, headers: dict | None = None, data: dict | None = None) -> dict:
+    async def execute_post_request(
+        self, url: str, headers: dict | None = None, data: dict | None = None, recursion: int = 0
+    ) -> dict:
         """Execute POST request to supplied URL."""
         if headers is None:
             headers = {}
@@ -406,12 +414,18 @@ class GitLab:
             data = {}
 
         session = await self.get_session()
-        async with session.post(url, headers=headers, json=data) as resp:
-            try:
+        try:
+            async with session.post(url, headers=headers, json=data) as resp:
                 response = await resp.json()
                 resp.raise_for_status()
-            except (ValueError, aiohttp.InvalidURL) as err:
-                dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
-            except (aiohttp.ClientResponseError, aiohttp.ClientError):
-                dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+        except AssertionError:
+            dms_warning(f"Gitlab connector could not make requst to {url}.")
+            response = {}
+        except (ValueError, aiohttp.InvalidURL) as err:
+            dms_error(f"Gitlab URL incorrectly formatted, please export 'CONGITLAB_GITLAB_URL'. (From error: {err})")
+        except (aiohttp.ClientResponseError, aiohttp.ClientError):
+            if recursion == 0:
+                return await self.execute_post_request(url, headers={}, data=data, recursion=1)
+            dms_warning(f"Unable to access object expected to exist at: {url}. (Got status code {resp.status})")
+            response = {}
         return response

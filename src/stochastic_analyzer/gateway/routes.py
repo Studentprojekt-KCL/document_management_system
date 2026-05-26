@@ -1,198 +1,95 @@
-"""Define API and routes."""
+"""Handeling routes in the API."""
 
-from dataclasses import dataclass
-
-from fastapi import APIRouter, HTTPException
+import asyncio
+from fastapi import APIRouter, Header
 from fastapi.responses import Response, JSONResponse
+from aiohttp import ClientError
 
-from gateway.services.classifier import Classifier, LABELS
+from gateway.services.md_pdf import PdfConverter
+from gateway.schemas import MarkdownRequest, PointerRequest
+from gateway.services.summarize import Summarizer
 from gateway.services.connector import Connector
-from gateway.services.summarizer import Summarizer
-from gateway.services.merger import Merger
-from gateway.services.summarizer_pdf import PdfConverter
-from gateway.services.indexer import Indexer
-from gateway.services.token_counter import TokenCounter, MergeLimits
-
-from gateway.schemas import (
-    RankResponse,
-    FileMetadata,
-    HealthCheck,
-    ClassificationResult,
-    PointerRequest,
-    MergeRequest,
-    SummaryResult,
-    InputItem,
-)
 
 from shared_functions.dmis_logger import dms_warning
 
 
-@dataclass
-class Services:
-    """Pre-configured service dependencies."""
-
-    connector: Connector
-    summarizer: Summarizer
-    merger: Merger
-    classifier: Classifier
-    pdf_converter: PdfConverter
-    indexer: Indexer
-    token_counter: TokenCounter
-
-
-async def _retrieve_documents(connector: Connector, pointers: list[str]) -> list[InputItem]:
-    """Fetch documents from connector or raise 502."""
-    items = await connector.get_file_contents(pointers)
-    if not items:
-        dms_warning("No documents could be retrieved from connector.")
-        raise HTTPException(status_code=502, detail="Failed to retrieve documents.")
-    return items
-
-
-async def _generate_summary(summarizer: Summarizer, items: list[InputItem]) -> SummaryResult:
-    """Summarize documents or raise 500."""
-    result = await summarizer.summarize(items)
-    if result is None:
-        dms_warning("Summarization returned no result.")
-        raise HTTPException(status_code=500, detail="Summarization failed.")
-    return result
-
-
-async def _generate_merge(merger: Merger, items: list[InputItem]) -> SummaryResult:
-    """Merge documents or raise 500."""
-    result = await merger.merge(items)
-    if result is None:
-        dms_warning("Merge returned no result.")
-        raise HTTPException(status_code=500, detail="Merge failed.")
-    return result
-
-
-def _enforce_token_limits(
-    items: list[InputItem],
-    counter: TokenCounter,
-    max_doc_tokens: int,
-    max_total_tokens: int,
-) -> None:
-    """Reject merge batches that exceed per-document or combined token limits."""
-    counts = [counter.count(item.content) for item in items]
-
-    for item, count in zip(items, counts, strict=True):
-        if count > max_doc_tokens:
-            name = item.metadata.name or item.metadata.unique_pointer or "unknown"
-            raise HTTPException(
-                status_code=400,
-                detail=(f"Document '{name}' exceeds the per-document limit " f"({count:,} > {max_doc_tokens:,} tokens)."),
-            )
-
-    total = sum(counts)
-    if total > max_total_tokens:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Combined document size exceeds the merge limit "
-                f"({total:,} > {max_total_tokens:,} tokens). "
-                f"Try merging fewer documents."
-            ),
-        )
-
-
-def create_router(services: Services, merge_limits: MergeLimits) -> APIRouter:
-    """Create router with pre-constructed service dependencies.
-
-    Args:
-        services: Pre-configured service instances.
-
-    Returns:
-        Configured APIRouter with all endpoints.
-    """
+def create_router(
+    pdf_converter: PdfConverter,
+    connector: Connector,
+    summarizer: Summarizer,
+) -> APIRouter:
+    """Create a router that handles the logic for services."""
     router = APIRouter()
 
-    @router.get("/health", response_model=HealthCheck)
-    async def health_check() -> dict:
-        """Health checks."""
-        return {"status": "active", "model_loaded": True}
-
-    @router.post("/rerank", response_model=RankResponse)
-    async def rerank_documents(payload: PointerRequest) -> dict:
-        """Endpoint for semantic document similarity search using vector retrieval.
-
-        Returns file metadata enriched with similarity scores, ordered by
-        descending similarity.
-        """
-        if len(payload.pointers) != 1:
-            raise HTTPException(status_code=400, detail="Provide exactly one reference pointer.")
-
-        query_pointer = payload.pointers[0]
-        reference_items = await services.connector.get_file_contents([query_pointer])
-        if not reference_items:
-            dms_warning("Failed to retrieve reference document from connector.")
-            raise HTTPException(status_code=502, detail="Failed to retrieve reference document.")
-
-        query = reference_items[0].content
-
-        results = await services.indexer.search_similar(query, limit=6)
-        results = [(p, s) for p, s in results if p != query_pointer][:5]
-        if not results:
-            return {"ranked_results": []}
-
-        # Join scores with connector-provided metadata by unique_pointer.
-        pointer_to_score = dict(results)
-        metadata_list = await services.connector.get_file_metadata(list(pointer_to_score.keys()))
-
-        enriched = [
-            FileMetadata(**{**meta, "score": pointer_to_score[meta["unique_pointer"]]})
-            for meta in metadata_list
-            if meta.get("unique_pointer") in pointer_to_score
-        ]
-        enriched.sort(key=lambda x: x.score, reverse=True)
-
-        return {"ranked_results": enriched}
-
-    @router.post("/index")
-    async def trigger_index() -> dict:
-        """Trigger document indexing into Qdrant."""
-        return await services.indexer.index(services.connector.url)
-
-    @router.post("/classify", response_model=list[ClassificationResult])
-    async def classify_endpoint(payload: PointerRequest) -> list[dict]:
-        """Endpoint to classify documents via batched NLI inference."""
-        items = await _retrieve_documents(services.connector, payload.pointers)
-        results = await services.classifier.classify(items)
-        return [r.model_dump(by_alias=True) for r in results]
-
-    @router.post("/summarize", response_model=SummaryResult)
-    async def summarize_batch(payload: PointerRequest) -> dict:
-        """Endpoint to summarize documents by fetching content via file pointers."""
-        items = await _retrieve_documents(services.connector, payload.pointers)
-        result = await _generate_summary(services.summarizer, items)
-        return result.model_dump()
-
-    @router.post("/merge", response_model=SummaryResult)
-    async def merge_documents(payload: MergeRequest) -> dict:
-        items = await _retrieve_documents(services.connector, payload.pointers)
-        _enforce_token_limits(
-            items,
-            services.token_counter,
-            merge_limits.max_doc_tokens,
-            merge_limits.max_total_tokens,
-        )
-        result = await _generate_merge(services.merger, items)
-        return result.model_dump()
-
-    @router.get("/classifications")
-    def classifications() -> Response:
-        """Endpoint for retrieving existing classifications."""
-        return JSONResponse(content=LABELS, status_code=200)
-
     @router.post("/md-to-pdf")
-    async def md_pdf_converter(payload: SummaryResult) -> Response:
-        """Endpoint to convert markdown to PDF."""
-        pdf: bytes = services.pdf_converter.convert(payload.summary)
+    async def md_to_pdf(payload: MarkdownRequest) -> Response:
+        """Route that takes a markdown string and returns a PDF."""
+        pdf = await asyncio.to_thread(pdf_converter.convert, payload.markdown)
+        if pdf is None:
+            return JSONResponse(
+                status_code=502,
+                content={"error": "PDF conversion failed"},
+            )
         return Response(
             content=pdf,
             status_code=200,
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename='summary.pdf'"},
         )
+
+    @router.post("/summarize")
+    async def summarize(payload: PointerRequest, authorization: str | None = Header(default=None)) -> dict[str, str]:
+        """Summarize one or more documents."""
+        if not payload.pointers:
+            dms_warning("summarize requires at least 1 pointer.")
+            return {"summary": ""}
+        try:
+            items = await connector.get_file_contents(payload.pointers, authorization)
+        except (ClientError, TimeoutError, ValueError):
+            dms_warning("connector unreachable")
+            return {"summary": ""}
+
+        if not items:
+            return {
+                "summary": (
+                    "I wasn't able to extract any readable content from the documents "
+                    "you provided—this usually happens with file types I don't support, "
+                    "image-only documents, or empty files."
+                )
+            }
+
+        result = await summarizer.summarize(items)
+        if result is None:
+            dms_warning("summarization failed")
+            return {"summary": ""}
+
+        return result
+
+    @router.post("/merge")
+    async def merge(payload: PointerRequest, authorization: str | None = Header(default=None)) -> dict[str, str]:
+        """Endpoint for returning merged documents."""
+        if len(payload.pointers) <= 1:
+            dms_warning("merge requires minimum 2 pointers.")
+            return {"summary": ""}
+        try:
+            items = await connector.get_file_contents(payload.pointers, authorization)
+        except (ClientError, TimeoutError, ValueError):
+            dms_warning("connector unreachable")
+            return {"summary": ""}
+
+        if not items:
+            return {
+                "summary": (
+                    "I wasn't able to extract any readable content from the documents "
+                    "you provided—this usually happens with file types I don't support, "
+                    "image-only documents, or empty files."
+                )
+            }
+
+        result = await summarizer.merge(items)
+        if result is None:
+            dms_warning("merge failed")
+            return {"summary": ""}
+        return result
 
     return router

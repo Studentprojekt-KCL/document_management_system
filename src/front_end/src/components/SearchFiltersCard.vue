@@ -198,6 +198,7 @@ const clearAllFilters = () => {
   border-radius: 18px;
   padding: 0.95rem 1rem 1rem;
   margin-top: 0.8rem;
+  margin-bottom: 0.8rem;
 }
 
 .filters-header {

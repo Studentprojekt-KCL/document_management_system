@@ -13,6 +13,7 @@
  * - Blocks non-admin users from admin routes (403).
  */
 import { createRouter, createWebHistory } from 'vue-router'
+import ConnectedSourcesView from '@/views/ConnectedSourcesView.vue'
 import SearchView from '@/views/SearchView.vue'
 import SourcesView from '@/views/SourcesView.vue'
 import IntelligenceView from '@/views/IntelligenceView.vue'
@@ -21,8 +22,10 @@ import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AuthCallbackView from '@/views/AuthCallbackView.vue'
 import ErrorStatusView from '@/views/ErrorStatusView.vue'
-import { isAuthenticated, getCurrentUser } from '@/utils/authClient'
+import { isAuthenticated } from '@/utils/authClient'
 import MergeFilesView from '@/views/MergeFilesView.vue'
+import { isAdmin } from '@/utils/auth.js'
+import SessionCallbackView from '@/views/SessionCallbackView.vue'
 
 const routes = [
   /* Public */
@@ -37,7 +40,18 @@ const routes = [
     name: 'AuthCallback',
     component: AuthCallbackView
   },
+  {
+    path: '/session/callback',
+    name: 'SessionCallback',
+    component: SessionCallbackView
+  },
   /* Protected */
+  {
+    path: '/connections',
+    name: 'Connections',
+    component: ConnectedSourcesView,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/search',
     name: 'Search',
@@ -120,13 +134,6 @@ const router = createRouter({
   routes
 })
 
-/* router guard so that you can't go to protected pages without logging in */
-function userHasRole(authInfo, role) {
-  const clientRoles = authInfo?.user?.client_roles ?? []
-  const realmRoles = authInfo?.user?.realm_roles ?? []
-  return clientRoles.includes(role) || realmRoles.includes(role)
-}
-
 router.beforeEach(async (to) => {
   if (!to.meta?.requiresAuth) {
     return true
@@ -139,8 +146,7 @@ router.beforeEach(async (to) => {
 
   /* Admin only route */
   if (to.meta?.requiresAdmin) {
-    const authInfo = await getCurrentUser()
-    if (!userHasRole(authInfo, 'admin')) {
+    if (!(await isAdmin())) {
       return { path: '/403' }
     }
   }

@@ -1,26 +1,28 @@
-# Document Management integration System
+# Document Management Integration System
 
-## Folder Structures
+DMIS (Document Management Integration System) is a dynamic application allowing orginisation to connect multiple repository hosting services (currently ingegrated with GitHub, GitLab, Confluence, SharePoint and SMB). User authentication is handled through SSO, using any OAuth2-compatible Identity Provider.
 
-```
-DMS
-├── documentation
-└── src
-    ├── api
-    ├── logger
-    │   ├── api
-    │   ├── database
-    │   └── webui
-    ├── front_end
-    ├── collectors
-    │   ├── github_collector
-    │   ├── smb_collector
-    │   └── gitlab_collector
-    ├── search_engine
-    ├── shared_functions
-    └── stochastic_analyzer
-    
-```
+A showcase of basic system functionality can be seen in the video below:
+
+<p align="center">
+  <a href="https://youtu.be/9-a6aLzqZM4">
+    <img 
+      src="https://img.youtube.com/vi/9-a6aLzqZM4/maxresdefault.jpg" 
+      alt="Watch the video" 
+      width="800"
+    >
+  </a>
+</p>
+
+
+## System documentation
+
+Full system documentation can be found [here](documentation/SYSTEM_DOCUMENTATION.md).
+
+## Setup instructions
+
+Full system setup instructions can be found [here](documentation/SETUP_INSTRUCTIONS.md).
+
 ## Developer instructions
 
 Firstly, it is recommended to add your SSH keys to Github, [this guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) can be followed.

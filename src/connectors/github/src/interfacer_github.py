@@ -3,6 +3,11 @@
 GitHub connector following same structure as GitLab connector.
 Exposes the same payloads: files + subdata, file_pointers + subdata, and
 per-file metadata/content compatible with GitLab's indexer contract.
+
+Indexing ``subdata`` is a JSON object (base64, URL-safe) mapping ``full_name``
+(e.g. ``org/repo``) to the repo's ``pushed_at`` ISO timestamp last indexed —
+mirroring GitLab's per-project map. Older deployments may still send a single
+legacy ISO timestamp (global floor); see ``_decode_subdata``.
 """
 
 import asyncio
@@ -10,7 +15,6 @@ import base64
 import binascii
 import io
 import json
-import os
 import zipfile
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
@@ -22,13 +26,13 @@ import httpx
 
 from shared_functions.variables import SOURCE_FILE
 from shared_functions.unpacker import unpack_values
+from shared_functions.file_type_logic import determine_file_type, get_file_resource
 from shared_functions.dmis_logger import dms_error, dms_info, dms_warning
 from shared_functions.initialisation_tools import read_env_variable
 
 HTTP_OK = 200
 REQUEST_TIMEOUT = 120
 NUM_WORKERS = 10
-BINARY_SKIP_LOG_LIMIT = 10
 
 
 class GitHub:
@@ -36,7 +40,6 @@ class GitHub:
 
     _client: httpx.Client
     api_base: str
-    _binary_skip_logs: int
 
     def __init__(self) -> None:
         """Constructor."""
@@ -45,10 +48,15 @@ class GitHub:
             raise ValueError("Missing CONGITHUB_GITHUB_API_URL")
         self.source_system = read_env_variable("CONGITHUB_GITHUB_SYSTEM_NAME")
         self.api_base = raw.rstrip("/") + "/"
-        self.org = os.environ.get("CONGITHUB_GITHUB_ORG")
+        self.org = read_env_variable("CONGITHUB_GITHUB_ORG", required=False)
         self._api_version = read_env_variable("CONGITHUB_GITHUB_API_VERSION")
-        self._binary_skip_logs = 0
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT)
+        file_type_resource = get_file_resource()
+        extensions = [extension.get("extension") for extension in file_type_resource]
+        descriptions = {extension.get("extension"): extension.get("description") for extension in file_type_resource}
+        self.defined_fields = {"content": None, "name": None, "unique_pointer": None, "size": None, "source_system": None} | {
+            key: None for key in determine_file_type("", extensions, descriptions)
+        }
 
     def _get_repos(self, token: str | None = None) -> list:
         """Retrieve all repositories the token can access (user or org)."""
@@ -83,14 +91,77 @@ class GitHub:
         return ids
 
     @staticmethod
+    def _create_date_object(date_string: str) -> datetime:
+        """UTC-normalized datetime from GitHub/GitLab-style ISO timestamps."""
+        date = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date
+
+    @staticmethod
+    def _decode_subdata(subdata: str | None) -> tuple[dict[str, str], datetime | None]:
+        """Decode stored indexing state: repo ``full_name`` -> ``pushed_at`` ISO strings.
+
+        Older clients sent a single ISO timestamp only (global ``pushed_at`` floor). That is
+        returned as ``(_, legacy_floor_datetime)``.
+        """
+        utc_min = datetime.min.replace(tzinfo=timezone.utc)
+        if subdata is None:
+            return {}, None
+
+        raw: bytes | None = None
+        for decoder in (base64.urlsafe_b64decode, base64.standard_b64decode):
+            try:
+                raw = decoder(subdata)
+                break
+            except binascii.Error:
+                continue
+        if raw is None:
+            dms_info("Request with invalid base64 encoding made to GitHub connector: %s", subdata)
+            return {}, utc_min
+
+        try:
+            text = raw.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            dms_error("GitHub connector could not interpret subdata (utf-8): %s", subdata)
+            return {}, utc_min
+
+        if text.startswith("{"):
+            try:
+                obj = json.loads(text)
+            except json.JSONDecodeError:
+                dms_warning(
+                    "GitHub subdata looked like JSON but failed to parse; trying legacy iso: %s",
+                    text[:120],
+                )
+            else:
+                if isinstance(obj, dict):
+                    repo_map: dict[str, str] = {}
+                    for key, val in obj.items():
+                        repo_key = key if isinstance(key, str) else str(key)
+                        if isinstance(val, str):
+                            repo_map[repo_key] = val
+                    return repo_map, None
+
+        try:
+            return {}, GitHub._create_date_object(text)
+        except ValueError:
+            dms_error("GitHub connector could not interpret subdata: %s", text[:120])
+            return {}, utc_min
+
+    @staticmethod
+    def _generate_subdata(snapshot: dict[str, str]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(snapshot, sort_keys=True).encode("utf-8")).decode()
+
+    @staticmethod
     def _encode_content_path(path: str) -> str:
         """Encode each path segment for use in GitHub contents API URLs."""
         return "/".join(quote(seg, safe="") for seg in path.split("/") if seg or path == "")
 
     @staticmethod
     def _is_excluded_path(path: str) -> bool:
-        """Optional path filter via env GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
-        raw = os.environ.get("GITHUB_EXCLUDE_PATHS", "")
+        """Optional path filter via env CONGITHUB_GITHUB_EXCLUDE_PATHS (comma-separated tokens)."""
+        raw = read_env_variable("CONGITHUB_GITHUB_EXCLUDE_PATHS", required=False) or ""
         if not raw:
             return False
         path_l = path.lower()
@@ -145,16 +216,6 @@ class GitHub:
             return unpack_values(data[0], ("commit", "committer", "date"))
         return None
 
-    def check_index_needed(self, subdata: str | None, token: str | None = None) -> dict[str, Any]:
-        """Check whether any repo has been updated since the provided subdata timestamp."""
-        provided_date = self._provided_date(subdata)
-        for change_time in self.get_repo_ids(token).values():
-            if not isinstance(change_time, str):
-                continue
-            if datetime.fromisoformat(change_time.replace("Z", "+00:00")) > provided_date:
-                return {"index_needed": True}
-        return {"index_needed": False}
-
     def get_file(
         self, pointer: str, include_content: bool = True, include_last_edit_date: bool = True, token: str | None = None
     ) -> dict:
@@ -162,7 +223,7 @@ class GitHub:
         parsed = self._parse_file_pointer(pointer)
         if not parsed:
             dms_info(f"Could not parse GitHub file pointer: {pointer}")
-            return {"metadata": {"unique_pointer": pointer, "type": SOURCE_FILE}}
+            return {"unique_pointer": pointer, "type": SOURCE_FILE}
 
         full_name, path, ref = parsed
         req_url = self._make_file_pointer(full_name, path, ref)
@@ -179,17 +240,15 @@ class GitHub:
         last_edit = self._last_commit_date_for_path(full_name, path, ref, token) if include_last_edit_date else None
 
         base_structure: dict[Any, Any] = {
-            "metadata": {
-                "unique_pointer": pointer,
-                "name": name,
-                "size": size,
-                "last_edit_date": last_edit,
-                "type": SOURCE_FILE,
-                "source_system": self.source_system,
-            }
+            "unique_pointer": pointer,
+            "name": name,
+            "size": size,
+            "last_edit_date": last_edit,
+            "type": SOURCE_FILE,
+            "source_system": self.source_system,
         }
         if isinstance(path, str):
-            base_structure["metadata"]["clickable_url"] = self._get_clickable_url(full_name, path, ref)
+            base_structure["clickable_url"] = self._get_clickable_url(full_name, path, ref)
         if include_content and isinstance(file.get("content"), str):
             base_structure["content"] = file["content"].replace("\n", "")
 
@@ -219,26 +278,15 @@ class GitHub:
                 info = zip_file.getinfo(name)
                 if info.is_dir():
                     continue
-                try:
-                    file_content = zip_file.read(name).decode("utf-8")
-                except UnicodeDecodeError as err:
-                    file_content = ""
-                    if self._binary_skip_logs < BINARY_SKIP_LOG_LIMIT:
-                        dms_info(f"Skipping binary/non-UTF8 file content: {name}. {err}")
-                        self._binary_skip_logs += 1
-                        if self._binary_skip_logs == BINARY_SKIP_LOG_LIMIT:
-                            dms_info("Further binary/non-UTF8 file skip logs are suppressed for this run.")
                 enc = self._encode_content_path(intermediate_path)
                 unique_pointer = f"{base_pointer_prefix}{enc}?ref={quote(branch, safe='')}"
                 files_data.append(
                     {
-                        "content": base64.b64encode(file_content.encode("utf-8")).decode("utf-8"),
-                        "metadata": {
-                            "name": Path(intermediate_path).name,
-                            "unique_pointer": unique_pointer,
-                            "size": info.file_size,
-                            "source_system": self.source_system,
-                        },
+                        "content": base64.b64encode(zip_file.read(name)).decode("utf-8"),
+                        "name": Path(intermediate_path).name,
+                        "unique_pointer": unique_pointer,
+                        "size": info.file_size,
+                        "source_system": self.source_system,
                     }
                 )
         return files_data
@@ -280,9 +328,38 @@ class GitHub:
             await output_queue.put(unpacked)
             zip_queue.task_done()
 
-    async def _enqueue_repos(self, repos: list, provided_date: datetime, token: str | None, task_queue: asyncio.Queue) -> datetime:
-        """Filter repos by timestamp, enqueue zip download tasks, return the latest push time seen."""
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+    def _github_repo_needs_rearchive(
+        self,
+        repo_floor: dict[str, str],
+        legacy_floor: datetime | None,
+        full_name: str,
+        pushed_dt: datetime,
+    ) -> bool:
+        """Return True when the repo archive should be downloaded again."""
+        if legacy_floor is not None:
+            return pushed_dt > legacy_floor
+        stored = repo_floor.get(full_name)
+        if not isinstance(stored, str):
+            return True
+        try:
+            stored_dt = self._create_date_object(stored)
+        except ValueError:
+            return True
+        return pushed_dt > stored_dt
+
+    def _repo_zipball_url(self, full_name: str, branch: str) -> str:
+        owner, _, name = full_name.partition("/")
+        return urljoin(self.api_base, f"repos/{owner}/{name}/zipball/refs/heads/{branch}")
+
+    async def _enqueue_repos(self, repos: list, subdata: str | None, token: str | None, task_queue: asyncio.Queue) -> str:
+        """Select repos needing a new archive fetch; persist per-repo ``pushed_at`` in outbound subdata.
+
+        Mirrors GitLab's incremental map keyed by integration id — here repo ``full_name``.
+        Legacy subdata remains a single timestamp floor for migration.
+        """
+        repo_floor, legacy_floor = self._decode_subdata(subdata)
+        new_subdata = dict(repo_floor)
+
         for repo in repos:
             fn = repo.get("full_name")
             if not isinstance(fn, str):
@@ -290,17 +367,26 @@ class GitHub:
             ts = repo.get("pushed_at")
             if not isinstance(ts, str):
                 continue
-            ts_obj = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if ts_obj <= provided_date:
+            try:
+                ts_obj = self._create_date_object(ts)
+            except ValueError:
                 continue
-            latest_update = max(latest_update, ts_obj)
+
+            if legacy_floor is not None and ts_obj <= legacy_floor:
+                new_subdata[fn] = ts
+                continue
+
+            if not self._github_repo_needs_rearchive(repo_floor, legacy_floor, fn, ts_obj):
+                continue
+
             branch = repo.get("default_branch")
             if not isinstance(branch, str):
                 branch = self._default_branch_for_repo(fn, token)
-            owner, _, name = fn.partition("/")
-            zip_url = urljoin(self.api_base, f"repos/{owner}/{name}/zipball/refs/heads/{branch}")
+            zip_url = self._repo_zipball_url(fn, branch)
             await task_queue.put((zip_url, fn, branch))
-        return latest_update
+            new_subdata[fn] = ts
+
+        return self._generate_subdata(new_subdata)
 
     async def stream_files_to_index(self, subdata: str | None = None, token: str | None = None) -> AsyncGenerator[bytes, None]:
         """Streaming equivalent of files_to_index: yields subdata header then one file per chunk."""
@@ -309,8 +395,7 @@ class GitHub:
         output_queue: asyncio.Queue = asyncio.Queue()
 
         repos = await asyncio.to_thread(self._get_repos, token)
-        latest_update = await self._enqueue_repos(repos, self._provided_date(subdata), token, task_queue)
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
+        generated_subdata = await self._enqueue_repos(repos, subdata, token, task_queue)
 
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
             download_tasks = [
@@ -348,47 +433,17 @@ class GitHub:
             return []
         return self._unpack_zip(resp.content, full_name, branch)
 
-    def files_to_index(self, subdata: str | None = None, token: str | None = None) -> dict:
-        """Same contract as GitLab.files_to_index: {"files", "subdata"}."""
-        provided_date = self._provided_date(subdata)
-        files_data: list = []
-        repos = self._get_repos(token)
-        latest_update = datetime.min.replace(tzinfo=timezone.utc)
+    async def verify_token(self, x_github_token: str | None) -> bool:
+        """Verifies token validity
 
-        for repo in repos:
-            fn = repo.get("full_name")
-            if not isinstance(fn, str):
-                continue
-            ts = repo.get("pushed_at")
-            if not isinstance(ts, str):
-                continue
-            ts_obj = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if ts_obj <= provided_date:
-                continue
-            latest_update = max(latest_update, ts_obj)
-            branch = repo.get("default_branch")
-            if not isinstance(branch, str):
-                branch = self._default_branch_for_repo(fn, token)
-            files_data.extend(self._files_from_repo_zip(fn, branch, token))
-
-        generated_subdata = base64.urlsafe_b64encode(latest_update.isoformat().encode()).decode()
-        return {"files": files_data, "subdata": generated_subdata}
-
-    @staticmethod
-    def _provided_date(subdata: str | None) -> datetime:
-        if subdata is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
-        try:
-            subdata_bytes = base64.b64decode(subdata)
-        except binascii.Error:
-            dms_info("Request with invalid base64 encoding made to GitHub connector: %s", subdata)
-            return datetime.min.replace(tzinfo=timezone.utc)
-        try:
-            subdata_str = subdata_bytes.decode("utf-8")
-            return datetime.fromisoformat(subdata_str.replace("Z", "+00:00"))
-        except (UnicodeDecodeError, ValueError):
-            dms_error("GitHub connector could not interpret subdata: %s", subdata)
-            return datetime.min.replace(tzinfo=timezone.utc)
+        Args:
+            x_github_token: token
+        Returns: True / False"""
+        if x_github_token is None:
+            return False
+        token_url = f"{self.api_base}user"
+        response = self._request(token_url, x_github_token)
+        return response.status_code == HTTP_OK
 
     def _request(self, url: str, token: str | None = None) -> httpx.Response:
         """Execute a clean GET request with all headers explicit and no cookie carry-over."""

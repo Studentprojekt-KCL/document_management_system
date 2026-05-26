@@ -32,8 +32,13 @@ const handleSearch = () => {
     return
   }
 
+  if (query.length > 512) {
+    throw new Error('Search query exceeds the character limit')
+  }
+
   emit('search', { query, documentsOnly: documentsOnly.value })
-  searchQuery.value = ''
+  /* Last searched term visible in the input. */
+  searchQuery.value = query
 }
 
 /* Disable search button if query is empty or currently searching */

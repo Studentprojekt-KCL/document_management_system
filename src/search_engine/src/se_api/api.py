@@ -7,12 +7,12 @@ from collections.abc import AsyncGenerator
 from collections.abc import Sequence
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 
-from se_api.handlers import Handler
+from se_api.handler import Handler
 from shared_functions.initialisation_tools import read_env_variable, read_port
 from shared_functions.file_type_logic import get_file_resource, get_documents_only_rescource
 
@@ -60,6 +60,7 @@ class API:
         self.app.add_api_route("/check_health", self.check_health, methods=["GET"])
         self.app.add_api_route("/reset", self.reset, methods=["POST"], status_code=204)
         self.app.add_api_route("/classification", self.set_classification, methods=["POST"])
+        self.app.add_api_route("/classifications", self.get_classifications, methods=["GET"])
         self.app.add_api_route("/file_types", self.file_types, methods=["GET"])
         self.app.add_api_route("/file_types_documents_only", self.file_types_documents_only, methods=["GET"])
         self.app.add_api_route("/find_matching", self.find_matching, methods=["GET"])
@@ -74,7 +75,7 @@ class API:
     async def lifespan(self, _: FastAPI) -> AsyncGenerator:
         """FastAPI lifespan"""
         self.handler = Handler()
-        await self.handler.init()
+        await self.handler.start()
         yield
         await self.handler.close()
 
@@ -105,7 +106,7 @@ class API:
 
         return JSONResponse(status_code=422, content=content)
 
-    async def find_matching(self, pointer: str, count: int | None = None) -> dict:
+    async def find_matching(self, pointer: str, count: int = 10, authorization: str | None = Header(default=None)) -> list[dict]:
         """Look for matching files.
 
         Args:
@@ -114,9 +115,11 @@ class API:
         Returns: unique pointers and their score.
         """
 
-        return self.handler.find_matching(pointer, count)
+        return await self.handler.find_matching(pointer, authorization, count)
 
-    async def query(self, conent: dict[str, str], count: int = 10, offset: int = 0) -> list:
+    async def query(
+        self, conent: dict[str, str], count: int = 10, offset: int = 0, authorization: str | None = Header(default=None)
+    ) -> list:
         """Preform query on documments, either returns a list or None
 
         Args:
@@ -125,11 +128,11 @@ class API:
         Returns:
             List of found files or None.
         """
-        return await self.handler.preform_search(conent, count, offset)
+        return await self.handler.preform_search(conent, count, offset, authorization)
 
-    async def set_classification(self, change: dict[str, str]) -> dict:
+    async def set_classification(self, change: dict[str, str], authorization: str | None = Header(default=None)) -> dict:
         """Manualy set the classification of a pointer."""
-        return await self.handler.set_classification(change)
+        return await self.handler.set_classification(change, authorization)
 
     @staticmethod
     async def check_health() -> JSONResponse:
@@ -162,5 +165,6 @@ class API:
 
 def run() -> None:
     """Initiate FastAPI using Uvicorn."""
+
     api: API = API()
     api.start()

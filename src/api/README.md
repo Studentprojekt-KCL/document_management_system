@@ -10,6 +10,10 @@
     DMISAPI_CONGATEWAY_URL=<URL pointing to gateway connector>
     DMISAPI_LOGAPI_URL=<URL pointing to the log API>
 
+    DMISAPI_AD_WELL_KNOWN_URL=<AD config URL>
+    DMISAPI_USER_ROLES=<USER ROLES DEFINED IN AD>
+    DMISAPI_ADMIN_ROLES=<ADMIN ROLES DEFINED IN AD>
+
     DMISAPI_AD_URL=<URL pointing to the the identity of the provider (realmn)>
     DMISAPI_AD_JWKS_URL=<JWT public keys endpoint for signature verification>
     DMISAPI_AD_ALLOWED_AZP=<Allowed authorized party (azp claim), comma separated if multiple>
@@ -17,6 +21,9 @@
     DMISAPI_AD_TOKEN_URL=<URL to AD>
     DMISAPI_AD_LOGOUT_URL=<URL to AD login>
     DMISAPI_AD_CLIENT_ID=<Client id in AD>
+
+    DMISAPI_ACCESS_COOKIE_MAX_AGE
+    DMISAPI_REFRESH_COOKIE_MAX_AGE
 
 ## Optional environmental variables
     DMISAPI_AD_AUDIENCE=<Expected audience (aud claim) for this API, comma separated if multiple>

@@ -13,3 +13,6 @@ packages = ["gateway", "gateway.services"]
 
 [project.scripts]
 stochastic-analyzer = "gateway.main:start"
+
+[project.optional-dependencies]
+test = ["httpx"]

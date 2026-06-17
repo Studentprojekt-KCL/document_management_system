@@ -1,0 +1,118 @@
+/* SearchBar Tests */
+import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import SearchBar from '@/components/SearchBar.vue'
+
+describe('SearchBar', () => {
+  const mountBar = (props = {}) => {
+    return mount(SearchBar, {
+      props: { loading: false, ...props }
+    })
+  }
+
+  /* ── Search button state ── */
+  describe('search button state', () => {
+    it('disables button when input is empty', () => {
+      const wrapper = mountBar()
+      expect(wrapper.find('.search-button').attributes('disabled')).toBeDefined()
+    })
+
+    it('disables button when input is only whitespace', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('.search-input').setValue('   ')
+      expect(wrapper.find('.search-button').attributes('disabled')).toBeDefined()
+    })
+
+    it('enables button when input has text', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('.search-input').setValue('test query')
+      expect(wrapper.find('.search-button').attributes('disabled')).toBeUndefined()
+    })
+
+    it('disables button when loading even with text', async () => {
+      const wrapper = mountBar({ loading: true })
+      await wrapper.find('.search-input').setValue('test query')
+      expect(wrapper.find('.search-button').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  /* ── Search emit ── */
+  describe('search emit', () => {
+    it('emits search with trimmed query and documentsOnly on form submit', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('.search-input').setValue('  test query  ')
+      await wrapper.find('form').trigger('submit')
+
+      expect(wrapper.emitted('search')).toBeTruthy()
+      expect(wrapper.emitted('search')[0]).toEqual([{ query: 'test query', documentsOnly: true }])
+    })
+
+    it('emits search on Enter key', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('.search-input').setValue('hello')
+      await wrapper.find('form').trigger('submit')
+
+      expect(wrapper.emitted('search')).toBeTruthy()
+      expect(wrapper.emitted('search')[0]).toEqual([{ query: 'hello', documentsOnly: true }])
+    })
+
+    it('does not emit search when input is empty', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('form').trigger('submit')
+
+      expect(wrapper.emitted('search')).toBeFalsy()
+    })
+
+    it('does not emit search when input is only whitespace', async () => {
+      const wrapper = mountBar()
+      await wrapper.find('.search-input').setValue('   ')
+      await wrapper.find('form').trigger('submit')
+
+      expect(wrapper.emitted('search')).toBeFalsy()
+    })
+    /*
+    it('clears the input after successful search', async () => { 
+        const wrapper = mountBar() 
+        const input = wrapper.find('.search-input') 
+        await input.setValue('test query') // button is enabled 
+        expect(wrapper.find('.search-button').attributes('disabled')).toBeUndefined() 
+        await wrapper.find('form').trigger('submit') 
+        await nextTick() //button is disabled again, and input is cleared 
+        expect(wrapper.find('.search-button').attributes('disabled')).toBeDefined() 
+    }) */
+
+    it('keeps the input value after successful search', async () => {
+      const wrapper = mountBar()
+      const input = wrapper.find('.search-input')
+
+      await input.setValue('test query')
+      await wrapper.find('form').trigger('submit')
+      await nextTick()
+
+      // input keeps latest search term
+      expect(input.element.value).toBe('test query')
+
+      // button remains enabled
+      expect(wrapper.find('.search-button').attributes('disabled')).toBeUndefined()
+    })
+
+    /* ── Multiple searches ── */
+    describe('multiple searches', () => {
+      it('can emit multiple searches in sequence', async () => {
+        const wrapper = mountBar()
+        const input = wrapper.find('.search-input')
+
+        await input.setValue('first')
+        await wrapper.find('form').trigger('submit')
+
+        await input.setValue('second')
+        await wrapper.find('form').trigger('submit')
+        await nextTick()
+        expect(wrapper.emitted('search')).toHaveLength(2)
+        expect(wrapper.emitted('search')[0]).toEqual([{ query: 'first', documentsOnly: true }])
+        expect(wrapper.emitted('search')[1]).toEqual([{ query: 'second', documentsOnly: true }])
+      })
+    })
+  })
+})
